@@ -1,0 +1,12 @@
+{
+  "conversations": [
+    {
+      "id": "conv-truncated",
+      "title": "Conv truncada",
+      "_mapping_node_count": 100,
+      "mapping": {
+        "root": {"id": "root", "parent": null, "children": []}
+      }
+    }
+  ]
+}

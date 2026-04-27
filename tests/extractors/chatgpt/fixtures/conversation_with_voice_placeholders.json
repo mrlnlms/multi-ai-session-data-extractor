@@ -1,0 +1,25 @@
+{
+  "id": "conv-voice",
+  "title": "Voice conv",
+  "create_time": 1700000000.0,
+  "update_time": 1700001000.0,
+  "_mapping_node_count": 10,
+  "mapping": {
+    "root": {"id": "root", "parent": null, "children": ["m1"]},
+    "m1": {"id": "m1", "parent": "root", "children": ["m2"], "message": {
+      "id": "m1",
+      "author": {"role": "user"},
+      "content": {"content_type": "multimodal_text", "parts": [{"content_type": "image_asset_pointer"}]}
+    }},
+    "m2": {"id": "m2", "parent": "m1", "children": ["m3"], "message": {
+      "id": "m2",
+      "author": {"role": "assistant"},
+      "content": {"content_type": "text", "parts": ["This is a text response from the assistant"]}
+    }},
+    "m3": {"id": "m3", "parent": "m2", "children": [], "message": {
+      "id": "m3",
+      "author": {"role": "user"},
+      "content": {"content_type": "multimodal_text", "parts": [{"content_type": "image_asset_pointer"}]}
+    }}
+  }
+}

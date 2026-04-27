@@ -1,0 +1,12 @@
+{
+  "id": "conv-normal",
+  "title": "Normal conv",
+  "mapping": {
+    "root": {"id": "root", "parent": null, "children": ["m1"]},
+    "m1": {"id": "m1", "parent": "root", "children": [], "message": {
+      "id": "m1",
+      "author": {"role": "user"},
+      "content": {"content_type": "text", "parts": ["Texto normal"]}
+    }}
+  }
+}

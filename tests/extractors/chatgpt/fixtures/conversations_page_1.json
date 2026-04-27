@@ -1,0 +1,24 @@
+{
+  "items": [
+    {
+      "id": "abc-conv-1",
+      "title": "Primeira conversa",
+      "create_time": 1700000000.0,
+      "update_time": 1700001000.0,
+      "gizmo_id": null,
+      "is_archived": false
+    },
+    {
+      "id": "def-conv-2",
+      "title": "Conversa em projeto",
+      "create_time": 1700100000.0,
+      "update_time": 1700200000.0,
+      "gizmo_id": "g-p-xyz",
+      "is_archived": false
+    }
+  ],
+  "total": 2,
+  "limit": 100,
+  "offset": 0,
+  "has_missing_conversations": false
+}

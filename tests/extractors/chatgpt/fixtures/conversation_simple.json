@@ -1,0 +1,38 @@
+{
+  "title": "Test conv",
+  "create_time": 1700000000.0,
+  "update_time": 1700000500.0,
+  "mapping": {
+    "root-node-id": {
+      "id": "root-node-id",
+      "parent": null,
+      "children": ["msg-1"]
+    },
+    "msg-1": {
+      "id": "msg-1",
+      "parent": "root-node-id",
+      "children": ["msg-2"],
+      "message": {
+        "id": "msg-1",
+        "author": {"role": "user"},
+        "content": {"content_type": "text", "parts": ["Hello"]},
+        "create_time": 1700000100.0
+      }
+    },
+    "msg-2": {
+      "id": "msg-2",
+      "parent": "msg-1",
+      "children": [],
+      "message": {
+        "id": "msg-2",
+        "author": {"role": "assistant"},
+        "content": {"content_type": "text", "parts": ["Hi there"]},
+        "create_time": 1700000200.0
+      }
+    }
+  },
+  "moderation_results": [],
+  "current_node": "msg-2",
+  "conversation_id": "conv-simple-id",
+  "gizmo_id": null
+}
