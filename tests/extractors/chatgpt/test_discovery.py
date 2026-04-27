@@ -25,11 +25,12 @@ async def test_discover_all_combines_sources_deduplicated(mocker):
     mock_client.list_projects.return_value = []
     mock_client.list_shared.side_effect = [[], []]
 
-    result = await discover_all(mock_client)
+    metas, project_names = await discover_all(mock_client)
 
-    ids = [m.id for m in result]
+    ids = [m.id for m in metas]
     assert sorted(ids) == ["a", "b", "c"]  # b nao duplicou
-    assert len(result) == 3
+    assert len(metas) == 3
+    assert project_names == {}  # sem projects nesse cenario
 
 
 async def test_discover_all_fetches_project_conversations(mocker):
@@ -54,8 +55,9 @@ async def test_discover_all_fetches_project_conversations(mocker):
         ),
     ]
 
-    result = await discover_all(mock_client)
+    metas, project_names = await discover_all(mock_client)
 
-    assert len(result) == 1
-    assert result[0].id == "pc1"
-    assert result[0].project_id == "g-p-1"
+    assert len(metas) == 1
+    assert metas[0].id == "pc1"
+    assert metas[0].project_id == "g-p-1"
+    assert project_names == {"g-p-1": "Studies"}
