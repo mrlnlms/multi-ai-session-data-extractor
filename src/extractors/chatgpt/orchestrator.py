@@ -20,6 +20,33 @@ from src.extractors.chatgpt.models import CaptureOptions, CaptureReport
 logger = logging.getLogger(__name__)
 
 
+# Aborta captura se discovery cair mais que isso vs maior valor historico ja visto.
+# Discovery flakey (/projects 404, DOM scrape parcial) e muito comum — sem essa
+# protecao, raw fica corrompido e contamina proxima base incremental.
+DISCOVERY_DROP_ABORT_THRESHOLD = 0.20
+
+
+def _get_max_known_discovery(raw_root: Path) -> int:
+    """Procura recursivamente o maior discovery.total ja visto em qualquer capture_log.
+
+    Recursivo de proposito — pega tambem capture_logs em subpastas (ex: _backup-*),
+    pra que mover raws antigos pra subpasta nao reseta a baseline.
+    """
+    if not raw_root.exists():
+        return 0
+    max_count = 0
+    for log_path in raw_root.rglob("capture_log.json"):
+        try:
+            with open(log_path) as f:
+                data = json.load(f)
+            count = (data.get("discovery") or {}).get("total", 0)
+            if count > max_count:
+                max_count = count
+        except Exception:
+            continue
+    return max_count
+
+
 async def run_capture(output_dir: Path, options: CaptureOptions) -> CaptureReport:
     """Roda captura completa do ChatGPT.
 
@@ -56,6 +83,21 @@ async def run_capture(output_dir: Path, options: CaptureOptions) -> CaptureRepor
         logger.info("Discovery...")
         metas, project_names = await discover_all(client, page=page)
         report.discovery_counts = {"total": len(metas)}
+
+        # Fail-fast: aborta se discovery caiu muito vs maior valor historico ja visto.
+        # Sem isso, raw fica corrompido (snapshot incompleto vira base do proximo
+        # incremental, que entao refetcha tudo que reapareceu — confusao garantida).
+        baseline = _get_max_known_discovery(output_dir.parent)
+        if baseline > 0:
+            drop = (baseline - len(metas)) / baseline
+            if drop > DISCOVERY_DROP_ABORT_THRESHOLD:
+                raise RuntimeError(
+                    f"Discovery suspeita: {len(metas)} convs vs {baseline} no historico "
+                    f"(queda {drop:.0%}, limite {DISCOVERY_DROP_ABORT_THRESHOLD:.0%}). "
+                    f"Provavel /projects 404 ou DOM scrape parcial — endpoints flakey. "
+                    f"Tente novamente em alguns minutos."
+                )
+            logger.info(f"Discovery OK: {len(metas)} convs (baseline historico: {baseline})")
 
         # Salva IDs da discovery (permite diff contra fetched pra achar falhas)
         discovery_path = output_dir / "discovery_ids.json"
