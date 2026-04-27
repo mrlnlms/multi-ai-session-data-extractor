@@ -18,11 +18,37 @@ pode deletar do servidor e continuar usando a plataforma sem perder nada.
 
 ## Status (2026-04-27)
 
-- ChatGPT: ✅ ciclo completo (sync 5 etapas: capture + hardlink + assets +
-  sources + reconcile, com fail-fast contra discovery flakey e preservation
-  de sources removidas no servidor)
+- ChatGPT: ✅ ciclo completo (sync 4 etapas: capture + assets + sources +
+  reconcile, com fail-fast contra discovery flakey, preservation de sources
+  removidas no servidor, e pasta unica cumulativa em data/raw/ChatGPT/)
 - Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity: extractors
   individuais migrados, falta sync orquestrador equivalente
+
+## Glossário
+
+Termos como **discovery**, **merged**, **baseline**, **preserved_missing**,
+**fail-fast**, **hardlink** aparecem nos logs e nos LAST_*.md. Pra entender
+o que cada um significa e como se relacionam: [docs/glossary.md](docs/glossary.md).
+
+## Headless vs headed por plataforma
+
+Login: sempre headed (1x por conta, persistido em
+`.storage/<plataforma>-profile-<conta>/`).
+
+Captura por plataforma:
+
+| Plataforma | Captura |
+|---|---|
+| Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek | headless ✅ |
+| ChatGPT, Perplexity | headed ⚠️ (Cloudflare detecta headless) |
+
+Se rodar uma das 5 primeiras e ver browser abrir, algo está errado.
+ChatGPT/Perplexity: esperado.
+
+## Operação no terminal
+
+Comandos comuns (sync, exports individuais, testes, status, rollback):
+[docs/operations.md](docs/operations.md).
 
 ## Setup
 

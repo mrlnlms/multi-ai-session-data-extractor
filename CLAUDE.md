@@ -151,11 +151,40 @@ PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --no-voice-pass
 - `data/raw/` gitignored — dados pessoais nunca no repo
 - Idioma codigo: ingles. Comentarios e docs: portugues sem acentos preferencialmente
 
+## Headless vs headed por plataforma
+
+Heranca do AI Interaction Analysis (projeto antigo). **Login eh sempre
+headed (1x por conta, persiste em `.storage/<plat>-profile-<conta>/`).**
+**Captura difere por plataforma:**
+
+| Plataforma | Login | Captura |
+|---|---|---|
+| Claude.ai | headed (1x) | headless ✅ |
+| Gemini | headed (1x) | headless ✅ |
+| NotebookLM | headed (1x) | headless ✅ |
+| Qwen | headed (1x) | headless ✅ |
+| DeepSeek | headed (1x) | headless ✅ |
+| ChatGPT | headed (1x) | **headed** (Cloudflare detecta headless) |
+| Perplexity | headed (1x) | **headed** (Cloudflare 403 em headless) |
+
+5 das 7 rodam headless por padrao. ChatGPT e Perplexity precisam abrir
+browser na captura — Cloudflare bloqueia headless com 403 / challenge
+"Just a moment...". Documentado por design em `perplexity/api_client.py:12-13`.
+
+**Implicacao operacional:** se rodar Claude/Gemini/NotebookLM/Qwen/DeepSeek
+e ver browser abrir, **algo esta errado**. Se for ChatGPT ou Perplexity,
+**esperado**.
+
+Ver tambem `docs/glossary.md` pra terminologia (discovery vs merged vs
+baseline, preserved_missing, fail-fast, hardlink, etc).
+
 ## Gotchas conhecidos
 
 - `chatgpt-export.py` roda `headless=False` no orchestrator (DOM scrape de
-  projects + voice pass precisam). `download-assets.py` roda `headless=True`
+  projects + voice pass + Cloudflare). `download-assets.py` roda `headless=True`
+  (so chama API com cookies, nao precisa de DOM)
 - 8 assets ChatGPT confirmados como **irrecuperaveis** (parents deletados no
   servidor) — failed=8 em download-assets eh esperado, nao bug
 - DOM scrape de projects as vezes pega 40 em vez de 47 — fail-fast cobre
-- Discovery `/projects` 404a as vezes — fail-fast cobre
+- Discovery `/projects` 404a as vezes — fail-fast cobre via fallback
+  `/gizmos/discovery/mine` -> DOM scrape
