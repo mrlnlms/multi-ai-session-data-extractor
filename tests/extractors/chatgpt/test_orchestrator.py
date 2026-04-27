@@ -26,14 +26,17 @@ async def test_run_capture_produces_raw_file(tmp_path, mocker):
         return_value=mock_playwright_context,
     )
 
-    # Mock discover_all
+    # Mock discover_all — retorna tupla (metas, project_names)
     mocker.patch(
         "src.extractors.chatgpt.orchestrator.discover_all",
         new_callable=mocker.AsyncMock,
-        return_value=[
-            ConversationMeta(id="a", title="A", create_time=1.0, update_time=2.0,
-                           project_id=None, archived=False),
-        ],
+        return_value=(
+            [
+                ConversationMeta(id="a", title="A", create_time=1.0, update_time=2.0,
+                               project_id=None, archived=False),
+            ],
+            {},
+        ),
     )
 
     # Mock fetch_all
@@ -65,5 +68,6 @@ async def test_run_capture_produces_raw_file(tmp_path, mocker):
     assert (output_dir / "chatgpt_raw.json").exists()
     assert (output_dir / "chatgpt_memories.md").exists()
     assert (output_dir / "chatgpt_instructions.json").exists()
-    assert (output_dir / "capture_log.json").exists()
+    assert (output_dir / "capture_log.jsonl").exists()
+    assert (output_dir / "LAST_CAPTURE.md").exists()
     assert report.discovery_counts["total"] == 1

@@ -143,14 +143,14 @@ def run_reconciliation(
         preserved_missing=len(plan.missing_from_server),
     )
 
-    # Salvar merged
-    output_dir = merged_output_base / today
-    output_dir.mkdir(parents=True, exist_ok=True)
-    merged_path = output_dir / "chatgpt_merged.json"
+    # Salvar merged — pasta unica cumulativa, sem subdir datada
+    merged_output_base.mkdir(parents=True, exist_ok=True)
+    merged_path = merged_output_base / "chatgpt_merged.json"
+    reconciled_at = datetime.now().isoformat()
     merged_path.write_text(
         json.dumps(
             {
-                "reconciled_at": datetime.now().isoformat(),
+                "reconciled_at": reconciled_at,
                 "conversations": merged_convs,
             },
             ensure_ascii=False, indent=2,
@@ -158,28 +158,50 @@ def run_reconciliation(
         encoding="utf-8",
     )
 
-    # Log
-    log_path = output_dir / "reconcile_log.json"
-    log_path.write_text(
-        json.dumps(
-            {
-                "added": report.added,
-                "updated": report.updated,
-                "copied": report.copied,
-                "preserved_missing": report.preserved_missing,
-                "warnings": report.validation_warnings,
-            },
-            ensure_ascii=False, indent=2,
-        ),
-        encoding="utf-8",
+    # Append em reconcile_log.jsonl (historico cumulativo)
+    log_path = merged_output_base / "reconcile_log.jsonl"
+    log_entry = {
+        "reconciled_at": reconciled_at,
+        "added": report.added,
+        "updated": report.updated,
+        "copied": report.copied,
+        "preserved_missing": report.preserved_missing,
+        "warnings": report.validation_warnings,
+    }
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+
+    # LAST_RECONCILE.md — snapshot human-readable
+    total = len(merged_convs)
+    preserved_total = sum(
+        1 for c in merged_convs.values()
+        if c.get("_last_seen_in_server") and c.get("_last_seen_in_server") != today
     )
+    md = (
+        "# Last reconcile\n\n"
+        f"- **Quando:** {reconciled_at}\n"
+        f"- **Total convs:** {total}\n"
+        f"- **Active (vistas hoje):** {total - preserved_total}\n"
+        f"- **Preserved missing:** {preserved_total}\n"
+        f"- **Ultima run:** added={report.added}, updated={report.updated}, "
+        f"copied={report.copied}, preserved_missing={report.preserved_missing}\n\n"
+        "Ver `reconcile_log.jsonl` pro historico completo.\n"
+    )
+    (merged_output_base / "LAST_RECONCILE.md").write_text(md, encoding="utf-8")
 
     return report
 
 
 def _find_latest_merged(merged_base: Path) -> Path | None:
-    """Pega o chatgpt_merged.json mais recente em merged_base/<YYYY-MM-DD>/."""
+    """Retorna o chatgpt_merged.json se existir na pasta unica.
+
+    Backward compat: se nao achar na raiz, fallback pra subpasta datada antiga.
+    """
     if not merged_base.exists():
         return None
+    direct = merged_base / "chatgpt_merged.json"
+    if direct.exists():
+        return direct
+    # Fallback: formato antigo com subdir datada
     candidates = sorted(merged_base.glob("*/chatgpt_merged.json"))
     return candidates[-1] if candidates else None

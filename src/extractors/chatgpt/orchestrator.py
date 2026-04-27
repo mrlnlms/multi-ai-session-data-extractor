@@ -31,10 +31,27 @@ def _get_max_known_discovery(raw_root: Path) -> int:
 
     Recursivo de proposito — pega tambem capture_logs em subpastas (ex: _backup-*),
     pra que mover raws antigos pra subpasta nao reseta a baseline.
+
+    Aceita capture_log.jsonl (formato novo, append-only) varrendo todas as linhas,
+    e capture_log.json (formato antigo, snapshot) durante transicao.
     """
     if not raw_root.exists():
         return 0
     max_count = 0
+    # Formato novo: jsonl com 1 linha por run
+    for log_path in raw_root.rglob("capture_log.jsonl"):
+        try:
+            with open(log_path) as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    data = json.loads(line)
+                    count = (data.get("discovery") or {}).get("total", 0)
+                    if count > max_count:
+                        max_count = count
+        except Exception:
+            continue
+    # Formato antigo: snapshot json
     for log_path in raw_root.rglob("capture_log.json"):
         try:
             with open(log_path) as f:
@@ -125,7 +142,7 @@ async def run_capture(output_dir: Path, options: CaptureOptions) -> CaptureRepor
             logger.info("Modo: completo (--full) — fetcha todas as convs")
             ids_to_fetch = [m.id for m in metas]
         else:
-            last = _find_last_capture(output_dir.parent)
+            last = _find_last_capture(output_dir)
             if last is None:
                 logger.info("Nenhuma captura anterior — modo completo (primeira run)")
                 ids_to_fetch = [m.id for m in metas]
@@ -258,36 +275,59 @@ async def run_capture(output_dir: Path, options: CaptureOptions) -> CaptureRepor
 
     _finalize_report(report, started_at)
 
-    # Salva capture_log.json — try/finally garante gravacao mesmo se algo falhar acima
+    # Append em capture_log.jsonl (1 linha por run, historico cumulativo)
     try:
-        log_path = output_dir / "capture_log.json"
-        log_path.write_text(
-            json.dumps(
-                {
-                    "run_started_at": report.run_started_at,
-                    "run_finished_at": report.run_finished_at,
-                    "duration_seconds": report.duration_seconds,
-                    "discovery": report.discovery_counts,
-                    "fetch": report.fetch_counts,
-                    "voice_pass": report.voice_pass_counts,
-                    "errors": report.errors,
-                },
-                ensure_ascii=False, indent=2,
-            ),
-            encoding="utf-8",
-        )
+        log_entry = {
+            "run_started_at": report.run_started_at,
+            "run_finished_at": report.run_finished_at,
+            "duration_seconds": report.duration_seconds,
+            "discovery": report.discovery_counts,
+            "fetch": report.fetch_counts,
+            "voice_pass": report.voice_pass_counts,
+            "errors": report.errors,
+        }
+        log_path = output_dir / "capture_log.jsonl"
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
     except Exception as log_exc:
-        logger.error(f"Falha gravando capture_log.json: {log_exc}")
+        logger.error(f"Falha gravando capture_log.jsonl: {log_exc}")
+
+    # LAST_CAPTURE.md — snapshot human-readable, sobrescreve a cada run
+    try:
+        _write_last_capture_md(output_dir, report)
+    except Exception as md_exc:
+        logger.error(f"Falha gravando LAST_CAPTURE.md: {md_exc}")
 
     return report
 
 
+def _write_last_capture_md(output_dir: Path, report: CaptureReport) -> None:
+    """Gera LAST_CAPTURE.md visivel — bate o olho e ve quando + counts."""
+    discovery = report.discovery_counts or {}
+    fetch = report.fetch_counts or {}
+    voice = report.voice_pass_counts or {}
+    errors_n = len(report.errors) if report.errors else 0
+    md = (
+        "# Last capture\n\n"
+        f"- **Quando:** {report.run_started_at}\n"
+        f"- **Duracao:** {report.duration_seconds:.0f}s\n"
+        f"- **Discovery total:** {discovery.get('total', 0)}\n"
+        f"- **Fetch attempted:** {fetch.get('attempted', 0)}\n"
+        f"- **Fetch succeeded:** {fetch.get('succeeded', 0)}\n"
+        f"- **Voice pass:** candidates={voice.get('candidates', 0)}, captured={voice.get('captured', 0)}\n"
+        f"- **Errors:** {errors_n}\n\n"
+        "Ver `capture_log.jsonl` pro historico completo.\n"
+    )
+    (output_dir / "LAST_CAPTURE.md").write_text(md, encoding="utf-8")
+
+
 def _resolve_output_dir(base: Path) -> Path:
-    """Se base ja existe, adiciona sufixo de hora pra nao sobrescrever."""
-    if not base.exists():
-        return base
-    hour = datetime.now().strftime("T%H-%M")
-    return base.parent / f"{base.name}{hour}"
+    """Pasta unica cumulativa — sempre retorna o mesmo path.
+
+    Antes (deprecado): adicionava sufixo de hora se a pasta ja existisse.
+    Agora: a pasta eh mutavel in-place, todas as runs gravam aqui.
+    """
+    return base
 
 
 def _finalize_report(report: CaptureReport, started_at: datetime) -> None:
@@ -318,35 +358,45 @@ def _parse_ts(v) -> float:
     return 0.0
 
 
-def _find_last_capture(raw_root: Path) -> tuple[Path, datetime] | None:
-    """Acha o ultimo ChatGPT Data */ com chatgpt_raw.json + capture_log.json.
+def _find_last_capture(raw_dir: Path) -> tuple[Path, datetime] | None:
+    """Verifica se a pasta unica tem captura previa valida.
 
-    Retorna (path_do_dir, run_started_at) do mais recente por run_started_at.
+    Pasta unica cumulativa: ou existe chatgpt_raw.json + capture_log.jsonl, ou nao
+    ha captura previa. Retorna (path, run_started_at_da_ultima_run) ou None.
+
+    Backward compat: aceita capture_log.json (formato antigo) durante transicao.
     """
-    if not raw_root.exists():
+    if not raw_dir.exists() or not raw_dir.is_dir():
         return None
-    candidates: list[tuple[datetime, Path]] = []
-    for d in raw_root.iterdir():
-        if not d.is_dir() or not d.name.startswith("ChatGPT Data"):
-            continue
-        log = d / "capture_log.json"
-        raw = d / "chatgpt_raw.json"
-        if not log.exists() or not raw.exists():
-            continue
-        try:
-            with open(log) as f:
-                data = json.load(f)
-            started = data.get("run_started_at")
-            if not started:
-                continue
-            ts = datetime.fromisoformat(started.replace("Z", "+00:00"))
-            candidates.append((ts, d))
-        except Exception as exc:
-            logger.warning(f"Skip {d.name}: {exc}")
-    if not candidates:
+    raw = raw_dir / "chatgpt_raw.json"
+    if not raw.exists():
         return None
-    ts, path = max(candidates, key=lambda x: x[0])
-    return path, ts
+
+    log_jsonl = raw_dir / "capture_log.jsonl"
+    log_json = raw_dir / "capture_log.json"
+    started_iso: str | None = None
+    try:
+        if log_jsonl.exists():
+            last_line = None
+            with open(log_jsonl) as f:
+                for line in f:
+                    if line.strip():
+                        last_line = line
+            if last_line:
+                started_iso = json.loads(last_line).get("run_started_at")
+        elif log_json.exists():
+            with open(log_json) as f:
+                started_iso = json.load(f).get("run_started_at")
+    except Exception as exc:
+        logger.warning(f"Falha lendo log de captura em {raw_dir}: {exc}")
+        return None
+    if not started_iso:
+        return None
+    try:
+        ts = datetime.fromisoformat(started_iso.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    return raw_dir, ts
 
 
 def _load_previous_raw(path: Path) -> dict[str, dict]:

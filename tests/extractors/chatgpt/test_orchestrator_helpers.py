@@ -1,23 +1,16 @@
-"""Testes dos helpers do orchestrator usados pelo sync.
+"""Testes dos helpers do orchestrator.
 
-Cobrem dois bugs reais ja vistos:
-
-1. _find_last_capture deve retornar a pasta com run_started_at mais recente,
-   NAO a primeira por nome alfabetico nem por mtime do filesystem.
-   Bug original em chatgpt-sync.py: helper usava early return na pasta sem
-   sufixo de hora (que ja existia da brute force), em vez de buscar a
-   recem-criada com sufixo.
-
-2. _get_max_known_discovery deve varrer recursivamente data/raw/, incluindo
-   subpastas (ex: _backup-gpt/), pra que mover raws antigos pra subpasta
-   nao reseta a baseline do fail-fast.
+Pasta unica cumulativa (refactor 2026-04-27):
+- _find_last_capture aceita o dir da pasta unica (ChatGPT/) e retorna
+  (path, run_started_at_da_ultima_run) se valida, ou None.
+  Suporta capture_log.jsonl (formato novo) e capture_log.json (compat).
+- _get_max_known_discovery varre rglob, aceitando jsonl (todas linhas) e
+  json (snapshot). Recursivo de proposito — subpastas como _backup-* contam.
 """
 
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
-
-import pytest
 
 from src.extractors.chatgpt.orchestrator import (
     _find_last_capture,
@@ -25,8 +18,21 @@ from src.extractors.chatgpt.orchestrator import (
 )
 
 
-def _make_capture_dir(parent: Path, name: str, started_at: datetime, total: int = 1000):
-    """Cria pasta de captura fake com capture_log.json + chatgpt_raw.json."""
+def _make_capture_dir_jsonl(parent: Path, name: str, started_at: datetime, total: int = 1000):
+    """Pasta com capture_log.jsonl (formato novo) + chatgpt_raw.json."""
+    d = parent / name
+    d.mkdir(parents=True)
+    entry = {
+        "run_started_at": started_at.isoformat(),
+        "discovery": {"total": total},
+    }
+    (d / "capture_log.jsonl").write_text(json.dumps(entry) + "\n")
+    (d / "chatgpt_raw.json").write_text("{}")
+    return d
+
+
+def _make_capture_dir_legacy(parent: Path, name: str, started_at: datetime, total: int = 1000):
+    """Pasta com capture_log.json (formato antigo, backward compat)."""
     d = parent / name
     d.mkdir(parents=True)
     (d / "capture_log.json").write_text(json.dumps({
@@ -38,68 +44,85 @@ def _make_capture_dir(parent: Path, name: str, started_at: datetime, total: int 
 
 
 # ============================================================
-# _find_last_capture
+# _find_last_capture (pasta unica)
 # ============================================================
 
-def test_find_last_capture_picks_most_recent_by_started_at(tmp_path):
-    """Cenario do bug do sync: pasta sem sufixo (antiga) + pasta com sufixo (nova).
-    Deve retornar a com run_started_at mais recente."""
-    older = datetime(2026, 4, 27, 15, 32, tzinfo=timezone.utc)
-    newer = datetime(2026, 4, 27, 16, 40, tzinfo=timezone.utc)
+def test_find_last_capture_returns_dir_when_jsonl_exists(tmp_path):
+    """Pasta com capture_log.jsonl + chatgpt_raw.json -> retorna (path, ts)."""
+    started = datetime(2026, 4, 27, 18, 16, tzinfo=timezone.utc)
+    raw_dir = _make_capture_dir_jsonl(tmp_path, "ChatGPT", started)
 
-    _make_capture_dir(tmp_path, "ChatGPT Data 2026-04-27", older)
-    expected = _make_capture_dir(tmp_path, "ChatGPT Data 2026-04-27T16-40", newer)
-
-    result = _find_last_capture(tmp_path)
+    result = _find_last_capture(raw_dir)
     assert result is not None
     path, ts = result
-    assert path == expected, f"Pegou {path.name} em vez de {expected.name}"
+    assert path == raw_dir
+    assert ts == started
+
+
+def test_find_last_capture_picks_last_line_in_jsonl(tmp_path):
+    """capture_log.jsonl com varias runs -> ts da ultima linha."""
+    raw_dir = tmp_path / "ChatGPT"
+    raw_dir.mkdir()
+    (raw_dir / "chatgpt_raw.json").write_text("{}")
+    older = datetime(2026, 4, 23, 12, 0, tzinfo=timezone.utc)
+    newer = datetime(2026, 4, 27, 18, 16, tzinfo=timezone.utc)
+    log = raw_dir / "capture_log.jsonl"
+    with open(log, "w") as f:
+        f.write(json.dumps({"run_started_at": older.isoformat(), "discovery": {"total": 1000}}) + "\n")
+        f.write(json.dumps({"run_started_at": newer.isoformat(), "discovery": {"total": 1168}}) + "\n")
+
+    _, ts = _find_last_capture(raw_dir)
     assert ts == newer
 
 
-def test_find_last_capture_returns_none_when_empty(tmp_path):
-    """Pasta vazia (sem capturas) retorna None."""
-    assert _find_last_capture(tmp_path) is None
+def test_find_last_capture_falls_back_to_legacy_json(tmp_path):
+    """Se nao ha capture_log.jsonl mas ha capture_log.json, usa o legacy."""
+    started = datetime(2026, 4, 27, 18, 0, tzinfo=timezone.utc)
+    raw_dir = _make_capture_dir_legacy(tmp_path, "ChatGPT", started)
 
-
-def test_find_last_capture_skips_dirs_without_capture_log(tmp_path):
-    """Pasta sem capture_log.json eh ignorada (captura incompleta)."""
-    incomplete = tmp_path / "ChatGPT Data 2026-04-27T17-00"
-    incomplete.mkdir()
-    # so chatgpt_raw, sem capture_log
-    (incomplete / "chatgpt_raw.json").write_text("{}")
-
-    older = datetime(2026, 4, 27, 15, 32, tzinfo=timezone.utc)
-    expected = _make_capture_dir(tmp_path, "ChatGPT Data 2026-04-27", older)
-
-    result = _find_last_capture(tmp_path)
+    result = _find_last_capture(raw_dir)
     assert result is not None
-    path, _ = result
-    assert path == expected
+    _, ts = result
+    assert ts == started
 
 
-def test_find_last_capture_ignores_non_chatgpt_dirs(tmp_path):
-    """So considera dirs que comecam com 'ChatGPT Data'."""
-    # Cria capture valida em pasta com nome irrelevante
-    foreign = tmp_path / "Some Other Tool"
-    foreign.mkdir()
-    (foreign / "capture_log.json").write_text(json.dumps({
-        "run_started_at": "2027-01-01T00:00:00+00:00",
-        "discovery": {"total": 9999},
-    }))
-    (foreign / "chatgpt_raw.json").write_text("{}")
+def test_find_last_capture_returns_none_when_no_raw(tmp_path):
+    """Pasta sem chatgpt_raw.json -> None (captura incompleta)."""
+    raw_dir = tmp_path / "ChatGPT"
+    raw_dir.mkdir()
+    (raw_dir / "capture_log.jsonl").write_text(
+        json.dumps({"run_started_at": "2026-04-27T00:00:00+00:00"}) + "\n"
+    )
+    assert _find_last_capture(raw_dir) is None
 
-    valid_ts = datetime(2026, 4, 27, 12, 0, tzinfo=timezone.utc)
-    expected = _make_capture_dir(tmp_path, "ChatGPT Data 2026-04-27", valid_ts)
 
-    result = _find_last_capture(tmp_path)
-    path, _ = result
-    assert path == expected
+def test_find_last_capture_returns_none_when_dir_missing(tmp_path):
+    """Pasta inexistente -> None."""
+    assert _find_last_capture(tmp_path / "ChatGPT") is None
+
+
+def test_find_last_capture_returns_none_when_no_log(tmp_path):
+    """Pasta com chatgpt_raw mas sem nenhum log -> None."""
+    raw_dir = tmp_path / "ChatGPT"
+    raw_dir.mkdir()
+    (raw_dir / "chatgpt_raw.json").write_text("{}")
+    assert _find_last_capture(raw_dir) is None
 
 
 # ============================================================
 # _get_max_known_discovery
 # ============================================================
+
+def test_get_max_known_discovery_jsonl(tmp_path):
+    """Le todas as linhas do jsonl, pega o maior discovery.total."""
+    raw_dir = _make_capture_dir_jsonl(tmp_path, "ChatGPT", datetime.now(timezone.utc), total=100)
+    log = raw_dir / "capture_log.jsonl"
+    with open(log, "a") as f:
+        f.write(json.dumps({"discovery": {"total": 1175}}) + "\n")
+        f.write(json.dumps({"discovery": {"total": 800}}) + "\n")
+
+    assert _get_max_known_discovery(tmp_path) == 1175
+
 
 def test_get_max_known_discovery_recursive(tmp_path):
     """Varre subpastas (ex: _backup-gpt/) — mover raws antigos pra backup
@@ -109,11 +132,10 @@ def test_get_max_known_discovery_recursive(tmp_path):
 
     backup = tmp_path / "_backup-gpt"
     backup.mkdir()
-    _make_capture_dir(backup, "ChatGPT Data 2026-04-23T12-40", older, total=1175)
+    _make_capture_dir_legacy(backup, "ChatGPT Data 2026-04-23T12-40", older, total=1175)
 
-    _make_capture_dir(tmp_path, "ChatGPT Data 2026-04-27", newer, total=1164)
+    _make_capture_dir_jsonl(tmp_path, "ChatGPT", newer, total=1164)
 
-    # Esperado: pega max (1175 do backup) — recursivo
     assert _get_max_known_discovery(tmp_path) == 1175
 
 
@@ -128,7 +150,7 @@ def test_get_max_known_discovery_skips_corrupt_logs(tmp_path):
     bad.mkdir()
     (bad / "capture_log.json").write_text("not valid json {{{")
 
-    good = _make_capture_dir(
+    _make_capture_dir_legacy(
         tmp_path, "ChatGPT Data 2026-04-26",
         datetime(2026, 4, 26, tzinfo=timezone.utc),
         total=500,

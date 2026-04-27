@@ -154,9 +154,13 @@ def test_run_reconciliation_first_time_no_previous(tmp_path):
     assert report.copied == 0
     assert not report.aborted
 
-    merged_file = next(merged_base.glob("*/chatgpt_merged.json"))
+    merged_file = merged_base / "chatgpt_merged.json"
+    assert merged_file.exists()
     merged = json.loads(merged_file.read_text())
     assert set(merged["conversations"].keys()) == {"a", "b"}
+    # Pasta unica: log eh jsonl append-only e LAST_RECONCILE.md eh gerado
+    assert (merged_base / "reconcile_log.jsonl").exists()
+    assert (merged_base / "LAST_RECONCILE.md").exists()
 
 
 def test_run_reconciliation_preserves_missing_from_server(tmp_path, mocker):
@@ -166,11 +170,11 @@ def test_run_reconciliation_preserves_missing_from_server(tmp_path, mocker):
     mock_dt.now.return_value.strftime.return_value = "2026-04-23"
     mock_dt.now.return_value.isoformat.return_value = "2026-04-23T00:00:00"
 
-    # Setup: merged anterior tem a, b. Raw atual so tem a (b foi deletada no servidor).
+    # Setup: merged anterior tem a, b (pasta unica, sem subdir datada).
+    # Raw atual so tem a (b foi deletada no servidor).
     merged_base = tmp_path / "merged" / "ChatGPT"
-    prev_dir = merged_base / "2026-04-10"
     _write_json(
-        prev_dir / "chatgpt_merged.json",
+        merged_base / "chatgpt_merged.json",
         {"conversations": {
             "a": {"id": "a", "update_time": 10.0, "mapping": {}, "_last_seen_in_server": "2026-04-10"},
             "b": {"id": "b", "update_time": 15.0, "mapping": {"m1": {}}, "_last_seen_in_server": "2026-04-10"},
@@ -188,9 +192,8 @@ def test_run_reconciliation_preserves_missing_from_server(tmp_path, mocker):
     report = run_reconciliation(raw_dir, merged_base)
 
     assert report.preserved_missing == 1
-    # Find the NEW merged file (2026-04-23 subdir) - glob returns both old and new, pick new
-    merged_files = list(merged_base.glob("*/chatgpt_merged.json"))
-    new_merged = next(p for p in merged_files if "2026-04-23" in str(p))
+    # Pasta unica: merged eh sobrescrito direto em merged_base
+    new_merged = merged_base / "chatgpt_merged.json"
     merged = json.loads(new_merged.read_text())
     assert "b" in merged["conversations"]
     # b preservada, _last_seen_in_server NAO foi atualizado
