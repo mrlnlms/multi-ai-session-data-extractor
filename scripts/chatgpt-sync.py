@@ -27,7 +27,7 @@ from datetime import datetime
 from pathlib import Path
 
 from src.extractors.chatgpt.models import CaptureOptions
-from src.extractors.chatgpt.orchestrator import run_capture
+from src.extractors.chatgpt.orchestrator import run_capture, _find_last_capture
 from src.reconcilers.chatgpt import run_reconciliation
 
 
@@ -78,9 +78,13 @@ def main():
         print("\n[--no-reconcile: pulando reconciliacao]")
         return
 
-    # output_dir pode ter sido alterado pelo orchestrator (sufixo de hora)
-    # — pega o real do report ou re-resolve
-    actual_raw_dir = _resolve_actual_raw_dir(output_dir)
+    # output_dir pode ter recebido sufixo de hora se ja existia uma pasta com
+    # mesmo nome. Usa _find_last_capture (ordena por run_started_at, robusto)
+    # pra achar a captura recem-feita.
+    last = _find_last_capture(output_dir.parent)
+    if last is None:
+        raise RuntimeError("Captura concluiu mas _find_last_capture retornou None")
+    actual_raw_dir, _ = last
 
     # 2. Reconciler
     print("\n" + "=" * 60)
@@ -101,29 +105,6 @@ def main():
     print("=" * 60)
     print(f"Raw:    {actual_raw_dir}")
     print(f"Merged: data/merged/ChatGPT/{datetime.now().strftime('%Y-%m-%d')}/")
-
-
-def _resolve_actual_raw_dir(intended: Path) -> Path:
-    """Acha o dir de raw real criado.
-
-    Orchestrator adiciona sufixo de hora se intended ja existir. Esse helper
-    procura o dir mais recente que comeca com o nome de intended.
-    """
-    if intended.exists() and (intended / "chatgpt_raw.json").exists():
-        return intended
-    # Procura variantes com sufixo
-    parent = intended.parent
-    base_name = intended.name
-    candidates = sorted(
-        [d for d in parent.iterdir()
-         if d.is_dir() and d.name.startswith(base_name)
-         and (d / "chatgpt_raw.json").exists()],
-        key=lambda p: p.stat().st_mtime,
-        reverse=True,
-    )
-    if not candidates:
-        raise RuntimeError(f"Nao achou raw dir pra {intended}")
-    return candidates[0]
 
 
 if __name__ == "__main__":
