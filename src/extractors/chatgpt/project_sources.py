@@ -7,10 +7,15 @@ Endpoint mapeado empiricamente em 24/abr/2026:
 
 Saida em data/raw/ChatGPT Data <date>/project_sources/{project_id}/{file_name}
 + um indice JSON por project com metadata dos files.
+
+Preservation: files removidas do servidor sao preservadas no indice com
+`_preserved_missing: true` e `_last_seen_in_server`. Mesmo padrao do
+reconciler de conversations — historia local nunca e perdida.
 """
 
 import asyncio
 import json
+from datetime import datetime
 from pathlib import Path
 
 from src.extractors.chatgpt.api_client import ChatGPTAPIClient
@@ -21,6 +26,39 @@ def _safe_filename(name: str) -> str:
     for ch in ("/", "\\", ":", "\x00"):
         name = name.replace(ch, "_")
     return name[:200]  # truncate
+
+
+def _merge_with_preserved(current_files: list[dict], existing_index_path: Path) -> tuple[list[dict], int]:
+    """Merge files atuais com files preservadas de runs anteriores.
+
+    Files presentes em runs anteriores mas ausentes na atual viram
+    _preserved_missing=True (mesma filosofia do reconciler de conversations).
+
+    Returns: (merged_list, count_preserved)
+    """
+    if not existing_index_path.exists():
+        return list(current_files), 0
+    try:
+        with open(existing_index_path, encoding="utf-8") as fh:
+            old_files = json.load(fh)
+    except Exception:
+        return list(current_files), 0
+    if not isinstance(old_files, list):
+        return list(current_files), 0
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    current_ids = {f.get("file_id") for f in current_files if f.get("file_id")}
+    preserved = []
+    for old_f in old_files:
+        fid = old_f.get("file_id")
+        if not fid or fid in current_ids:
+            continue
+        # Ja era preserved? mantem _last_seen_in_server original
+        if not old_f.get("_preserved_missing"):
+            old_f["_preserved_missing"] = True
+            old_f.setdefault("_last_seen_in_server", today)
+        preserved.append(old_f)
+    return list(current_files) + preserved, len(preserved)
 
 
 async def download_project_sources(
@@ -47,6 +85,7 @@ async def download_project_sources(
         "total_files": 0,
         "downloaded": 0,
         "skipped_existing": 0,
+        "preserved_missing": 0,
         "errors": [],
     }
 
@@ -67,9 +106,12 @@ async def download_project_sources(
 
         pdir = root / pid
         pdir.mkdir(parents=True, exist_ok=True)
-        # Salva indice com metadata de cada file
-        with open(pdir / "_files.json", "w", encoding="utf-8") as f:
-            json.dump(files, f, ensure_ascii=False, indent=2)
+        # Merge com preserved (files removidas do servidor mas presentes em runs anteriores)
+        index_path = pdir / "_files.json"
+        merged_files, preserved_count = _merge_with_preserved(files, index_path)
+        stats["preserved_missing"] += preserved_count
+        with open(index_path, "w", encoding="utf-8") as f:
+            json.dump(merged_files, f, ensure_ascii=False, indent=2)
 
         for f in files:
             fid = f.get("file_id")
@@ -104,6 +146,7 @@ async def download_project_sources(
     print(
         f"Downloaded: {stats['downloaded']}, "
         f"skipped: {stats['skipped_existing']}, "
+        f"preserved_missing: {stats['preserved_missing']}, "
         f"errors: {len(stats['errors'])}"
     )
     return stats
