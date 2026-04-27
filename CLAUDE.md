@@ -21,6 +21,37 @@ Ver `README.md` pra setup e uso.
 
 Backlog principal: replicar o padrao do ChatGPT-sync nas outras 6 plataformas.
 
+## Estado validado em 2026-04-27 — NAO refazer
+
+Antes de propor refatoracao ou script novo, conferir esta secao. O que esta
+listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
+
+**ChatGPT — ciclo completo validado:**
+- Brute force capturou 1164 convs (30min, 0 erros)
+- 3 runs incrementais encadeadas (cada uma pegou exatamente o delta do que
+  foi atualizado/criado entre runs)
+- Reconciler em cadeia (3 steps) com `--previous-merged` explicito —
+  add/updated/copied/preserved bateram em todos os steps
+- Sync v2 com 5 etapas rodou end-to-end: 924 assets + 110 sources
+  hardlinkados (zero rebaixar), 547 skipped, 0 erros
+- Fail-fast disparou 1x em 5+ runs (discovery 858), retry resolveu
+
+**Estado atual `data/merged/ChatGPT/2026-04-27/chatgpt_merged.json`:**
+- 1167 convs cumulativas (incluindo preserved_missing de runs anteriores)
+- E a fonte de verdade pro ChatGPT — proxima run consome dele como
+  previous_merged automatico
+
+**O que NAO precisa ser feito (proposto e descartado em 27/abr):**
+- Re-mergear "do zero" varrendo `_backup-gpt/merged-*` — reconciler ja faz
+  preservation naturalmente, merged atual ja tem tudo
+- Refatorar `asset_downloader.py` pra "pool cumulativo" — hardlink no sync
+  resolve sem mexer no script
+- Criar `chatgpt-reconcile-from-zero.py` ou similar — sync ja orquestra
+
+**Antes de criar QUALQUER script novo:** conferir se sync, scripts standalone
+existentes ou os helpers em src/ ja resolvem. Se nao tiver certeza, ler
+codigo + memory antes de propor.
+
 ## Princípios inegociaveis (decisoes ja tomadas — nao questionar sem motivo forte)
 
 ### 1. Capturar uma vez, nunca rebaixar
@@ -77,9 +108,8 @@ data/
 ├── raw/                      # (gitignored) saida dos extractors
 ├── merged/                   # (gitignored) saida dos reconcilers
 └── processed/                # (gitignored) saida dos parsers
-.venv/                        # nao usar — usar o do projeto antigo
-                              # (~/Desktop/AI Interaction Analysis/.venv)
-                              # ou criar novo: python -m venv .venv
+.venv/                        # local — Python 3.14, criado em 2026-04-27
+                              # setup: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 
 ## Helpers chave (NAO mexer sem entender)
@@ -100,15 +130,17 @@ data/
 
 ## Comandos comuns
 
+Pre-requisito: `.venv` ativado (`source .venv/bin/activate`) ou usar `.venv/bin/python` direto.
+
 ```bash
 # Smoke test imports
-PYTHONPATH=. python -c "from src.extractors.chatgpt.orchestrator import run_capture; print('ok')"
+PYTHONPATH=. .venv/bin/python -c "from src.extractors.chatgpt.orchestrator import run_capture; print('ok')"
 
 # Rodar testes do ChatGPT
-PYTHONPATH=. pytest tests/extractors/chatgpt/ tests/test_chatgpt_sync.py -v
+PYTHONPATH=. .venv/bin/pytest tests/extractors/chatgpt/ tests/test_chatgpt_sync.py -v
 
 # Sync ChatGPT completo (rapido se tem captura anterior)
-PYTHONPATH=. python scripts/chatgpt-sync.py --no-voice-pass
+PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --no-voice-pass
 ```
 
 ## Convencoes do projeto (heranca do projeto antigo)
