@@ -1,0 +1,4 @@
+[server]
+# Habilita serving de arquivos em ./static/ via URL /app/static/<file>.
+# Usado pra servir HTMLs do Quarto descritivo (Fase 3.2 do dashboard-plan).
+enableStaticServing = true

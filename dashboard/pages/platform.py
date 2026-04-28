@@ -14,6 +14,7 @@ from dashboard.components import (
     format_size,
     relative_time,
 )
+from dashboard import quarto
 from dashboard.data import PlatformState, directory_size_bytes, load_platform_state
 from dashboard.metrics import (
     compute_merged_stats,
@@ -112,6 +113,7 @@ def render(state: PlatformState) -> None:
     st.divider()
     st.subheader("Acoes")
     _render_sync_button(state)
+    _render_quarto_section(state)
 
     st.divider()
     _render_metrics(state)
@@ -181,6 +183,72 @@ def _render_sync_button(state: PlatformState) -> None:
                 st.code((result.stdout or "")[-3000:])
             st.cache_data.clear()
             st.rerun()
+
+
+def _render_quarto_section(state: PlatformState) -> None:
+    """Botao + link pra abrir o data-profile Quarto da plataforma.
+
+    Estados possiveis:
+    - Quarto nao instalado → hint amigavel, sem botao
+    - QMD nao existe pra plataforma → mensagem informativa
+    - HTML existe e atualizado → link "Ver dados detalhados" (nova aba)
+    - HTML existe mas stale → link + botao "Re-renderizar"
+    - HTML nao existe → botao "Renderizar dados detalhados"
+    """
+    if not quarto.quarto_installed():
+        st.caption(
+            "ℹ️ Quarto não instalado — `brew install quarto` habilita visão "
+            "descritiva detalhada (`notebooks/<plat>.qmd`)."
+        )
+        return
+
+    qmd = quarto.qmd_path(state.name)
+    if not qmd.exists():
+        st.caption(
+            f"📝 Notebook descritivo Quarto não existe pra {state.name} ainda. "
+            f"Implementar `notebooks/{state.name.lower()}.qmd` (modelo: "
+            f"`notebooks/chatgpt.qmd`)."
+        )
+        return
+
+    html_src = quarto.html_output_path(state.name)
+    static_dst = quarto.html_static_path(state.name)
+    stale = quarto.is_html_stale(state.name)
+
+    cols = st.columns([3, 1])
+
+    with cols[0]:
+        if html_src.exists() and not stale:
+            # Garante que static/ tem cópia atualizada (idempotente — só copia
+            # se mtime diferir)
+            if not static_dst.exists() or static_dst.stat().st_mtime < html_src.stat().st_mtime:
+                quarto.copy_to_static(state.name)
+            url = quarto.streamlit_static_url(state.name)
+            st.markdown(
+                f'📊 **[Ver dados detalhados ({state.name})]({url})** — '
+                f'HTML self-contained, abre em nova aba',
+                unsafe_allow_html=True,
+            )
+        elif html_src.exists() and stale:
+            st.warning(
+                "⚠️ Dados detalhados desatualizados — parquet mais novo que último render. "
+                "Use o botão pra re-renderizar."
+            )
+        else:
+            st.caption("📊 Dados detalhados ainda não rendirizados.")
+
+    with cols[1]:
+        label = "🔄 Re-render" if html_src.exists() else "📊 Renderizar"
+        if st.button(label, key=f"render-quarto-{state.name}"):
+            with st.spinner(f"Renderizando {state.name}.qmd... (~20s)"):
+                ok, err = quarto.render_and_publish(state.name)
+            if ok:
+                st.success("✅ Rendirizado e disponível")
+                st.rerun()
+            else:
+                st.error("❌ Render falhou")
+                with st.expander("stderr"):
+                    st.code(err or "(vazio)")
 
 
 def _render_metrics(state: PlatformState) -> None:
