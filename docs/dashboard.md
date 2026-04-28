@@ -1,15 +1,18 @@
 # Dashboard — manual de funcionalidades (Fase 1)
 
 Documento vivo do que ja existe no dashboard. Pareado com `dashboard-plan.md`
-(o plan formal das 4 fases). Aqui descrevemos so o que esta entregue.
+(plan formal das 4 fases) e `dashboard-operations.md` (como subir, parar,
+acessar de outras sessoes).
 
 Roda com:
 
 ```bash
-PYTHONPATH=. streamlit run dashboard.py
+PYTHONPATH=. .venv/bin/streamlit run dashboard.py
 ```
 
-Abre em <http://localhost:8501>.
+Abre em <http://localhost:8501>. Pra detalhes de operacao (background,
+healthcheck, acesso programatico via `AppTest`, MCP browser, gotchas), ver
+`dashboard-operations.md`.
 
 ---
 

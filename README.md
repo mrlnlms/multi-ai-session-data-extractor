@@ -146,6 +146,11 @@ PYTHONPATH=. streamlit run dashboard.py
 Abre em <http://localhost:8501>. Sidebar tem botao "Recarregar dados" pra
 limpar cache depois de um sync rodado fora do dashboard.
 
+Pra detalhes operacionais (background, healthcheck, acesso de outra sessao
+Claude via MCP browser ou `streamlit.testing.v1.AppTest`, gotchas), ver
+[docs/dashboard-operations.md](docs/dashboard-operations.md). Pra
+funcionalidades de cada tela, ver [docs/dashboard.md](docs/dashboard.md).
+
 ### O que faz
 
 - **Overview** — totais cross-plataforma, ultima sync global, alerta de
