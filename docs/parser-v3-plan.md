@@ -275,21 +275,33 @@ respeitando ordem.
 
 ### 4.3. DALL-E (`raw_with_dalle.json`)
 
-**Algoritmo:**
-1. Detectar `parts[i]` dict com `content_type=="image_asset_pointer"` E
-   `metadata.dalle` truthy
-2. Resolver path do asset:
-   - `asset_pointer = "sediment://file_<hash>"` → extrair `file_<hash>`
-   - Procurar em `data/raw/ChatGPT/assets/images/<conv_id>/file_<hash>.*`
-   - Adicionar path encontrado em `Message.asset_paths`
-3. `Message.content` recebe placeholder: `"[imagem gerada: {prompt}]"` (ou
-   `"[imagem gerada]"` se prompt vazio)
-4. `metadata.dalle.gen_id` vai pra metadata_json se for criar ToolEvent
-   separado pra geração
+**ACHADO EMPÍRICO PÓS-FASE-2A:** DALL-E aparece em `role=tool` em 46/46
+casos, NÃO em `role=assistant`. Plan original (que assumia Message +
+asset_paths) foi revisado. Implementação cobre 2 casos distintos:
 
-**Decisão:** DALL-E gera tanto Message (com asset_paths) quanto ToolEvent
-(quando autor é `dalle.text2im`). Message representa "tem imagem aqui",
-ToolEvent representa "operação de geração ocorreu".
+**Caso A — DALL-E (servidor gerou imagem):**
+1. Detectar via **semântica** (não nome de tool):
+   `image_asset_pointer` + `metadata.dalle` truthy em `parts[]`
+2. Vira **ToolEvent** (não Message — role=tool):
+   - `event_type = "image_generation"`
+   - `tool_name = author.name` (preservado, mas sanitizado em fixture
+     vira algo opaco — detecção semântica é o sinal real)
+   - `file_path` resolvido: `asset_pointer = "sediment://file_<hash>"`
+     → buscar em `data/raw/ChatGPT/assets/images/<conv_id>/file_<hash>.*`
+   - `metadata_json` inclui `metadata.dalle` completo (gen_id, prompt, etc)
+3. Linkado ao parent message_id (assistant que invocou)
+
+**Caso B — User upload de imagem (user subiu imagem):**
+1. Detectar `image_asset_pointer` SEM `metadata.dalle` em `role=user`
+2. Vira **Message regular** (não ToolEvent):
+   - `Message.asset_paths` recebe path resolvido
+   - `Message.content_types` inclui marker `"image_upload"`
+   - Distingue de DALL-E mesmo quando ambos têm `image_asset_pointer`
+
+**Frequências reais (Fase 2a):**
+- DALL-E (Caso A): 50 ToolEvents (45 com file_path resolvido, 5 sem
+  porque asset removido)
+- User uploads (Caso B): 402 Messages com `asset_paths` + marker
 
 ### 4.4. Canvas (`raw_with_canvas.json`)
 
@@ -360,8 +372,17 @@ encontrável, gizmo_resolved=False" — validar quando rolar.
 1. Pra cada msg com `author.role == "tool"`:
    - Não vira Message regular (filtrar do output `messages.parquet`)
    - Vira ToolEvent
-2. `event_type` = categoria mapeada (heurística):
+2. `event_type` = categoria mapeada. Usar **detecção semântica primeiro**
+   (presença de campos específicos), nome do tool como fallback:
    ```python
+   # Detecção semântica primeiro (robusto contra fixtures sanitizadas
+   # e nomes opacos de JIT plugins)
+   if has_image_asset_pointer_with_dalle_metadata(msg):
+       event_type = "image_generation"
+   elif content_type == "tether_quote":
+       event_type = "quote"
+
+   # Senão, classifier por tool_name
    tool_name = author.name
    if "browser" in tool_name or tool_name in ("web", "web.run"):
        event_type = "search"
@@ -371,15 +392,27 @@ encontrável, gizmo_resolved=False" — validar quando rolar.
        event_type = "canvas"
    elif tool_name.startswith("research_kickoff_tool"):
        event_type = "deep_research"
-   elif tool_name.startswith("dalle"):
-       event_type = "image_generation"
    elif tool_name == "bio":
        event_type = "memory"
-   elif tool_name.startswith("file_search"):
+   elif tool_name.startswith("file_search") or tool_name == "myfiles_browser":
        event_type = "file_search"
+   elif tool_name.startswith(("computer.", "container.")):
+       event_type = "computer_use"
    else:
-       event_type = "other"  # plugins JIT, etc
+       event_type = "other"  # plugins JIT, custom GPT plugins, etc
    ```
+
+**Frequências observadas (Fase 2a, 3030 ToolEvents reais):**
+- `quote`: 527
+- `search`: 519
+- `code`: 498
+- `canvas`: 393
+- `file_search`: 324
+- `deep_research`: 291
+- `other`: 275 (JIT plugins, custom)
+- `memory`: 141
+- `image_generation`: 50
+- `computer_use`: 12
 3. `tool_name = author.name` (exato, preservado)
 4. `result = text extraído` da content (pode ser code, multimodal_text, etc)
 5. `metadata_json = json.dumps(msg.metadata)`

@@ -70,7 +70,23 @@ extra.
 
 **Onde:** `parts[]` da content, como dict.
 
-**Frequência:** 11 convs (com poucos nodes).
+**Frequência:** 11 convs amostradas inicialmente. Após Fase 2a impl: 50
+ocorrências reais em todo merged.
+
+**ACHADO PÓS-IMPLEMENTAÇÃO:** DALL-E aparece em `role=tool` em **46/46
+casos**, NÃO em `role=assistant` como o plan v1 §4.3 assumiu. Decisão
+revisada: virou ToolEvent com `file_path` resolvido, não Message com
+`asset_paths`. Coerência com resto do parser (role=tool → ToolEvent).
+
+**Detecção:** **semântica** (presença de `image_asset_pointer +
+metadata.dalle`), NÃO baseada em `tool_name` (nomes de plugin podem ser
+sanitizados ou opacos).
+
+**ACHADO COMPLEMENTAR:** existem **402 msgs com `image_asset_pointer`
+em `role=user`** — são **uploads de imagem do usuário**, NÃO geradas por
+DALL-E. Tratamento separado: viram Message regular com `asset_paths` +
+marker `image_upload` em content_types. Distinção semântica clara entre
+"servidor gerou" (ToolEvent) e "user subiu" (Message).
 
 **Shape observado:**
 ```json
@@ -287,10 +303,19 @@ maioria).
 {"type": "max_tokens"}                       // ⚠️ truncated por limite
 ```
 
+**Valores observados após implementação Fase 2a (8434 ocorrências reais):**
+```
+stop:         8086  (96%)
+max_tokens:   169   (truncado por limite)
+unknown:      124   (servidor não retornou type — fallback)
+interrupted:  55    (user interrompeu mid-stream)
+```
+
 **Decisão informada:**
 - `Message.finish_reason: Optional[str]` recebe só o `type`
-- Valores observados: `"stop"`, `"max_tokens"` (não vimos `content_filter`
-  ainda mas é reportado pela OpenAI)
+- Mapear ausência → `"unknown"` (não None) pra facilitar agregação
+- `content_filter` ainda não observado (reportado pela OpenAI mas raro
+  no merged atual)
 
 ### message_source
 
