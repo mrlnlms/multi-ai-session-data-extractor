@@ -1,0 +1,59 @@
+/* CSS compartilhado pros notebooks Quarto descritivos.
+   Adaptado de ~/Desktop/AI Interaction Analysis/notebooks/data-profile/_style.css. */
+
+:root {
+    --source-color: #74AA9C;  /* ChatGPT green */
+    --muted: #6b7280;
+    --border: #e5e7eb;
+}
+
+/* Imagens em outputs ocupam largura total */
+.cell-output-display img {
+    width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    margin: 0 auto !important;
+}
+
+/* Tabelas com mais respiro */
+.cell-output-display table.dataframe,
+.cell-output-display table {
+    border-collapse: collapse;
+    margin: 0.5rem 0 1rem;
+    font-size: 0.92em;
+    width: 100%;
+}
+
+.cell-output-display table th,
+.cell-output-display table td {
+    padding: 0.45rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+}
+
+.cell-output-display table th {
+    background: rgba(116, 170, 156, 0.08);
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.cell-output-display table tr:hover td {
+    background: rgba(116, 170, 156, 0.04);
+}
+
+/* Plotly */
+.plotly-graph-div {
+    margin: 0.5rem 0 1.5rem;
+}
+
+/* Code-fold mais discreto */
+details > summary {
+    color: var(--muted);
+    font-size: 0.88em;
+    cursor: pointer;
+}
+
+details > summary:hover {
+    color: var(--source-color);
+}
