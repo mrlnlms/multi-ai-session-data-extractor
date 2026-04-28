@@ -97,6 +97,52 @@ Cada run gera contadores desses 4 estados em `reconcile_log.jsonl`.
 
 ---
 
+## Termos do parser canônico (Fase 2 do ChatGPT — `src/parsers/chatgpt.py`)
+
+### Parquet canônico / `processed`
+
+Saída do parser em `data/processed/<Source>/`. 4 tabelas (ChatGPT):
+`conversations.parquet`, `messages.parquet`, `tool_events.parquet`,
+`branches.parquet`. Schema definido em `src/schema/models.py`. Interface
+universal consumida pelo dashboard descritivo (Quarto futuro) e pelo projeto
+de análise qualitativa (`~/Desktop/AI Interaction Analysis/`).
+
+### Branch
+
+Caminho linear no `mapping` da conv. Conv sem fork tem 1 branch (`<conv>_main`).
+Conv com fork (node com ≥2 children) tem N branches: a main vai do root até
+o fork, cada child do fork começa uma sub-branch própria com
+`parent_branch_id` apontando pra origem. `is_active=True` em exatamente 1
+branch por conv (a que contém `current_node`). v2 ignorava forks off-path —
+v3 preserva tudo.
+
+### ToolEvent
+
+Linha em `tool_events.parquet`. Representa uma operação não-conversacional:
+busca (`search`), execução de código (`code`), canvas, deep research, geração
+de imagem (`image_generation`), citação (`quote` = tether_quote), memória
+(`bio`), file_search, computer_use, etc. Cada msg do raw com `author.role=tool`
+vira um ToolEvent. A msg correspondente NÃO aparece em `messages.parquet`
+(filtrada — só `role∈{user,assistant}` vira Message).
+
+### is_preserved_missing / last_seen_in_server
+
+Campos canônicos da Conversation derivados do `_last_seen_in_server` do raw:
+`is_preserved_missing=True` quando `_last_seen_in_server` ≠ data da última
+run conhecida no merged (idempotente, independente de `today`). Permite
+downstream filtrar "convs ativas no servidor" vs "preservadas localmente"
+sem reimplementar a heurística.
+
+### Custom GPT vs Project (gizmo_id)
+
+`gizmo_id` no raw mistura dois conceitos pelo prefixo:
+- `g-p-*` → Project (pasta com sources). Vai pra `Conversation.project_id`.
+- `g-*` (não `g-p-*`) → Custom GPT real. Vai pra `Conversation.gizmo_id`.
+
+Empírico: ~1045 convs em projects, ~1 conv com Custom GPT real (na base atual).
+
+---
+
 ## Outputs visíveis
 
 ### `LAST_CAPTURE.md` / `LAST_RECONCILE.md`

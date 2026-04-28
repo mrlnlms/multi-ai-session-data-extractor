@@ -9,17 +9,18 @@ do servidor, manter local como fonte primaria**.
 
 Ver `README.md` pra setup e uso.
 
-## Status (2026-04-27)
+## Status (2026-04-28)
 
-| Plataforma | Capture | Reconcile | Sync orquestrador | Notas |
-|---|---|---|---|---|
-| ChatGPT | ✅ | ✅ | ✅ (4 etapas, pasta unica) | Preservation completa (conv, source, project deletado), rename detection, fail-fast |
-| Claude.ai | ✅ | ✅ | ❌ | Falta sync equivalente |
-| Gemini | ✅ | ✅ | ❌ | Idem |
-| NotebookLM | ✅ | ✅ | ❌ | 9 tipos de outputs (audio, video, slide deck PDF+PPTX, blog, flashcards, quiz, data table, infographic, mind map) |
-| Qwen / DeepSeek / Perplexity | ✅ | ❌ | ❌ | Reconcilers + sync pendentes |
+| Plataforma | Capture | Reconcile | Sync orquestrador | Parser canonico | Notas |
+|---|---|---|---|---|---|
+| ChatGPT | ✅ | ✅ | ✅ (4 etapas, pasta unica) | ✅ (Fase 2 done) | Preservation completa, rename detection, fail-fast, parser cobrindo branches + ToolEvents |
+| Claude.ai | ✅ | ✅ | ❌ | ❌ | Falta sync equivalente |
+| Gemini | ✅ | ✅ | ❌ | ❌ | Idem |
+| NotebookLM | ✅ | ✅ | ❌ | ❌ | 9 tipos de outputs (audio, video, slide deck PDF+PPTX, blog, flashcards, quiz, data table, infographic, mind map) |
+| Qwen / DeepSeek / Perplexity | ✅ | ❌ | ❌ | ❌ | Reconcilers + sync pendentes |
 
-Backlog principal: replicar o padrao do ChatGPT-sync nas outras 6 plataformas.
+Backlog principal: replicar o padrao do ChatGPT-sync nas outras 6 plataformas
++ parsers canonicos por plataforma (espelhar `src/parsers/chatgpt.py`).
 
 ## Estado validado em 2026-04-28 — NAO refazer
 
@@ -45,6 +46,24 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
 - 1171 convs cumulativas (1168 active + 3 preserved_missing)
 - E a fonte de verdade pro ChatGPT
 - LAST_RECONCILE.md e reconcile_log.jsonl atualizados a cada run
+
+**Parser canonico ChatGPT (Fase 2 do plan, validado em 2026-04-28):**
+- `src/parsers/chatgpt.py` (`ChatGPTParser`, `source_name="chatgpt"`) — substitui
+  o legacy GPT2Claude bookmarklet e o MVP `chatgpt_v2.py`
+- Versoes anteriores em `_backup-temp/parser-v3-promocao-2026-04-28/` (gitignored,
+  deletar quando confirmar que tudo OK)
+- Output em `data/processed/ChatGPT/`: conversations.parquet, messages.parquet,
+  tool_events.parquet, branches.parquet
+- Cobertura: tree-walk completo (preserva branches off-path), voice (com
+  direction in/out), DALL-E (em ToolEvent), uploads do user (em Message),
+  tether_quote, canvas, deep_research, custom_gpt vs project distinction,
+  preservation (is_preserved_missing, last_seen_in_server)
+- Rodada validada: 1171 convs / 17583 msgs / 3109 tool_events / 1369 branches,
+  idempotente byte-a-byte, 261 testes passando
+- Plan formal: `docs/parser-v3-plan.md`
+- Findings empiricos: `docs/parser-v3-empirical-findings.md`
+- Validation v2 vs v3: `docs/parser-v3-validation.md`
+- Comando: `PYTHONPATH=. .venv/bin/python scripts/chatgpt-parse.py`
 
 ## Comportamento do servidor ChatGPT (validado empiricamente)
 
@@ -98,8 +117,9 @@ codigo + memory antes de propor.
 
 ### 4. Schema canonico e fronteira
 - `src/schema/models.py` define `Conversation`, `Message`, `ToolEvent`,
-  `ConversationProject`
-- Extractors entregam parquet nesse schema
+  `ConversationProject`, `Branch`
+- Extractors entregam raw/merged JSON; **parsers** entregam parquet nesse
+  schema (atualmente so ChatGPT — outras 6 plataformas em backlog)
 - Analise (em outro projeto, `~/Desktop/AI Interaction Analysis/`) consome
   parquet read-only
 
@@ -110,9 +130,12 @@ src/
 ├── extractors/<source>/      # 6 modulos por plataforma (auth, api_client,
 │                             # discovery, fetcher, asset_downloader, orchestrator)
 ├── reconcilers/<source>.py   # build_plan + run_reconciliation, preserva missing
-├── parsers/                  # raw -> parquet (atualmente bookmarklet legacy
-│                             # pro ChatGPT; rewrite consumindo merged em backlog)
-└── schema/models.py
+├── parsers/                  # merged -> parquet (canonico)
+│   ├── chatgpt.py            # ⭐ canonico (Fase 2 done) — tree-walk, branches,
+│   │                         #    ToolEvents, voice, DALL-E, custom_gpt etc
+│   ├── _chatgpt_helpers.py   # helpers puros do parser ChatGPT
+│   └── <outras>.py           # legacy / parsers de outras plataformas (backlog)
+└── schema/models.py          # Conversation, Message, ToolEvent, Branch, ConversationProject
 
 scripts/
 ├── <source>-login.py         # 1x por plataforma, abre navegador pra login
@@ -120,9 +143,10 @@ scripts/
 ├── <source>-reconcile.py     # standalone (sync ja chama)
 ├── <source>-download-assets.py
 ├── <source>-download-project-sources.py  (so ChatGPT por enquanto)
-└── chatgpt-sync.py           # ⭐ orquestrador 5 etapas, modelo pras outras
+├── chatgpt-sync.py           # ⭐ orquestrador 5 etapas, modelo pras outras
+└── chatgpt-parse.py          # ⭐ merged -> parquet canonico (Fase 2)
 
-tests/  (170+ testes — TODOS devem passar antes de qualquer merge)
+tests/  (260+ testes — TODOS devem passar antes de qualquer merge)
 data/
 ├── raw/                      # (gitignored) saida dos extractors
 ├── merged/                   # (gitignored) saida dos reconcilers
@@ -160,6 +184,9 @@ PYTHONPATH=. .venv/bin/pytest tests/extractors/chatgpt/ tests/test_chatgpt_sync.
 
 # Sync ChatGPT completo (rapido se tem captura anterior)
 PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --no-voice-pass
+
+# Parse merged -> parquet canonico (idempotente; ~3s pras 1171 convs atuais)
+PYTHONPATH=. .venv/bin/python scripts/chatgpt-parse.py
 ```
 
 ## Convencoes do projeto (heranca do projeto antigo)

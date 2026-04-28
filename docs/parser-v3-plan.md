@@ -1,5 +1,12 @@
 # Plan: parser ChatGPT v3 (raw → parquet)
 
+> **Status: IMPLEMENTADO em 2026-04-28.** Parser v3 promovido a `chatgpt`
+> canônico. Ver `src/parsers/chatgpt.py`, `docs/parser-v3-validation.md`,
+> e os 3 commits backdated em `feat/parser-v3-canonico` (mergeada em main).
+> Versões antigas em `_backup-temp/parser-v3-promocao-2026-04-28/` (gitignored).
+> Os critérios de pronto das Fases 2a, 2b, 2c, 2d foram atendidos. Este doc
+> fica como histórico do plan formal — não editar pra refletir estado.
+
 Plan formal pra implementação do parser v3 do ChatGPT. **Informado por
 dados empíricos** coletados em [parser-v3-empirical-findings.md](parser-v3-empirical-findings.md).
 
