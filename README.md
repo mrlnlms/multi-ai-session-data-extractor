@@ -16,13 +16,21 @@ chats deletados no servidor, e mantem tudo em schema canonico (parquet).
 Output desenhado pra ser **fonte autoritativa**: depois de capturado, voce
 pode deletar do servidor e continuar usando a plataforma sem perder nada.
 
-## Status (2026-04-27)
+## Status (2026-04-28)
 
-- ChatGPT: ✅ ciclo completo (sync 4 etapas: capture + assets + sources +
-  reconcile, com fail-fast contra discovery flakey, preservation de sources
-  removidas no servidor, e pasta unica cumulativa em data/raw/ChatGPT/)
-- Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity: extractors
-  individuais migrados, falta sync orquestrador equivalente
+**ChatGPT — ciclo completo validado end-to-end:**
+- ✅ Sync 4 etapas (capture + assets + project_sources + reconcile)
+- ✅ Pasta única cumulativa (`data/raw/ChatGPT/` + `data/merged/ChatGPT/`)
+- ✅ Os 6 cenários CRUD validados empiricamente:
+  conv deletada → preserved | conv atualizada → updated | conv nova → added |
+  conv renomeada → updated | project criado → captured |
+  project deletado inteiro → todas sources preservadas, binários intactos
+- ✅ Fail-fast contra discovery flakey (aborta antes de salvar dado corrompido)
+- ✅ 100 testes unitários passando
+
+**Outras 6 plataformas** (Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity):
+extractors individuais migrados, falta sync orquestrador equivalente ao ChatGPT.
+Backlog principal do projeto.
 
 ## Glossário
 

@@ -114,3 +114,21 @@ Histórico cumulativo, append-only — uma linha por run. Não pode ser reconstr
 > **Discovery pode baixar. Merged não.**
 
 Se ver discovery caindo, é porque o servidor mudou. Se ver merged crescendo, é porque capturamos mais histórico. Se ver merged baixando — é bug e tem que investigar.
+
+---
+
+## Comportamento do servidor ChatGPT (validado empiricamente)
+
+### `update_time` em rename de conv
+
+O servidor **bumpa `update_time` para a hora atual** quando renomeias um chat pela sidebar. Validado em 2026-04-28 com 2 chats antigos (out/2025 e mai/2025) — ambos saltaram para 2026-04-28 ao serem renomeados.
+
+**Implicação:** rename é detectado pelo caminho incremental normal (`update_time > cutoff` força refetch). O guardrail extra no código (`_filter_incremental_targets` comparando `title` da discovery vs `prev_raw`) é defesa em profundidade caso o comportamento mude.
+
+### Rename de project
+
+Sempre detectado, independente de `update_time`. O `project_names` é re-fetched a cada run (via DOM scrape ou API). Como `_project_name` é injetado em todas as convs do project no enrichment, o reconciler detecta mudança via diff de campos `_*`.
+
+### `/projects` 404 intermitente
+
+A discovery tem fallback automático: `/projects` → `/gizmos/discovery/mine` → DOM scrape do sidebar. Fail-fast só dispara se TODOS falharem juntos (raro). Aceita captura parcial só quando explicitamente em última instância (e ainda assim, se a captura cair >20% do baseline histórico, aborta).

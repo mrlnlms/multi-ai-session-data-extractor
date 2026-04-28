@@ -13,7 +13,7 @@ Ver `README.md` pra setup e uso.
 
 | Plataforma | Capture | Reconcile | Sync orquestrador | Notas |
 |---|---|---|---|---|
-| ChatGPT | ✅ | ✅ | ✅ (5 etapas) | Fail-fast + hardlink + preservation completos |
+| ChatGPT | ✅ | ✅ | ✅ (4 etapas, pasta unica) | Preservation completa (conv, source, project deletado), rename detection, fail-fast |
 | Claude.ai | ✅ | ✅ | ❌ | Falta sync equivalente |
 | Gemini | ✅ | ✅ | ❌ | Idem |
 | NotebookLM | ✅ | ✅ | ❌ | 9 tipos de outputs (audio, video, slide deck PDF+PPTX, blog, flashcards, quiz, data table, infographic, mind map) |
@@ -21,25 +21,44 @@ Ver `README.md` pra setup e uso.
 
 Backlog principal: replicar o padrao do ChatGPT-sync nas outras 6 plataformas.
 
-## Estado validado em 2026-04-27 — NAO refazer
+## Estado validado em 2026-04-28 — NAO refazer
 
 Antes de propor refatoracao ou script novo, conferir esta secao. O que esta
 listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
 
-**ChatGPT — ciclo completo validado:**
-- Brute force capturou 1164 convs (30min, 0 erros)
-- 3 runs incrementais encadeadas (cada uma pegou exatamente o delta do que
-  foi atualizado/criado entre runs)
-- Reconciler em cadeia (3 steps) com `--previous-merged` explicito —
-  add/updated/copied/preserved bateram em todos os steps
-- Sync v2 com 5 etapas rodou end-to-end: 924 assets + 110 sources
-  hardlinkados (zero rebaixar), 547 skipped, 0 erros
-- Fail-fast disparou 1x em 5+ runs (discovery 858), retry resolveu
+**ChatGPT — ciclo completo end-to-end validado:**
+- Pasta unica cumulativa: `data/raw/ChatGPT/` e `data/merged/ChatGPT/`
+- Sync v3 com 4 etapas (capture + assets + project_sources + reconcile)
+- Os 6 cenarios CRUD validados empiricamente em 2026-04-27 e 2026-04-28:
+  - Conv deletada → preserved_missing no merged
+  - Conv atualizada (mensagem nova) → updated, update_time bumpado
+  - Conv nova → added
+  - Conv renomeada → updated (servidor bumpa update_time, mas guardrail extra
+    no codigo cobre o caso edge de nao-bump)
+  - Project criado → discovery sobe, novo g-p-* em project_sources/
+  - Project deletado inteiro → todas as sources marcadas _preserved_missing,
+    binarios fisicos intocados, chats internos preservados no merged
+- Fail-fast contra discovery flakey (>20% drop aborta antes do save)
+- 100 testes unitarios passando
 
-**Estado atual `data/merged/ChatGPT/2026-04-27/chatgpt_merged.json`:**
-- 1167 convs cumulativas (incluindo preserved_missing de runs anteriores)
-- E a fonte de verdade pro ChatGPT — proxima run consome dele como
-  previous_merged automatico
+**Estado atual `data/merged/ChatGPT/chatgpt_merged.json`:**
+- 1171 convs cumulativas (1168 active + 3 preserved_missing)
+- E a fonte de verdade pro ChatGPT
+- LAST_RECONCILE.md e reconcile_log.jsonl atualizados a cada run
+
+## Comportamento do servidor ChatGPT (validado empiricamente)
+
+- **`update_time` em rename:** servidor BUMPA pra hora atual quando renomeias
+  conv pela sidebar. Validado em 2026-04-28 com 2 chats antigos (out/2025 e
+  mai/2025) — ambos saltaram pra 2026-04-28 ao renomear. Implicacao: caminho
+  incremental normal (`update_time > cutoff`) ja pega rename. Guardrail no
+  `_filter_incremental_targets` (compara title da discovery vs prev_raw) eh
+  defesa em profundidade caso comportamento mude.
+- **Rename de project (nome do project_id, nao IDs):** sempre detectado via
+  `project_names` re-fetched a cada run. Independente de update_time.
+- **`/projects` 404 intermitente:** caller tem fallback automatico para
+  `/gizmos/discovery/mine` -> DOM scrape. Fail-fast cobre quando todos os
+  fallbacks falham juntos (raro).
 
 **O que NAO precisa ser feito (proposto e descartado em 27/abr):**
 - Re-mergear "do zero" varrendo `_backup-gpt/merged-*` — reconciler ja faz
