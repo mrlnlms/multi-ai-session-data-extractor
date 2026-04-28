@@ -51,8 +51,10 @@ def build_plan(current_raw: dict, previous_merged: dict | None) -> Plan:
                        if k.startswith("_") and k not in OPERATIONAL_ENRICHMENT}
         prev_enrich = {k: v for k, v in prev.items()
                        if k.startswith("_") and k not in OPERATIONAL_ENRICHMENT}
-        if curr_ut > prev_ut or curr_enrich != prev_enrich:
-            to_use.append(cid)  # updated (ou enrichment semantico mudou)
+        # Title pode mudar via rename sem update_time (guardrail preventivo).
+        title_changed = curr.get("title") != prev.get("title")
+        if curr_ut > prev_ut or curr_enrich != prev_enrich or title_changed:
+            to_use.append(cid)  # updated (ou enrichment semantico mudou ou rename)
         else:
             to_copy.append(cid)  # unchanged
 

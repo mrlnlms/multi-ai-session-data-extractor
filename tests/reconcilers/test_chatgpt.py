@@ -99,6 +99,34 @@ def test_build_plan_enrichment_unchanged_goes_to_copy():
     assert plan.to_use_from_current == []
 
 
+def test_build_plan_title_changed_without_update_time_goes_to_current():
+    """Guardrail: title diferente entre current e previous → to_use, mesmo
+    sem update_time mudar. Cobre caso de rename onde servidor nao bumpa
+    update_time (defensive — empiricamente nao validado mas previne gap)."""
+    prev_conv = _conv("a", 10.0)
+    prev_conv["title"] = "Title Antigo"
+    curr_conv = _conv("a", 10.0)  # mesmo update_time
+    curr_conv["title"] = "Title NOVO"  # so o title mudou
+    previous = _raw_dict([prev_conv])
+    current = _raw_dict([curr_conv])
+    plan = build_plan(current, previous)
+    assert plan.to_use_from_current == ["a"]
+    assert plan.to_copy_from_previous == []
+
+
+def test_build_plan_same_title_goes_to_copy():
+    """Title igual + update_time igual + enrichment igual → to_copy (idempotente)."""
+    prev_conv = _conv("a", 10.0)
+    prev_conv["title"] = "Mesmo Title"
+    curr_conv = _conv("a", 10.0)
+    curr_conv["title"] = "Mesmo Title"
+    previous = _raw_dict([prev_conv])
+    current = _raw_dict([curr_conv])
+    plan = build_plan(current, previous)
+    assert plan.to_copy_from_previous == ["a"]
+    assert plan.to_use_from_current == []
+
+
 def test_build_plan_only_operational_enrichment_diff_goes_to_copy():
     """_last_seen_in_server eh operacional (muda toda captura). Diff so nele NAO triggera to_use.
 

@@ -12,7 +12,9 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.extractors.chatgpt.models import ConversationMeta
 from src.extractors.chatgpt.orchestrator import (
+    _filter_incremental_targets,
     _find_last_capture,
     _get_max_known_discovery,
 )
@@ -157,3 +159,75 @@ def test_get_max_known_discovery_skips_corrupt_logs(tmp_path):
     )
 
     assert _get_max_known_discovery(tmp_path) == 500
+
+
+# ============================================================
+# _filter_incremental_targets — incremental fetch decision
+# ============================================================
+
+def _meta(cid: str, title: str | None, update_time: float):
+    return ConversationMeta(
+        id=cid, title=title, create_time=1.0, update_time=update_time,
+        project_id=None, archived=False,
+    )
+
+
+def test_filter_incremental_includes_new_convs(tmp_path):
+    """Conv que nao esta no prev_raw deve ser fetchada."""
+    cutoff = datetime(2026, 4, 27, 12, 0, tzinfo=timezone.utc)
+    metas = [_meta("new", "Novo Chat", 1234567890.0)]
+    prev_raw = {}  # vazio
+
+    targets = _filter_incremental_targets(metas, prev_raw, cutoff)
+
+    assert targets == ["new"]
+
+
+def test_filter_incremental_includes_updated_convs(tmp_path):
+    """Conv com update_time > cutoff deve ser refetchada."""
+    cutoff = datetime(2026, 4, 27, 12, 0, tzinfo=timezone.utc)
+    cutoff_epoch = cutoff.timestamp()
+    metas = [_meta("a", "Antigo", cutoff_epoch + 100)]
+    prev_raw = {"a": {"id": "a", "title": "Antigo", "update_time": cutoff_epoch - 100}}
+
+    targets = _filter_incremental_targets(metas, prev_raw, cutoff)
+
+    assert targets == ["a"]
+
+
+def test_filter_incremental_skips_unchanged(tmp_path):
+    """Conv com update_time <= cutoff e mesmo title NAO refetchada (incremental skip)."""
+    cutoff = datetime(2026, 4, 27, 12, 0, tzinfo=timezone.utc)
+    cutoff_epoch = cutoff.timestamp()
+    metas = [_meta("a", "Mesmo Title", cutoff_epoch - 100)]
+    prev_raw = {"a": {"id": "a", "title": "Mesmo Title", "update_time": cutoff_epoch - 100}}
+
+    targets = _filter_incremental_targets(metas, prev_raw, cutoff)
+
+    assert targets == []
+
+
+def test_filter_incremental_detects_rename_without_update_time_change(tmp_path):
+    """Guardrail: title mudou (rename) mas update_time igual → forca refetch."""
+    cutoff = datetime(2026, 4, 27, 12, 0, tzinfo=timezone.utc)
+    cutoff_epoch = cutoff.timestamp()
+    metas = [_meta("a", "Title NOVO", cutoff_epoch - 100)]
+    # prev_raw tem title antigo
+    prev_raw = {"a": {"id": "a", "title": "Title Antigo", "update_time": cutoff_epoch - 100}}
+
+    targets = _filter_incremental_targets(metas, prev_raw, cutoff)
+
+    assert targets == ["a"], "Rename sem update_time bump deve forcar refetch"
+
+
+def test_filter_incremental_handles_missing_title_in_meta(tmp_path):
+    """Meta com title=None nao quebra a comparacao."""
+    cutoff = datetime(2026, 4, 27, 12, 0, tzinfo=timezone.utc)
+    cutoff_epoch = cutoff.timestamp()
+    metas = [_meta("a", None, cutoff_epoch - 100)]
+    prev_raw = {"a": {"id": "a", "title": "Algum Title", "update_time": cutoff_epoch - 100}}
+
+    targets = _filter_incremental_targets(metas, prev_raw, cutoff)
+
+    # title=None nao dispara rename detection (poderia ser meta incompleta)
+    assert targets == []

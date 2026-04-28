@@ -409,7 +409,13 @@ def _load_previous_raw(path: Path) -> dict[str, dict]:
 def _filter_incremental_targets(
     metas: list, prev_raw: dict[str, dict], cutoff: datetime
 ) -> list[str]:
-    """Retorna IDs pra fetchar: novos (nao estao em prev_raw) + update_time > cutoff."""
+    """Retorna IDs pra fetchar: novos + update_time > cutoff + title-renamed.
+
+    Title rename: se a discovery retorna title diferente do que temos no
+    prev_raw local, forca refetch mesmo se update_time nao mudou. Guarda contra
+    o caso onde o servidor nao bumpa update_time em rename (nao validado
+    empiricamente — guardrail preventivo).
+    """
     cutoff_epoch = cutoff.timestamp()
     targets: list[str] = []
     for m in metas:
@@ -418,5 +424,9 @@ def _filter_incremental_targets(
             continue
         meta_ut = _parse_ts(m.update_time)
         if meta_ut > cutoff_epoch:
+            targets.append(m.id)
+            continue
+        # Rename detection: discovery tem title diferente do raw local
+        if m.title and m.title != prev_raw[m.id].get("title"):
             targets.append(m.id)
     return targets
