@@ -19,6 +19,7 @@ build/
 .quarto/
 *_files/
 *.html
+notebooks/_output/
 
 # Positron / Playwright storage
 .storage/
