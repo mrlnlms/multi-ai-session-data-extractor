@@ -105,7 +105,7 @@ fixture + teste. Fail = não implementado corretamente.
 
 ## 3. Schema canônico atualizado
 
-### 3.1. Conversation (+4 campos novos)
+### 3.1. Conversation (+6 campos novos)
 
 ```python
 @dataclass
@@ -126,16 +126,30 @@ class Conversation:
     parent_session_id: Optional[str] = None
 
     # NOVOS (parser v3)
-    project_id: Optional[str] = None       # g-p-* (separado de gizmo_id)
-    gizmo_id: Optional[str] = None         # SOMENTE Custom GPT real (g-* não g-p-*)
-    gizmo_name: Optional[str] = None       # nome do Custom GPT, se resolvido
-    gizmo_resolved: bool = True            # False se Custom GPT deletado no servidor
+    project_id: Optional[str] = None              # g-p-* (separado de gizmo_id)
+    gizmo_id: Optional[str] = None                # SOMENTE Custom GPT real (g-* não g-p-*)
+    gizmo_name: Optional[str] = None              # nome do Custom GPT, se resolvido
+    gizmo_resolved: bool = True                   # False se Custom GPT deletado no servidor
+    is_preserved_missing: bool = False            # True se servidor não retornou na última run
+    last_seen_in_server: Optional[pd.Timestamp] = None  # equivalente canônico de _last_seen_in_server
 ```
 
 **Distinção crítica:**
 - `project_id`: g-p-* (pasta com sources)
 - `gizmo_id`: g-* não g-p-* (Custom GPT real)
 - A mesma conv pode ter os dois (raro mas possível)
+
+**Campos de preservation (importante pra dashboard descritivo):**
+- `is_preserved_missing`: equivalente canônico do `_last_seen_in_server != today`
+  do raw. Permite dashboards filtrarem "convs ativas no servidor" vs
+  "preservadas localmente porque sumiram"
+- `last_seen_in_server`: data ISO da última vez que servidor retornou essa
+  conv. Pra preserved, fica fixa no momento de sumiço; pra ativas, atualiza
+  a cada run.
+
+Sem esses campos, downstream teria que reimplementar a heurística
+`_last_seen_in_server vs today` que hoje é convenção do raw — campo
+canônico evita acoplamento ao formato interno.
 
 ### 3.2. Message (+8 campos novos)
 
@@ -397,6 +411,29 @@ src/schema/models.py                          # ATUALIZADO com campos novos + Br
                                                 #   continuar passando
 ```
 
+### 5.1. Convenção de naming (já estabelecida)
+
+O dashboard (Fase 1, já implementado) descobre os mergeds via
+`merged_dir.glob("*_merged.json")`. Implica padrão **`<source_lower>_merged.json`**:
+
+```
+data/merged/ChatGPT/chatgpt_merged.json
+data/merged/Claude.ai/claude_ai_merged.json   (futuro)
+data/merged/Gemini/gemini_merged.json         (futuro)
+```
+
+E pros parquets de saída do parser:
+```
+data/processed/<Source>/conversations.parquet
+data/processed/<Source>/messages.parquet
+data/processed/<Source>/tool_events.parquet
+data/processed/<Source>/branches.parquet
+```
+
+**Regra:** o pacote de saída do parser usa o nome canônico do source
+(capitalizado em pasta `<Source>/`). Os arquivos individuais usam nomes
+da tabela canônica (singular: `conversations`, `messages`, etc).
+
 ---
 
 ## 6. Fases de implementação
@@ -604,8 +641,48 @@ tests/extractors/chatgpt/fixtures/
 ### Independência das fases do dashboard
 
 Parser v3 é **independente** do dashboard:
-- Fase 1 do dashboard (Streamlit MVP, sem parser) já tá rolando paralela
+- Fase 1 do dashboard (Streamlit MVP, sem parser) já está implementada
 - Parser v3 desbloqueia Fase 3 do dashboard (Quarto descritivo)
 - Mas Fase 1 do dashboard não depende do parser
 
 Pode implementar em qualquer ordem.
+
+### Stats vão divergir entre Fase 1 e Fase 3 do dashboard (esperado)
+
+O dashboard Fase 1 (Streamlit, já em produção) calcula stats via
+**heurísticas leves** direto do `chatgpt_merged.json`:
+
+- `total_messages_estimated`: conta nodes com `message != null` (não
+  filtra hidden, system bridges, tool calls)
+- `models`: pega qualquer `model_slug` em qualquer msg (inclui
+  `model_editable_context` e outros system slugs)
+- `convs_per_project`: groupby `_project_id` direto
+
+O parser v3 (Fase 2) gera contagens **exatas** filtrando role∈{user,
+assistant}, excluindo hidden/preserved/system. Quando Fase 3 estiver
+ativa (Quarto consumindo parquets), as stats vão **divergir** das do
+dashboard Fase 1 — esperado, mais fiéis.
+
+**Migração futura (não bloqueante):** quando Fase 3 estabilizar, dashboard
+Fase 1 pode ser refatorado pra ler dos parquets ao invés do merged.json.
+Stats ficam consistentes em todo o produto. Mas Fase 1 funciona standalone
+sem essa migração.
+
+### Compatibilidade com o dashboard Fase 1
+
+Campos que o dashboard Fase 1 lê do `chatgpt_merged.json` e que devem
+permanecer disponíveis (no merged, não no parquet):
+
+| Campo no raw/merged | Quem consome |
+|---|---|
+| `_last_seen_in_server` | Dashboard (active vs preserved) |
+| `_archived` ou `is_archived` | Dashboard (archived count) |
+| `_project_id` | Dashboard (groupby project) |
+| `_project_name` | Dashboard (label projects) |
+| `mapping` (estrutura) | Dashboard (count msgs estimado) |
+| `metadata.model_slug` | Dashboard (count modelos) |
+
+O parser v3 **não modifica o merged.json** — só lê. Esses campos
+continuam intactos pra dashboard Fase 1 funcionar. Parser apenas gera
+representação canônica derivada (parquets) que dashboard Fase 3 lê
+adicionalmente.

@@ -347,13 +347,20 @@ expande pra cobrir todos os 13.
 
 ## 10. Resumo de decisões finais (atualizadas pelos achados)
 
-### Conversation +3 (mantido + 1 ajuste)
+### Conversation +6 (4 do schema + 2 de preservation)
 ```python
 gizmo_id: Optional[str] = None        # SOMENTE Custom GPT real (g-* não g-p-*)
 gizmo_name: Optional[str] = None
 gizmo_resolved: bool = True
 project_id: Optional[str] = None      # NOVO — separa de gizmo_id (gizmo_id era ambíguo)
+is_preserved_missing: bool = False                  # NOVO — equiv canônico de "_last_seen != today"
+last_seen_in_server: Optional[pd.Timestamp] = None  # NOVO — equiv canônico de _last_seen_in_server
 ```
+
+Os 2 últimos foram adicionados após implementação do dashboard Fase 1
+(que consome merged.json direto). Sem eles, downstream que lê parquet
+teria que reimplementar a heurística `_last_seen_in_server vs today`,
+acoplando ao formato interno do raw.
 
 ### Message +6 (ajustes nos achados)
 ```python
