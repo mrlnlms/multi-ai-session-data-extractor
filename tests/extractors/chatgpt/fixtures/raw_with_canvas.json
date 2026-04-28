@@ -1,0 +1,405 @@
+{
+  "conversation_id": "67ed845a-b978-800c-b148-b326f27f0cba",
+  "conversation": {
+    "id": "67ed845a-b978-800c-b148-b326f27f0cba",
+    "title": "[REDACTED]",
+    "create_time": "2025-04-02T18:39:23.462001Z",
+    "update_time": "2025-04-23T13:17:13.885871Z",
+    "mapping": {
+      "be95444e-3df7-4848-b065-adfb915de213": {
+        "id": "be95444e-3df7-4848-b065-adfb915de213",
+        "children": [
+          "4b2c6064-6a81-4c28-886b-28f860c06a83"
+        ]
+      },
+      "4b2c6064-6a81-4c28-886b-28f860c06a83": {
+        "id": "4b2c6064-6a81-4c28-886b-28f860c06a83",
+        "message": {
+          "id": "4b2c6064-6a81-4c28-886b-28f860c06a83",
+          "author": {
+            "role": "system",
+            "metadata": {}
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 0.0,
+          "metadata": {
+            "is_visually_hidden_from_conversation": true
+          },
+          "recipient": "all"
+        },
+        "parent": "be95444e-3df7-4848-b065-adfb915de213",
+        "children": [
+          "3ce5604e-5de0-449b-8c22-8693b34a2a5d"
+        ]
+      },
+      "3ce5604e-5de0-449b-8c22-8693b34a2a5d": {
+        "id": "3ce5604e-5de0-449b-8c22-8693b34a2a5d",
+        "message": {
+          "id": "3ce5604e-5de0-449b-8c22-8693b34a2a5d",
+          "author": {
+            "role": "user",
+            "metadata": {}
+          },
+          "create_time": 1743619162.369879,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "dictation": false,
+            "request_id": "92a272d5f987f1d7-GRU",
+            "message_source": null,
+            "timestamp_": "absolute",
+            "message_type": null
+          },
+          "recipient": "all"
+        },
+        "parent": "4b2c6064-6a81-4c28-886b-28f860c06a83",
+        "children": [
+          "fa84671d-c19e-44ba-9b6f-46e24f8bb1b3"
+        ]
+      },
+      "fa84671d-c19e-44ba-9b6f-46e24f8bb1b3": {
+        "id": "fa84671d-c19e-44ba-9b6f-46e24f8bb1b3",
+        "message": {
+          "id": "fa84671d-c19e-44ba-9b6f-46e24f8bb1b3",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1743619175.514602,
+          "content": {
+            "content_type": "model_editable_context",
+            "model_set_context": ""
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "message_type": null,
+            "model_slug": "gpt-4-5",
+            "default_model_slug": "gpt-4-5",
+            "parent_id": "3ce5604e-5de0-449b-8c22-8693b34a2a5d",
+            "request_id": "92a272d5f987f1d7-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "3ce5604e-5de0-449b-8c22-8693b34a2a5d",
+        "children": [
+          "70ead3b4-185f-469d-8287-3d52be5e1431"
+        ]
+      },
+      "70ead3b4-185f-469d-8287-3d52be5e1431": {
+        "id": "70ead3b4-185f-469d-8287-3d52be5e1431",
+        "message": {
+          "id": "70ead3b4-185f-469d-8287-3d52be5e1431",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1743619163.724115,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": false,
+          "weight": 1.0,
+          "metadata": {
+            "finish_details": {
+              "type": "stop",
+              "stop_tokens": [
+                200007
+              ]
+            },
+            "is_complete": true,
+            "citations": [],
+            "content_references": [],
+            "message_type": null,
+            "model_slug": "gpt-4-5",
+            "default_model_slug": "gpt-4-5",
+            "parent_id": "fa84671d-c19e-44ba-9b6f-46e24f8bb1b3",
+            "request_id": "92a272d5f987f1d7-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "fa84671d-c19e-44ba-9b6f-46e24f8bb1b3",
+        "children": [
+          "1a20c537-7909-4cb9-8ab0-9d98b258e183"
+        ]
+      },
+      "1a20c537-7909-4cb9-8ab0-9d98b258e183": {
+        "id": "1a20c537-7909-4cb9-8ab0-9d98b258e183",
+        "message": {
+          "id": "1a20c537-7909-4cb9-8ab0-9d98b258e183",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1743619168.955443,
+          "content": {
+            "content_type": "code",
+            "language": "json",
+            "text": "[REDACTED]"
+          },
+          "status": "finished_successfully",
+          "end_turn": false,
+          "weight": 1.0,
+          "metadata": {
+            "finish_details": {
+              "type": "stop",
+              "stop_tokens": [
+                200007
+              ]
+            },
+            "is_complete": true,
+            "citations": [],
+            "content_references": [],
+            "message_type": null,
+            "model_slug": "gpt-4-5",
+            "default_model_slug": "gpt-4-5",
+            "parent_id": "70ead3b4-185f-469d-8287-3d52be5e1431",
+            "request_id": "92a272d5f987f1d7-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "canmore.create_textdoc"
+        },
+        "parent": "70ead3b4-185f-469d-8287-3d52be5e1431",
+        "children": [
+          "65b247e3-de02-4116-afc0-642e2e714bf1"
+        ]
+      },
+      "65b247e3-de02-4116-afc0-642e2e714bf1": {
+        "id": "65b247e3-de02-4116-afc0-642e2e714bf1",
+        "message": {
+          "id": "65b247e3-de02-4116-afc0-642e2e714bf1",
+          "author": {
+            "role": "tool",
+            "name": "canmore.create_textdoc",
+            "metadata": {}
+          },
+          "create_time": 1743619220.041823,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 0.0,
+          "metadata": {
+            "canvas": {
+              "textdoc_id": "67ed848fec788191906e94e561f396d8",
+              "textdoc_type": "document",
+              "version": 1,
+              "title": "Principios Cross Canal",
+              "create_source": "model"
+            },
+            "command": "create_textdoc",
+            "message_type": null,
+            "model_slug": "gpt-4-5",
+            "default_model_slug": "gpt-4-5",
+            "parent_id": "1a20c537-7909-4cb9-8ab0-9d98b258e183",
+            "request_id": "92a272d5f987f1d7-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "1a20c537-7909-4cb9-8ab0-9d98b258e183",
+        "children": [
+          "45b71de1-61a0-4b7a-bc9f-6fcfde0bb0e4"
+        ]
+      },
+      "45b71de1-61a0-4b7a-bc9f-6fcfde0bb0e4": {
+        "id": "45b71de1-61a0-4b7a-bc9f-6fcfde0bb0e4",
+        "message": {
+          "id": "45b71de1-61a0-4b7a-bc9f-6fcfde0bb0e4",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1743619216.18349,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "finish_details": {
+              "type": "stop",
+              "stop_tokens": [
+                200002
+              ]
+            },
+            "is_complete": true,
+            "citations": [],
+            "content_references": [],
+            "message_type": null,
+            "model_slug": "gpt-4-5",
+            "default_model_slug": "gpt-4-5",
+            "parent_id": "65b247e3-de02-4116-afc0-642e2e714bf1",
+            "request_id": "92a272d5f987f1d7-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "65b247e3-de02-4116-afc0-642e2e714bf1",
+        "children": [
+          "92da9fa5-6dc2-4b56-a40f-92894a9c3f63"
+        ]
+      },
+      "92da9fa5-6dc2-4b56-a40f-92894a9c3f63": {
+        "id": "92da9fa5-6dc2-4b56-a40f-92894a9c3f63",
+        "message": {
+          "id": "92da9fa5-6dc2-4b56-a40f-92894a9c3f63",
+          "author": {
+            "role": "user",
+            "metadata": {}
+          },
+          "create_time": 1743619236.574168,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "dictation": false,
+            "request_id": "92a274a5bd0ef1d7-GRU",
+            "message_source": null,
+            "timestamp_": "absolute",
+            "message_type": null
+          },
+          "recipient": "all"
+        },
+        "parent": "45b71de1-61a0-4b7a-bc9f-6fcfde0bb0e4",
+        "children": [
+          "7ae505f4-b680-43c2-8bb6-26c1355ec999"
+        ]
+      },
+      "7ae505f4-b680-43c2-8bb6-26c1355ec999": {
+        "id": "7ae505f4-b680-43c2-8bb6-26c1355ec999",
+        "message": {
+          "id": "7ae505f4-b680-43c2-8bb6-26c1355ec999",
+          "author": {
+            "role": "system",
+            "metadata": {}
+          },
+          "create_time": 1743619249.688672,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 0.0,
+          "metadata": {
+            "rebase_system_message": true,
+            "message_type": null,
+            "model_slug": "gpt-4-5",
+            "default_model_slug": "gpt-4-5",
+            "parent_id": "92da9fa5-6dc2-4b56-a40f-92894a9c3f63",
+            "request_id": "92a274a5bd0ef1d7-GRU",
+            "timestamp_": "absolute",
+            "is_visually_hidden_from_conversation": true
+          },
+          "recipient": "all"
+        },
+        "parent": "92da9fa5-6dc2-4b56-a40f-92894a9c3f63",
+        "children": [
+          "f2bc929e-5548-4766-be1f-b9f3e6be6540"
+        ]
+      },
+      "f2bc929e-5548-4766-be1f-b9f3e6be6540": {
+        "id": "f2bc929e-5548-4766-be1f-b9f3e6be6540",
+        "message": {
+          "id": "f2bc929e-5548-4766-be1f-b9f3e6be6540",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1743619237.979185,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "finish_details": {
+              "type": "stop",
+              "stop_tokens": [
+                200002
+              ]
+            },
+            "is_complete": true,
+            "citations": [],
+            "content_references": [],
+            "message_type": null,
+            "model_slug": "gpt-4-5",
+            "default_model_slug": "gpt-4-5",
+            "parent_id": "7ae505f4-b680-43c2-8bb6-26c1355ec999",
+            "request_id": "92a274a5bd0ef1d7-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "7ae505f4-b680-43c2-8bb6-26c1355ec999",
+        "children": []
+      }
+    },
+    "current_node": "f2bc929e-5548-4766-be1f-b9f3e6be6540",
+    "conversation_template_id": "g-p-67ec2fb46eb08191a913dcb0eb24603b",
+    "gizmo_id": "g-p-67ec2fb46eb08191a913dcb0eb24603b",
+    "is_archived": false,
+    "is_temporary_chat": false,
+    "memory_scope": "global_enabled",
+    "context_scopes_v2": {
+      "context_scopes": [
+        {
+          "is_siloed": false,
+          "scope_namespace": "global",
+          "sub_scope": null,
+          "key": null,
+          "key_timestamp": null,
+          "key_scoped_access_claim": null
+        }
+      ]
+    },
+    "safe_urls": [
+      "https://www.caju.com.br/"
+    ],
+    "blocked_urls": [],
+    "sugar_item_visible": false,
+    "_truncation_recovered": false,
+    "_archived": false,
+    "_project_id": "g-p-67ec2fb46eb08191a913dcb0eb24603b",
+    "_last_seen_in_server": "2026-04-28",
+    "_project_name": "Sicredi - Heuristic Evaluation IB+App"
+  }
+}

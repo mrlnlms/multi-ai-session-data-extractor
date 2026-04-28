@@ -1,0 +1,287 @@
+{
+  "conversation_id": "67dada8d-bf44-800c-8f35-bb5f1a3d916f",
+  "conversation": {
+    "id": "67dada8d-bf44-800c-8f35-bb5f1a3d916f",
+    "title": "[REDACTED]",
+    "create_time": "2025-03-19T14:54:06.125978Z",
+    "update_time": "2025-03-29T18:51:04.981099Z",
+    "mapping": {
+      "72b80b7e-71f0-4083-bf19-6a823924dd9a": {
+        "id": "72b80b7e-71f0-4083-bf19-6a823924dd9a",
+        "children": [
+          "88659af3-c867-4303-b180-798f7a37578b"
+        ]
+      },
+      "88659af3-c867-4303-b180-798f7a37578b": {
+        "id": "88659af3-c867-4303-b180-798f7a37578b",
+        "message": {
+          "id": "88659af3-c867-4303-b180-798f7a37578b",
+          "author": {
+            "role": "system",
+            "metadata": {}
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 0.0,
+          "metadata": {
+            "is_visually_hidden_from_conversation": true
+          },
+          "recipient": "all"
+        },
+        "parent": "72b80b7e-71f0-4083-bf19-6a823924dd9a",
+        "children": [
+          "7b37ac9d-dd79-4656-99bf-51c33b595fc4"
+        ]
+      },
+      "7b37ac9d-dd79-4656-99bf-51c33b595fc4": {
+        "id": "7b37ac9d-dd79-4656-99bf-51c33b595fc4",
+        "message": {
+          "id": "7b37ac9d-dd79-4656-99bf-51c33b595fc4",
+          "author": {
+            "role": "user",
+            "metadata": {}
+          },
+          "create_time": 1742396045.451386,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "attachments": [
+              {
+                "mime_type": "text/plain",
+                "size": 81633,
+                "name": "[REDACTED]",
+                "id": "file-KG7J2YSiFk5CqXDKqfxZT1"
+              }
+            ],
+            "dictation": false,
+            "request_id": "922dcd9518f6f1a1-GRU",
+            "message_source": null,
+            "timestamp_": "absolute",
+            "message_type": null
+          },
+          "recipient": "all"
+        },
+        "parent": "88659af3-c867-4303-b180-798f7a37578b",
+        "children": [
+          "4cc69a76-e25a-4bb3-948c-a11b89bf001a"
+        ]
+      },
+      "4cc69a76-e25a-4bb3-948c-a11b89bf001a": {
+        "id": "4cc69a76-e25a-4bb3-948c-a11b89bf001a",
+        "message": {
+          "id": "4cc69a76-e25a-4bb3-948c-a11b89bf001a",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1742396058.24544,
+          "content": {
+            "content_type": "model_editable_context",
+            "model_set_context": ""
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "message_type": null,
+            "model_slug": "gpt-4o",
+            "default_model_slug": "gpt-4o",
+            "parent_id": "7b37ac9d-dd79-4656-99bf-51c33b595fc4",
+            "request_id": "922dcd9518f6f1a1-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "7b37ac9d-dd79-4656-99bf-51c33b595fc4",
+        "children": [
+          "ef63bf1a-48d4-4a2e-849d-2fe52866861a"
+        ]
+      },
+      "ef63bf1a-48d4-4a2e-849d-2fe52866861a": {
+        "id": "ef63bf1a-48d4-4a2e-849d-2fe52866861a",
+        "message": {
+          "id": "ef63bf1a-48d4-4a2e-849d-2fe52866861a",
+          "author": {
+            "role": "tool",
+            "name": "myfiles_browser",
+            "metadata": {}
+          },
+          "create_time": 1742396058.245692,
+          "content": {
+            "content_type": "tether_browsing_display",
+            "result": "",
+            "summary": ""
+          },
+          "status": "finished_successfully",
+          "weight": 0.0,
+          "metadata": {
+            "command": "spinner",
+            "status": "running",
+            "message_type": null,
+            "model_slug": "gpt-4o",
+            "default_model_slug": "gpt-4o",
+            "parent_id": "4cc69a76-e25a-4bb3-948c-a11b89bf001a",
+            "request_id": "922dcd9518f6f1a1-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "4cc69a76-e25a-4bb3-948c-a11b89bf001a",
+        "children": [
+          "130ba5b0-dff0-474e-accf-43344631072f"
+        ]
+      },
+      "130ba5b0-dff0-474e-accf-43344631072f": {
+        "id": "130ba5b0-dff0-474e-accf-43344631072f",
+        "message": {
+          "id": "130ba5b0-dff0-474e-accf-43344631072f",
+          "author": {
+            "role": "tool",
+            "name": "myfiles_browser",
+            "metadata": {}
+          },
+          "create_time": 1742396058.245816,
+          "content": {
+            "content_type": "tether_quote",
+            "url": "file-[REDACTED]",
+            "domain": "[REDACTED]",
+            "text": "[REDACTED]",
+            "title": "[REDACTED]"
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "command": "context_stuff",
+            "is_visually_hidden_from_conversation": false,
+            "message_type": null,
+            "model_slug": "gpt-4o",
+            "default_model_slug": "gpt-4o",
+            "parent_id": "ef63bf1a-48d4-4a2e-849d-2fe52866861a",
+            "request_id": "922dcd9518f6f1a1-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "ef63bf1a-48d4-4a2e-849d-2fe52866861a",
+        "children": [
+          "749d12b2-7bb3-431d-a46b-8495e8297d16"
+        ]
+      },
+      "749d12b2-7bb3-431d-a46b-8495e8297d16": {
+        "id": "749d12b2-7bb3-431d-a46b-8495e8297d16",
+        "message": {
+          "id": "749d12b2-7bb3-431d-a46b-8495e8297d16",
+          "author": {
+            "role": "tool",
+            "name": "myfiles_browser",
+            "metadata": {}
+          },
+          "create_time": 1742396058.246007,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "is_visually_hidden_from_conversation": false,
+            "command": "prompt",
+            "message_type": null,
+            "model_slug": "gpt-4o",
+            "default_model_slug": "gpt-4o",
+            "parent_id": "130ba5b0-dff0-474e-accf-43344631072f",
+            "request_id": "922dcd9518f6f1a1-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "130ba5b0-dff0-474e-accf-43344631072f",
+        "children": [
+          "8d2d1f37-65b1-4c4a-8abb-25e6942b30aa"
+        ]
+      },
+      "8d2d1f37-65b1-4c4a-8abb-25e6942b30aa": {
+        "id": "8d2d1f37-65b1-4c4a-8abb-25e6942b30aa",
+        "message": {
+          "id": "8d2d1f37-65b1-4c4a-8abb-25e6942b30aa",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1742396046.70137,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "finish_details": {
+              "type": "stop",
+              "stop_tokens": [
+                200002
+              ]
+            },
+            "is_complete": true,
+            "citations": [],
+            "content_references": [],
+            "message_type": null,
+            "model_slug": "gpt-4o",
+            "default_model_slug": "gpt-4o",
+            "parent_id": "749d12b2-7bb3-431d-a46b-8495e8297d16",
+            "request_id": "922dcd9518f6f1a1-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "749d12b2-7bb3-431d-a46b-8495e8297d16",
+        "children": []
+      }
+    },
+    "current_node": "8d2d1f37-65b1-4c4a-8abb-25e6942b30aa",
+    "conversation_template_id": "g-p-67e840ac41748191b90975beafe3dd86",
+    "gizmo_id": "g-p-67e840ac41748191b90975beafe3dd86",
+    "is_archived": false,
+    "is_temporary_chat": false,
+    "memory_scope": "global_enabled",
+    "context_scopes_v2": {
+      "context_scopes": [
+        {
+          "is_siloed": false,
+          "scope_namespace": "global",
+          "sub_scope": null,
+          "key": null,
+          "key_timestamp": null,
+          "key_scoped_access_claim": null
+        }
+      ]
+    },
+    "safe_urls": [
+      "https://www.caju.com.br/",
+      "https://app.tactiq.io/api/2/u/m/r/bo8Of7Bns62zpBPdLqJE?o=txt"
+    ],
+    "blocked_urls": [],
+    "sugar_item_visible": false,
+    "_truncation_recovered": false,
+    "_archived": false,
+    "_project_id": "g-p-67e840ac41748191b90975beafe3dd86",
+    "_last_seen_in_server": "2026-04-28",
+    "_project_name": "Sicredi - Redesign do Canais Digitais"
+  }
+}

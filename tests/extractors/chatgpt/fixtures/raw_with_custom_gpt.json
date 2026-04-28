@@ -1,0 +1,568 @@
+{
+  "conversation_id": "691ea2cb-0a78-8328-b4a8-8820de9aa998",
+  "conversation": {
+    "id": "691ea2cb-0a78-8328-b4a8-8820de9aa998",
+    "title": "[REDACTED]",
+    "create_time": "2025-11-20T05:10:37.480012Z",
+    "update_time": "2025-11-20T05:10:49.322483Z",
+    "mapping": {
+      "client-created-root": {
+        "id": "client-created-root",
+        "children": [
+          "d481600b-5df4-4c3a-8ecf-50cd9b81a889"
+        ]
+      },
+      "d481600b-5df4-4c3a-8ecf-50cd9b81a889": {
+        "id": "d481600b-5df4-4c3a-8ecf-50cd9b81a889",
+        "message": {
+          "id": "d481600b-5df4-4c3a-8ecf-50cd9b81a889",
+          "author": {
+            "role": "system",
+            "metadata": {}
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 0.0,
+          "metadata": {
+            "is_visually_hidden_from_conversation": true
+          },
+          "recipient": "all"
+        },
+        "parent": "client-created-root",
+        "children": [
+          "b1773495-6ed5-4d7a-bd97-f3691f572046"
+        ]
+      },
+      "b1773495-6ed5-4d7a-bd97-f3691f572046": {
+        "id": "b1773495-6ed5-4d7a-bd97-f3691f572046",
+        "message": {
+          "id": "b1773495-6ed5-4d7a-bd97-f3691f572046",
+          "author": {
+            "role": "system",
+            "metadata": {}
+          },
+          "create_time": 1763615436.47801,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "attachments": [
+              {
+                "id": "file-2A63hrBpn2K4Bx8zSmxBiB",
+                "name": "[REDACTED]",
+                "mimeType": "text/html",
+                "fileSizeTokens": 3398
+              },
+              {
+                "id": "file-SpayV1ZLVkqP9mHUwAjUbj",
+                "name": "[REDACTED]",
+                "mimeType": "text/html",
+                "fileSizeTokens": 3290
+              },
+              {
+                "id": "file-V8BMxJNtdJAdFLtSHVUpeQ",
+                "name": "[REDACTED]",
+                "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "fileSizeTokens": 5296
+              },
+              {
+                "id": "file-8AnwkuMm5ZuepFe2pzkkYB",
+                "name": "[REDACTED]",
+                "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "fileSizeTokens": 3878
+              }
+            ],
+            "is_visually_hidden_from_conversation": true
+          },
+          "recipient": "all"
+        },
+        "parent": "d481600b-5df4-4c3a-8ecf-50cd9b81a889",
+        "children": [
+          "11109765-f4de-418f-bcb3-0cbb2add5e03"
+        ]
+      },
+      "11109765-f4de-418f-bcb3-0cbb2add5e03": {
+        "id": "11109765-f4de-418f-bcb3-0cbb2add5e03",
+        "message": {
+          "id": "11109765-f4de-418f-bcb3-0cbb2add5e03",
+          "author": {
+            "role": "user",
+            "metadata": {}
+          },
+          "create_time": 1763615434.485,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "request_id": "237ac025-668b-4ad6-8115-3e02fe85a044",
+            "message_source": null,
+            "turn_exchange_id": "35cacc70-f066-4a6a-89c3-30d7b26ac6ca",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "b1773495-6ed5-4d7a-bd97-f3691f572046",
+        "children": [
+          "45ef614d-df8e-4524-8107-0621be282671"
+        ]
+      },
+      "45ef614d-df8e-4524-8107-0621be282671": {
+        "id": "45ef614d-df8e-4524-8107-0621be282671",
+        "message": {
+          "id": "45ef614d-df8e-4524-8107-0621be282671",
+          "author": {
+            "role": "system",
+            "metadata": {}
+          },
+          "create_time": 1763615436.490446,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 0.0,
+          "metadata": {
+            "is_visually_hidden_from_conversation": true,
+            "request_id": "237ac025-668b-4ad6-8115-3e02fe85a044",
+            "message_source": null,
+            "turn_exchange_id": "35cacc70-f066-4a6a-89c3-30d7b26ac6ca",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "11109765-f4de-418f-bcb3-0cbb2add5e03",
+        "children": [
+          "dac541c4-c2cd-4f81-9a33-8ec636fdd0e5"
+        ]
+      },
+      "dac541c4-c2cd-4f81-9a33-8ec636fdd0e5": {
+        "id": "dac541c4-c2cd-4f81-9a33-8ec636fdd0e5",
+        "message": {
+          "id": "dac541c4-c2cd-4f81-9a33-8ec636fdd0e5",
+          "author": {
+            "role": "tool",
+            "name": "file_search",
+            "metadata": {}
+          },
+          "create_time": 1763615436.5229504,
+          "content": {
+            "content_type": "tether_browsing_display",
+            "result": "",
+            "summary": ""
+          },
+          "status": "finished_successfully",
+          "weight": 0.0,
+          "metadata": {
+            "command": "spinner",
+            "status": "running",
+            "request_id": "237ac025-668b-4ad6-8115-3e02fe85a044",
+            "message_type": "next",
+            "model_slug": "gpt-5-1",
+            "default_model_slug": "gpt-5-1",
+            "parent_id": "45ef614d-df8e-4524-8107-0621be282671",
+            "turn_exchange_id": "35cacc70-f066-4a6a-89c3-30d7b26ac6ca",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "45ef614d-df8e-4524-8107-0621be282671",
+        "children": [
+          "408224a8-7ab5-4b84-a9e9-ea7f3d5194dd"
+        ]
+      },
+      "408224a8-7ab5-4b84-a9e9-ea7f3d5194dd": {
+        "id": "408224a8-7ab5-4b84-a9e9-ea7f3d5194dd",
+        "message": {
+          "id": "408224a8-7ab5-4b84-a9e9-ea7f3d5194dd",
+          "author": {
+            "role": "tool",
+            "name": "file_search",
+            "metadata": {}
+          },
+          "create_time": 1763615437.4126694,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              "[REDACTED]",
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "command": "context_stuff",
+            "is_visually_hidden_from_conversation": false,
+            "retrieval_turn_number": 0,
+            "retrieval_file_index": 0,
+            "request_id": "237ac025-668b-4ad6-8115-3e02fe85a044",
+            "message_type": "next",
+            "model_slug": "gpt-5-1",
+            "default_model_slug": "gpt-5-1",
+            "parent_id": "dac541c4-c2cd-4f81-9a33-8ec636fdd0e5",
+            "turn_exchange_id": "35cacc70-f066-4a6a-89c3-30d7b26ac6ca",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "dac541c4-c2cd-4f81-9a33-8ec636fdd0e5",
+        "children": [
+          "36399e22-95c7-4e11-ae99-69101360b043"
+        ]
+      },
+      "36399e22-95c7-4e11-ae99-69101360b043": {
+        "id": "36399e22-95c7-4e11-ae99-69101360b043",
+        "message": {
+          "id": "36399e22-95c7-4e11-ae99-69101360b043",
+          "author": {
+            "role": "tool",
+            "name": "file_search",
+            "metadata": {}
+          },
+          "create_time": 1763615437.4315596,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              "[REDACTED]",
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "command": "context_stuff",
+            "is_visually_hidden_from_conversation": false,
+            "retrieval_turn_number": 0,
+            "retrieval_file_index": 1,
+            "request_id": "237ac025-668b-4ad6-8115-3e02fe85a044",
+            "message_type": "next",
+            "model_slug": "gpt-5-1",
+            "default_model_slug": "gpt-5-1",
+            "parent_id": "408224a8-7ab5-4b84-a9e9-ea7f3d5194dd",
+            "turn_exchange_id": "35cacc70-f066-4a6a-89c3-30d7b26ac6ca",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "408224a8-7ab5-4b84-a9e9-ea7f3d5194dd",
+        "children": [
+          "678044a3-42ab-4cc3-9b55-0b7792ffc7e9"
+        ]
+      },
+      "678044a3-42ab-4cc3-9b55-0b7792ffc7e9": {
+        "id": "678044a3-42ab-4cc3-9b55-0b7792ffc7e9",
+        "message": {
+          "id": "678044a3-42ab-4cc3-9b55-0b7792ffc7e9",
+          "author": {
+            "role": "tool",
+            "name": "file_search",
+            "metadata": {}
+          },
+          "create_time": 1763615437.4350603,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              "[REDACTED]",
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "command": "context_stuff",
+            "is_visually_hidden_from_conversation": false,
+            "retrieval_turn_number": 0,
+            "retrieval_file_index": 2,
+            "request_id": "237ac025-668b-4ad6-8115-3e02fe85a044",
+            "message_type": "next",
+            "model_slug": "gpt-5-1",
+            "default_model_slug": "gpt-5-1",
+            "parent_id": "36399e22-95c7-4e11-ae99-69101360b043",
+            "turn_exchange_id": "35cacc70-f066-4a6a-89c3-30d7b26ac6ca",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "36399e22-95c7-4e11-ae99-69101360b043",
+        "children": [
+          "98786a66-9a99-4836-9b5d-3518ade0442c"
+        ]
+      },
+      "98786a66-9a99-4836-9b5d-3518ade0442c": {
+        "id": "98786a66-9a99-4836-9b5d-3518ade0442c",
+        "message": {
+          "id": "98786a66-9a99-4836-9b5d-3518ade0442c",
+          "author": {
+            "role": "tool",
+            "name": "file_search",
+            "metadata": {}
+          },
+          "create_time": 1763615437.4393115,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              "[REDACTED]",
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "command": "context_stuff",
+            "is_visually_hidden_from_conversation": false,
+            "retrieval_turn_number": 0,
+            "retrieval_file_index": 3,
+            "request_id": "237ac025-668b-4ad6-8115-3e02fe85a044",
+            "message_type": "next",
+            "model_slug": "gpt-5-1",
+            "default_model_slug": "gpt-5-1",
+            "parent_id": "678044a3-42ab-4cc3-9b55-0b7792ffc7e9",
+            "turn_exchange_id": "35cacc70-f066-4a6a-89c3-30d7b26ac6ca",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "678044a3-42ab-4cc3-9b55-0b7792ffc7e9",
+        "children": [
+          "69e106b7-ebf8-40cc-8a51-cd53d13426a6"
+        ]
+      },
+      "69e106b7-ebf8-40cc-8a51-cd53d13426a6": {
+        "id": "69e106b7-ebf8-40cc-8a51-cd53d13426a6",
+        "message": {
+          "id": "69e106b7-ebf8-40cc-8a51-cd53d13426a6",
+          "author": {
+            "role": "tool",
+            "name": "file_search",
+            "metadata": {}
+          },
+          "create_time": 1763615437.4436672,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "is_visually_hidden_from_conversation": false,
+            "request_id": "237ac025-668b-4ad6-8115-3e02fe85a044",
+            "message_type": "next",
+            "model_slug": "gpt-5-1",
+            "default_model_slug": "gpt-5-1",
+            "parent_id": "98786a66-9a99-4836-9b5d-3518ade0442c",
+            "turn_exchange_id": "35cacc70-f066-4a6a-89c3-30d7b26ac6ca",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "98786a66-9a99-4836-9b5d-3518ade0442c",
+        "children": [
+          "58bf23ae-d0ef-424e-aa26-5ba6f907d3c3"
+        ]
+      },
+      "58bf23ae-d0ef-424e-aa26-5ba6f907d3c3": {
+        "id": "58bf23ae-d0ef-424e-aa26-5ba6f907d3c3",
+        "message": {
+          "id": "58bf23ae-d0ef-424e-aa26-5ba6f907d3c3",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1763615437.417009,
+          "update_time": 1763615445.61277,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "finish_details": {
+              "type": "stop",
+              "stop_tokens": [
+                200002
+              ]
+            },
+            "is_complete": true,
+            "citations": [
+              {
+                "start_ix": 581,
+                "end_ix": 602,
+                "citation_format_type": "berry_file_search",
+                "metadata": {
+                  "type": "file",
+                  "name": "[REDACTED]",
+                  "id": "file-2A63hrBpn2K4Bx8zSmxBiB",
+                  "source": "my_files",
+                  "text": "",
+                  "extra": {
+                    "retrieval_turn": 0,
+                    "retrieval_file_index": 0,
+                    "cited_message_idx": 9,
+                    "cited_message_id": "408224a8-7ab5-4b84-a9e9-ea7f3d5194dd",
+                    "search_result_idx": null,
+                    "line_range": null,
+                    "cloud_doc_url": null,
+                    "authors_display": null,
+                    "doi": null,
+                    "publication_year": "None",
+                    "journal_name": null,
+                    "journal_homepage_url": null
+                  }
+                }
+              },
+              {
+                "start_ix": 603,
+                "end_ix": 624,
+                "citation_format_type": "berry_file_search",
+                "metadata": {
+                  "type": "file",
+                  "name": "[REDACTED]",
+                  "id": "file-SpayV1ZLVkqP9mHUwAjUbj",
+                  "source": "my_files",
+                  "text": "",
+                  "extra": {
+                    "retrieval_turn": 0,
+                    "retrieval_file_index": 1,
+                    "cited_message_idx": 10,
+                    "cited_message_id": "36399e22-95c7-4e11-ae99-69101360b043",
+                    "search_result_idx": null,
+                    "line_range": null,
+                    "cloud_doc_url": null,
+                    "authors_display": null,
+                    "doi": null,
+                    "publication_year": "None",
+                    "journal_name": null,
+                    "journal_homepage_url": null
+                  }
+                }
+              }
+            ],
+            "content_references": [
+              {
+                "matched_text": "fileciteturn0file0",
+                "start_idx": 581,
+                "end_idx": 602,
+                "alt": null,
+                "type": "file",
+                "name": "[REDACTED]",
+                "id": "file-2A63hrBpn2K4Bx8zSmxBiB",
+                "source": "my_files",
+                "snippet": "",
+                "cloud_doc_url": null,
+                "medical_file_reference": {
+                  "authors_display": null,
+                  "doi": null,
+                  "publication_year": "None",
+                  "journal_name": null,
+                  "journal_homepage_url": null
+                },
+                "input_pointer": {
+                  "message_index": 0,
+                  "message_id": "408224a8-7ab5-4b84-a9e9-ea7f3d5194dd",
+                  "file_index": 0,
+                  "line_range_start": null,
+                  "line_range_end": null
+                },
+                "fff_metadata": null,
+                "connector_id": null
+              },
+              {
+                "matched_text": "fileciteturn0file1",
+                "start_idx": 603,
+                "end_idx": 624,
+                "alt": null,
+                "type": "file",
+                "name": "[REDACTED]",
+                "id": "file-SpayV1ZLVkqP9mHUwAjUbj",
+                "source": "my_files",
+                "snippet": "",
+                "cloud_doc_url": null,
+                "medical_file_reference": {
+                  "authors_display": null,
+                  "doi": null,
+                  "publication_year": "None",
+                  "journal_name": null,
+                  "journal_homepage_url": null
+                },
+                "input_pointer": {
+                  "message_index": 0,
+                  "message_id": "36399e22-95c7-4e11-ae99-69101360b043",
+                  "file_index": 1,
+                  "line_range_start": null,
+                  "line_range_end": null
+                },
+                "fff_metadata": null,
+                "connector_id": null
+              }
+            ],
+            "gizmo_id": "g-6914a7b93f1881919e59b5438fc9a349",
+            "request_id": "237ac025-668b-4ad6-8115-3e02fe85a044",
+            "message_type": "next",
+            "model_slug": "gpt-5-1",
+            "default_model_slug": "gpt-5-1",
+            "parent_id": "69e106b7-ebf8-40cc-8a51-cd53d13426a6",
+            "turn_exchange_id": "35cacc70-f066-4a6a-89c3-30d7b26ac6ca",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all",
+          "channel": "final"
+        },
+        "parent": "69e106b7-ebf8-40cc-8a51-cd53d13426a6",
+        "children": []
+      }
+    },
+    "current_node": "58bf23ae-d0ef-424e-aa26-5ba6f907d3c3",
+    "conversation_template_id": "g-6914a7b93f1881919e59b5438fc9a349",
+    "gizmo_id": "g-6914a7b93f1881919e59b5438fc9a349",
+    "is_archived": false,
+    "is_temporary_chat": false,
+    "is_do_not_remember": false,
+    "memory_scope": "global_enabled",
+    "context_scopes_v2": {
+      "context_scopes": [
+        {
+          "is_siloed": false,
+          "scope_namespace": "global",
+          "sub_scope": null,
+          "key": null,
+          "key_timestamp": null,
+          "key_scoped_access_claim": null
+        }
+      ]
+    },
+    "safe_urls": [
+      "https://www.openai.com"
+    ],
+    "blocked_urls": [],
+    "sugar_item_visible": false,
+    "_truncation_recovered": false,
+    "_archived": false,
+    "_project_id": "g-6914a7b93f1881919e59b5438fc9a349",
+    "_last_seen_in_server": "2026-04-28",
+    "_project_name": null
+  }
+}

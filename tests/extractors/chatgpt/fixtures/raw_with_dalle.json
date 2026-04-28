@@ -1,0 +1,306 @@
+{
+  "conversation_id": "68258145-4d40-800c-9bae-fba7377d8ac4",
+  "conversation": {
+    "id": "68258145-4d40-800c-9bae-fba7377d8ac4",
+    "title": "[REDACTED]",
+    "create_time": "2025-05-15T05:53:10.402772Z",
+    "update_time": "2026-04-23T17:05:44.284442Z",
+    "mapping": {
+      "c61ca0ac-2a7c-4b0c-9ba3-64014e83d4d0": {
+        "id": "c61ca0ac-2a7c-4b0c-9ba3-64014e83d4d0",
+        "children": [
+          "c3e50c49-fdc0-4e6e-a079-07a49b86e774"
+        ]
+      },
+      "c3e50c49-fdc0-4e6e-a079-07a49b86e774": {
+        "id": "c3e50c49-fdc0-4e6e-a079-07a49b86e774",
+        "message": {
+          "id": "c3e50c49-fdc0-4e6e-a079-07a49b86e774",
+          "author": {
+            "role": "system",
+            "metadata": {}
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 0.0,
+          "metadata": {
+            "is_visually_hidden_from_conversation": true
+          },
+          "recipient": "all"
+        },
+        "parent": "c61ca0ac-2a7c-4b0c-9ba3-64014e83d4d0",
+        "children": [
+          "2be08ca6-a9dd-4abd-b98e-ca6b9f400fa0"
+        ]
+      },
+      "2be08ca6-a9dd-4abd-b98e-ca6b9f400fa0": {
+        "id": "2be08ca6-a9dd-4abd-b98e-ca6b9f400fa0",
+        "message": {
+          "id": "2be08ca6-a9dd-4abd-b98e-ca6b9f400fa0",
+          "author": {
+            "role": "user",
+            "metadata": {}
+          },
+          "create_time": 1747288388.882458,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "dictation": false,
+            "request_id": "94005f905b17a4f5-GRU",
+            "message_source": null,
+            "timestamp_": "absolute",
+            "message_type": null
+          },
+          "recipient": "all"
+        },
+        "parent": "c3e50c49-fdc0-4e6e-a079-07a49b86e774",
+        "children": [
+          "68c3511d-3a45-48e3-8352-ecf23698a925"
+        ]
+      },
+      "68c3511d-3a45-48e3-8352-ecf23698a925": {
+        "id": "68c3511d-3a45-48e3-8352-ecf23698a925",
+        "message": {
+          "id": "68c3511d-3a45-48e3-8352-ecf23698a925",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1747288402.468125,
+          "content": {
+            "content_type": "model_editable_context",
+            "model_set_context": ""
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "message_type": null,
+            "model_slug": "gpt-4o",
+            "default_model_slug": "gpt-4o",
+            "parent_id": "2be08ca6-a9dd-4abd-b98e-ca6b9f400fa0",
+            "request_id": "94005f905b17a4f5-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "2be08ca6-a9dd-4abd-b98e-ca6b9f400fa0",
+        "children": [
+          "176993ff-5cc4-4bbe-94b4-380194c12d9e"
+        ]
+      },
+      "176993ff-5cc4-4bbe-94b4-380194c12d9e": {
+        "id": "176993ff-5cc4-4bbe-94b4-380194c12d9e",
+        "message": {
+          "id": "176993ff-5cc4-4bbe-94b4-380194c12d9e",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1747288390.869438,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": false,
+          "weight": 1.0,
+          "metadata": {
+            "finish_details": {
+              "type": "stop",
+              "stop_tokens": [
+                200007
+              ]
+            },
+            "is_complete": true,
+            "citations": [],
+            "content_references": [],
+            "message_type": null,
+            "model_slug": "gpt-4o",
+            "default_model_slug": "gpt-4o",
+            "parent_id": "68c3511d-3a45-48e3-8352-ecf23698a925",
+            "request_id": "94005f905b17a4f5-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "t2uay3k.sj1i4kz"
+        },
+        "parent": "68c3511d-3a45-48e3-8352-ecf23698a925",
+        "children": [
+          "f9a2c828-a3f8-42c6-b1c9-0a0bc93f4285"
+        ]
+      },
+      "f9a2c828-a3f8-42c6-b1c9-0a0bc93f4285": {
+        "id": "f9a2c828-a3f8-42c6-b1c9-0a0bc93f4285",
+        "message": {
+          "id": "f9a2c828-a3f8-42c6-b1c9-0a0bc93f4285",
+          "author": {
+            "role": "tool",
+            "name": "t2uay3k.sj1i4kz",
+            "metadata": {}
+          },
+          "create_time": 1747288422.928505,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "image_asset_pointer",
+                "asset_pointer": "sediment://file_00000000e2fc61f9a1e7e724bc1b7373",
+                "size_bytes": 2175052,
+                "width": 1024,
+                "height": 1536,
+                "metadata": {
+                  "dalle": {
+                    "gen_id": "4a5bd929-289e-4cbb-90f7-3578f86964c6",
+                    "prompt": "",
+                    "serialization_title": "DALL-E generation metadata"
+                  },
+                  "generation": {
+                    "gen_id": "4a5bd929-289e-4cbb-90f7-3578f86964c6",
+                    "gen_size": "xlimage",
+                    "height": 1536,
+                    "width": 1024,
+                    "transparent_background": false,
+                    "serialization_title": "Image Generation metadata"
+                  },
+                  "container_pixel_height": 1536,
+                  "container_pixel_width": 1024,
+                  "sanitized": false
+                }
+              }
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 0.0,
+          "metadata": {
+            "image_gen_title": "Fatores de Decisão no Estacionamento",
+            "message_type": null,
+            "model_slug": "gpt-4o",
+            "default_model_slug": "gpt-4o",
+            "parent_id": "176993ff-5cc4-4bbe-94b4-380194c12d9e",
+            "request_id": "94005f905b17a4f5-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "176993ff-5cc4-4bbe-94b4-380194c12d9e",
+        "children": [
+          "1576a347-771b-491f-b6f0-c39a3faa1e44"
+        ]
+      },
+      "1576a347-771b-491f-b6f0-c39a3faa1e44": {
+        "id": "1576a347-771b-491f-b6f0-c39a3faa1e44",
+        "message": {
+          "id": "1576a347-771b-491f-b6f0-c39a3faa1e44",
+          "author": {
+            "role": "tool",
+            "name": "t2uay3k.sj1i4kz",
+            "metadata": {}
+          },
+          "create_time": 1747288455.41079,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 0.0,
+          "metadata": {
+            "message_type": null,
+            "model_slug": "gpt-4o",
+            "default_model_slug": "gpt-4o",
+            "parent_id": "f9a2c828-a3f8-42c6-b1c9-0a0bc93f4285",
+            "request_id": "94005f905b17a4f5-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "assistant"
+        },
+        "parent": "f9a2c828-a3f8-42c6-b1c9-0a0bc93f4285",
+        "children": [
+          "2126a3c3-6367-4d48-8fa5-51125ca313fc"
+        ]
+      },
+      "2126a3c3-6367-4d48-8fa5-51125ca313fc": {
+        "id": "2126a3c3-6367-4d48-8fa5-51125ca313fc",
+        "message": {
+          "id": "2126a3c3-6367-4d48-8fa5-51125ca313fc",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1747288452.848426,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "finish_details": {
+              "type": "stop",
+              "stop_tokens": [
+                200002
+              ]
+            },
+            "is_complete": true,
+            "citations": [],
+            "content_references": [],
+            "message_type": null,
+            "model_slug": "gpt-4o",
+            "default_model_slug": "gpt-4o",
+            "parent_id": "1576a347-771b-491f-b6f0-c39a3faa1e44",
+            "request_id": "94005f905b17a4f5-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "1576a347-771b-491f-b6f0-c39a3faa1e44",
+        "children": []
+      }
+    },
+    "current_node": "2126a3c3-6367-4d48-8fa5-51125ca313fc",
+    "conversation_template_id": "g-p-684dd8d644748191ac06728c75f2a89c",
+    "gizmo_id": "g-p-684dd8d644748191ac06728c75f2a89c",
+    "is_archived": false,
+    "is_temporary_chat": false,
+    "memory_scope": "global_enabled",
+    "context_scopes_v2": {
+      "context_scopes": [
+        {
+          "is_siloed": false,
+          "scope_namespace": "global",
+          "sub_scope": null,
+          "key": null,
+          "key_timestamp": null,
+          "key_scoped_access_claim": null
+        }
+      ]
+    },
+    "safe_urls": [
+      "https://www.caju.com.br/"
+    ],
+    "blocked_urls": [],
+    "sugar_item_visible": false,
+    "_truncation_recovered": false,
+    "_archived": false,
+    "_project_id": "g-p-684dd8d644748191ac06728c75f2a89c",
+    "_project_name": "DataTransf Toolbox",
+    "_last_seen_in_server": "2026-04-28"
+  }
+}

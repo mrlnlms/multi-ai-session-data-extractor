@@ -1,0 +1,643 @@
+{
+  "conversation_id": "69499a7b-5ac4-8330-9417-455d02bc60c6",
+  "conversation": {
+    "id": "69499a7b-5ac4-8330-9417-455d02bc60c6",
+    "title": "[REDACTED]",
+    "create_time": "2025-12-22T19:22:46.771496Z",
+    "update_time": "2025-12-22T19:27:26.035643Z",
+    "mapping": {
+      "994a9049-1d29-4973-9889-0a14d7c409b3": {
+        "id": "994a9049-1d29-4973-9889-0a14d7c409b3",
+        "children": [
+          "00f479c6-5816-4f8f-9ff7-950c9c219ce2"
+        ]
+      },
+      "00f479c6-5816-4f8f-9ff7-950c9c219ce2": {
+        "id": "00f479c6-5816-4f8f-9ff7-950c9c219ce2",
+        "message": {
+          "id": "00f479c6-5816-4f8f-9ff7-950c9c219ce2",
+          "author": {
+            "role": "system",
+            "metadata": {}
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 0.0,
+          "metadata": {
+            "is_visually_hidden_from_conversation": true
+          },
+          "recipient": "all"
+        },
+        "parent": "994a9049-1d29-4973-9889-0a14d7c409b3",
+        "children": [
+          "48007f0a-c082-4075-b137-08662b1771b6"
+        ]
+      },
+      "48007f0a-c082-4075-b137-08662b1771b6": {
+        "id": "48007f0a-c082-4075-b137-08662b1771b6",
+        "message": {
+          "id": "48007f0a-c082-4075-b137-08662b1771b6",
+          "author": {
+            "role": "system",
+            "metadata": {}
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "is_contextual_answers_system_message": true,
+            "contextual_answers_message_type": "identity_prompt",
+            "is_visually_hidden_from_conversation": true
+          },
+          "recipient": "all"
+        },
+        "parent": "00f479c6-5816-4f8f-9ff7-950c9c219ce2",
+        "children": [
+          "89288eef-9fbe-4655-90b4-29261b231e27"
+        ]
+      },
+      "89288eef-9fbe-4655-90b4-29261b231e27": {
+        "id": "89288eef-9fbe-4655-90b4-29261b231e27",
+        "message": {
+          "id": "89288eef-9fbe-4655-90b4-29261b231e27",
+          "author": {
+            "role": "user",
+            "metadata": {}
+          },
+          "create_time": 1766431366.769477,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "audio_transcription",
+                "text": "[REDACTED]",
+                "direction": "in"
+              },
+              {
+                "expiry_datetime": "2026-06-20T19:22:45.874889+00:00",
+                "content_type": "real_time_user_audio_video_asset_pointer",
+                "frames_asset_pointers": [],
+                "audio_asset_pointer": {
+                  "expiry_datetime": "2026-06-20T19:22:45.874889+00:00",
+                  "content_type": "audio_asset_pointer",
+                  "asset_pointer": "sediment://file_0000000023c471f5acf7e5a00ce333d5",
+                  "size_bytes": 38478,
+                  "format": "wav",
+                  "metadata": {
+                    "start": 0.0,
+                    "end": 0.8
+                  }
+                },
+                "audio_start_timestamp": 1.1195351271890104
+              }
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "voice_mode_message": true,
+            "request_id": "req_bdfb89d24a5a7c0d11fff2e5480ddbb2/b2uz",
+            "message_source": null,
+            "real_time_audio_has_video": false
+          },
+          "recipient": "all"
+        },
+        "parent": "48007f0a-c082-4075-b137-08662b1771b6",
+        "children": [
+          "65e4b486-7189-42b5-8a91-c055bbf9fe31"
+        ]
+      },
+      "65e4b486-7189-42b5-8a91-c055bbf9fe31": {
+        "id": "65e4b486-7189-42b5-8a91-c055bbf9fe31",
+        "message": {
+          "id": "65e4b486-7189-42b5-8a91-c055bbf9fe31",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1766431356.440239,
+          "content": {
+            "content_type": "model_editable_context",
+            "model_set_context": ""
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "parent_id": "89288eef-9fbe-4655-90b4-29261b231e27",
+            "turn_exchange_id": "023b90a9-12d7-4e68-9379-e8dd775c1306"
+          },
+          "recipient": "all"
+        },
+        "parent": "89288eef-9fbe-4655-90b4-29261b231e27",
+        "children": [
+          "d0c76c72-9347-4f33-b594-50b311f359e1"
+        ]
+      },
+      "d0c76c72-9347-4f33-b594-50b311f359e1": {
+        "id": "d0c76c72-9347-4f33-b594-50b311f359e1",
+        "message": {
+          "id": "d0c76c72-9347-4f33-b594-50b311f359e1",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1766431367.367124,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "audio_transcription",
+                "text": "[REDACTED]",
+                "direction": "out"
+              },
+              {
+                "expiry_datetime": "2026-06-20T19:22:45.874956+00:00",
+                "content_type": "audio_asset_pointer",
+                "asset_pointer": "sediment://file_0000000056e4720e959d4567a2b89930",
+                "size_bytes": 278478,
+                "format": "wav",
+                "metadata": {
+                  "start": 0.0,
+                  "end": 5.8
+                }
+              }
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "citations": [],
+            "content_references": [],
+            "finish_details": {
+              "type": "stop",
+              "stop_tokens": [
+                200002
+              ]
+            },
+            "is_complete": true,
+            "parent_id": "65e4b486-7189-42b5-8a91-c055bbf9fe31",
+            "turn_exchange_id": "023b90a9-12d7-4e68-9379-e8dd775c1306"
+          },
+          "recipient": "all"
+        },
+        "parent": "65e4b486-7189-42b5-8a91-c055bbf9fe31",
+        "children": [
+          "5bd49c45-c1ac-4138-9d8f-b7f9e4fe7980"
+        ]
+      },
+      "5bd49c45-c1ac-4138-9d8f-b7f9e4fe7980": {
+        "id": "5bd49c45-c1ac-4138-9d8f-b7f9e4fe7980",
+        "message": {
+          "id": "5bd49c45-c1ac-4138-9d8f-b7f9e4fe7980",
+          "author": {
+            "role": "user",
+            "metadata": {}
+          },
+          "create_time": 1766431398.663607,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "audio_transcription",
+                "text": "[REDACTED]",
+                "direction": "in"
+              },
+              {
+                "expiry_datetime": "2026-06-20T19:23:17.218610+00:00",
+                "content_type": "real_time_user_audio_video_asset_pointer",
+                "frames_asset_pointers": [],
+                "audio_asset_pointer": {
+                  "expiry_datetime": "2026-06-20T19:23:17.218610+00:00",
+                  "content_type": "audio_asset_pointer",
+                  "asset_pointer": "sediment://file_00000000afbc720ea35f9aa74d497044",
+                  "size_bytes": 632238,
+                  "format": "wav",
+                  "metadata": {
+                    "start": 0.0,
+                    "end": 13.17
+                  }
+                },
+                "audio_start_timestamp": 28.317680376116186
+              }
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "voice_mode_message": true,
+            "request_id": "req_bdfb89d24a5a7c0d11fff2e5480ddbb2/8lmy",
+            "message_source": null,
+            "real_time_audio_has_video": false
+          },
+          "recipient": "all"
+        },
+        "parent": "d0c76c72-9347-4f33-b594-50b311f359e1",
+        "children": [
+          "ee93a903-45f2-49ab-b77d-282c4c61a8e8"
+        ]
+      },
+      "ee93a903-45f2-49ab-b77d-282c4c61a8e8": {
+        "id": "ee93a903-45f2-49ab-b77d-282c4c61a8e8",
+        "message": {
+          "id": "ee93a903-45f2-49ab-b77d-282c4c61a8e8",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1766431399.041148,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "audio_transcription",
+                "text": "[REDACTED]",
+                "direction": "out"
+              },
+              {
+                "expiry_datetime": "2026-06-20T19:23:17.218735+00:00",
+                "content_type": "audio_asset_pointer",
+                "asset_pointer": "sediment://file_00000000b70c71f5af766520fc14d7ce",
+                "size_bytes": 556878,
+                "format": "wav",
+                "metadata": {
+                  "start": 0.0,
+                  "end": 11.6
+                }
+              }
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "citations": [],
+            "content_references": [],
+            "finish_details": {
+              "type": "stop",
+              "stop_tokens": [
+                200002
+              ]
+            },
+            "is_complete": true,
+            "parent_id": "5bd49c45-c1ac-4138-9d8f-b7f9e4fe7980",
+            "turn_exchange_id": "21debb29-6b9e-497f-9dad-02ba910d1c06"
+          },
+          "recipient": "all"
+        },
+        "parent": "5bd49c45-c1ac-4138-9d8f-b7f9e4fe7980",
+        "children": [
+          "33cdd9f1-0958-4a82-a716-b2976644b907"
+        ]
+      },
+      "33cdd9f1-0958-4a82-a716-b2976644b907": {
+        "id": "33cdd9f1-0958-4a82-a716-b2976644b907",
+        "message": {
+          "id": "33cdd9f1-0958-4a82-a716-b2976644b907",
+          "author": {
+            "role": "user",
+            "metadata": {}
+          },
+          "create_time": 1766431461.098383,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "audio_transcription",
+                "text": "[REDACTED]",
+                "direction": "in"
+              },
+              {
+                "expiry_datetime": "2026-06-20T19:24:18.998431+00:00",
+                "content_type": "real_time_user_audio_video_asset_pointer",
+                "frames_asset_pointers": [],
+                "audio_asset_pointer": {
+                  "expiry_datetime": "2026-06-20T19:24:18.998431+00:00",
+                  "content_type": "audio_asset_pointer",
+                  "asset_pointer": "sediment://file_0000000045c4720ebdad2d957999d136",
+                  "size_bytes": 1550958,
+                  "format": "wav",
+                  "metadata": {
+                    "start": 0.0,
+                    "end": 32.31
+                  }
+                },
+                "audio_start_timestamp": 74.24424379505217
+              }
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "voice_mode_message": true,
+            "request_id": "req_bdfb89d24a5a7c0d11fff2e5480ddbb2/5st1",
+            "message_source": null,
+            "real_time_audio_has_video": false
+          },
+          "recipient": "all"
+        },
+        "parent": "ee93a903-45f2-49ab-b77d-282c4c61a8e8",
+        "children": [
+          "d058157a-f592-4c74-9bd7-f5ba780ea30a"
+        ]
+      },
+      "d058157a-f592-4c74-9bd7-f5ba780ea30a": {
+        "id": "d058157a-f592-4c74-9bd7-f5ba780ea30a",
+        "message": {
+          "id": "d058157a-f592-4c74-9bd7-f5ba780ea30a",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1766431461.459087,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "audio_transcription",
+                "text": "[REDACTED]",
+                "direction": "out"
+              },
+              {
+                "expiry_datetime": "2026-06-20T19:24:18.998513+00:00",
+                "content_type": "audio_asset_pointer",
+                "asset_pointer": "sediment://file_00000000d98071f5831998eedf94f865",
+                "size_bytes": 1272078,
+                "format": "wav",
+                "metadata": {
+                  "start": 0.0,
+                  "end": 26.5
+                }
+              }
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "citations": [],
+            "content_references": [],
+            "finish_details": {
+              "type": "stop",
+              "stop_tokens": [
+                200002
+              ]
+            },
+            "is_complete": true,
+            "parent_id": "33cdd9f1-0958-4a82-a716-b2976644b907",
+            "turn_exchange_id": "900182f0-ec14-4436-95a4-32779b24cbbd"
+          },
+          "recipient": "all"
+        },
+        "parent": "33cdd9f1-0958-4a82-a716-b2976644b907",
+        "children": [
+          "4cd95a0b-7629-4d19-ac82-ed37dfda0f07"
+        ]
+      },
+      "4cd95a0b-7629-4d19-ac82-ed37dfda0f07": {
+        "id": "4cd95a0b-7629-4d19-ac82-ed37dfda0f07",
+        "message": {
+          "id": "4cd95a0b-7629-4d19-ac82-ed37dfda0f07",
+          "author": {
+            "role": "user",
+            "metadata": {}
+          },
+          "create_time": 1766431537.986465,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "audio_transcription",
+                "text": "[REDACTED]",
+                "direction": "in"
+              },
+              {
+                "expiry_datetime": "2026-06-20T19:25:35.665413+00:00",
+                "content_type": "real_time_user_audio_video_asset_pointer",
+                "frames_asset_pointers": [],
+                "audio_asset_pointer": {
+                  "expiry_datetime": "2026-06-20T19:25:35.665413+00:00",
+                  "content_type": "audio_asset_pointer",
+                  "asset_pointer": "sediment://file_0000000005f871f5bc546bfae7e6a438",
+                  "size_bytes": 2062638,
+                  "format": "wav",
+                  "metadata": {
+                    "start": 0.0,
+                    "end": 42.97
+                  }
+                },
+                "audio_start_timestamp": 146.42219291510992
+              }
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "voice_mode_message": true,
+            "request_id": "req_bdfb89d24a5a7c0d11fff2e5480ddbb2/wkyy",
+            "message_source": null,
+            "real_time_audio_has_video": false
+          },
+          "recipient": "all"
+        },
+        "parent": "d058157a-f592-4c74-9bd7-f5ba780ea30a",
+        "children": [
+          "555ced2a-ddf6-4bbf-8696-ec0a99d0f5d0"
+        ]
+      },
+      "555ced2a-ddf6-4bbf-8696-ec0a99d0f5d0": {
+        "id": "555ced2a-ddf6-4bbf-8696-ec0a99d0f5d0",
+        "message": {
+          "id": "555ced2a-ddf6-4bbf-8696-ec0a99d0f5d0",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1766431538.42006,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "audio_transcription",
+                "text": "[REDACTED]",
+                "direction": "out"
+              },
+              {
+                "expiry_datetime": "2026-06-20T19:25:35.665484+00:00",
+                "content_type": "audio_asset_pointer",
+                "asset_pointer": "sediment://file_00000000a0dc720ea30b2936ca9780e3",
+                "size_bytes": 1507278,
+                "format": "wav",
+                "metadata": {
+                  "start": 0.0,
+                  "end": 31.4
+                }
+              }
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "citations": [],
+            "content_references": [],
+            "finish_details": {
+              "type": "stop",
+              "stop_tokens": [
+                200002
+              ]
+            },
+            "is_complete": true,
+            "parent_id": "4cd95a0b-7629-4d19-ac82-ed37dfda0f07",
+            "turn_exchange_id": "0b6b26e5-67a3-4b33-84c7-9482499bd9e3"
+          },
+          "recipient": "all"
+        },
+        "parent": "4cd95a0b-7629-4d19-ac82-ed37dfda0f07",
+        "children": [
+          "2c670e19-ea6c-4e77-8b28-17120cc87665"
+        ]
+      },
+      "2c670e19-ea6c-4e77-8b28-17120cc87665": {
+        "id": "2c670e19-ea6c-4e77-8b28-17120cc87665",
+        "message": {
+          "id": "2c670e19-ea6c-4e77-8b28-17120cc87665",
+          "author": {
+            "role": "user",
+            "metadata": {}
+          },
+          "create_time": 1766431645.288412,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "audio_transcription",
+                "text": "[REDACTED]",
+                "direction": "in"
+              },
+              {
+                "expiry_datetime": "2026-06-20T19:27:23.582725+00:00",
+                "content_type": "real_time_user_audio_video_asset_pointer",
+                "frames_asset_pointers": [],
+                "audio_asset_pointer": {
+                  "expiry_datetime": "2026-06-20T19:27:23.582725+00:00",
+                  "content_type": "audio_asset_pointer",
+                  "asset_pointer": "sediment://file_000000001994720eaf453c3af38006da",
+                  "size_bytes": 3412398,
+                  "format": "wav",
+                  "metadata": {
+                    "start": 0.0,
+                    "end": 71.09
+                  }
+                },
+                "audio_start_timestamp": 252.153265315108
+              }
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "voice_mode_message": true,
+            "request_id": "req_bdfb89d24a5a7c0d11fff2e5480ddbb2/dn8d",
+            "message_source": null,
+            "real_time_audio_has_video": false
+          },
+          "recipient": "all"
+        },
+        "parent": "555ced2a-ddf6-4bbf-8696-ec0a99d0f5d0",
+        "children": [
+          "a287e6d6-aa0a-4888-86b5-38db04306994"
+        ]
+      },
+      "a287e6d6-aa0a-4888-86b5-38db04306994": {
+        "id": "a287e6d6-aa0a-4888-86b5-38db04306994",
+        "message": {
+          "id": "a287e6d6-aa0a-4888-86b5-38db04306994",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1766431645.68223,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "audio_transcription",
+                "text": "[REDACTED]",
+                "direction": "out"
+              },
+              {
+                "expiry_datetime": "2026-06-20T19:27:23.582836+00:00",
+                "content_type": "audio_asset_pointer",
+                "asset_pointer": "sediment://file_00000000836471f5a56321673e17c8e8",
+                "size_bytes": 1564878,
+                "format": "wav",
+                "metadata": {
+                  "start": 0.0,
+                  "end": 32.6
+                }
+              }
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "citations": [],
+            "content_references": [],
+            "finish_details": {
+              "type": "stop",
+              "stop_tokens": [
+                200002
+              ]
+            },
+            "is_complete": true,
+            "parent_id": "2c670e19-ea6c-4e77-8b28-17120cc87665",
+            "turn_exchange_id": "059d3c79-3c12-4934-9aa3-5c6c46c7d018"
+          },
+          "recipient": "all"
+        },
+        "parent": "2c670e19-ea6c-4e77-8b28-17120cc87665",
+        "children": []
+      }
+    },
+    "current_node": "a287e6d6-aa0a-4888-86b5-38db04306994",
+    "is_archived": false,
+    "is_temporary_chat": false,
+    "is_do_not_remember": false,
+    "memory_scope": "global_enabled",
+    "context_scopes_v2": {
+      "context_scopes": [
+        {
+          "is_siloed": false,
+          "scope_namespace": "global",
+          "sub_scope": null,
+          "key": null,
+          "key_timestamp": null,
+          "key_scoped_access_claim": null
+        }
+      ]
+    },
+    "safe_urls": [
+      "https://www.qualtrics.com/support/survey-platform/distributions-module/email-distribution/email-distribution-error-messages/"
+    ],
+    "blocked_urls": [],
+    "sugar_item_visible": false,
+    "_truncation_recovered": false,
+    "_archived": false,
+    "_project_id": null,
+    "_project_name": null,
+    "_last_seen_in_server": "2026-04-28"
+  }
+}

@@ -1,0 +1,164 @@
+{
+  "conversation_id": "670efa03-508c-4276-9742-a72d6074d17e",
+  "conversation": {
+    "id": "670efa03-508c-4276-9742-a72d6074d17e",
+    "title": "[REDACTED]",
+    "create_time": "2023-05-11T02:25:18.608252Z",
+    "update_time": "2025-03-30T18:29:11.113251Z",
+    "mapping": {
+      "aaa1d58d-c443-48d6-a179-6f8947642478": {
+        "id": "aaa1d58d-c443-48d6-a179-6f8947642478",
+        "children": [
+          "4daea82a-3b67-4163-b3c9-085473675648"
+        ]
+      },
+      "4daea82a-3b67-4163-b3c9-085473675648": {
+        "id": "4daea82a-3b67-4163-b3c9-085473675648",
+        "message": {
+          "id": "52879592-5641-449e-bee5-66707522f792",
+          "author": {
+            "role": "system",
+            "metadata": {}
+          },
+          "create_time": 1683771967.369311,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "is_visually_hidden_from_conversation": true
+          },
+          "recipient": "all"
+        },
+        "parent": "aaa1d58d-c443-48d6-a179-6f8947642478",
+        "children": [
+          "aaa28f70-7c45-4d80-8c7b-e7a388f4f62f"
+        ]
+      },
+      "aaa28f70-7c45-4d80-8c7b-e7a388f4f62f": {
+        "id": "aaa28f70-7c45-4d80-8c7b-e7a388f4f62f",
+        "message": {
+          "id": "aaa28f70-7c45-4d80-8c7b-e7a388f4f62f",
+          "author": {
+            "role": "user",
+            "metadata": {}
+          },
+          "create_time": 1683771918.612331,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "timestamp_": "absolute",
+            "message_type": null
+          },
+          "recipient": "all"
+        },
+        "parent": "4daea82a-3b67-4163-b3c9-085473675648",
+        "children": [
+          "436e8ede-14f3-46f3-b922-382f83a24ccd",
+          "36652c66-9b51-4550-a322-9e829b25990f"
+        ]
+      },
+      "436e8ede-14f3-46f3-b922-382f83a24ccd": {
+        "id": "436e8ede-14f3-46f3-b922-382f83a24ccd",
+        "message": {
+          "id": "436e8ede-14f3-46f3-b922-382f83a24ccd",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1683771944.69426,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "message_type": null,
+            "model_slug": "text-davinci-002-render-sha",
+            "finish_details": {
+              "type": "stop",
+              "stop": "<|im_end|>"
+            },
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "aaa28f70-7c45-4d80-8c7b-e7a388f4f62f",
+        "children": []
+      },
+      "36652c66-9b51-4550-a322-9e829b25990f": {
+        "id": "36652c66-9b51-4550-a322-9e829b25990f",
+        "message": {
+          "id": "36652c66-9b51-4550-a322-9e829b25990f",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1683771984.902407,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "message_type": null,
+            "model_slug": "text-davinci-002-render-sha",
+            "finish_details": {
+              "type": "stop",
+              "stop": "<|im_end|>"
+            },
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "aaa28f70-7c45-4d80-8c7b-e7a388f4f62f",
+        "children": []
+      }
+    },
+    "current_node": "36652c66-9b51-4550-a322-9e829b25990f",
+    "conversation_template_id": "g-p-67e8829a664081919961c3d786da567a",
+    "gizmo_id": "g-p-67e8829a664081919961c3d786da567a",
+    "is_archived": false,
+    "is_temporary_chat": false,
+    "memory_scope": "global_enabled",
+    "context_scopes_v2": {
+      "context_scopes": [
+        {
+          "is_siloed": false,
+          "scope_namespace": "global",
+          "sub_scope": null,
+          "key": null,
+          "key_timestamp": null,
+          "key_scoped_access_claim": null
+        }
+      ]
+    },
+    "safe_urls": [],
+    "blocked_urls": [],
+    "sugar_item_visible": false,
+    "_truncation_recovered": false,
+    "_archived": false,
+    "_project_id": "g-p-67e8829a664081919961c3d786da567a",
+    "_last_seen_in_server": "2026-04-28",
+    "_project_name": "Dasa"
+  }
+}

@@ -1,0 +1,175 @@
+{
+  "conversation_id": "66eaed5e-5110-800c-ad1c-a6cd1626778a",
+  "conversation": {
+    "id": "66eaed5e-5110-800c-ad1c-a6cd1626778a",
+    "title": "[REDACTED]",
+    "create_time": "2024-09-18T15:10:22.822601Z",
+    "update_time": "2025-03-29T19:58:16.513796Z",
+    "mapping": {
+      "e62865d7-69fe-4d06-a7c2-368f89be936a": {
+        "id": "e62865d7-69fe-4d06-a7c2-368f89be936a",
+        "children": [
+          "61aa30ac-de65-4dbe-8845-89e215ba6486"
+        ]
+      },
+      "61aa30ac-de65-4dbe-8845-89e215ba6486": {
+        "id": "61aa30ac-de65-4dbe-8845-89e215ba6486",
+        "message": {
+          "id": "61aa30ac-de65-4dbe-8845-89e215ba6486",
+          "author": {
+            "role": "system",
+            "metadata": {}
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 0.0,
+          "metadata": {
+            "is_visually_hidden_from_conversation": true
+          },
+          "recipient": "all"
+        },
+        "parent": "e62865d7-69fe-4d06-a7c2-368f89be936a",
+        "children": [
+          "2a19b7b4-2a1f-44ea-9ec1-e83c6b867d6d"
+        ]
+      },
+      "2a19b7b4-2a1f-44ea-9ec1-e83c6b867d6d": {
+        "id": "2a19b7b4-2a1f-44ea-9ec1-e83c6b867d6d",
+        "message": {
+          "id": "2a19b7b4-2a1f-44ea-9ec1-e83c6b867d6d",
+          "author": {
+            "role": "user",
+            "metadata": {}
+          },
+          "create_time": 1726672222.824059,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "request_id": "8c52432cc96c6b12-GRU",
+            "message_source": null,
+            "timestamp_": "absolute",
+            "message_type": null
+          },
+          "recipient": "all"
+        },
+        "parent": "61aa30ac-de65-4dbe-8845-89e215ba6486",
+        "children": [
+          "881a1af8-e648-44d5-85d7-be6692bf15c6"
+        ]
+      },
+      "881a1af8-e648-44d5-85d7-be6692bf15c6": {
+        "id": "881a1af8-e648-44d5-85d7-be6692bf15c6",
+        "message": {
+          "id": "881a1af8-e648-44d5-85d7-be6692bf15c6",
+          "author": {
+            "role": "tool",
+            "name": "a8km123",
+            "metadata": {}
+          },
+          "create_time": 1726672243.756164,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 0.0,
+          "metadata": {
+            "finished_text": "Thought for 6 seconds",
+            "initial_text": "Thinking",
+            "parent_id": "2a19b7b4-2a1f-44ea-9ec1-e83c6b867d6d",
+            "request_id": "8c52432cc96c6b12-GRU",
+            "timestamp_": "absolute",
+            "message_type": null
+          },
+          "recipient": "all"
+        },
+        "parent": "2a19b7b4-2a1f-44ea-9ec1-e83c6b867d6d",
+        "children": [
+          "514a0343-bb27-40f2-a635-3f3dcf2e8a33"
+        ]
+      },
+      "514a0343-bb27-40f2-a635-3f3dcf2e8a33": {
+        "id": "514a0343-bb27-40f2-a635-3f3dcf2e8a33",
+        "message": {
+          "id": "514a0343-bb27-40f2-a635-3f3dcf2e8a33",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1726672243.75624,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "citations": [],
+            "content_references": [],
+            "gizmo_id": null,
+            "finish_details": {
+              "type": "stop",
+              "stop_tokens": [
+                199999
+              ]
+            },
+            "is_complete": true,
+            "message_type": null,
+            "model_slug": "o1-preview",
+            "default_model_slug": "o1-preview",
+            "pad": "AAAAAAAAAAAAA",
+            "parent_id": "881a1af8-e648-44d5-85d7-be6692bf15c6",
+            "request_id": "8c52432cc96c6b12-GRU",
+            "timestamp_": "absolute"
+          },
+          "recipient": "all"
+        },
+        "parent": "881a1af8-e648-44d5-85d7-be6692bf15c6",
+        "children": []
+      }
+    },
+    "current_node": "514a0343-bb27-40f2-a635-3f3dcf2e8a33",
+    "conversation_template_id": "g-p-67e84fa22e648191b52f638d46f72798",
+    "gizmo_id": "g-p-67e84fa22e648191b52f638d46f72798",
+    "is_archived": false,
+    "is_temporary_chat": false,
+    "memory_scope": "global_enabled",
+    "context_scopes_v2": {
+      "context_scopes": [
+        {
+          "is_siloed": false,
+          "scope_namespace": "global",
+          "sub_scope": null,
+          "key": null,
+          "key_timestamp": null,
+          "key_scoped_access_claim": null
+        }
+      ]
+    },
+    "safe_urls": [],
+    "blocked_urls": [],
+    "sugar_item_visible": false,
+    "_truncation_recovered": false,
+    "_archived": false,
+    "_project_id": "g-p-67e84fa22e648191b52f638d46f72798",
+    "_last_seen_in_server": "2026-04-28",
+    "_project_name": "Print - Service Design"
+  }
+}

@@ -1,0 +1,336 @@
+{
+  "conversation_id": "698c0802-35d8-8333-a290-3ccd4d3c52ba",
+  "conversation": {
+    "id": "698c0802-35d8-8333-a290-3ccd4d3c52ba",
+    "title": "[REDACTED]",
+    "create_time": "2026-02-11T04:39:30.764789Z",
+    "update_time": "2026-03-26T14:34:12.164474Z",
+    "mapping": {
+      "client-created-root": {
+        "id": "client-created-root",
+        "children": [
+          "f4e58b73-830d-45cc-b195-94ec41a92e06"
+        ]
+      },
+      "f4e58b73-830d-45cc-b195-94ec41a92e06": {
+        "id": "f4e58b73-830d-45cc-b195-94ec41a92e06",
+        "message": {
+          "id": "f4e58b73-830d-45cc-b195-94ec41a92e06",
+          "author": {
+            "role": "system",
+            "metadata": {}
+          },
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 0.0,
+          "metadata": {
+            "is_visually_hidden_from_conversation": true
+          },
+          "recipient": "all"
+        },
+        "parent": "client-created-root",
+        "children": [
+          "9767bc84-9556-485d-ad83-227277a5ac32"
+        ]
+      },
+      "9767bc84-9556-485d-ad83-227277a5ac32": {
+        "id": "9767bc84-9556-485d-ad83-227277a5ac32",
+        "message": {
+          "id": "9767bc84-9556-485d-ad83-227277a5ac32",
+          "author": {
+            "role": "system",
+            "metadata": {}
+          },
+          "create_time": 1770784770.481207,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 0.0,
+          "metadata": {
+            "is_visually_hidden_from_conversation": true
+          },
+          "recipient": "all"
+        },
+        "parent": "f4e58b73-830d-45cc-b195-94ec41a92e06",
+        "children": [
+          "7d7b7f7c-df7c-46ea-b812-272d4ce6277b"
+        ]
+      },
+      "7d7b7f7c-df7c-46ea-b812-272d4ce6277b": {
+        "id": "7d7b7f7c-df7c-46ea-b812-272d4ce6277b",
+        "message": {
+          "id": "7d7b7f7c-df7c-46ea-b812-272d4ce6277b",
+          "author": {
+            "role": "user",
+            "metadata": {}
+          },
+          "create_time": 1770784770.008,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "weight": 1.0,
+          "metadata": {
+            "system_hints": [
+              "research"
+            ],
+            "kaur1br5": {
+              "origin": "ntp",
+              "type": "user",
+              "client_id": "C5811D92-9D0B-4E5F-9232-30D542428441",
+              "client_capability_version": 1,
+              "sources": []
+            },
+            "request_id": "28cd5a38-e026-4476-a980-a14c9ca75b6f",
+            "message_source": null,
+            "turn_exchange_id": "a82b2739-beb6-4201-b7e4-745703c4c222",
+            "resolved_model_slug": "research"
+          },
+          "recipient": "all"
+        },
+        "parent": "9767bc84-9556-485d-ad83-227277a5ac32",
+        "children": [
+          "451cf0f2-07f6-4258-9d39-ce8cd5144388"
+        ]
+      },
+      "451cf0f2-07f6-4258-9d39-ce8cd5144388": {
+        "id": "451cf0f2-07f6-4258-9d39-ce8cd5144388",
+        "message": {
+          "id": "451cf0f2-07f6-4258-9d39-ce8cd5144388",
+          "author": {
+            "role": "assistant",
+            "metadata": {}
+          },
+          "create_time": 1770784771.266104,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "[REDACTED]"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "request_id": "28cd5a38-e026-4476-a980-a14c9ca75b6f",
+            "message_type": "next",
+            "model_slug": "research",
+            "default_model_slug": "gpt-5-2",
+            "parent_id": "7d7b7f7c-df7c-46ea-b812-272d4ce6277b",
+            "turn_exchange_id": "a82b2739-beb6-4201-b7e4-745703c4c222"
+          },
+          "recipient": "all"
+        },
+        "parent": "7d7b7f7c-df7c-46ea-b812-272d4ce6277b",
+        "children": [
+          "a35fbec0-bc67-4f2c-8e54-b6e814b8c16d"
+        ]
+      },
+      "a35fbec0-bc67-4f2c-8e54-b6e814b8c16d": {
+        "id": "a35fbec0-bc67-4f2c-8e54-b6e814b8c16d",
+        "message": {
+          "id": "a35fbec0-bc67-4f2c-8e54-b6e814b8c16d",
+          "author": {
+            "role": "tool",
+            "name": "research_kickoff_tool.clarify_with_text",
+            "metadata": {}
+          },
+          "create_time": 1770784772.3544257,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "is_visually_hidden_from_conversation": true,
+            "command": "clarify_with_text",
+            "permissions": [
+              {
+                "type": "notification",
+                "status": "requested",
+                "notification_channel_id": "deep_research",
+                "notification_channel_name": "Research",
+                "notification_priority": 4
+              }
+            ],
+            "request_id": "28cd5a38-e026-4476-a980-a14c9ca75b6f",
+            "message_type": "next",
+            "model_slug": "research",
+            "default_model_slug": "gpt-5-2",
+            "parent_id": "451cf0f2-07f6-4258-9d39-ce8cd5144388",
+            "turn_exchange_id": "a82b2739-beb6-4201-b7e4-745703c4c222"
+          },
+          "recipient": "all"
+        },
+        "parent": "451cf0f2-07f6-4258-9d39-ce8cd5144388",
+        "children": [
+          "508600e5-ded3-4d63-9dd3-204c1f309960"
+        ]
+      },
+      "508600e5-ded3-4d63-9dd3-204c1f309960": {
+        "id": "508600e5-ded3-4d63-9dd3-204c1f309960",
+        "message": {
+          "id": "508600e5-ded3-4d63-9dd3-204c1f309960",
+          "author": {
+            "role": "tool",
+            "name": "super_widget",
+            "metadata": {}
+          },
+          "create_time": 1770784773.190799,
+          "content": {
+            "content_type": "super_widget",
+            "widgets": {
+              "navlinks": [
+                {
+                  "title": "[REDACTED]",
+                  "url": "https://[REDACTED]",
+                  "domain": "[REDACTED]",
+                  "snippet": "[REDACTED]",
+                  "source": "lynx"
+                },
+                {
+                  "title": "[REDACTED]",
+                  "url": "https://[REDACTED]",
+                  "domain": "[REDACTED]",
+                  "snippet": "[REDACTED]",
+                  "source": "caracal"
+                },
+                {
+                  "title": "[REDACTED]",
+                  "url": "https://[REDACTED]",
+                  "domain": "[REDACTED]",
+                  "snippet": "[REDACTED]",
+                  "source": "caracal"
+                },
+                {
+                  "title": "[REDACTED]",
+                  "url": "https://[REDACTED]",
+                  "domain": "[REDACTED]",
+                  "snippet": "[REDACTED]",
+                  "source": "caracal"
+                },
+                {
+                  "title": "[REDACTED]",
+                  "url": "https://[REDACTED]",
+                  "domain": "[REDACTED]",
+                  "snippet": "[REDACTED]",
+                  "source": "caracal"
+                },
+                {
+                  "title": "[REDACTED]",
+                  "url": "https://[REDACTED]",
+                  "domain": "[REDACTED]",
+                  "snippet": "[REDACTED]",
+                  "source": "caracal"
+                },
+                {
+                  "title": "[REDACTED]",
+                  "url": "https://[REDACTED]",
+                  "domain": "[REDACTED]",
+                  "snippet": "[REDACTED]",
+                  "source": "caracal"
+                },
+                {
+                  "title": "[REDACTED]",
+                  "url": "https://[REDACTED]",
+                  "domain": "[REDACTED]",
+                  "snippet": "[REDACTED]",
+                  "source": "caracal"
+                },
+                {
+                  "title": "[REDACTED]",
+                  "url": "https://[REDACTED]",
+                  "domain": "[REDACTED]",
+                  "snippet": "[REDACTED]",
+                  "source": "caracal"
+                },
+                {
+                  "title": "[REDACTED]",
+                  "url": "https://[REDACTED]",
+                  "domain": "[REDACTED]",
+                  "snippet": "[REDACTED]",
+                  "source": "caracal"
+                },
+                {
+                  "title": "[REDACTED]",
+                  "url": "https://[REDACTED]",
+                  "domain": "[REDACTED]",
+                  "snippet": "[REDACTED]",
+                  "source": "caracal"
+                }
+              ],
+              "navlinks_ready": true,
+              "images": [],
+              "videos": [],
+              "news": [],
+              "query": "Public-source memo and comparison of 3–5 mixed methods frameworks for UX/market research (e.g., convergent parallel, explanatory/exploratory sequential, embedded, multiphase) focusing",
+              "safety": "safe",
+              "news_tab_enabled": true,
+              "is_navlinks_emphasize": false,
+              "safe_search_off": false
+            }
+          },
+          "status": "finished_successfully",
+          "weight": 0.0,
+          "metadata": {
+            "request_id": "28cd5a38-e026-4476-a980-a14c9ca75b6f",
+            "message_type": "next",
+            "model_slug": "research",
+            "default_model_slug": "gpt-5-2",
+            "parent_id": "a35fbec0-bc67-4f2c-8e54-b6e814b8c16d",
+            "turn_exchange_id": "a82b2739-beb6-4201-b7e4-745703c4c222"
+          },
+          "recipient": "all"
+        },
+        "parent": "a35fbec0-bc67-4f2c-8e54-b6e814b8c16d",
+        "children": []
+      }
+    },
+    "current_node": "508600e5-ded3-4d63-9dd3-204c1f309960",
+    "is_archived": false,
+    "is_temporary_chat": false,
+    "is_do_not_remember": false,
+    "memory_scope": "global_enabled",
+    "context_scopes_v2": {
+      "context_scopes": [
+        {
+          "is_siloed": false,
+          "scope_namespace": "global",
+          "sub_scope": null,
+          "key": null,
+          "key_timestamp": null,
+          "key_scoped_access_claim": null
+        }
+      ]
+    },
+    "safe_urls": [
+      "https://chatgpt.com/s/xyz",
+      "https://chatgpt.com/c/xyz"
+    ],
+    "blocked_urls": [],
+    "sugar_item_visible": false,
+    "_truncation_recovered": false,
+    "_archived": null,
+    "_project_id": null,
+    "_project_name": null,
+    "_last_seen_in_server": "2026-04-28"
+  }
+}
