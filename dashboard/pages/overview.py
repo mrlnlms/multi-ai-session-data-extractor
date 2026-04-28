@@ -24,13 +24,13 @@ def _cached_merged_stats(merged_path_str: str, mtime: float):
     return compute_merged_stats(Path(merged_path_str))
 
 
-def _quick_stats(state: PlatformState) -> tuple[int, int, int]:
-    """Retorna (total, active, preserved) — 0 se sem merged."""
+def _quick_stats(state: PlatformState) -> tuple[int, int, int, "datetime | None"]:
+    """Retorna (total, active, preserved, newest_update_time) — None/0 se sem merged."""
     merged = state.merged_json_path
     if merged is None:
-        return (0, 0, 0)
+        return (0, 0, 0, None)
     stats = _cached_merged_stats(str(merged), merged.stat().st_mtime)
-    return (stats.total_convs, stats.active, stats.preserved_missing)
+    return (stats.total_convs, stats.active, stats.preserved_missing, stats.newest_update_time)
 
 
 def _global_kpis(states: list[PlatformState]) -> dict:
@@ -40,7 +40,7 @@ def _global_kpis(states: list[PlatformState]) -> dict:
     most_outdated_when = None
     overdue = []
     for s in states:
-        t, a, p = _quick_stats(s)
+        t, a, p, _ = _quick_stats(s)
         total += t
         active += a
         preserved += p
@@ -66,7 +66,7 @@ def _global_kpis(states: list[PlatformState]) -> dict:
 def _platform_table(states: list[PlatformState]) -> pd.DataFrame:
     rows = []
     for s in states:
-        total, active, preserved = _quick_stats(s)
+        total, active, preserved, newest_update = _quick_stats(s)
         rows.append(
             {
                 " ": STATUS_BADGES.get(s.status(), "⚪"),
@@ -74,7 +74,9 @@ def _platform_table(states: list[PlatformState]) -> pd.DataFrame:
                 "Ultima captura": (
                     relative_time(s.last_capture.started_at) if s.last_capture else "—"
                 ),
-                "Ultima conv mexida (servidor)": "—",
+                "Ultima conv mexida (servidor)": (
+                    relative_time(newest_update) if newest_update else "—"
+                ),
                 "Total": f"{total:,}" if total else "—",
                 "Active": f"{active:,}" if active else "—",
                 "Preserved": f"{preserved:,}" if preserved else "—",
