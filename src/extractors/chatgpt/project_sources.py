@@ -61,6 +61,62 @@ def _merge_with_preserved(current_files: list[dict], existing_index_path: Path) 
     return list(current_files) + preserved, len(preserved)
 
 
+def _find_orphan_local_projects(root: Path, current_pids: set[str]) -> list[Path]:
+    """Acha pastas g-p-* locais que NAO estao na lista atual de projects do servidor.
+
+    Sao projects que foram deletados inteiros no servidor — aparecem localmente
+    mas a discovery nao os retorna mais.
+    """
+    if not root.exists():
+        return []
+    orphans = []
+    for pdir in root.iterdir():
+        if not pdir.is_dir():
+            continue
+        if not pdir.name.startswith("g-p-"):
+            continue
+        if pdir.name in current_pids:
+            continue
+        orphans.append(pdir)
+    return orphans
+
+
+def _mark_project_as_deleted(pdir: Path) -> int:
+    """Marca todas as sources de um project como _preserved_missing=true.
+
+    Usado quando o project inteiro foi deletado no servidor (a discovery nao
+    retorna mais o g-p-*). Sem isso, as sources ficariam ACTIVE mesmo nao
+    existindo mais no servidor — gap na visualizacao do estado.
+
+    Idempotente: sources ja preserved nao sao tocadas (mantem _last_seen original).
+    Returns: numero de sources que ganharam a flag agora (nao incluindo as ja
+    preserved de antes).
+    """
+    index_path = pdir / "_files.json"
+    if not index_path.exists():
+        return 0
+    try:
+        with open(index_path, encoding="utf-8") as fh:
+            files = json.load(fh)
+    except Exception:
+        return 0
+    if not isinstance(files, list):
+        return 0
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    newly_marked = 0
+    for f in files:
+        if not f.get("_preserved_missing"):
+            f["_preserved_missing"] = True
+            f.setdefault("_last_seen_in_server", today)
+            newly_marked += 1
+
+    if newly_marked > 0:
+        with open(index_path, "w", encoding="utf-8") as fh:
+            json.dump(files, fh, ensure_ascii=False, indent=2)
+    return newly_marked
+
+
 async def download_project_sources(
     client: ChatGPTAPIClient,
     project_ids: list[str],
@@ -86,6 +142,7 @@ async def download_project_sources(
         "downloaded": 0,
         "skipped_existing": 0,
         "preserved_missing": 0,
+        "projects_deleted_marked": 0,  # projects locais que sumiram do servidor
         "errors": [],
     }
 
@@ -138,6 +195,16 @@ async def download_project_sources(
     print(f"Scaneando {len(project_ids)} projects pra files...")
     await asyncio.gather(*(_process_project(pid) for pid in project_ids))
 
+    # Detectar projects deletados inteiros: presentes localmente mas ausentes
+    # da discovery atual. Marcar todas as sources como _preserved_missing.
+    current_pids = set(project_ids)
+    orphans = _find_orphan_local_projects(root, current_pids)
+    for orphan_pdir in orphans:
+        marked = _mark_project_as_deleted(orphan_pdir)
+        if marked > 0:
+            stats["projects_deleted_marked"] += 1
+            stats["preserved_missing"] += marked
+
     print(
         f"Scanned {stats['projects_scanned']} projects, "
         f"{stats['projects_with_files']} com files, "
@@ -149,4 +216,9 @@ async def download_project_sources(
         f"preserved_missing: {stats['preserved_missing']}, "
         f"errors: {len(stats['errors'])}"
     )
+    if stats["projects_deleted_marked"] > 0:
+        print(
+            f"Projects deletados no servidor (sources marcadas preserved): "
+            f"{stats['projects_deleted_marked']}"
+        )
     return stats

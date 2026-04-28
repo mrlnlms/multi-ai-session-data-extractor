@@ -8,7 +8,11 @@ do reconciler de conversations: nada se perde se ja foi capturado.
 import json
 from pathlib import Path
 
-from src.extractors.chatgpt.project_sources import _merge_with_preserved
+from src.extractors.chatgpt.project_sources import (
+    _find_orphan_local_projects,
+    _mark_project_as_deleted,
+    _merge_with_preserved,
+)
 
 
 def test_no_existing_index_returns_current_as_is(tmp_path):
@@ -82,3 +86,109 @@ def test_corrupt_index_falls_back_to_current(tmp_path):
 
     assert merged == current
     assert count == 0
+
+
+# ============================================================
+# _find_orphan_local_projects + _mark_project_as_deleted
+# (project inteiro deletado no servidor)
+# ============================================================
+
+def _make_project_dir(root: Path, pid: str, files: list[dict]) -> Path:
+    pdir = root / pid
+    pdir.mkdir(parents=True, exist_ok=True)
+    (pdir / "_files.json").write_text(json.dumps(files), encoding="utf-8")
+    return pdir
+
+
+def test_find_orphan_local_projects_detects_deleted(tmp_path):
+    """g-p-* local que nao esta na lista atual de discovery = orfao."""
+    _make_project_dir(tmp_path, "g-p-aaa", [{"file_id": "f1", "name": "x"}])
+    _make_project_dir(tmp_path, "g-p-bbb", [{"file_id": "f2", "name": "y"}])
+    _make_project_dir(tmp_path, "g-p-ccc", [{"file_id": "f3", "name": "z"}])
+
+    # discovery atual so tem aaa e ccc
+    orphans = _find_orphan_local_projects(tmp_path, {"g-p-aaa", "g-p-ccc"})
+
+    assert len(orphans) == 1
+    assert orphans[0].name == "g-p-bbb"
+
+
+def test_find_orphan_returns_empty_when_all_present(tmp_path):
+    """Todos os locais estao na discovery atual = nenhum orfao."""
+    _make_project_dir(tmp_path, "g-p-aaa", [{"file_id": "f1", "name": "x"}])
+
+    orphans = _find_orphan_local_projects(tmp_path, {"g-p-aaa"})
+
+    assert orphans == []
+
+
+def test_find_orphan_ignores_non_project_dirs(tmp_path):
+    """Pastas que nao comecam com g-p- sao ignoradas (ex: assets/, .git/)."""
+    (tmp_path / "assets").mkdir()
+    (tmp_path / ".git").mkdir()
+    _make_project_dir(tmp_path, "g-p-real", [{"file_id": "f1", "name": "x"}])
+
+    orphans = _find_orphan_local_projects(tmp_path, set())
+
+    assert len(orphans) == 1
+    assert orphans[0].name == "g-p-real"
+
+
+def test_find_orphan_returns_empty_when_root_missing(tmp_path):
+    """Root inexistente nao quebra."""
+    orphans = _find_orphan_local_projects(tmp_path / "nonexistent", set())
+    assert orphans == []
+
+
+def test_mark_project_as_deleted_flags_all_sources(tmp_path):
+    """Project deletado: todas as sources ganham _preserved_missing=true."""
+    pdir = _make_project_dir(tmp_path, "g-p-x", [
+        {"file_id": "a", "name": "a.pdf"},
+        {"file_id": "b", "name": "b.pdf"},
+    ])
+
+    marked = _mark_project_as_deleted(pdir)
+
+    assert marked == 2
+    files = json.loads((pdir / "_files.json").read_text())
+    assert all(f.get("_preserved_missing") is True for f in files)
+    assert all("_last_seen_in_server" in f for f in files)
+
+
+def test_mark_project_as_deleted_idempotent(tmp_path):
+    """Source ja preserved nao eh re-marcada (mantem _last_seen original)."""
+    pdir = _make_project_dir(tmp_path, "g-p-x", [
+        {"file_id": "a", "name": "a.pdf",
+         "_preserved_missing": True, "_last_seen_in_server": "2026-04-10"},
+        {"file_id": "b", "name": "b.pdf"},  # nova ainda nao preserved
+    ])
+
+    marked = _mark_project_as_deleted(pdir)
+
+    assert marked == 1  # so b foi marcada agora
+    files = json.loads((pdir / "_files.json").read_text())
+    a = next(f for f in files if f["file_id"] == "a")
+    b = next(f for f in files if f["file_id"] == "b")
+    assert a["_last_seen_in_server"] == "2026-04-10"  # nao foi alterada
+    assert b["_preserved_missing"] is True
+
+
+def test_mark_project_as_deleted_no_files_json(tmp_path):
+    """Pasta sem _files.json retorna 0 sem quebrar."""
+    pdir = tmp_path / "g-p-empty"
+    pdir.mkdir()
+
+    marked = _mark_project_as_deleted(pdir)
+
+    assert marked == 0
+
+
+def test_mark_project_as_deleted_corrupt_json(tmp_path):
+    """_files.json corrompido retorna 0 sem quebrar."""
+    pdir = tmp_path / "g-p-x"
+    pdir.mkdir()
+    (pdir / "_files.json").write_text("not valid {{{")
+
+    marked = _mark_project_as_deleted(pdir)
+
+    assert marked == 0
