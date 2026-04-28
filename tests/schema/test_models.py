@@ -103,6 +103,8 @@ def test_conversations_to_df():
         "conversation_id", "source", "title",
         "created_at", "updated_at", "message_count", "model", "account", "mode", "project", "url",
         "interaction_type", "parent_session_id",
+        "project_id", "gizmo_id", "gizmo_name", "gizmo_resolved",
+        "is_preserved_missing", "last_seen_in_server",
     ]
 
 
@@ -373,4 +375,135 @@ def test_conversation_invalid_interaction_type_raises():
             conversation_id="test_1", source="chatgpt", title="Test",
             created_at=pd.Timestamp("2026-01-01"), updated_at=pd.Timestamp("2026-01-01"),
             message_count=1, model=None, interaction_type="invalid",
+        )
+
+
+def test_chatgpt_is_valid_source():
+    conv = Conversation(
+        conversation_id="gpt_1", source="chatgpt", title="Test",
+        created_at=pd.Timestamp("2026-04-28"), updated_at=pd.Timestamp("2026-04-28"),
+        message_count=2, model="gpt-5",
+    )
+    assert conv.source == "chatgpt"
+
+
+def test_conversation_v3_fields_defaults():
+    conv = Conversation(
+        conversation_id="gpt_1", source="chatgpt", title=None,
+        created_at=pd.Timestamp("2026-04-28"), updated_at=pd.Timestamp("2026-04-28"),
+        message_count=0, model=None,
+    )
+    assert conv.project_id is None
+    assert conv.gizmo_id is None
+    assert conv.gizmo_name is None
+    assert conv.gizmo_resolved is True
+    assert conv.is_preserved_missing is False
+    assert conv.last_seen_in_server is None
+
+
+def test_conversation_v3_fields_set():
+    conv = Conversation(
+        conversation_id="gpt_1", source="chatgpt", title="Test",
+        created_at=pd.Timestamp("2026-04-28"), updated_at=pd.Timestamp("2026-04-28"),
+        message_count=2, model="gpt-5",
+        project_id="g-p-abc", gizmo_id="g-xyz", gizmo_name="My Custom GPT",
+        gizmo_resolved=False, is_preserved_missing=True,
+        last_seen_in_server=pd.Timestamp("2026-04-20"),
+    )
+    assert conv.project_id == "g-p-abc"
+    assert conv.gizmo_id == "g-xyz"
+    assert conv.gizmo_resolved is False
+    assert conv.is_preserved_missing is True
+
+
+def test_message_branch_id_default_is_conv_main():
+    msg = Message(
+        message_id="msg_1", conversation_id="conv-abc", source="chatgpt",
+        sequence=1, role="user", content="oi", model=None,
+        created_at=pd.Timestamp("2026-04-28"),
+    )
+    assert msg.branch_id == "conv-abc_main"
+
+
+def test_message_branch_id_explicit_is_respected():
+    msg = Message(
+        message_id="msg_1", conversation_id="conv-abc", source="chatgpt",
+        sequence=1, role="user", content="oi", model=None,
+        created_at=pd.Timestamp("2026-04-28"),
+        branch_id="conv-abc_fork-xyz",
+    )
+    assert msg.branch_id == "conv-abc_fork-xyz"
+
+
+def test_message_v3_fields():
+    msg = Message(
+        message_id="msg_1", conversation_id="conv-abc", source="chatgpt",
+        sequence=1, role="assistant", content="[imagem gerada]", model="gpt-5",
+        created_at=pd.Timestamp("2026-04-28"),
+        asset_paths=["data/raw/ChatGPT/assets/images/conv/file_abc.png"],
+        finish_reason="stop", is_voice=False, voice_direction=None,
+    )
+    assert msg.asset_paths == ["data/raw/ChatGPT/assets/images/conv/file_abc.png"]
+    assert msg.finish_reason == "stop"
+    assert msg.is_hidden is False
+    assert msg.hidden_reason is None
+
+
+def test_message_voice_direction():
+    msg = Message(
+        message_id="msg_1", conversation_id="conv-abc", source="chatgpt",
+        sequence=1, role="user", content="ola", model=None,
+        created_at=pd.Timestamp("2026-04-28"),
+        is_voice=True, voice_direction="in",
+    )
+    assert msg.is_voice is True
+    assert msg.voice_direction == "in"
+
+
+def test_tool_event_with_result():
+    evt = ToolEvent(
+        event_id="evt_1", conversation_id="conv_1", message_id="msg_1",
+        source="chatgpt", event_type="search", tool_name="browser.search",
+        result="[\"snippet 1\", \"snippet 2\"]",
+    )
+    assert evt.result == "[\"snippet 1\", \"snippet 2\"]"
+
+
+def test_branch_to_dict():
+    from src.schema.models import Branch
+    b = Branch(
+        branch_id="conv-abc_main", conversation_id="conv-abc",
+        source="chatgpt", root_message_id="root", leaf_message_id="leaf",
+        is_active=True, created_at=pd.Timestamp("2026-04-28"),
+        parent_branch_id=None,
+    )
+    d = b.to_dict()
+    assert d["branch_id"] == "conv-abc_main"
+    assert d["is_active"] is True
+    assert d["parent_branch_id"] is None
+
+
+def test_branches_to_df():
+    from src.schema.models import Branch, branches_to_df
+    branches = [
+        Branch(branch_id="c1_main", conversation_id="c1", source="chatgpt",
+               root_message_id="r1", leaf_message_id="l1", is_active=False,
+               created_at=pd.Timestamp("2026-04-28"), parent_branch_id=None),
+        Branch(branch_id="c1_fork", conversation_id="c1", source="chatgpt",
+               root_message_id="r2", leaf_message_id="l2", is_active=True,
+               created_at=pd.Timestamp("2026-04-28"), parent_branch_id="c1_main"),
+    ]
+    df = branches_to_df(branches)
+    assert len(df) == 2
+    assert "branch_id" in df.columns
+    assert "parent_branch_id" in df.columns
+
+
+def test_branch_invalid_source_raises():
+    from src.schema.models import Branch
+    with pytest.raises(ValueError, match="source"):
+        Branch(
+            branch_id="b1", conversation_id="c1", source="invalid_xx",
+            root_message_id="r", leaf_message_id="l", is_active=False,
+            created_at=pd.Timestamp("2026-04-28"),
         )
