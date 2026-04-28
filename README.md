@@ -127,6 +127,48 @@ python scripts/chatgpt-download-project-sources.py "data/raw/<dir>"  # so source
 python scripts/chatgpt-reconcile.py "data/raw/<dir>"              # so reconcile
 ```
 
+## Dashboard (Fase 1)
+
+Visualizacao descritiva — counts, saude operacional, status por plataforma.
+Roda local, single-user, read-only no que o sync produziu.
+
+### Instalacao
+
+`streamlit` e `plotly` ja vem em `requirements.txt`. Se ja rodou
+`pip install -r requirements.txt` (ou `pip install -e ".[dev]"`), esta tudo.
+
+### Rodar
+
+```bash
+PYTHONPATH=. streamlit run dashboard.py
+```
+
+Abre em <http://localhost:8501>. Sidebar tem botao "Recarregar dados" pra
+limpar cache depois de um sync rodado fora do dashboard.
+
+### O que faz
+
+- **Overview** — totais cross-plataforma, ultima sync global, alerta de
+  plataformas atrasadas, timeline de discovery, botao "Atualizar todas".
+- **Drill-down por plataforma** — status, ultima captura/reconcile,
+  storage local, conteudo capturado (active vs preserved, projects,
+  modelos, top projects), historico de capturas e reconciles, botao de
+  sync individual, lista de convs preservadas (deletadas no servidor).
+
+### Primeira vez
+
+Sem captura nenhuma, todas as plataformas aparecem como ⚫ "nunca rodou".
+Use o botao "Sync esta plataforma" no drill-down — abre browser pro login
+inicial. ChatGPT tem orquestrador completo (`chatgpt-sync.py`); as outras
+6 ainda usam o `<plat>-export.py` standalone (sync orquestrador esta no
+backlog).
+
+### O que **NAO** faz
+
+Catalogo + saude. Nada de analise interpretativa, clustering, sentiment,
+deteccao de topicos. Quem quer interpretacao pesada leva os parquets pra
+`~/Desktop/AI Interaction Analysis/`.
+
 ## Testes
 
 ```bash
