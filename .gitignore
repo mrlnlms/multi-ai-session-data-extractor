@@ -31,6 +31,7 @@ build/
 
 # Backups
 *.bak
+_backup-temp/
 
 # Local scratch
 local/

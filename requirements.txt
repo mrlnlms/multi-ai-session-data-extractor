@@ -2,6 +2,7 @@
 beautifulsoup4>=4.14
 pandas>=2.2
 playwright>=1.58
+pyarrow>=14.0
 python-dateutil>=2.9
 PyYAML>=6.0
 

@@ -1,167 +1,452 @@
+"""Testes do parser v3 do ChatGPT.
+
+Cada feature tem fixture em tests/extractors/chatgpt/fixtures/raw_with_*.json.
+Usamos um helper pra "wrap" a fixture (formato {conversation_id, conversation})
+no shape de merged ({conversations: {<id>: <conv>}}) que o parser consome.
+"""
+
+from __future__ import annotations
+
 import json
-import zipfile
-import pytest
 from pathlib import Path
+
+import pytest
+
 from src.parsers.chatgpt import ChatGPTParser
-import pandas as pd
 
 
-FIXTURE = {
-    "export_date": "2026-03-27T18:13:46.494Z",
-    "tool": "GPT2Claude Migration Kit v2.7",
-    "format_version": 7,
-    "total_conversations": 2,
-    "conversations": [
-        {
-            "id": "conv-gpt1",
-            "title": "Simple chat",
-            "create_time": "2025-08-01T10:00:00Z",
-            "update_time": "2025-08-01T10:05:00Z",
-            "model": "gpt-4o",
-            "message_count": 2,
-            "messages": [
-                {"role": "user", "content": "Hello", "timestamp": 1722502800.0},
-                {"role": "assistant", "content": "Hi there!", "timestamp": 1722502810.0},
-            ],
+FIXTURES_DIR = Path(__file__).parent.parent / "extractors" / "chatgpt" / "fixtures"
+
+
+def _make_merged(fixture_name: str, tmp_path: Path) -> Path:
+    """Carrega fixture e escreve em formato de merged em tmp_path."""
+    with open(FIXTURES_DIR / fixture_name, encoding="utf-8") as f:
+        wrapper = json.load(f)
+    conv_id = wrapper["conversation_id"]
+    conv = wrapper["conversation"]
+    merged = {"conversations": {conv_id: conv}}
+    out = tmp_path / "chatgpt_merged.json"
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(merged, f, ensure_ascii=False)
+    return out
+
+
+def _parse(fixture_name: str, tmp_path: Path, raw_root: Path | None = None) -> ChatGPTParser:
+    merged = _make_merged(fixture_name, tmp_path)
+    parser = ChatGPTParser(raw_root=raw_root or tmp_path)
+    parser.parse(merged)
+    return parser
+
+
+# ============================================================
+# voice
+# ============================================================
+
+def test_parse_voice_extracts_transcript_and_direction(tmp_path):
+    parser = _parse("raw_with_voice.json", tmp_path)
+    assert parser.conversations, "deve gerar pelo menos 1 conv"
+    voice_msgs = [m for m in parser.messages if m.is_voice]
+    assert voice_msgs, "fixture voice deve produzir >=1 msg com is_voice=True"
+    # Direction: in (user) ou out (assistant)
+    assert any(m.voice_direction in ("in", "out") for m in voice_msgs)
+    # content_types deve marcar audio_transcription
+    assert any("audio_transcription" in (m.content_types or "") for m in voice_msgs)
+
+
+# ============================================================
+# DALL-E (achado empirico: aparece em role=tool, vira ToolEvent)
+# ============================================================
+
+def test_parse_dalle_creates_image_generation_event(tmp_path):
+    parser = _parse("raw_with_dalle.json", tmp_path)
+    # DALL-E aparece sempre em role=tool no merged real, vira ToolEvent
+    img_events = [e for e in parser.events if e.event_type == "image_generation"]
+    assert img_events, "fixture dalle deve gerar tool_events com event_type='image_generation'"
+
+
+def test_parse_dalle_resolves_file_path_when_file_present(tmp_path):
+    """Quando o file existe em <raw_root>/assets/images/<conv>/<file_id>__*,
+    o ToolEvent (role=tool com DALL-E) preenche file_path."""
+    with open(FIXTURES_DIR / "raw_with_dalle.json", encoding="utf-8") as f:
+        wrapper = json.load(f)
+    conv_id = wrapper["conversation_id"]
+    conv = wrapper["conversation"]
+
+    pointer = None
+    for n in conv.get("mapping", {}).values():
+        msg = (n.get("message") or {})
+        for p in (msg.get("content") or {}).get("parts") or []:
+            if isinstance(p, dict) and p.get("content_type") == "image_asset_pointer":
+                if (p.get("metadata") or {}).get("dalle"):
+                    pointer = p.get("asset_pointer")
+                    break
+        if pointer:
+            break
+    assert pointer, "fixture deve ter pointer DALL-E"
+
+    file_id = pointer.split("://", 1)[1]
+    fake_assets = tmp_path / "assets" / "images" / conv_id
+    fake_assets.mkdir(parents=True, exist_ok=True)
+    (fake_assets / f"{file_id}__test.png").write_bytes(b"fake-png")
+
+    merged = tmp_path / "chatgpt_merged.json"
+    merged.write_text(json.dumps({"conversations": {conv_id: conv}}, ensure_ascii=False))
+
+    parser = ChatGPTParser(raw_root=tmp_path)
+    parser.parse(merged)
+
+    img_events = [e for e in parser.events if e.event_type == "image_generation"]
+    assert img_events
+    paths = [e.file_path for e in img_events if e.file_path]
+    assert paths, "ToolEvent DALL-E deve ter file_path populado"
+    assert any(file_id in p for p in paths)
+
+
+def test_parse_user_image_upload_populates_asset_paths_in_message(tmp_path):
+    """Uploads de imagem (image_asset_pointer SEM dalle) em role=user viram
+    Message com asset_paths populado."""
+    fake_conv = {
+        "id": "upload-1", "title": "test",
+        "create_time": 1700000000, "update_time": 1700000100,
+        "current_node": "msg-user",
+        "mapping": {
+            "root": {"id": "root", "parent": None, "children": ["msg-user"], "message": None},
+            "msg-user": {
+                "id": "msg-user", "parent": "root", "children": [],
+                "message": {
+                    "id": "msg-user", "create_time": 1700000050,
+                    "author": {"role": "user"},
+                    "content": {
+                        "content_type": "multimodal_text",
+                        "parts": [
+                            {"content_type": "image_asset_pointer",
+                             "asset_pointer": "file-service://file-ABCDEF",
+                             "metadata": {}},
+                            "analise essa imagem"
+                        ],
+                    },
+                    "metadata": {},
+                },
+            },
         },
-        {
-            "id": "conv-gpt2",
-            "title": "Research chat",
-            "create_time": "2025-09-15T20:00:00Z",
-            "update_time": "2025-09-15T20:10:00Z",
-            "model": "gpt-4o",
-            "message_count": 3,
-            "messages": [
-                {"role": "user", "content": "Search for mixed methods", "timestamp": 1726430400.0},
-                {"role": "tool", "content": "{\"content_type\":\"super_widget\",\"urls\":[\"https://example.com\"]}", "timestamp": 1726430405.0, "model": "research"},
-                {"role": "assistant", "content": "Here are the results...", "timestamp": 1726430410.0},
-            ],
-        },
-    ],
-}
+    }
+    # Cria asset no disco
+    fake_assets = tmp_path / "assets" / "images" / "upload-1"
+    fake_assets.mkdir(parents=True, exist_ok=True)
+    (fake_assets / "file-ABCDEF__photo.png").write_bytes(b"fake")
+
+    merged = tmp_path / "chatgpt_merged.json"
+    merged.write_text(json.dumps({"conversations": {"upload-1": fake_conv}}))
+
+    parser = ChatGPTParser(raw_root=tmp_path)
+    parser.parse(merged)
+
+    user_msgs = [m for m in parser.messages if m.role == "user"]
+    assert user_msgs
+    msg = user_msgs[0]
+    assert msg.asset_paths is not None
+    assert any("file-ABCDEF" in p for p in msg.asset_paths)
+    assert "image_upload" in (msg.content_types or "")
 
 
-def _write_fixture(tmp_path, data):
-    p = tmp_path / "export.json"
-    p.write_text(json.dumps(data))
-    return p
+# ============================================================
+# Canvas
+# ============================================================
+
+def test_parse_canvas_creates_tool_events(tmp_path):
+    parser = _parse("raw_with_canvas.json", tmp_path)
+    canvas_events = [e for e in parser.events if e.event_type == "canvas"]
+    assert canvas_events, "fixture canvas deve gerar tool_events com event_type='canvas'"
+    # tool_name deve preservar canmore.* quando aplicavel
+    assert any((e.tool_name or "").startswith("canmore.") or e.tool_name == "canmore"
+               for e in canvas_events)
 
 
-def test_chatgpt_simple(tmp_path):
-    path = _write_fixture(tmp_path, FIXTURE)
-    parser = ChatGPTParser()
-    parser.parse(path)
-    assert len(parser.conversations) == 2
+# ============================================================
+# Deep Research
+# ============================================================
+
+def test_parse_deep_research_creates_tool_events(tmp_path):
+    parser = _parse("raw_with_deep_research.json", tmp_path)
+    dr_events = [e for e in parser.events if e.event_type == "deep_research"]
+    assert dr_events, "fixture deep_research deve gerar tool_events com event_type='deep_research'"
+
+
+# ============================================================
+# Tether quote
+# ============================================================
+
+def test_parse_tether_quote_creates_tool_event_not_message(tmp_path):
+    parser = _parse("raw_with_tether_quote.json", tmp_path)
+    tether_events = [e for e in parser.events if e.event_type == "quote"]
+    assert tether_events, "fixture tether_quote deve gerar event_type='quote'"
+    assert all(e.tool_name == "tether_quote" for e in tether_events)
+    # Tether_quote NAO deve aparecer como Message — content_type tether_quote
+    # nao deve estar na CSV de content_types das messages
+    tether_msg = [m for m in parser.messages if "tether_quote" in (m.content_types or "")]
+    assert not tether_msg, "tether_quote nao deve virar Message regular"
+
+
+# ============================================================
+# Custom GPT vs Project
+# ============================================================
+
+def test_parse_custom_gpt_distinguishes_from_project(tmp_path):
+    parser = _parse("raw_with_custom_gpt.json", tmp_path)
+    assert parser.conversations
     conv = parser.conversations[0]
-    assert conv.conversation_id == "conv-gpt1"
-    assert conv.source == "chatgpt"
-    assert conv.title == "Simple chat"
-    assert conv.model == "gpt-4o"
-    assert conv.mode == "chat"
+    # A fixture tem gizmo_id g-* (Custom GPT real, nao g-p-*)
+    assert conv.gizmo_id is not None
+    assert conv.gizmo_id.startswith("g-")
+    assert not conv.gizmo_id.startswith("g-p-"), (
+        f"gizmo_id de Custom GPT real nao deve comecar com 'g-p-': {conv.gizmo_id!r}"
+    )
 
 
-def test_chatgpt_tool_message_merged(tmp_path):
-    path = _write_fixture(tmp_path, FIXTURE)
-    parser = ChatGPTParser()
-    parser.parse(path)
-    conv2_msgs = [m for m in parser.messages if m.conversation_id == "conv-gpt2"]
-    assert len(conv2_msgs) == 2
-    asst = conv2_msgs[1]
-    assert asst.role == "assistant"
-    assert asst.content == "Here are the results..."
-    assert asst.tool_results is not None
-    assert "super_widget" in asst.tool_results
+def test_parse_project_id_separates_from_gizmo_id(tmp_path):
+    """Conv com gizmo_id g-p-* (Project) deve ter project_id setado e gizmo_id None."""
+    # Sintetizar uma conv com g-p-* gizmo_id
+    fake_conv = {
+        "id": "fake-1",
+        "title": "test",
+        "create_time": 1700000000,
+        "update_time": 1700000100,
+        "gizmo_id": "g-p-fake-project-id",
+        "current_node": "root",
+        "mapping": {
+            "root": {
+                "id": "root", "parent": None, "children": [],
+                "message": {
+                    "id": "root", "create_time": 1700000000,
+                    "author": {"role": "user"},
+                    "content": {"content_type": "text", "parts": ["oi"]},
+                    "metadata": {},
+                },
+            }
+        },
+    }
+    merged = tmp_path / "chatgpt_merged.json"
+    merged.write_text(json.dumps({"conversations": {"fake-1": fake_conv}}))
+    parser = ChatGPTParser(raw_root=tmp_path)
+    parser.parse(merged)
+    assert parser.conversations
+    c = parser.conversations[0]
+    assert c.project_id == "g-p-fake-project-id"
+    assert c.gizmo_id is None
 
 
-def test_chatgpt_research_mode(tmp_path):
-    path = _write_fixture(tmp_path, FIXTURE)
-    parser = ChatGPTParser()
-    parser.parse(path)
-    conv = parser.conversations[1]
-    assert conv.mode == "research"
+# ============================================================
+# Tools (role=tool)
+# ============================================================
+
+def test_parse_tools_creates_events_with_correct_event_type(tmp_path):
+    parser = _parse("raw_with_tools.json", tmp_path)
+    assert parser.events, "fixture tools deve gerar >=1 ToolEvent"
+    # Cada ToolEvent deve ter event_type classificado
+    types = {e.event_type for e in parser.events}
+    assert types, "events devem ter event_type"
+    # role=tool messages NAO devem aparecer como Messages
+    assert not any(m.role == "tool" for m in parser.messages)
 
 
-def test_chatgpt_timestamps_from_float(tmp_path):
-    path = _write_fixture(tmp_path, FIXTURE)
-    parser = ChatGPTParser()
-    parser.parse(path)
-    msg = parser.messages[0]
-    # epoch 1722502800 = 2024-08-01 09:00 UTC = 06:00 BRT
-    assert msg.created_at == pd.Timestamp("2024-08-01 06:00:00")
+# ============================================================
+# Branch default + idempotencia + smoke
+# ============================================================
+
+def test_parse_main_branch_id_is_default(tmp_path):
+    parser = _parse("raw_with_voice.json", tmp_path)
+    assert parser.conversations
+    conv_id = parser.conversations[0].conversation_id
+    expected = f"{conv_id}_main"
+    assert all(m.branch_id == expected for m in parser.messages)
 
 
-def test_chatgpt_url_generated(tmp_path):
-    path = _write_fixture(tmp_path, FIXTURE)
-    parser = ChatGPTParser()
-    parser.parse(path)
-    assert parser.conversations[0].url == "https://chatgpt.com/c/conv-gpt1"
+def test_parse_idempotent_two_runs_produce_same_output(tmp_path):
+    merged = _make_merged("raw_with_tools.json", tmp_path)
+    p1 = ChatGPTParser(raw_root=tmp_path)
+    p1.parse(merged)
+    p2 = ChatGPTParser(raw_root=tmp_path)
+    p2.parse(merged)
+    assert [c.to_dict() for c in p1.conversations] == [c.to_dict() for c in p2.conversations]
+    assert [m.to_dict() for m in p1.messages] == [m.to_dict() for m in p2.messages]
+    assert [e.to_dict() for e in p1.events] == [e.to_dict() for e in p2.events]
 
 
-def _make_dalle_zip(tmp_path):
-    """Cria um zip DALL-E fake com estrutura real."""
-    zip_path = tmp_path / "dalle.zip"
-    with zipfile.ZipFile(zip_path, "w") as z:
-        # Standalone generation com caption
-        z.writestr(
-            "personal/dallelabs/user-test/generations/generation-abc123/caption.txt",
-            "A cyberpunk city",
-        )
-        z.writestr(
-            "personal/dallelabs/user-test/generations/generation-abc123/image.png",
-            b"fake-png",
-        )
-        z.writestr(
-            "personal/dallelabs/user-test/generations/generation-abc123/image.webp",
-            b"fake-webp",
-        )
-        # In-conversation (conv_id com hex timestamp valido: 2024-11-11 ~20:17)
-        z.writestr(
-            "personal/dallelabs/user-data/chatgptgenerations/user-test/conversations/67326661-4c64-800c-a22b-fac1da33674e/img1.webp",
-            b"fake-webp",
-        )
-    return zip_path
+def test_save_writes_parquets_without_source_prefix(tmp_path):
+    """Plan §5: paths sao data/processed/<Source>/conversations.parquet (sem prefix)."""
+    merged = _make_merged("raw_with_voice.json", tmp_path)
+    parser = ChatGPTParser(raw_root=tmp_path)
+    parser.parse(merged)
+    out = tmp_path / "out"
+    parser.save(out)
+    assert (out / "conversations.parquet").is_file()
+    assert (out / "messages.parquet").is_file()
+    # tool_events pode ou nao existir dependendo da fixture; voice nao tem
 
 
-def test_parse_dalle_standalone(tmp_path):
-    path = _write_fixture(tmp_path, FIXTURE)
-    parser = ChatGPTParser()
-    parser.parse(path)
-    dalle_zip = _make_dalle_zip(tmp_path)
-    parser.parse_dalle(dalle_zip)
+# ============================================================
+# Branches (Fase 2b)
+# ============================================================
 
-    dalle_convs = [c for c in parser.conversations if c.mode == "dalle"]
-    assert len(dalle_convs) == 2  # 1 standalone + 1 in_conversation
-
-    standalone = [c for c in dalle_convs if c.conversation_id.startswith("dalle-standalone")]
-    assert len(standalone) == 1
-    assert "cyberpunk" in standalone[0].title.lower()
-    assert standalone[0].model == "dall-e"
-
-    # Mensagens: standalone tem user (prompt) + assistant (geração)
-    standalone_msgs = [m for m in parser.messages if m.conversation_id == standalone[0].conversation_id]
-    assert len(standalone_msgs) == 2
-    assert standalone_msgs[0].role == "user"
-    assert standalone_msgs[0].content == "A cyberpunk city"
-    assert standalone_msgs[1].role == "assistant"
-    assert standalone_msgs[1].content_types == "image_generation"
+def test_parse_branches_extracts_branch_table(tmp_path):
+    parser = _parse("raw_with_branches.json", tmp_path)
+    assert parser.branches, "fixture branches deve gerar entries em parser.branches"
+    # Pelo menos 2 branches (main + 1 fork minimo)
+    assert len(parser.branches) >= 2
 
 
-def test_parse_dalle_in_conversation_orphan(tmp_path):
-    path = _write_fixture(tmp_path, FIXTURE)
-    parser = ChatGPTParser()
-    parser.parse(path)
-    dalle_zip = _make_dalle_zip(tmp_path)
-    parser.parse_dalle(dalle_zip)
-
-    orphan = [c for c in parser.conversations if c.conversation_id == "67326661-4c64-800c-a22b-fac1da33674e"]
-    assert len(orphan) == 1
-    assert orphan[0].mode == "dalle"
-    assert orphan[0].url == "https://chatgpt.com/c/67326661-4c64-800c-a22b-fac1da33674e"
-    # Timestamp decodificado do hex
-    assert orphan[0].created_at.year == 2024
+def test_parse_branches_active_marks_current_node(tmp_path):
+    parser = _parse("raw_with_branches.json", tmp_path)
+    actives = [b for b in parser.branches if b.is_active]
+    assert len(actives) == 1, f"deve existir exatamente 1 branch ativa, achei {len(actives)}"
 
 
-def test_decode_hex_ts():
-    assert ChatGPTParser._decode_hex_ts("67326661-4c64-800c").year == 2024
-    assert pd.isna(ChatGPTParser._decode_hex_ts("12bebd92-da0a-49b9"))  # fora do range
-    assert pd.isna(ChatGPTParser._decode_hex_ts("zzzzzzzz-invalid"))
+def test_parse_branches_main_has_no_parent(tmp_path):
+    parser = _parse("raw_with_branches.json", tmp_path)
+    main_branches = [b for b in parser.branches if b.parent_branch_id is None]
+    assert main_branches, "deve existir pelo menos 1 branch sem parent (main)"
+    # Convencao: branch_id = '<conv>_main' pra principal
+    assert any(b.branch_id.endswith("_main") for b in main_branches)
+
+
+def test_parse_branches_forks_have_parent(tmp_path):
+    parser = _parse("raw_with_branches.json", tmp_path)
+    forks = [b for b in parser.branches if b.parent_branch_id is not None]
+    assert forks, "fixture branches tem fork — deve gerar pelo menos 1 sub-branch"
+
+
+def test_parse_messages_get_correct_branch_id(tmp_path):
+    parser = _parse("raw_with_branches.json", tmp_path)
+    branch_ids = {b.branch_id for b in parser.branches}
+    msg_branch_ids = {m.branch_id for m in parser.messages}
+    # Toda branch_id em msgs deve existir na tabela branches
+    assert msg_branch_ids.issubset(branch_ids), (
+        f"branch_ids em messages nao previstas: {msg_branch_ids - branch_ids}"
+    )
+
+
+def test_parse_no_fork_yields_single_main_branch(tmp_path):
+    """Conv sem fork (todos os nodes 0 ou 1 child) tem 1 branch só."""
+    fake_conv = {
+        "id": "linear-1", "title": "test",
+        "create_time": 1700000000, "update_time": 1700000100,
+        "current_node": "n3",
+        "mapping": {
+            "n0": {"id": "n0", "parent": None, "children": ["n1"], "message": None},
+            "n1": {"id": "n1", "parent": "n0", "children": ["n2"],
+                   "message": {"id": "n1", "create_time": 1700000010,
+                               "author": {"role": "user"},
+                               "content": {"content_type": "text", "parts": ["a"]},
+                               "metadata": {}}},
+            "n2": {"id": "n2", "parent": "n1", "children": ["n3"],
+                   "message": {"id": "n2", "create_time": 1700000020,
+                               "author": {"role": "assistant"},
+                               "content": {"content_type": "text", "parts": ["b"]},
+                               "metadata": {}}},
+            "n3": {"id": "n3", "parent": "n2", "children": [],
+                   "message": {"id": "n3", "create_time": 1700000030,
+                               "author": {"role": "user"},
+                               "content": {"content_type": "text", "parts": ["c"]},
+                               "metadata": {}}},
+        },
+    }
+    merged = tmp_path / "chatgpt_merged.json"
+    merged.write_text(json.dumps({"conversations": {"linear-1": fake_conv}}))
+    parser = ChatGPTParser(raw_root=tmp_path)
+    parser.parse(merged)
+    assert len(parser.branches) == 1
+    assert parser.branches[0].branch_id == "linear-1_main"
+    assert parser.branches[0].is_active is True
+    assert all(m.branch_id == "linear-1_main" for m in parser.messages)
+
+
+def test_parse_fork_yields_three_branches(tmp_path):
+    """Conv com 1 fork (2 children) gera 3 branches: main + 2 sub."""
+    fake_conv = {
+        "id": "fork-1", "title": "test",
+        "create_time": 1700000000, "update_time": 1700000100,
+        "current_node": "alt",
+        "mapping": {
+            "n0": {"id": "n0", "parent": None, "children": ["n1"], "message": None},
+            "n1": {"id": "n1", "parent": "n0", "children": ["main-c", "alt"],
+                   "message": {"id": "n1", "create_time": 1700000010,
+                               "author": {"role": "user"},
+                               "content": {"content_type": "text", "parts": ["q"]},
+                               "metadata": {}}},
+            "main-c": {"id": "main-c", "parent": "n1", "children": [],
+                       "message": {"id": "main-c", "create_time": 1700000020,
+                                   "author": {"role": "assistant"},
+                                   "content": {"content_type": "text", "parts": ["resposta1"]},
+                                   "metadata": {}}},
+            "alt": {"id": "alt", "parent": "n1", "children": [],
+                    "message": {"id": "alt", "create_time": 1700000025,
+                                "author": {"role": "assistant"},
+                                "content": {"content_type": "text", "parts": ["resposta2"]},
+                                "metadata": {}}},
+        },
+    }
+    merged = tmp_path / "chatgpt_merged.json"
+    merged.write_text(json.dumps({"conversations": {"fork-1": fake_conv}}))
+    parser = ChatGPTParser(raw_root=tmp_path)
+    parser.parse(merged)
+
+    branch_ids = {b.branch_id for b in parser.branches}
+    assert branch_ids == {"fork-1_main", "fork-1_main-c", "fork-1_alt"}, branch_ids
+
+    # is_active aponta pro alt (current_node)
+    actives = [b for b in parser.branches if b.is_active]
+    assert len(actives) == 1
+    assert actives[0].branch_id == "fork-1_alt"
+
+    # parent_branch_id de main-c e alt aponta pra main
+    by_id = {b.branch_id: b for b in parser.branches}
+    assert by_id["fork-1_main"].parent_branch_id is None
+    assert by_id["fork-1_main-c"].parent_branch_id == "fork-1_main"
+    assert by_id["fork-1_alt"].parent_branch_id == "fork-1_main"
+
+    # Msgs em main-c e alt em suas respectivas branches
+    msg_branches = {m.message_id: m.branch_id for m in parser.messages}
+    assert msg_branches.get("main-c") == "fork-1_main-c"
+    assert msg_branches.get("alt") == "fork-1_alt"
+    assert msg_branches.get("n1") == "fork-1_main"
+
+
+def test_parse_branches_saved_in_parquet(tmp_path):
+    merged = _make_merged("raw_with_branches.json", tmp_path)
+    parser = ChatGPTParser(raw_root=tmp_path)
+    parser.parse(merged)
+    out = tmp_path / "out"
+    parser.save(out)
+    assert (out / "branches.parquet").is_file()
+
+
+def test_parse_preservation_fields_present(tmp_path):
+    """is_preserved_missing e last_seen_in_server devem ser preenchidos quando
+    _last_seen_in_server existe no merged."""
+    fake_conv = {
+        "id": "preserved-1", "title": "old",
+        "create_time": 1700000000, "update_time": 1700000100,
+        "_last_seen_in_server": "2026-04-20",  # antes do max
+        "current_node": "root",
+        "mapping": {
+            "root": {"id": "root", "parent": None, "children": [],
+                     "message": {"id": "root", "create_time": 1700000000,
+                                 "author": {"role": "user"},
+                                 "content": {"content_type": "text", "parts": ["oi"]},
+                                 "metadata": {}}},
+        },
+    }
+    fresh_conv = dict(fake_conv)
+    fresh_conv["id"] = "fresh-1"
+    fresh_conv["_last_seen_in_server"] = "2026-04-28"
+    merged = tmp_path / "chatgpt_merged.json"
+    merged.write_text(json.dumps({"conversations": {
+        "preserved-1": fake_conv,
+        "fresh-1": fresh_conv,
+    }}))
+    parser = ChatGPTParser(raw_root=tmp_path)
+    parser.parse(merged)
+    by_id = {c.conversation_id: c for c in parser.conversations}
+    assert by_id["preserved-1"].is_preserved_missing is True
+    assert by_id["fresh-1"].is_preserved_missing is False
+    assert by_id["preserved-1"].last_seen_in_server is not None

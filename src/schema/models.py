@@ -7,7 +7,7 @@ from typing import Optional
 import pandas as pd
 
 
-VALID_SOURCES = ("claude_ai", "chatgpt", "chatgpt_v2", "qwen", "claude_code", "deepseek", "perplexity", "gemini", "notebooklm", "codex", "gemini_cli")
+VALID_SOURCES = ("claude_ai", "chatgpt", "qwen", "claude_code", "deepseek", "perplexity", "gemini", "notebooklm", "codex", "gemini_cli")
 VALID_ROLES = ("user", "assistant", "system")
 VALID_MODES = ("chat", "search", "research", "copilot", "concise", "dalle", "cli")
 
@@ -27,6 +27,13 @@ class Conversation:
     url: Optional[str] = None
     interaction_type: str = "human_ai"
     parent_session_id: Optional[str] = None
+    # parser v3
+    project_id: Optional[str] = None
+    gizmo_id: Optional[str] = None
+    gizmo_name: Optional[str] = None
+    gizmo_resolved: bool = True
+    is_preserved_missing: bool = False
+    last_seen_in_server: Optional[pd.Timestamp] = None
 
     def __post_init__(self):
         if self.source not in VALID_SOURCES:
@@ -57,12 +64,22 @@ class Message:
     content_types: Optional[str] = None
     thinking: Optional[str] = None
     tool_results: Optional[str] = None
+    # parser v3
+    branch_id: str = ""
+    asset_paths: Optional[list[str]] = None
+    finish_reason: Optional[str] = None
+    is_hidden: bool = False
+    hidden_reason: Optional[str] = None
+    is_voice: bool = False
+    voice_direction: Optional[str] = None
 
     def __post_init__(self):
         if self.source not in VALID_SOURCES:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
         if self.role not in VALID_ROLES:
             raise ValueError(f"role '{self.role}' invalido. Validos: {VALID_ROLES}")
+        if not self.branch_id:
+            self.branch_id = f"{self.conversation_id}_main"
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -81,6 +98,8 @@ class ToolEvent:
     duration_ms: Optional[int] = None
     success: Optional[bool] = None
     metadata_json: Optional[str] = None
+    # parser v3
+    result: Optional[str] = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -92,6 +111,25 @@ class ConversationProject:
     project_tag: str
     tagged_by: str
     confidence: Optional[float] = None
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class Branch:
+    branch_id: str
+    conversation_id: str
+    source: str
+    root_message_id: str
+    leaf_message_id: str
+    is_active: bool
+    created_at: pd.Timestamp
+    parent_branch_id: Optional[str] = None
+
+    def __post_init__(self):
+        if self.source not in VALID_SOURCES:
+            raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -123,3 +161,8 @@ def tool_events_to_df(events: list[ToolEvent]) -> pd.DataFrame:
 def conversation_projects_to_df(projects: list[ConversationProject]) -> pd.DataFrame:
     cols = [f.name for f in fields(ConversationProject)]
     return _models_to_df(projects, cols)
+
+
+def branches_to_df(branches: list[Branch]) -> pd.DataFrame:
+    cols = [f.name for f in fields(Branch)]
+    return _models_to_df(branches, cols)
