@@ -1,5 +1,13 @@
 # Quarto descritivo — briefing pra implementação (Fase 3 do dashboard)
 
+> **Status: Fase 3.1 IMPLEMENTADA em 2026-04-28.** `notebooks/chatgpt.qmd`
+> renderiza em ~20s, HTML self-contained ~52MB, 4 seções entregues
+> (§1 Dados, §2 Cobertura, §3 Volumes, §4 Preservation). Comando:
+> `QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/chatgpt.qmd`.
+> Pendente: Fase 3.2 (template parametrizado quando 2+ plataformas) +
+> integração Streamlit (botão "Ver dados detalhados"). Este doc fica como
+> histórico do plan.
+
 Briefing curto pra sessão paralela implementar o Quarto descritivo. Output:
 notebook(s) `.qmd` que renderiza HTML estático mostrando "o que tem nos
 parquets do parser v3", linkado a partir do dashboard Streamlit.

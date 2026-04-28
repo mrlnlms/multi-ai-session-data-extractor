@@ -11,13 +11,13 @@ Ver `README.md` pra setup e uso.
 
 ## Status (2026-04-28)
 
-| Plataforma | Capture | Reconcile | Sync orquestrador | Parser canonico | Notas |
-|---|---|---|---|---|---|
-| ChatGPT | ✅ | ✅ | ✅ (4 etapas, pasta unica) | ✅ (Fase 2 done) | Preservation completa, rename detection, fail-fast, parser cobrindo branches + ToolEvents |
-| Claude.ai | ✅ | ✅ | ❌ | ❌ | Falta sync equivalente |
-| Gemini | ✅ | ✅ | ❌ | ❌ | Idem |
-| NotebookLM | ✅ | ✅ | ❌ | ❌ | 9 tipos de outputs (audio, video, slide deck PDF+PPTX, blog, flashcards, quiz, data table, infographic, mind map) |
-| Qwen / DeepSeek / Perplexity | ✅ | ❌ | ❌ | ❌ | Reconcilers + sync pendentes |
+| Plataforma | Capture | Reconcile | Sync orquestrador | Parser canonico | Quarto descritivo | Notas |
+|---|---|---|---|---|---|---|
+| ChatGPT | ✅ | ✅ | ✅ (4 etapas, pasta unica) | ✅ (Fase 2 done) | ✅ (Fase 3.1 done) | Preservation completa, rename detection, fail-fast, parser cobrindo branches + ToolEvents, data-profile renderizando |
+| Claude.ai | ✅ | ✅ | ❌ | ❌ | ❌ | Falta sync equivalente |
+| Gemini | ✅ | ✅ | ❌ | ❌ | ❌ | Idem |
+| NotebookLM | ✅ | ✅ | ❌ | ❌ | ❌ | 9 tipos de outputs (audio, video, slide deck PDF+PPTX, blog, flashcards, quiz, data table, infographic, mind map) |
+| Qwen / DeepSeek / Perplexity | ✅ | ❌ | ❌ | ❌ | ❌ | Reconcilers + sync pendentes |
 
 Backlog principal: replicar o padrao do ChatGPT-sync nas outras 6 plataformas
 + parsers canonicos por plataforma (espelhar `src/parsers/chatgpt.py`).
@@ -64,6 +64,24 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
 - Findings empiricos: `docs/parser-v3-empirical-findings.md`
 - Validation v2 vs v3: `docs/parser-v3-validation.md`
 - Comando: `PYTHONPATH=. .venv/bin/python scripts/chatgpt-parse.py`
+
+**Quarto descritivo ChatGPT (Fase 3.1 do dashboard, validado em 2026-04-28):**
+- `notebooks/chatgpt.qmd` — data-profile "zero trato": schema + cobertura
+  + amostras + distribuicoes + preservation. Sem sentiment/clustering/topic
+  (analise interpretativa fica em `~/Desktop/AI Interaction Analysis/`)
+- `notebooks/_style.css`, `notebooks/_quarto.yml` — config compartilhado
+- Stack: DuckDB queryando parquets + Plotly + itables (tabela filtravel)
+- Output: `notebooks/_output/chatgpt.html` (gitignored, ~52MB self-contained)
+- Render: ~20s pras 1171 convs (criterio <30s)
+- Briefing: `docs/quarto-briefing.md`
+- Comando:
+  ```bash
+  # IMPORTANTE: Quarto precisa achar o python do venv (com duckdb, plotly, itables)
+  QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/chatgpt.qmd
+  ```
+  Sem `QUARTO_PYTHON`, ele tenta usar python do system e falha por falta de deps.
+  Pra Streamlit (Fase 3.2) integrar via `subprocess`, vai precisar setar essa env
+  var antes de chamar `quarto render`.
 
 ## Comportamento do servidor ChatGPT (validado empiricamente)
 
@@ -146,6 +164,12 @@ scripts/
 ├── chatgpt-sync.py           # ⭐ orquestrador 5 etapas, modelo pras outras
 └── chatgpt-parse.py          # ⭐ merged -> parquet canonico (Fase 2)
 
+notebooks/
+├── _quarto.yml               # config compartilhado (output_dir, format html)
+├── _style.css                # CSS compartilhado (cor ChatGPT, tabelas, plotly)
+├── chatgpt.qmd               # ⭐ data-profile descritivo (Fase 3.1)
+└── _output/                  # (gitignored) HTML rendirizado
+
 tests/  (260+ testes — TODOS devem passar antes de qualquer merge)
 data/
 ├── raw/                      # (gitignored) saida dos extractors
@@ -187,6 +211,9 @@ PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --no-voice-pass
 
 # Parse merged -> parquet canonico (idempotente; ~3s pras 1171 convs atuais)
 PYTHONPATH=. .venv/bin/python scripts/chatgpt-parse.py
+
+# Renderiza o data-profile descritivo (~20s)
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/chatgpt.qmd
 ```
 
 ## Convencoes do projeto (heranca do projeto antigo)
