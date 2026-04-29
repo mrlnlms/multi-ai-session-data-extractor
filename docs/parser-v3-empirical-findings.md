@@ -253,9 +253,22 @@ Deep Research:
 - `research_kickoff_tool`, `research_kickoff_tool.start_research_task`,
   `research_kickoff_tool.clarify_with_text`
 
-Computer Use (agentic):
+Computer Use (agentic — ChatGPT Agent):
 - `computer.get`, `computer.sync_file`
 - `container.exec`, `container.download`, `container.open_image`
+
+**Validação adicional pós-Fase 2a (computer_use, 2026-04-28):**
+- 12 ToolEvents `computer_use` no merged real, distribuídos em 3 convs
+- Tool names únicos: `container.open_image` (6), `container.exec` (2),
+  `computer.sync_file` (2), `computer.get` (1), `container.download` (1)
+- Detecção via prefix `computer.` ou `container.` em `author.name`
+- Vira ToolEvent com `event_type="computer_use"` (categoria dedicada,
+  separada de `other`)
+- Fixture: `tests/extractors/chatgpt/fixtures/raw_with_computer_use.json`
+  (conv "Documentos CodeMarker v2", 81 nodes, 2 compute events
+  cobrindo `container.download` + `container.open_image`)
+- Meta-test: `test_fixture_computer_use_has_agent_tools`
+- Parser test: `test_parse_computer_use_creates_computer_use_events`
 
 JIT plugins (códigos opacos):
 - `kaur1br5_context`, `q7dr546`, `n7jupd.metadata`

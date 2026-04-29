@@ -249,6 +249,27 @@ def test_parse_tools_creates_events_with_correct_event_type(tmp_path):
     assert not any(m.role == "tool" for m in parser.messages)
 
 
+def test_parse_computer_use_creates_computer_use_events(tmp_path):
+    """ChatGPT Agent / Computer Use: tools com author.name começando em
+    computer.* ou container.* viram ToolEvents com event_type='computer_use'.
+    Tool name preservado exato (computer.get, container.exec, etc)."""
+    parser = _parse("raw_with_computer_use.json", tmp_path)
+    compute_events = [
+        e for e in parser.events if e.event_type == "computer_use"
+    ]
+    assert compute_events, (
+        "fixture computer_use deve gerar >=1 ToolEvent com event_type='computer_use'"
+    )
+    # Tool names devem ser preservados (não redactados — agente real)
+    tool_names = {e.tool_name for e in compute_events}
+    assert all(
+        n and n.startswith(("computer.", "container.")) for n in tool_names
+    ), f"tool_names devem começar com computer./container.: {tool_names}"
+    # Cada compute event deve estar linkado à conversation_id da fixture
+    conv_ids = {e.conversation_id for e in compute_events}
+    assert len(conv_ids) == 1, f"todos events da mesma conv: {conv_ids}"
+
+
 # ============================================================
 # Branch default + idempotencia + smoke
 # ============================================================

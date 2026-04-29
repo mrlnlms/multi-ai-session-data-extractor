@@ -189,6 +189,35 @@ def test_fixture_tools_has_tool_role():
 
 
 # ============================================================
+# computer_use (ChatGPT Agent / agentic mode):
+# ≥1 msg com author.role=tool e tool_name começando com computer./container.
+# ============================================================
+
+def test_fixture_computer_use_has_agent_tools():
+    """ChatGPT Agent / Computer Use modo agentic: ferramentas que controlam
+    container (computer.get, computer.sync_file, container.exec, etc).
+    """
+    conv = _load("raw_with_computer_use.json")
+    compute_msgs = []
+    tool_names = set()
+    for _, _, msg in _iter_messages(conv):
+        author = msg.get("author") or {}
+        if author.get("role") != "tool":
+            continue
+        name = author.get("name") or ""
+        if name.startswith(("computer.", "container.")):
+            compute_msgs.append(msg)
+            tool_names.add(name)
+    assert compute_msgs, (
+        "fixture computer_use deve ter ≥1 msg com author.role=tool "
+        "e name começando com 'computer.' ou 'container.'"
+    )
+    # Pelo menos 1 nome preservado (não redactado — é nome de tool)
+    assert all(not n.startswith("[REDACTED") for n in tool_names), \
+        f"tool names de computer/container devem ser preservados: {tool_names}"
+
+
+# ============================================================
 # Sanity geral: PII de title sempre redactada
 # ============================================================
 
@@ -201,6 +230,7 @@ ALL_FIXTURES = [
     "raw_with_tether_quote.json",
     "raw_with_custom_gpt.json",
     "raw_with_tools.json",
+    "raw_with_computer_use.json",
 ]
 
 
