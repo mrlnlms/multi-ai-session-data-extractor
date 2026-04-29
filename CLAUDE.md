@@ -9,6 +9,32 @@ do servidor, manter local como fonte primaria**.
 
 Ver `README.md` pra setup e uso.
 
+## Projeto pai — SEMPRE olhar la antes de criar do zero
+
+Este projeto foi spawned de `~/Desktop/AI Interaction Analysis/` em 2026-04-27.
+**Antes de criar QUALQUER coisa do zero aqui** (profile de login, fixture
+baseline, config de captura, dados ancora pra debug, scripts equivalentes),
+verificar primeiro se ja existe la. Cobre principalmente:
+
+- **`.storage/<plat>-profile-*/`** — sessoes Playwright logadas pra todas as
+  7 plataformas. Profile copiado vale (auth.py de cada extractor tem fallback
+  pro nome legacy sem sufixo de account). NAO peca login do zero sem
+  conferir.
+- **`data/raw/<Plat>/`** e **`data/merged/<Plat>/`** — capturas anteriores
+  servem de baseline / ground truth pra confronto com captura nova
+  (especialmente quando a gente quer auditar gaps no extractor).
+- **Configs e secrets** que nao estao versionados aqui ainda
+  (cookies, API keys, etc).
+- **Backup-temp** ou snapshots historicos quando precisar comparar
+  comportamento antigo.
+
+Princípio: o projeto pai e referencia operacional ate este aqui ficar
+maduro pra rodar standalone. Reusar config local NAO contradiz o objetivo
+opensource — quando o projeto for distribuido, cada usuario gera o proprio
+profile/dados; o projeto pai e atalho de dev pra mim, nao parte do produto.
+
+Lista de imports pendentes em `memory/project_pending_imports_from_old.md`.
+
 ## Status (2026-04-28)
 
 | Plataforma | Capture | Reconcile | Sync orquestrador | Parser canonico | Quarto descritivo | Notas |
@@ -17,7 +43,8 @@ Ver `README.md` pra setup e uso.
 | Claude.ai | ✅ | ✅ | ❌ | ❌ | ❌ | Falta sync equivalente |
 | Gemini | ✅ | ✅ | ❌ | ❌ | ❌ | Idem |
 | NotebookLM | ✅ | ✅ | ❌ | ❌ | ❌ | 9 tipos de outputs (audio, video, slide deck PDF+PPTX, blog, flashcards, quiz, data table, infographic, mind map) |
-| Qwen / DeepSeek / Perplexity | ✅ | ❌ | ❌ | ❌ | ❌ | Reconcilers + sync pendentes |
+| Perplexity | ✅ + Spaces | ⚠️ legacy | ❌ | ⚠️ legacy | ❌ | Auditoria 2026-04-29: pinned bug fixado, Spaces (collections) capturados, 1 orphan detectado em GAS |
+| Qwen / DeepSeek | ✅ | ❌ | ❌ | ❌ | ❌ | Reconcilers + sync pendentes |
 
 Backlog principal: replicar o padrao do ChatGPT-sync nas outras 6 plataformas
 + parsers canonicos por plataforma (espelhar `src/parsers/chatgpt.py`).
@@ -41,6 +68,33 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
     binarios fisicos intocados, chats internos preservados no merged
 - Fail-fast contra discovery flakey (>20% drop aborta antes do save)
 - 100 testes unitarios passando
+
+**Perplexity — auditoria de extractor + Spaces (2026-04-29):**
+- Profile reusado de `~/Desktop/AI Interaction Analysis/.storage/perplexity-profile/`
+  (78MB, 24/abr — bate com fallback legacy do `auth.py` sem sufixo de account)
+- **Bug pinned threads fixado:** `list_pinned_ask_threads` exige POST
+  com body `{}`. GET retornava 400 silenciosamente. Confirmado via probe
+  (7 variacoes testadas).
+- **Spaces (collections) agora capturados:** novo modulo
+  `src/extractors/perplexity/spaces.py`, 4 spaces salvos em
+  `spaces/{uuid}/{metadata,threads_index,files}.json` + `spaces/_index.json`.
+  Endpoints: `collections/list_user_collections`, `collections/get_collection`,
+  `collections/list_collection_threads`, `file-repository/list-files`.
+- **1 thread orphan detectada em GAS:** `d344c501-46aa-4951-85f7-6d27d2d4631d`
+  (2024-09-02), referenciada em space mas deletada do servidor (HTTP 400
+  ENTRY_NOT_FOUND). `list_collection_threads` preserva metadata mesmo de
+  threads deletadas — fonte de preservation passiva.
+- **NAO e cap temporal:** mais antiga em list_ask_threads e 2024-08-23
+  (anterior ao orphan). Filtro parece ser presenca-no-servidor.
+- **Computer/Scheduled/History — nada novo capturavel em conta free**:
+  workflows/gallery sao templates globais, threads do Computer (mode=asi)
+  ja estao em list_ask_threads.
+- Findings empiricos em `docs/perplexity-audit-findings.md`.
+- Probes em `scripts/perplexity-probe-features.py` e
+  `scripts/perplexity-probe-spaces.py`.
+- Pasta ainda com timestamp + nome legacy "Perplexity Data" (Fase A do
+  plan de replicacao, nao feita ainda — escopo dessa auditoria foi so
+  fechar gaps no extractor).
 
 **Estado atual `data/merged/ChatGPT/chatgpt_merged.json`:**
 - 1171 convs cumulativas (1168 active + 3 preserved_missing)
