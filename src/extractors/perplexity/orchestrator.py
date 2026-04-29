@@ -11,6 +11,7 @@ from src.extractors.perplexity.auth import load_context
 from src.extractors.perplexity.api_client import PerplexityAPIClient
 from src.extractors.perplexity.discovery import discover
 from src.extractors.perplexity.fetcher import fetch_threads
+from src.extractors.perplexity.spaces import discover_spaces, fetch_spaces
 
 
 BASE_DIR = Path("data/raw/Perplexity Data")
@@ -92,6 +93,10 @@ async def run_export(
         print(f"Fetching {len(to_fetch)} threads ({reused} reusadas)")
         ok, skipped, errs = await fetch_threads(client, to_fetch, output_dir)
 
+        # Spaces (collections) — descobertos via auditoria empirica 2026-04-29
+        collections = await discover_spaces(client, output_dir)
+        spaces_ok, _, spaces_errs = await fetch_spaces(client, collections, output_dir)
+
         log = {
             "started_at": started_at.isoformat(),
             "finished_at": datetime.now(timezone.utc).isoformat(),
@@ -104,8 +109,11 @@ async def run_export(
                 "threads_fetched": ok,
                 "threads_reused_incremental": reused,
                 "threads_errors": len(errs),
+                "spaces_discovered": len(collections),
+                "spaces_fetched": spaces_ok,
+                "spaces_errors": len(spaces_errs),
             },
-            "errors": {"threads": errs[:50]},
+            "errors": {"threads": errs[:50], "spaces": spaces_errs[:20]},
         }
         with open(output_dir / "capture_log.json", "w", encoding="utf-8") as f:
             json.dump(log, f, ensure_ascii=False, indent=2)
