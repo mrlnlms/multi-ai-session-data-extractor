@@ -95,6 +95,69 @@ def collect_block_types(content_blocks: list) -> list[str]:
     return sorted(types)
 
 
+def collect_citations(content_blocks: list) -> list[dict]:
+    """Coleta `citations` aninhadas em blocks `text`. Achata em uma lista."""
+    out = []
+    for b in content_blocks or []:
+        if not isinstance(b, dict):
+            continue
+        if b.get("type") == "text":
+            cits = b.get("citations") or []
+            if isinstance(cits, list):
+                out.extend(c for c in cits if c)
+    return out
+
+
+def block_time_bounds(content_blocks: list) -> tuple[Optional[str], Optional[str]]:
+    """Retorna (min start_timestamp, max stop_timestamp) entre todos os blocks.
+
+    Util pra medir latencia: quanto tempo total Claude levou pra produzir
+    a msg (incluindo thinking + tool calls + text). Strings ISO — caller
+    converte pra Timestamp.
+    """
+    starts, stops = [], []
+    for b in content_blocks or []:
+        if not isinstance(b, dict):
+            continue
+        s = b.get("start_timestamp")
+        e = b.get("stop_timestamp")
+        if s:
+            starts.append(s)
+        if e:
+            stops.append(e)
+    return (min(starts) if starts else None, max(stops) if stops else None)
+
+
+def is_mcp_tool_use(block: dict) -> bool:
+    """Detecta MCP no tool_use checando os 3 sinais que a spec do projeto pai
+    listou: integration_name, mcp_server_url, is_mcp_app."""
+    if not isinstance(block, dict):
+        return False
+    return bool(
+        block.get("integration_name")
+        or block.get("mcp_server_url")
+        or block.get("is_mcp_app")
+    )
+
+
+def serialize_attachments(attachments: list[dict]) -> list[dict]:
+    """Serializa attachments preservando extracted_content (campo critico do
+    schema do Claude.ai — 1.8k+ attachments com texto extraido inline)."""
+    out = []
+    for a in attachments or []:
+        if not isinstance(a, dict):
+            continue
+        out.append({
+            "id": a.get("id"),
+            "file_name": a.get("file_name") or "",
+            "file_type": a.get("file_type"),
+            "file_size": a.get("file_size"),
+            "extracted_content": a.get("extracted_content") or "",
+            "created_at": a.get("created_at"),
+        })
+    return out
+
+
 def resolve_file_assets(
     files: list[dict],
     assets_root: Path,

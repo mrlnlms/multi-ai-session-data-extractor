@@ -31,23 +31,29 @@ from typing import Optional
 import pandas as pd
 
 from src.parsers._claude_ai_helpers import (
+    block_time_bounds,
     build_branches,
     classify_tool_event,
     collect_attachment_names,
     collect_block_types,
+    collect_citations,
     concat_text_blocks,
     concat_thinking_blocks,
+    is_mcp_tool_use,
     resolve_file_assets,
+    serialize_attachments,
 )
 from src.parsers.base import BaseParser
 from src.schema.models import (
     Branch,
     Conversation,
     Message,
+    ProjectDoc,
     ToolEvent,
     branches_to_df,
     conversations_to_df,
     messages_to_df,
+    project_docs_to_df,
     tool_events_to_df,
 )
 
@@ -73,6 +79,7 @@ class ClaudeAIParser(BaseParser):
         super().reset()
         self.branches: list[Branch] = []
         self.projects = []
+        self.project_docs: list[ProjectDoc] = []
 
     @property
     def conversations_dir(self) -> Path:
@@ -127,7 +134,7 @@ class ClaudeAIParser(BaseParser):
                     continue
                 self._parse_conv(conv, last_run_date=last_run_date)
 
-        # Projects (so guarda raw — vai virar tabela project_metadata.parquet no save)
+        # Projects (raw + project_docs como tabela separada com content)
         if proj_dir.exists():
             for fp in sorted(proj_dir.glob("*.json")):
                 try:
@@ -136,6 +143,7 @@ class ClaudeAIParser(BaseParser):
                 except Exception:
                     continue
                 self.projects.append(proj)
+                self._extract_project_docs(proj)
 
     @staticmethod
     def _compute_last_run_date(conv_dir: Path) -> Optional[str]:
@@ -209,6 +217,18 @@ class ClaudeAIParser(BaseParser):
             and last_seen < last_run_date
         )
 
+        # settings preservados como JSON pra futuras consultas (paprika_mode,
+        # web_search, artifacts, etc — features flags por conv).
+        settings = conv.get("settings")
+        settings_json = (
+            json.dumps(settings, ensure_ascii=False)
+            if isinstance(settings, dict) and settings
+            else None
+        )
+        summary = conv.get("summary") or None
+        if summary == "":
+            summary = None
+
         self.conversations.append(Conversation(
             conversation_id=conv_uuid,
             source=SOURCE,
@@ -229,6 +249,8 @@ class ClaudeAIParser(BaseParser):
             is_temporary=bool(conv.get("is_temporary", False)),
             is_preserved_missing=is_preserved,
             last_seen_in_server=self._ts(last_seen) if last_seen else None,
+            summary=summary,
+            settings_json=settings_json,
         ))
 
         self.messages.extend(messages)
@@ -254,9 +276,14 @@ class ClaudeAIParser(BaseParser):
         thinking = concat_thinking_blocks(content_blocks)
         block_types = collect_block_types(content_blocks)
 
-        # Attachments (extracted_content fica preservado no raw — aqui so registramos nomes)
+        # Attachments com extracted_content (1.8k+ no projeto-mae,
+        # texto extraido fica inline em attachments_json)
         attachments = msg.get("attachments") or []
         att_names = collect_attachment_names(attachments)
+        att_serialized = serialize_attachments(attachments)
+        attachments_json = (
+            json.dumps(att_serialized, ensure_ascii=False) if att_serialized else None
+        )
 
         # Files (binarios) → asset_paths
         files = msg.get("files") or []
@@ -267,6 +294,15 @@ class ClaudeAIParser(BaseParser):
             block_types.append("attachment")
         if files and "file" not in block_types:
             block_types.append("file")
+
+        # Citations agregadas (de blocks `text`)
+        citations = collect_citations(content_blocks)
+        citations_json = (
+            json.dumps(citations, ensure_ascii=False) if citations else None
+        )
+
+        # Timestamps de bloco (latencia: max(stop) - min(start))
+        start_ts_str, stop_ts_str = block_time_bounds(content_blocks)
 
         model = conv.get("model") if role == "assistant" else None
         branch_id = msg_to_branch.get(msg_uuid, f"{conv_uuid}_main")
@@ -287,6 +323,10 @@ class ClaudeAIParser(BaseParser):
             branch_id=branch_id,
             asset_paths=asset_paths,
             finish_reason=msg.get("stop_reason"),
+            citations_json=citations_json,
+            attachments_json=attachments_json,
+            start_timestamp=self._ts(start_ts_str) if start_ts_str else None,
+            stop_timestamp=self._ts(stop_ts_str) if stop_ts_str else None,
         )
 
     def _extract_tool_events(self, conv_uuid: str, msg: dict) -> list[ToolEvent]:
@@ -306,7 +346,7 @@ class ClaudeAIParser(BaseParser):
 
             if btype == "tool_use":
                 tool_name = block.get("name") or ""
-                is_mcp = bool(block.get("integration_name"))
+                is_mcp = is_mcp_tool_use(block)
                 category = classify_tool_event(tool_name, is_mcp)
 
                 metadata = {
@@ -317,6 +357,8 @@ class ClaudeAIParser(BaseParser):
                     "is_mcp": is_mcp,
                     "integration_name": block.get("integration_name"),
                     "integration_icon_url": block.get("integration_icon_url"),
+                    "mcp_server_url": block.get("mcp_server_url"),
+                    "is_mcp_app": block.get("is_mcp_app"),
                     "start_timestamp": block.get("start_timestamp"),
                     "stop_timestamp": block.get("stop_timestamp"),
                 }
@@ -370,8 +412,39 @@ class ClaudeAIParser(BaseParser):
     # Save
     # ------------------------------------------------------------------
 
+    def _extract_project_docs(self, proj: dict) -> None:
+        """Coleta docs do project como ProjectDoc (com content inline)."""
+        proj_uuid = proj.get("uuid")
+        if not proj_uuid:
+            return
+        for doc in proj.get("docs") or []:
+            if not isinstance(doc, dict):
+                continue
+            doc_uuid = doc.get("uuid")
+            if not doc_uuid:
+                continue
+            content = doc.get("content") or ""
+            etok = doc.get("estimated_token_count")
+            try:
+                etok_int = int(etok) if etok is not None else None
+            except (TypeError, ValueError):
+                etok_int = None
+            self.project_docs.append(ProjectDoc(
+                doc_id=doc_uuid,
+                project_id=proj_uuid,
+                source=SOURCE,
+                file_name=doc.get("file_name") or "",
+                content=content,
+                content_size=len(content),
+                estimated_token_count=etok_int,
+                created_at=self._ts(doc.get("created_at")) if doc.get("created_at") else None,
+            ))
+
     def branches_df(self) -> pd.DataFrame:
         return branches_to_df(self.branches)
+
+    def project_docs_df(self) -> pd.DataFrame:
+        return project_docs_to_df(self.project_docs)
 
     def project_metadata_df(self) -> pd.DataFrame:
         """Tabela auxiliar: 1 row por project, com docs_count + files_count
@@ -427,3 +500,7 @@ class ClaudeAIParser(BaseParser):
         proj_df = self.project_metadata_df()
         if not proj_df.empty:
             proj_df.to_parquet(output_dir / f"{self.source_name}_project_metadata.parquet")
+
+        docs_df = self.project_docs_df()
+        if not docs_df.empty:
+            docs_df.to_parquet(output_dir / f"{self.source_name}_project_docs.parquet")

@@ -190,8 +190,10 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
   projects), idempotente, pasta unica `data/merged/Claude.ai/conversations/<uuid>.json`
   + `projects/<uuid>.json` + `assets/`. Saida: `claude_ai_merged_summary.json`
   + `LAST_RECONCILE.md` + `reconcile_log.jsonl`
-- **Parser canonico v3** (`src/parsers/claude_ai.py` + `_claude_ai_helpers.py`):
-  835 convs / 24.504 msgs / 16.180 tool_events / 1.160 branches / 83 projects.
+- **Parser canonico v3.1 — gap-fill backlog #41 do projeto-mae fechado**
+  (`src/parsers/claude_ai.py` + `_claude_ai_helpers.py`):
+  835 convs / 24.504 msgs / 16.180 tool_events / 1.160 branches / 83 projects /
+  **546 project_docs (23.182.481 chars — bate exato com spec do pai)**.
   Cobertura:
   - **Branches via DAG plano** (`parent_message_uuid` + `current_leaf_message_uuid`)
     — diferente do tree-walk do ChatGPT. 832 main + 319 secundarias (28%
@@ -211,6 +213,17 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
   - **`is_temporary`** preservado (0 nesta run — feature efemera)
   - **Project metadata** em tabela auxiliar `claude_ai_project_metadata.parquet`
     (83 projects com docs_count + files_count + prompt_template)
+  - **v3.1 (gap-fill 2026-05-01):**
+    - `Conversation.summary` auto-gerado pelo servidor (466/835 = 56%)
+    - `Conversation.settings_json` feature flags por conv (100%)
+    - `Message.citations_json` citations em text blocks (115 msgs)
+    - `Message.attachments_json` com extracted_content inline (1.344 msgs)
+    - `Message.start_timestamp` + `stop_timestamp` latencia por block
+      (23.930 msgs — 98% cobertura, mediana ~30s assistant)
+    - MCP detection com 3 sinais (`integration_name` + `mcp_server_url`
+      + `is_mcp_app`) — 791 MCP calls vs 716 antes
+    - Nova tabela `claude_ai_project_docs.parquet` (546 docs / 23.182.481
+      chars — content inline, queryable)
 - **Quarto descritivo** (`notebooks/claude-ai.qmd`): 46MB HTML self-contained,
   render < 30s. Cor primaria: Anthropic burnt orange (#CC785C)
 - **Findings empiricos:** `docs/claude-ai-parser-empirical-findings.md`

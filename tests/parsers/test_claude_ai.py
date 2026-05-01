@@ -446,6 +446,194 @@ def test_project_metadata_df(tmp_path):
 # Save end-to-end
 # ----------------------------------------------------------------------
 
+# ----------------------------------------------------------------------
+# Gap-fill: summary, settings, citations, attachments_json, block timestamps,
+# MCP detection completa, project_docs
+# ----------------------------------------------------------------------
+
+def test_summary_preserved_in_conversation(tmp_path):
+    conv = _basic_conv(summary="Conv overview text\n\nMore details...")
+    merged = _write_merged(tmp_path, [conv])
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+    assert parser.conversations[0].summary == "Conv overview text\n\nMore details..."
+
+
+def test_summary_empty_string_becomes_none(tmp_path):
+    conv = _basic_conv(summary="")
+    merged = _write_merged(tmp_path, [conv])
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+    assert parser.conversations[0].summary is None
+
+
+def test_settings_preserved_as_json(tmp_path):
+    conv = _basic_conv(settings={
+        "paprika_mode": "extended",
+        "enabled_web_search": True,
+        "tool_search_mode": "auto",
+    })
+    merged = _write_merged(tmp_path, [conv])
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+    settings = json.loads(parser.conversations[0].settings_json)
+    assert settings["paprika_mode"] == "extended"
+    assert settings["enabled_web_search"] is True
+
+
+def test_settings_empty_dict_becomes_none(tmp_path):
+    merged = _write_merged(tmp_path, [_basic_conv(settings={})])
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+    assert parser.conversations[0].settings_json is None
+
+
+def test_citations_extracted_from_text_blocks(tmp_path):
+    conv = _basic_conv()
+    conv["chat_messages"][1]["content"] = [
+        {
+            "type": "text",
+            "text": "answer with citation",
+            "citations": [
+                {"type": "url_citation", "url": "https://example.com", "title": "X"},
+                {"type": "url_citation", "url": "https://example.org", "title": "Y"},
+            ],
+        },
+    ]
+    merged = _write_merged(tmp_path, [conv])
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+    cits = json.loads(parser.messages[1].citations_json)
+    assert len(cits) == 2
+    assert cits[0]["url"] == "https://example.com"
+
+
+def test_attachments_json_preserves_extracted_content(tmp_path):
+    conv = _basic_conv()
+    conv["chat_messages"][0]["attachments"] = [
+        {
+            "id": "att-1",
+            "file_name": "data.csv",
+            "file_type": "csv",
+            "file_size": 1024,
+            "extracted_content": "id,name\n1,foo\n2,bar",
+            "created_at": "2025-06-20T09:00:00Z",
+        },
+    ]
+    merged = _write_merged(tmp_path, [conv])
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+    msg = parser.messages[0]
+    atts = json.loads(msg.attachments_json)
+    assert atts[0]["file_name"] == "data.csv"
+    assert "id,name" in atts[0]["extracted_content"]
+
+
+def test_block_timestamps_min_max(tmp_path):
+    conv = _basic_conv()
+    conv["chat_messages"][1]["content"] = [
+        {"type": "thinking", "thinking": "...",
+         "start_timestamp": "2025-06-20T09:00:30Z",
+         "stop_timestamp": "2025-06-20T09:00:45Z"},
+        {"type": "text", "text": "ok",
+         "start_timestamp": "2025-06-20T09:00:46Z",
+         "stop_timestamp": "2025-06-20T09:00:50Z"},
+    ]
+    merged = _write_merged(tmp_path, [conv])
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+    msg = parser.messages[1]
+    assert msg.start_timestamp is not None
+    assert msg.stop_timestamp is not None
+    # stop - start = 20 segundos (entre 09:00:30 e 09:00:50)
+    assert (msg.stop_timestamp - msg.start_timestamp).total_seconds() == 20
+
+
+def test_mcp_detection_via_mcp_server_url(tmp_path):
+    conv = _basic_conv()
+    conv["chat_messages"][1]["content"] = [
+        {
+            "type": "tool_use",
+            "id": "toolu_x",
+            "name": "custom_tool",
+            "input": {},
+            "mcp_server_url": "https://mcp.example.com",
+        },
+    ]
+    merged = _write_merged(tmp_path, [conv])
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+    metadata = json.loads(parser.events[0].metadata_json)
+    assert metadata["is_mcp"] is True
+    assert metadata["mcp_server_url"] == "https://mcp.example.com"
+
+
+def test_mcp_detection_via_is_mcp_app(tmp_path):
+    conv = _basic_conv()
+    conv["chat_messages"][1]["content"] = [
+        {
+            "type": "tool_use",
+            "id": "toolu_y",
+            "name": "another_tool",
+            "input": {},
+            "is_mcp_app": True,
+        },
+    ]
+    merged = _write_merged(tmp_path, [conv])
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+    metadata = json.loads(parser.events[0].metadata_json)
+    assert metadata["is_mcp"] is True
+
+
+def test_project_docs_extracted_with_content(tmp_path):
+    conv = _basic_conv()
+    project = {
+        "uuid": "proj-x",
+        "name": "Test",
+        "docs": [
+            {
+                "uuid": "doc-1",
+                "file_name": "guide.md",
+                "content": "# Title\n\nLong content...",
+                "estimated_token_count": "42",
+                "created_at": "2025-08-01T10:00:00Z",
+                "project_uuid": "proj-x",
+            },
+            {
+                "uuid": "doc-2",
+                "file_name": "data.txt",
+                "content": "raw text",
+                "estimated_token_count": "5",
+                "created_at": "2025-08-02T10:00:00Z",
+                "project_uuid": "proj-x",
+            },
+        ],
+        "files": [],
+        "is_private": True,
+        "is_starred": False,
+        "is_starter_project": False,
+        "created_at": "2025-08-01T10:00:00Z",
+        "updated_at": "2025-08-01T10:00:00Z",
+        "docs_count": "2",
+        "files_count": "0",
+    }
+    merged = _write_merged(tmp_path, [conv], projects=[project])
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+    assert len(parser.project_docs) == 2
+    df = parser.project_docs_df()
+    assert list(df.columns) == [
+        "doc_id", "project_id", "source", "file_name", "content",
+        "content_size", "estimated_token_count", "created_at",
+    ]
+    row = df.iloc[0]
+    assert row["project_id"] == "proj-x"
+    assert row["source"] == "claude_ai"
+    assert row["content_size"] == len("# Title\n\nLong content...")
+    assert row["estimated_token_count"] == 42
+
+
 def test_save_writes_parquets(tmp_path):
     conv = _basic_conv()
     conv["chat_messages"][1]["content"] = [
@@ -462,3 +650,31 @@ def test_save_writes_parquets(tmp_path):
     assert (out / "claude_ai_messages.parquet").exists()
     assert (out / "claude_ai_tool_events.parquet").exists()
     assert (out / "claude_ai_branches.parquet").exists()
+
+
+def test_save_writes_project_docs_parquet(tmp_path):
+    conv = _basic_conv()
+    project = {
+        "uuid": "proj-1",
+        "name": "P",
+        "docs": [
+            {"uuid": "d1", "file_name": "a.md", "content": "hi",
+             "estimated_token_count": "1", "created_at": "2025-01-01T00:00:00Z",
+             "project_uuid": "proj-1"},
+        ],
+        "files": [],
+        "is_private": True,
+        "is_starred": False,
+        "is_starter_project": False,
+        "created_at": "2025-01-01T00:00:00Z",
+        "updated_at": "2025-01-01T00:00:00Z",
+        "docs_count": "1",
+        "files_count": "0",
+    }
+    merged = _write_merged(tmp_path, [conv], projects=[project])
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+    out = tmp_path / "processed"
+    parser.save(out)
+    assert (out / "claude_ai_project_docs.parquet").exists()
+    assert (out / "claude_ai_project_metadata.parquet").exists()

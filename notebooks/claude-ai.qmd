@@ -26,7 +26,7 @@ init_notebook_mode(all_interactive=False)
 
 PROCESSED = _project_root / "data" / "processed" / "Claude.ai"
 con = duckdb.connect()
-for table in ("conversations", "messages", "tool_events", "branches", "project_metadata"):
+for table in ("conversations", "messages", "tool_events", "branches", "project_metadata", "project_docs"):
     p = PROCESSED / f"claude_ai_{table}.parquet"
     if p.exists():
         con.execute(f"CREATE VIEW {table} AS SELECT * FROM read_parquet('{p}')")
@@ -82,12 +82,19 @@ range_dt = con.execute("""
     FROM conversations
 """).df()
 
+_n_docs = 0
+try:
+    _n_docs = con.execute("SELECT COUNT(*) FROM project_docs").fetchone()[0]
+except Exception:
+    pass
+
 show_df(pd.DataFrame([
     {"Tabela": "conversations.parquet", "Rows": f"{totals['conversations'].iloc[0]:,}", "Periodo": f"{range_dt['oldest'].iloc[0]:%Y-%m-%d} → {range_dt['newest_created'].iloc[0]:%Y-%m-%d}"},
     {"Tabela": "messages.parquet", "Rows": f"{totals['messages'].iloc[0]:,}", "Periodo": "—"},
     {"Tabela": "tool_events.parquet", "Rows": f"{totals['tool_events'].iloc[0]:,}", "Periodo": "—"},
     {"Tabela": "branches.parquet", "Rows": f"{totals['branches'].iloc[0]:,}", "Periodo": "—"},
     {"Tabela": "project_metadata.parquet", "Rows": f"{totals['projects'].iloc[0]:,}", "Periodo": "—"},
+    {"Tabela": "project_docs.parquet", "Rows": f"{_n_docs:,}", "Periodo": "—"},
 ]))
 ```
 
@@ -696,7 +703,111 @@ fig.update_yaxes(title="N convs")
 fig.show()
 ```
 
-# 4. Preservation
+# 4. Conteudo rico — gap-fill v3.1
+
+Campos adicionais alem do basic schema. Cobertos pelo parser apos
+ajuste de spec do projeto-mae:
+
+```{python}
+#| label: rich-content-stats
+
+stats = con.execute("""
+    SELECT
+        SUM(CASE WHEN summary IS NOT NULL THEN 1 ELSE 0 END) AS with_summary,
+        SUM(CASE WHEN settings_json IS NOT NULL THEN 1 ELSE 0 END) AS with_settings
+    FROM conversations
+""").df()
+msg_stats = con.execute("""
+    SELECT
+        COUNT(*) AS total_msgs,
+        SUM(CASE WHEN citations_json IS NOT NULL THEN 1 ELSE 0 END) AS with_citations,
+        SUM(CASE WHEN attachments_json IS NOT NULL THEN 1 ELSE 0 END) AS with_attachments_json,
+        SUM(CASE WHEN start_timestamp IS NOT NULL THEN 1 ELSE 0 END) AS with_block_ts
+    FROM messages
+""").df()
+mcp_stats = con.execute("""
+    SELECT COUNT(*) AS mcp_events
+    FROM tool_events
+    WHERE event_type LIKE 'mcp_%'
+""").df()
+
+show_df(pd.DataFrame([
+    {"Campo": "Conversation.summary", "Cobertura": int(stats.with_summary.iloc[0])},
+    {"Campo": "Conversation.settings_json", "Cobertura": int(stats.with_settings.iloc[0])},
+    {"Campo": "Message.citations_json", "Cobertura": int(msg_stats.with_citations.iloc[0])},
+    {"Campo": "Message.attachments_json (com extracted_content)", "Cobertura": int(msg_stats.with_attachments_json.iloc[0])},
+    {"Campo": "Message.start_timestamp/stop_timestamp (latencia por bloco)", "Cobertura": int(msg_stats.with_block_ts.iloc[0])},
+    {"Campo": "ToolEvent MCP detection (3 sinais)", "Cobertura": int(mcp_stats.mcp_events.iloc[0])},
+]))
+```
+
+## 4.1 Project docs (content inline)
+
+Tabela auxiliar — uma row por knowledge file com **content extraido inline**.
+Volume valida o achado do projeto-mae: ~23M chars em 546 docs.
+
+```{python}
+#| label: project-docs-stats
+
+if _n_docs > 0:
+    docs_stats = con.execute("""
+        SELECT
+            COUNT(*) AS total_docs,
+            SUM(content_size) AS total_chars,
+            ROUND(AVG(content_size), 0)::INT AS avg_chars,
+            MAX(content_size) AS max_chars,
+            COUNT(DISTINCT project_id) AS distinct_projects
+        FROM project_docs
+    """).df()
+    show_df(docs_stats)
+
+    top_docs = con.execute("""
+        SELECT file_name, content_size, estimated_token_count,
+               substr(project_id, 1, 8) AS proj_id
+        FROM project_docs ORDER BY content_size DESC LIMIT 10
+    """).df()
+    show_df(top_docs)
+else:
+    print("Tabela project_docs ainda nao gerada. Rode scripts/claude-parse.py.")
+```
+
+## 4.2 Latencia de resposta (block timestamps)
+
+```{python}
+#| label: latency-distribution
+
+lat = con.execute("""
+    SELECT
+        epoch(stop_timestamp - start_timestamp) AS latency_s,
+        role
+    FROM messages
+    WHERE start_timestamp IS NOT NULL AND stop_timestamp IS NOT NULL
+      AND role = 'assistant'
+""").df()
+
+if not lat.empty:
+    bins = pd.cut(lat["latency_s"],
+                  bins=[0, 5, 15, 30, 60, 120, 300, 600, 99999],
+                  labels=["0-5s", "5-15s", "15-30s", "30-60s",
+                          "1-2min", "2-5min", "5-10min", "10min+"])
+    grp = bins.value_counts().sort_index()
+    fig = plotly_bar(
+        x=grp.index.astype(str), y=grp.values,
+        title=f"Latencia assistant (start → stop block timestamps), n={len(lat):,}",
+        height=300,
+    )
+    fig.update_xaxes(title="Janela de latencia")
+    fig.update_yaxes(title="N msgs")
+    fig.show()
+
+    pct = lat["latency_s"].quantile([0.5, 0.9, 0.95, 0.99])
+    show_df(pd.DataFrame([
+        {"Percentil": f"P{int(p*100)}", "Latencia (s)": f"{v:.1f}"}
+        for p, v in pct.items()
+    ]))
+```
+
+# 5. Preservation
 
 ## 4.1 Active vs preserved_missing
 

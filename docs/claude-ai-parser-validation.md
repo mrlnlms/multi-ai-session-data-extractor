@@ -149,6 +149,24 @@ o uso intensivo de Computer Use (file editing, bash) e MCPs. Em messages
 absolutas, supera ChatGPT mesmo com volume menor de convs (média ~29
 msgs/conv vs 15 do ChatGPT).
 
+## Gap-fill v3.1 (2026-05-01)
+
+Após primeira entrega "shipped", auditoria do backlog #41 do projeto-mãe
+revelou 6 gaps de cobertura. Fechados em sequência, schema bumped.
+
+| Gap | Impl |
+|---|---|
+| `Conversation.summary` (auto-gerado pelo servidor) | ✅ 466/835 convs (56%) |
+| `Conversation.settings_json` (paprika_mode, web_search, etc) | ✅ 835/835 (100%) |
+| `Message.citations_json` (citations em text blocks) | ✅ 115 msgs |
+| `Message.attachments_json` (extracted_content inline) | ✅ 1.344 msgs |
+| `Message.start_timestamp` + `stop_timestamp` (latência por block) | ✅ 23.930 msgs (98%) |
+| MCP detection completa (`integration_name` + `mcp_server_url` + `is_mcp_app`) | ✅ 791 MCP calls (vs 716 antes) |
+| Nova tabela `project_docs` (content inline, 23M chars) | ✅ 546 docs / 23.182.481 chars |
+
+Bate com a spec do projeto-mãe (item #41): "23M chars em 546 docs" ✅
+exato; "1.8k+ attachments" → 1.344 (próximo); "16k+ tool_use" → 16.180 ✅.
+
 ## TODOs futuros (não bloqueantes)
 
 - **Inconsistência search_call vs search_result**: 298 calls / 766 results.

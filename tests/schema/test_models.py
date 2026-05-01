@@ -106,6 +106,7 @@ def test_conversations_to_df():
         "project_id", "gizmo_id", "gizmo_name", "gizmo_resolved",
         "is_preserved_missing", "last_seen_in_server", "is_pinned",
         "is_archived", "is_temporary",
+        "summary", "settings_json",
     ]
 
 

@@ -37,6 +37,9 @@ class Conversation:
     is_pinned: Optional[bool] = None
     is_archived: Optional[bool] = None
     is_temporary: Optional[bool] = None
+    # parser v3.1 (Claude.ai gap-fill)
+    summary: Optional[str] = None
+    settings_json: Optional[str] = None
 
     def __post_init__(self):
         if self.source not in VALID_SOURCES:
@@ -75,6 +78,11 @@ class Message:
     hidden_reason: Optional[str] = None
     is_voice: bool = False
     voice_direction: Optional[str] = None
+    # parser v3.1 (Claude.ai gap-fill)
+    citations_json: Optional[str] = None
+    attachments_json: Optional[str] = None
+    start_timestamp: Optional[pd.Timestamp] = None
+    stop_timestamp: Optional[pd.Timestamp] = None
 
     def __post_init__(self):
         if self.source not in VALID_SOURCES:
@@ -114,6 +122,32 @@ class ConversationProject:
     project_tag: str
     tagged_by: str
     confidence: Optional[float] = None
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class ProjectDoc:
+    """Doc de project (knowledge file/source) com content inline.
+
+    Tabela auxiliar do parser v3.1 — usado pra Claude.ai onde projects tem
+    docs com content extraido (23M chars em 546 docs no projeto-mae).
+    Schema agnostico ao source pra permitir reuso em outras plataformas
+    (ChatGPT project_sources tambem se encaixa).
+    """
+    doc_id: str
+    project_id: str
+    source: str
+    file_name: str
+    content: str
+    content_size: int
+    estimated_token_count: Optional[int] = None
+    created_at: Optional[pd.Timestamp] = None
+
+    def __post_init__(self):
+        if self.source not in VALID_SOURCES:
+            raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -169,3 +203,8 @@ def conversation_projects_to_df(projects: list[ConversationProject]) -> pd.DataF
 def branches_to_df(branches: list[Branch]) -> pd.DataFrame:
     cols = [f.name for f in fields(Branch)]
     return _models_to_df(branches, cols)
+
+
+def project_docs_to_df(docs: list[ProjectDoc]) -> pd.DataFrame:
+    cols = [f.name for f in fields(ProjectDoc)]
+    return _models_to_df(docs, cols)
