@@ -137,8 +137,9 @@ def _load_capture_log(path: Path) -> list[CaptureRun]:
                 d = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            # ChatGPT schema: run_started_at, discovery.total, fetch.{attempted,succeeded}
+            # ChatGPT schema:    run_started_at, discovery.total, fetch.{attempted,succeeded}
             # Perplexity schema: started_at, totals.{threads_discovered,threads_fetched}
+            # Claude.ai schema:  started_at, totals.{conversations_discovered,conversations_fetched}
             started = _parse_iso(d.get("run_started_at") or d.get("started_at"))
             finished = _parse_iso(d.get("run_finished_at") or d.get("finished_at"))
             duration = d.get("duration_seconds")
@@ -158,9 +159,21 @@ def _load_capture_log(path: Path) -> list[CaptureRun]:
                     started_at=started,
                     finished_at=finished,
                     duration_seconds=duration,
-                    discovery_total=discovery.get("total") or totals.get("threads_discovered"),
-                    fetch_attempted=fetch.get("attempted") or totals.get("threads_fetched"),
-                    fetch_succeeded=fetch.get("succeeded") or totals.get("threads_fetched"),
+                    discovery_total=(
+                        discovery.get("total")
+                        or totals.get("threads_discovered")
+                        or totals.get("conversations_discovered")
+                    ),
+                    fetch_attempted=(
+                        fetch.get("attempted")
+                        or totals.get("threads_fetched")
+                        or totals.get("conversations_fetched")
+                    ),
+                    fetch_succeeded=(
+                        fetch.get("succeeded")
+                        or totals.get("threads_fetched")
+                        or totals.get("conversations_fetched")
+                    ),
                     errors_count=errors_count,
                 )
             )
@@ -180,13 +193,37 @@ def _load_reconcile_log(path: Path) -> list[ReconcileRun]:
                 d = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            # Schemas:
+            #  - ChatGPT:    added/updated/copied/preserved_missing (top-level)
+            #  - Perplexity: threads_added/_updated/_copied/_preserved_missing
+            #  - Claude.ai:  convs_added/_updated/_copied/_preserved_missing
             runs.append(
                 ReconcileRun(
                     reconciled_at=_parse_iso(d.get("reconciled_at")),
-                    added=d.get("added") or 0,
-                    updated=d.get("updated") or 0,
-                    copied=d.get("copied") or 0,
-                    preserved_missing=d.get("preserved_missing") or 0,
+                    added=(
+                        d.get("added")
+                        or d.get("threads_added")
+                        or d.get("convs_added")
+                        or 0
+                    ),
+                    updated=(
+                        d.get("updated")
+                        or d.get("threads_updated")
+                        or d.get("convs_updated")
+                        or 0
+                    ),
+                    copied=(
+                        d.get("copied")
+                        or d.get("threads_copied")
+                        or d.get("convs_copied")
+                        or 0
+                    ),
+                    preserved_missing=(
+                        d.get("preserved_missing")
+                        or d.get("threads_preserved_missing")
+                        or d.get("convs_preserved_missing")
+                        or 0
+                    ),
                     warnings_count=len(d.get("warnings") or []),
                 )
             )
