@@ -12,6 +12,7 @@ from src.extractors.perplexity.api_client import PerplexityAPIClient
 from src.extractors.perplexity.discovery import discover
 from src.extractors.perplexity.fetcher import fetch_threads
 from src.extractors.perplexity.spaces import discover_spaces, fetch_spaces
+from src.extractors.perplexity.artifact_downloader import download_artifacts
 
 
 BASE_DIR = Path("data/raw/Perplexity Data")
@@ -111,6 +112,14 @@ async def run_export(
             json.dump(assets_pinned, f, ensure_ascii=False, indent=2)
         print(f"  {len(assets_all)} assets ({len(assets_pinned)} pinados)")
 
+        # Download dos binarios dos artifacts (CloudFront/S3) — adicionado em 2026-05-01
+        if assets_all:
+            print("Baixando binarios dos artifacts...")
+            dl_stats = await download_artifacts(context, assets_all, output_dir)
+            print(f"  downloaded={dl_stats['downloaded']} skipped_existing={dl_stats['skipped_existing']} failed={dl_stats['failed']}")
+        else:
+            dl_stats = {"downloaded": 0, "skipped_existing": 0, "failed": 0, "total": 0}
+
         log = {
             "started_at": started_at.isoformat(),
             "finished_at": datetime.now(timezone.utc).isoformat(),
@@ -128,6 +137,9 @@ async def run_export(
                 "spaces_errors": len(spaces_errs),
                 "assets_total": len(assets_all),
                 "assets_pinned": len(assets_pinned),
+                "assets_downloaded": dl_stats["downloaded"],
+                "assets_download_skipped": dl_stats["skipped_existing"],
+                "assets_download_failed": dl_stats["failed"],
             },
             "errors": {"threads": errs[:50], "spaces": spaces_errs[:20]},
         }
