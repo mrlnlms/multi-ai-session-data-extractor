@@ -9,6 +9,27 @@ do servidor, manter local como fonte primaria**.
 
 Ver `README.md` pra setup e uso.
 
+## SEMPRE refletir na UI do dashboard (Streamlit)
+
+Toda vez que adicionar/promover plataforma (sync, parser v3, Quarto), **a
+UI do dashboard Streamlit precisa refletir**. Nao basta criar arquivos —
+abrir o dashboard e validar:
+
+- `KNOWN_PLATFORMS` em `dashboard/data.py` lista a plataforma (ja lista as 7)
+- Tabela cross-plataforma do overview mostra os 4 status verdes (capture +
+  reconcile + parser + Quarto)
+- Botao "Ver dados detalhados" aparece quando `notebooks/<source>.qmd` existe
+- Counters batem com `LAST_CAPTURE.md` + `LAST_RECONCILE.md` + jsonls
+
+Caminho default: `streamlit run dashboard/app.py` (ou comando equivalente
+do projeto). Se nao reflete automaticamente, eh bug do dashboard — corrige
+antes de declarar plataforma "shipped".
+
+**Sintoma de que esqueci disso:** declarei plataforma pronta sem ter
+aberto o dashboard. Furo: `notebooks/<source>.qmd` rendiriza, parquets
+estao em `data/processed/<Source>/`, mas a tabela do dashboard ainda
+mostra ❌. Resolver antes de fechar.
+
 ## Projeto pai — SEMPRE olhar la antes de criar do zero
 
 Este projeto foi spawned de `~/Desktop/AI Interaction Analysis/` em 2026-04-27.
@@ -35,12 +56,12 @@ profile/dados; o projeto pai e atalho de dev pra mim, nao parte do produto.
 
 Lista de imports pendentes em `memory/project_pending_imports_from_old.md`.
 
-## Status (2026-04-28)
+## Status (2026-05-01)
 
 | Plataforma | Capture | Reconcile | Sync orquestrador | Parser canonico | Quarto descritivo | Notas |
 |---|---|---|---|---|---|---|
 | ChatGPT | ✅ | ✅ | ✅ (4 etapas, pasta unica) | ✅ (Fase 2 done) | ✅ (Fase 3.1 done) | Preservation completa, rename detection, fail-fast, parser cobrindo branches + ToolEvents, data-profile renderizando |
-| Claude.ai | ✅ | ✅ | ❌ | ❌ | ❌ | Falta sync equivalente |
+| Claude.ai | ✅ | ✅ | ✅ (3 etapas, pasta unica) | ✅ v3 | ✅ | thinking, tool_use/result+MCP, branches via parent_uuid, is_pinned/is_temporary mapeados, 24k msgs / 16k events |
 | Gemini | ✅ | ✅ | ❌ | ❌ | ❌ | Idem |
 | NotebookLM | ✅ | ✅ | ❌ | ❌ | ❌ | 9 tipos de outputs (audio, video, slide deck PDF+PPTX, blog, flashcards, quiz, data table, infographic, mind map) |
 | Perplexity | ✅ | ✅ | ✅ | ✅ | ✅ | Auditoria + reconciler + parser v3 + Quarto. 81 conversations (77 threads + 4 pages), 9 artifacts c/ binarios, 1 orphan, 4 spaces |
@@ -156,6 +177,61 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/perplexity.qmd
   ```
 
+**Claude.ai — ciclo completo end-to-end validado em 2026-05-01:**
+- **Pasta unica cumulativa:** `data/raw/Claude.ai/` e `data/merged/Claude.ai/`
+  (sem timestamps, sem subpastas datadas)
+- **Sync orquestrador 3 etapas:** `scripts/claude-sync.py` (capture + assets +
+  reconcile)
+- **Cobertura completa na captura:** 835 conversations + 83 projects descobertos
+  (829 fetched com sucesso, 6 erros — investigar TODO), 2.110 binarios baixados,
+  1.117 artifacts extraidos (code/markdown/html/react via tool_use)
+- **Reconciler v3 (FEATURES_VERSION=2):** preservation completa (convs +
+  projects), idempotente, pasta unica `data/merged/Claude.ai/conversations/<uuid>.json`
+  + `projects/<uuid>.json` + `assets/`. Saida: `claude_ai_merged_summary.json`
+  + `LAST_RECONCILE.md` + `reconcile_log.jsonl`
+- **Parser canonico v3** (`src/parsers/claude_ai.py` + `_claude_ai_helpers.py`):
+  834 convs / 24.397 msgs / 16.044 tool_events / 1.151 branches / 83 projects.
+  Cobertura:
+  - **Branches via DAG plano** (`parent_message_uuid` + `current_leaf_message_uuid`)
+    — diferente do tree-walk do ChatGPT. 832 main + 319 secundarias (28%
+    convs com fork)
+  - **Thinking blocks** preservados em `Message.thinking` (4.460 msgs)
+  - **Tool use/result** → ToolEvent. Categorias observadas:
+    `code_call/_result` (4k+ Computer Use/file editing), `artifact_call/_result`
+    (2.8k cada), `search` (web_search + research), `mcp_*` (1.067 events
+    em Google Drive e outros)
+  - **MCP detection** via `integration_name` no tool_use block
+  - **Attachments com extracted_content** preservados in-place no merged;
+    parser registra file_names em `Message.attachment_names` (711 msgs)
+  - **Files (uploads binarios)** → `Message.asset_paths` (1.225 msgs com
+    paths resolvidos a partir de file_uuid)
+  - **`is_starred` → `is_pinned`** (12 pinadas em 834 convs — cross-platform
+    check)
+  - **`is_temporary`** preservado (0 nesta run — feature efemera)
+  - **Project metadata** em tabela auxiliar `claude_ai_project_metadata.parquet`
+    (83 projects com docs_count + files_count + prompt_template)
+- **Quarto descritivo** (`notebooks/claude-ai.qmd`): 46MB HTML self-contained,
+  render < 30s. Cor primaria: Anthropic burnt orange (#CC785C)
+- **Findings empiricos:** `docs/claude-ai-parser-empirical-findings.md`
+- **Validation cruzada vs legacy:** `docs/claude-ai-parser-validation.md`
+  (parser v3 ⊇ legacy estritamente — adiciona thinking, tool_events,
+  branches, MCP, asset_paths, preservation, is_pinned/is_temporary)
+- **Backup do legacy:** `_backup-temp/parser-claude-ai-promocao-2026-05-01/`
+- **Auth:** profile copiado de `~/Desktop/AI Interaction Analysis/.storage/claude-ai-profile-default/`
+- **Captura headless** (sem Cloudflare challenge em runtime)
+- **Comandos:**
+  ```bash
+  PYTHONPATH=. .venv/bin/python scripts/claude-sync.py
+  PYTHONPATH=. .venv/bin/python scripts/claude-parse.py
+  QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/claude-ai.qmd
+  ```
+- **TODOs validacao manual** (cenarios CRUD pendentes):
+  - rename → servidor bumpa `updated_at`? (hipotese: sim)
+  - delete → reconciler marca como `_preserved_missing`?
+  - pin via UI → `is_starred=true` reflete em discovery?
+  - temporary chat → comportamento na captura?
+  - project archive → `archived_at` populado?
+
 **Estado atual `data/merged/ChatGPT/chatgpt_merged.json`:**
 - 1171 convs cumulativas (1168 active + 3 preserved_missing)
 - E a fonte de verdade pro ChatGPT
@@ -219,10 +295,11 @@ captura. Lista crescente conforme aprendemos:
     em `data/raw/ChatGPT/gizmos_pinned.json` (sidecar separado).
 - **Claude.ai:** ✅ tem `is_starred` (pin) + `is_temporary` no schema da API
   (`/api/organizations/{org}/chat_conversations_v2`, validado 2026-05-01 via
-  probe Chrome MCP em 835 convs). Extractor ja extrai `is_starred` em discovery
-  e preserva `is_temporary` no JSON cru. **Falta:** parser canonico v3 mapear
-  pra `Conversation.is_pinned` / `is_temporary`. **Sem campo `is_archived`** no
-  schema visivel.
+  probe Chrome MCP em 835 convs). Extractor extrai `is_starred` em discovery
+  e preserva `is_temporary` no JSON cru. **Parser v3 mapeia ambos**:
+  `is_starred` → `Conversation.is_pinned` (12 pinadas em 834 convs);
+  `is_temporary` preservado in-place (0 capturadas — feature efemera).
+  **Sem campo `is_archived`** no schema visivel.
 - **Gemini, NotebookLM, Qwen, DeepSeek:** ⏸ verificar quando
   extractor for atualizado pra schema v3.
 

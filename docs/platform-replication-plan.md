@@ -13,7 +13,7 @@ adaptar gotchas.
 |---|---|---|---|---|---|---|---|
 | **ChatGPT** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Perplexity** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Claude.ai | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
+| **Claude.ai** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Gemini | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
 | NotebookLM | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
 | Qwen | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
