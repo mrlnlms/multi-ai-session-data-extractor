@@ -200,10 +200,52 @@ Opcoes:
 **Recomendacao:** opcao A — sem novo codigo. Threads_index dos spaces
 ja tem tudo que precisa. Parser cobre a diferenca.
 
+### ✅ Comportamento do servidor (validado empiricamente 2026-05-01)
+
+Testes manuais via UI + capture:
+- **Rename de thread**: servidor BUMPA `last_query_datetime` pra hora atual.
+  Validado: thread `a3a6d563` antes 2025-06-27, depois rename 2026-05-01T14:58.
+  Foi pro topo da lista.
+  → **Reconciler detecta via caminho incremental normal** (igual ChatGPT).
+- **Add to space**: thread aparece em `list_collection_threads` do space alvo.
+  Validado: thread `83887374` adicionada a Brainstorm Buddy via dialog
+  "Choose Space".
+- **Delete via menu thread (Library)**: backend retorna `ENTRY_DELETED`
+  ao tentar fetchar. Thread some de **tudo** — `list_ask_threads` + qualquer
+  `list_collection_threads`. Validado com thread `83887374`.
+- **Delete legacy** (caso `d344c501`): thread deletada do servidor mas
+  **continua referenciada** em `list_collection_threads` da GAS.
+  Discrepancia vs caso `83887374`: ambos retornam `ENTRY_DELETED` ao fetch,
+  mas so um vira orphan no space. **Hipotese:** depende de quando foi
+  deletada vs quando foi adicionada ao space (sequencia temporal); ou de
+  qual UI exata foi usada (menu da thread em library vs dentro do space).
+  Nao deterministico no curto teste.
+  → **Reconciler precisa cobrir AMBOS os cenarios:**
+  - Thread some do list_ask_threads E do space → marca como deletada
+  - Thread some do list_ask_threads MAS continua em list_collection_threads
+    → marca como `_orphan_in_space` no threads_index do space
+
 ### ⏸ Fase 4 — reconciler de Spaces (depois)
 `src/reconcilers/perplexity.py` precisa estender pra reconciliar tambem
 `spaces/_index.json` (preservation analoga a project_sources do ChatGPT)
 + marcar orphans em `threads_index.json` baseado em diff com captured.
+
+Logica do reconciler:
+1. **Threads** (sempre):
+   - Diff `list_ask_threads` atual vs anterior
+   - `_preserved_missing` pra threads que sumiram do listing
+2. **Spaces** (novo):
+   - Diff `_index.json` atual vs anterior
+   - Spaces que sumiram → marca preserved (o user deletou o space)
+3. **Threads em spaces** (novo):
+   - Pra cada space, diff `threads_index.json` atual vs anterior
+   - Threads que sumiram do space MAS estao em `list_ask_threads` →
+     foram removidas do space (sem deletar)
+   - Threads que sumiram do space MAS NAO estao em `list_ask_threads` →
+     orphan (caso CV) ou deletadas. Sub-diff:
+     - `fetch_thread()` retorna `ENTRY_DELETED` → deletada de vez
+     - Caso contrario → preserved/orphan
+4. **Pages e Files**: idem, preservation se sumiram
 
 ### ⏸ Fase 5 — sync orquestrador (depois)
 `scripts/perplexity-sync.py` (3 etapas: capture + assets + reconcile) +
