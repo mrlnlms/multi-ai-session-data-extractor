@@ -282,8 +282,13 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
   PYTHONPATH=. .venv/bin/python scripts/qwen-parse.py
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/qwen.qmd
   ```
-- **TODO:** download local dos project files (presigned S3 expira 6h);
-  validar cenarios CRUD (rename/delete/pin/archive) — bateria manual
+- **Asset download integrado** (`scripts/qwen-download-assets.py`):
+  326 URLs detectadas em msgs/projects, 321 baixadas com sucesso,
+  196MB local. Parser resolve `asset_paths` via `assets_manifest.json`:
+  171 msgs com `asset_paths` populados.
+- **CRUD historico validado** via 4 snapshots do projeto-pai (`docs/qwen-server-behavior.md`):
+  +6 added, 0 deletes/renames/pins. Bateria manual UI fica como TODO
+  futuro nao-bloqueante
 
 **DeepSeek — ciclo completo end-to-end validado em 2026-05-01:**
 - **Pasta unica cumulativa:** `data/raw/DeepSeek/` e `data/merged/DeepSeek/`
@@ -316,9 +321,12 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
   PYTHONPATH=. .venv/bin/python scripts/deepseek-parse.py
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/deepseek.qmd
   ```
-- **TODO:** validar cenarios CRUD; testar agent mode (visto no schema mas
-  nao capturado nesta base); R1 reasoner com `model_type='thinking'` validar
-  comportamento
+- **`model_type='expert'` mapeado** pra mode='research' (R1 reasoner)
+- **`status` enum descoberto:** `FINISHED`/`INCOMPLETE`/`WIP` (716/5/1 msgs)
+- **`feedback`/`tips`/`ban_edit`/`ban_regenerate`/`thinking_elapsed_secs`**
+  preservados em `Message.attachments_json` (220 msgs com metadata)
+- **CRUD historico validado** via 2 snapshots (`docs/deepseek-server-behavior.md`):
+  +1 added, 0 deletes
 
 **Estado atual `data/merged/ChatGPT/chatgpt_merged.json`:**
 - 1171 convs cumulativas (1168 active + 3 preserved_missing)

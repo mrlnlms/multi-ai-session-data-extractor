@@ -139,13 +139,19 @@ Diferente de Qwen/Claude.ai/ChatGPT — DeepSeek nao expoe sources/knowledge
 files separados. Sem `project_id` no schema da session. Logica de pasta
 unica fica mais simples (so threads).
 
-## TODOs durante implementacao
+## TODOs durante implementacao — STATUS
 
-- [ ] Validar enum de `status`: `FINISHED` visto, mais valores possiveis?
-- [ ] Validar enum de `search_status`
-- [ ] Schema de `files` per msg (poucos exemplos na base)
-- [ ] `agent='agent'` (vs 'chat'): se aparecer, qual diferenca no schema?
-- [ ] `model_type='thinking'` / `'reasoner'` — se R1 mode tem schema
-  diferente (ja vimos thinking_content em msg de model='' — interessante)
-- [ ] Validar se rename de title bumpa updated_at (espelho ChatGPT/Perplexity)
-- [ ] Cenario de delete: `_preserved_missing` no reconciler
+- [x] **Enum `status`:** confirmado 3 valores (`FINISHED`, `INCOMPLETE`,
+  `WIP`). Parser via `normalize_status_to_finish_reason`.
+- [x] **Enum `search_status`:** so `FINISHED` visto. Preservado em metadata.
+- [x] **Schema de `files` per msg:** documentado — campos `name`,
+  `file_name`, `url`, `file_url`, `file_id`, `size`, `file_type`. 47 msgs
+  com files na base.
+- [x] **`agent='agent'`:** schema tem mas 0 sessions com agent mode na base.
+  Parser ja mapeia agent → mode='research' por precaucao.
+- [x] **`model_type` variants:** descobertos `default` (78) E `expert` (1).
+  `expert` = R1 reasoner mode. Parser mapeia expert/thinking/reasoner →
+  mode='research'.
+- [x] **CRUD historico via parent snapshots:** validado em
+  `docs/deepseek-server-behavior.md` (2 snapshots, +1 added, 0 deletes).
+- [ ] **Rename via UI:** `updated_at` bumpa? — manual TODO, nao bloqueia

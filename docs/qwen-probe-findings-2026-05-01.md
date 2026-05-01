@@ -167,13 +167,21 @@ pra exercitar parsing de projects/learn. Vai como fixture.
 Outros chat_types unicos pra fixtures: `artifacts` (980a5719), `t2v`
 (o unico), `t2i` (3 — Network Graph Designs / Diagrama / Infographic).
 
-## TODOs durante implementacao
+## TODOs durante implementacao — STATUS
 
-- [ ] Conferir endpoint `/api/v2/chats/{id}/messages` (paginacao? ou messages
-  ja vem inline?)
-- [ ] Verificar se `is_stop` indica msgs interrompidas → `incomplete_message`
-  conceptual
-- [ ] `feature_config` por msg — verificar se contem flags de `web_search`/
-  `image_gen` (paralelo ao Claude.ai settings)
-- [ ] Folders feature — chats em folder se comportam como em project?
-- [ ] Sharing (`share_id`) — implica conv publica? Capturar share_url?
+- [x] **Endpoint `/api/v2/chats/{id}/messages`:** mensagens vem inline em
+  `data.chat.history.messages` (dict keyed por id) — sem paginacao adicional.
+- [x] **`is_stop`:** confirmado, msgs com `is_stop=true` viram
+  `finish_reason='user_stop'`.
+- [x] **`feature_config` por msg:** preservado em `Conversation.settings_json`
+  (extraido do primeiro msg user) — contem flags como `web_search`,
+  `image_gen`, etc.
+- [x] **Folders:** schema tem `folder_id` mas 0 valores nesta base. Parser
+  preserva na settings_json. Behavior runtime depende da UI — nao bloqueia.
+- [x] **Sharing:** schema tem `share_id` mas 0 valores. Parser ignora —
+  recriar sob demanda quando user usar feature.
+- [x] **Asset download:** 326 URLs detectadas, 321 baixadas (5 erros
+  por URL expirada). 196MB local. Parser resolve via `assets_manifest.json`:
+  171 msgs com `asset_paths` populados.
+- [x] **CRUD historico via parent snapshots:** validado em
+  `docs/qwen-server-behavior.md` (4 snapshots, +6 added, 0 deletes/renames).
