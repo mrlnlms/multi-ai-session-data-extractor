@@ -20,6 +20,7 @@ async def discover(client: PerplexityAPIClient, output_dir: Path) -> list[dict]:
             "last_query_datetime": t.get("last_query_datetime"),
             "mode": t.get("mode"),
             "query_count": t.get("query_count"),
+            "is_pinned": bool(t.get("is_pinned")) if t.get("is_pinned") is not None else None,
         }
         for t in threads if t.get("uuid")
     ]

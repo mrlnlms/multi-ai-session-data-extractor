@@ -898,7 +898,98 @@ pages_detail = con.execute("""
 show_df(pages_detail)
 ```
 
-## 4.4 Tabela completa filtravel
+## 4.4 Threads pinadas (`is_pinned`)
+
+Threads marcadas como pinadas pelo user no UI (`Pin` no menu de
+`/library`). Capturadas via `list_pinned_ask_threads` POST. Campo
+canonico em `Conversation.is_pinned`.
+
+```{python}
+#| label: pinned-detail
+#| code-summary: "Threads com is_pinned=true"
+
+pinned_threads = con.execute("""
+    SELECT
+        substr(conversation_id, 1, 12) AS conv_id,
+        substr(title, 1, 70) AS title,
+        mode,
+        message_count AS msgs,
+        substr(project_id, 1, 8) AS space_uuid,
+        date_trunc('day', updated_at) AS last_query
+    FROM conversations
+    WHERE is_pinned = true
+    ORDER BY updated_at DESC
+""").df()
+print(f"Total pinadas: {len(pinned_threads)} de {totals['conversations'].iloc[0]} conversations")
+show_df(pinned_threads) if len(pinned_threads) else None
+```
+
+## 4.5 Skills em spaces (Computer Skills)
+
+Skills sao instrucoes reutilizaveis carregadas via SKILL.md (YAML frontmatter
++ markdown). Capturadas em `data/raw/Perplexity/spaces/{uuid}/skills.json`
++ `data/raw/Perplexity/user/skills.json`. Endpoint:
+`GET /rest/skills?scope={collection|individual|global|organization}&scope_id=<UUID>`.
+
+```{python}
+#| label: skills-detail
+#| code-summary: "Skills capturadas (collection-level + user-level)"
+
+import pandas as pd
+skills_rows = []
+# Collection-level skills (in spaces)
+if spaces_dir.exists():
+    for sd in spaces_dir.iterdir():
+        if not sd.is_dir():
+            continue
+        sk = sd / "skills.json"
+        meta = sd / "metadata.json"
+        if not sk.exists():
+            continue
+        try:
+            arr = json.loads(sk.read_text(encoding="utf-8"))
+            space_title = "?"
+            if meta.exists():
+                m = json.loads(meta.read_text(encoding="utf-8"))
+                space_title = m.get("title") or "?"
+            for s in arr:
+                skills_rows.append({
+                    "scope": s.get("scope", "?"),
+                    "container": space_title,
+                    "name": s.get("name") or "?",
+                    "description": (s.get("description") or "")[:90],
+                    "enabled": s.get("enabled"),
+                    "created": s.get("created_at", "")[:10],
+                })
+        except Exception:
+            continue
+# User-level skills (raw root, not merged — read direct)
+raw_root = _project_root / "data" / "raw" / "Perplexity"
+user_skills_path = raw_root / "user" / "skills.json"
+if user_skills_path.exists():
+    try:
+        arr = json.loads(user_skills_path.read_text(encoding="utf-8"))
+        for s in arr:
+            skills_rows.append({
+                "scope": s.get("scope", "individual"),
+                "container": "(user)",
+                "name": s.get("name") or "?",
+                "description": (s.get("description") or "")[:90],
+                "enabled": s.get("enabled"),
+                "created": s.get("created_at", "")[:10],
+            })
+    except Exception:
+        pass
+
+if skills_rows:
+    skills_df = pd.DataFrame(skills_rows).sort_values(["scope", "container", "name"])
+    print(f"Total skills capturadas: {len(skills_df)}")
+    show_df(skills_df)
+else:
+    print("Nenhuma skill capturada nesta base.")
+```
+
+## 4.6 Tabela completa filtravel
 
 Todas as conversations. Use a barra de busca pra filtrar por titulo,
 space, ou qualquer campo. Click nos cabecalhos pra ordenar.

@@ -34,6 +34,7 @@ class Conversation:
     gizmo_resolved: bool = True
     is_preserved_missing: bool = False
     last_seen_in_server: Optional[pd.Timestamp] = None
+    is_pinned: Optional[bool] = None
 
     def __post_init__(self):
         if self.source not in VALID_SOURCES:

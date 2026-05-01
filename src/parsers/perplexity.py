@@ -245,6 +245,7 @@ class PerplexityParser(BaseParser):
         first_query = first_entry.get("entry_created_datetime")
         last_seen = data.get("_last_seen_in_server")
         is_preserved = bool(disc.get("_preserved_missing"))
+        is_pinned = bool(disc.get("is_pinned"))
 
         space_uuid = thread_to_space.get(uid)
 
@@ -357,6 +358,7 @@ class PerplexityParser(BaseParser):
             project_id=space_uuid,
             is_preserved_missing=is_preserved,
             last_seen_in_server=_to_ts(last_seen) if last_seen else None,
+            is_pinned=is_pinned,
         ))
 
         if first_msg_id and last_msg_id:

@@ -197,6 +197,29 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
   Pra Streamlit (Fase 3.2) integrar via `subprocess`, vai precisar setar essa env
   var antes de chamar `quarto render`.
 
+## Pontos de verificacao por plataforma (cross-feature checks)
+
+Quando descobrimos uma feature numa plataforma (pin, archive, voice, share),
+**checar empiricamente nas outras** se ela tambem existe e se o extractor
+captura. Lista crescente conforme aprendemos:
+
+### Pin de thread/conv
+- **Perplexity:** ✅ tem (UI em `/library`, endpoint `list_pinned_ask_threads`,
+  campo `is_pinned: true` na thread). Schema canonico: `Conversation.is_pinned`.
+  Capturado via `discovery.py` summary + parser. Validado 2026-05-01.
+- **ChatGPT:** ❌ feature nao existe na UI nem no schema raw (sem campo pin
+  em 1168 convs verificadas 2026-05-01). `Conversation.is_pinned=None`.
+- **Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek:** ⏸ verificar quando
+  extractor for atualizado pra schema v3.
+
+### Archive de thread/conv
+- **Perplexity:** Enterprise-only. Backend aceita `archive_thread`/`unarchive_thread`
+  mas estado nao expoe via API publica em conta Pro. Sem gap.
+- **ChatGPT:** ✅ schema raw tem `is_archived` + `_archived`. UI tem opcao
+  Archive. Atualmente 0 convs arquivadas em 1168 (feature funciona, so nao
+  usada). **TODO:** quando user arquivar, validar reconciler + parser.
+- **Outras:** verificar quando o extractor for refeito.
+
 ## Comportamento do servidor ChatGPT (validado empiricamente)
 
 - **`update_time` em rename:** servidor BUMPA pra hora atual quando renomeias

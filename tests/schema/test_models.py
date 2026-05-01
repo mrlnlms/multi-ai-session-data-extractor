@@ -104,7 +104,7 @@ def test_conversations_to_df():
         "created_at", "updated_at", "message_count", "model", "account", "mode", "project", "url",
         "interaction_type", "parent_session_id",
         "project_id", "gizmo_id", "gizmo_name", "gizmo_resolved",
-        "is_preserved_missing", "last_seen_in_server",
+        "is_preserved_missing", "last_seen_in_server", "is_pinned",
     ]
 
 
