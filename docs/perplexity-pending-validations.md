@@ -7,7 +7,26 @@ ações específicas no produto pra confirmar captura → reconcile → parser.
 
 ---
 
-## Parte 1 — Próxima sessão (sem Pro, acionável)
+## Parte 1 — Bateria executada em 2026-05-01
+
+7 das 8 acoes do Bloco A executadas pelo user (conta Pro). **Resultados
+detalhados em `perplexity-audit-findings.md` ("Bateria UI 2026-05-01").**
+
+Resumo:
+- ✅ Validados: 1.3 rename space, 1.4 delete space (preservation), 1.8 mover thread
+- 🟡 Parciais: 1.1 voice (texto sim, audio nao), 1.2 share (so estado final), 1.7 metadata rico (4/5 — falta skill)
+- ❌ Falhou: 1.5 pin (endpoint provavelmente errado)
+- ❌ Dropado: 1.6 GDrive (redundante)
+
+Gaps novos identificados:
+1. ~~Pin de thread em library~~ → ✅ FECHADO (bug em `list_all_threads` corrigido)
+2. ~~Skills em spaces~~ → ✅ FECHADO (`/rest/skills?scope=collection&scope_id=<UUID>`)
+3. ~~Action "Archive" de thread~~ → ✅ DOCUMENTADO (Enterprise-only, no-op pra Pro)
+4. Voice nao capturavel → ✅ DOCUMENTADO (limitacao upstream)
+
+---
+
+## Parte 1 (legada) — checklist original (sem Pro, acionável)
 
 Ações que o user com **conta free** pode fazer pra fechar gaps de cobertura.
 Cada uma exige ~1-3min no UI do Perplexity. Após cada ação, rodar

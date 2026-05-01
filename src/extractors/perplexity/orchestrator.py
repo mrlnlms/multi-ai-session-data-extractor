@@ -94,6 +94,10 @@ async def run_export(
                 json.dumps(await client.get_user_ai_profile(), ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+            (user_dir / "skills.json").write_text(
+                json.dumps(await client.list_user_skills(), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
         except Exception as e:
             print(f"  warn user metadata: {str(e)[:100]}")
 

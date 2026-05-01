@@ -194,9 +194,35 @@ class PerplexityAPIClient:
             return data.get("files", []) if isinstance(data.get("files"), list) else []
         return []
 
+    async def list_collection_skills(self, uuid: str) -> list[dict]:
+        """Skills de uma collection (Computer Skills, feature Pro/Enterprise).
+        Endpoint descoberto via probe 2026-05-01: /rest/skills?scope=collection&scope_id=<UUID>.
+        Schema: id, name, description, file_url, scope, created_at, updated_at, tags, enabled.
+        Retorna [] em conta sem skill ou sem Pro. 404 se file repository nao existir."""
+        path = f"{API_BASE}/rest/skills?scope=collection&scope_id={uuid}"
+        try:
+            data = await self._fetch(path)
+        except Exception as e:
+            # 404 quando space nao tem file repository (sem skills/files)
+            if "404" in str(e):
+                return []
+            raise
+        if isinstance(data, dict):
+            return data.get("skills") or []
+        return []
+
+    async def list_user_skills(self) -> list[dict]:
+        """Skills individuais do user (nao em collection).
+        Endpoint: /rest/skills?scope=individual."""
+        path = f"{API_BASE}/rest/skills?scope=individual"
+        data = await self._fetch(path)
+        if isinstance(data, dict):
+            return data.get("skills") or []
+        return []
+
     async def list_all_threads(self, page_size: int = 50) -> list[dict]:
         all_threads: list[dict] = []
-        seen: set[str] = set()
+        seen: dict[str, dict] = {}
         offset = 0
         while True:
             batch = await self.list_threads_page(offset=offset, limit=page_size)
@@ -206,17 +232,23 @@ class PerplexityAPIClient:
             for t in batch:
                 uid = t.get("uuid")
                 if uid and uid not in seen:
-                    seen.add(uid)
+                    seen[uid] = t
                     all_threads.append(t)
                     new += 1
             if new == 0 or len(batch) < page_size:
                 break
             offset += page_size
-        # Pinned (merge, nao sobrescreve)
+        # Pinned threads vem com `is_pinned: true` extra. Se thread ja apareceu em
+        # list_ask_threads, propagar a flag (e qualquer outro campo extra). Se for
+        # nova (nao apareceu no listing principal), append.
         for t in await self.list_pinned_threads():
             uid = t.get("uuid")
-            if uid and uid not in seen:
-                seen.add(uid)
+            if not uid:
+                continue
+            if uid in seen:
+                seen[uid].update({k: v for k, v in t.items() if k not in seen[uid] or k == "is_pinned"})
+            else:
+                seen[uid] = t
                 all_threads.append(t)
         return all_threads
 

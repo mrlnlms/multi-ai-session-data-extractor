@@ -225,6 +225,158 @@ Testes manuais via UI + capture:
   - Thread some do list_ask_threads MAS continua em list_collection_threads
     → marca como `_orphan_in_space` no threads_index do space
 
+### ✅ Bateria UI 2026-05-01 (Bloco A das pending-validations)
+
+User com **conta Pro** (`display_model: pplx_pro_upgraded`) executou 7 das 8
+acoes do Bloco A (1.6 GDrive dropado por redundancia). Sync rodou em ~80s.
+Resultados por acao:
+
+| # | Acao | UUID | Validado? | Achado |
+|---|---|---|---|---|
+| 1.1 | Voice em thread existente | `a3a6d563` | 🟡 parcial | `last_query_datetime` bumpou (14:58 → 17:36); **`query_str` veio como TEXTO normal** — servidor transcreve e descarta audio. Sem campo `is_voice` no schema. **Nao capturavel.** |
+| 1.2 | Share (anyone with link → private) | `0ffebdcb` | 🟡 limitado | Schema **nao mudou** — `privacy_state: NONE`, `read_write_token` igual, `thread_url_slug` igual. Limitacao da nossa metodologia: capturamos so o estado FINAL (private). UI mostra 3 niveis: Private / Specific people / Anyone with the link. |
+| 1.3 | Rename Space | `8c756721` | ✅ | title "Heatmaps" → "Heatmaps Study", slug bumpou tambem (`heatmaps-...` → `heatmaps-study-...`), `updated_datetime` bumpou de 2024-11-09 → 2026-05-01T18:00. **Resolve item 3.4 das limitacoes upstream (era TODO).** |
+| 1.4 | Deletar Space | `75e5df63` (GAS) | ✅ | Antes do delete, thread movida pra Bookmarks. Reconciler marcou GAS com `_preserved_missing: true` no merged `_index.json`. Pasta fisica preservada. |
+| 1.5 | Pin thread | `d20e2c86` | ❌ | `list_pinned_ask_threads` retornou `[]` mesmo com pin feito no UI. Sem `is_pinned`/`bookmark_state=PINNED` no body da thread (`bookmark_state: NOT_BOOKMARKED`). **Pin em library usa endpoint diferente do `list_pinned_ask_threads`** (que provavelmente cobre apenas pin em spaces). **GAP do extractor.** |
+| 1.6 | GDrive connector | — | ❌ dropado | Redundante com upload direto de file em space (1.7) |
+| 1.7 | Heatmaps Study — file + instructions + link + skill | `8c756721` | 🟡 4/5 capturado | **Capturado:** description, instructions ricas, suggested_queries (12 auto-geradas), focused_web_config.link_configs (uxcam.com), primers (1 RESEARCH com 3 queries), file (Heat Maps `.md`, 67KB). **NAO capturado:** skill upload. Extractor nao chama endpoint de skills. **GAP do extractor.** |
+| 1.8 | Mover thread Bookmarks → Brainstorm Buddy | `4cec8783` | ✅ | Reconciler marcou: 1 removida-sem-delete do Bookmarks. Thread aparece em `threads_index.json` do Brainstorm Buddy. |
+
+### ❗ Achados emergentes desta bateria
+
+**1. Bumps de `updated_datetime` em spaces (alem de rename):**
+- Mover thread pra/de space tambem bumpa: Bookmarks "2025-04-12" → "2026-05-01T18:01",
+  Brainstorm Buddy "2026-05-01T14:54" → "2026-05-01T17:40".
+- Implicacao: `_index.json` por si so e fonte de verdade pra detectar
+  mudancas em space. Reconciler ja faz diff field-by-field.
+
+**2. UI "Archive" em /library:**
+- Threads em `/library` tem menu (⋯) com Pin / Rename / Add to Space / **Archive** / Delete.
+- Sidebar de history so tem Rename / Delete.
+- Action "Archive" nao mapeada — pode ter endpoint proprio
+  (`/rest/thread/archive` ou similar). **Probe pendente.**
+
+**3. UI Share (3 niveis confirmados):**
+- Private (default) — `privacy_state: NONE` no schema
+- Specific people (invite) — schema desconhecido
+- Anyone with the link — schema desconhecido
+- **Nao conseguimos validar mutacoes** porque metodologia incremental
+  captura so o estado AGORA. Pra validar, precisaria capturar baseline
+  ANTES do toggle e diff DEPOIS. Workaround: anotar o estado ANTES de
+  mudar no UI, anotar o link gerado, comparar manualmente.
+
+**4. Rename de space muda o slug:**
+- "heatmaps-jHVnIaPPSxSLNrU6uEF9iQ" → "heatmaps-study-jHVnIaPPSxSLNrU6uEF9iQ"
+- Sufixo (UUID-like) preservado, prefixo segue title.
+- Implicacao: `slug` nao e identificador estavel. Sempre usar `uuid`
+  como chave.
+
+**5. Conta Pro tem display_model `pplx_pro_upgraded`:**
+- Threads novas saem com `display_model: pplx_pro_upgraded`,
+  `user_selected_model: pplx_pro`.
+- Permite distinguir threads criadas em Pro vs versoes free anteriores.
+- **Implicacao no parser:** mapeamento de mode pode precisar ajuste se
+  Pro introduzir modes novos (`mode=ASI` etc).
+
+### ✅ Gaps fechados via probe direto na sessao Chrome (2026-05-01)
+
+Probe rodando JS dentro do Chrome do user (`window.fetch` autenticado),
+testando candidatos de endpoint sem precisar de UI clicks.
+
+#### 1. Pin de thread em library — RESOLVIDO
+
+**Bug:** `list_all_threads` em `api_client.py` mantinha `seen` set e
+ignorava a versao da thread vinda de `list_pinned_ask_threads` quando
+ela ja aparecia em `list_ask_threads`. So que **`list_pinned_ask_threads`
+retorna a thread COM campo extra `is_pinned: true`** que nao existe no
+listing principal — e esse campo era descartado.
+
+**Fix:** mudou `seen: set` para `seen: dict[str, dict]`, e ao processar
+pinned, faz `update()` na thread existente pra propagar `is_pinned`
+(e qualquer outro campo extra). Validado: thread `d20e2c86` agora aparece
+em `threads-index.json` com `is_pinned: true`.
+
+#### 2. Skills em spaces — RESOLVIDO
+
+**Endpoints descobertos (probe direto):**
+- `GET /rest/skills?scope=collection&scope_id=<UUID>` — skills de 1 collection
+- `GET /rest/skills?scope=individual` — skills do user fora de collection
+- `GET /rest/skills?scope=global` — 10 built-ins do Perplexity (skill library)
+- `GET /rest/skills?scope=organization` — vazio em conta nao-Enterprise
+- **Schema:** `id, name, description, file_url (S3 signed URL),
+  scope, created_at, updated_at, tags, enabled`
+- 404 com `error_code=MISSING_COLLECTION_SCOPE_ID` se faltar `scope_id`
+- Scopes validos enum: `'global', 'organization', 'collection', 'individual'`
+
+**Implementacao:** `list_collection_skills(uuid)` e `list_user_skills()`
+no api_client. Saida em `spaces/{uuid}/skills.json` e `user/skills.json`.
+Validado: 1 skill `heatmap-explainer` capturado em Heatmaps Study com
+schema completo.
+
+**Nota sobre `file_url`:** S3 signed URL com expiracao curta (15min).
+Schema do SKILL.md (YAML frontmatter `name` lowercase+hyphens 1-64 chars
++ `description` com trigger phrases + body markdown) esta no
+`/rest/skills` POST com body `{scope, file: <multipart>}`.
+
+#### 3. Action "Archive" de thread — RESOLVIDO (Enterprise-only, no-op pra Pro)
+
+**Endpoints descobertos:**
+- `POST /rest/thread/archive_thread` body `{context_uuid: <UUID>}` → retorna `{"status":"success"}`
+- `DELETE /rest/thread/unarchive_thread/<context_uuid>` → retorna `{"status":"success"}`
+
+**Comportamento bizarro descoberto via teste empirico (2026-05-01):**
+
+Testamos archive numa conta Pro. Resultado:
+1. Backend ACEITA o request (200 success)
+2. Mas `list_ask_threads` retorna a thread **igual** apos archive (nao some)
+3. `fetch_thread` retorna JSON **byte-a-byte identico** apos archive
+   (zero diff em thread_metadata, zero diff em entries)
+4. Nenhum campo `is_archived`, `archived_at`, ou `thread_status='archived'`
+   aparece em qualquer lugar
+5. Filtros candidatos (`with_archived`, `archived_only`, `view: archived`,
+   etc) sao todos ignorados pelo `list_ask_threads`
+
+**Pista decisiva:** ao clicar Archive no UI da conta Pro, o frontend tenta
+carregar `restricted-feature-loader-CeE8XF0f.js` que redireciona pra
+`perplexity-ai.cloudflareaccess.com` (Cloudflare Access — zero-trust auth).
+Chunk eh **gated Enterprise**. CORS bloqueia o chunk pra contas nao-Enterprise,
+e o handler do Archive nunca executa direito — UI optimistic mostra "Archived"
+e instantes depois faz rollback ("indo e voltando").
+
+**Conclusao definitiva:** archive eh feature **Enterprise-only**. Pra contas
+Pro/Free, e cosmetica e backend nao expoe estado archivado via endpoints
+publicos. **Sem gap pro extractor:** threads arquivadas em Pro continuam
+visiveis em todos os endpoints normais como qualquer thread.
+
+**Endpoint de listagem de archived NAO descoberto** — provavelmente existe
+mas so eh chamado pelo chunk restricted (Enterprise-only). Pra mapear:
+contributor com conta Enterprise faz archive + intercepta XHRs. Documentado
+como TODO Enterprise (analogo aos outros features Pro Max do doc
+`pending-validations.md`).
+
+#### 4. Voice em Perplexity — limitacao upstream confirmada
+
+Servidor transcreve audio e salva apenas `query_str` (texto). Sem campo
+de voice no schema — `is_voice`/`audio_url`/`transcription_meta` nao
+existem. Analogo ao caso 3.1 (S3 attachments expirados): nao-bug, eh
+comportamento upstream irrecuperavel.
+
+### ⏸ TODOs persistentes
+
+1. **Listar archived threads (Enterprise-only)** — confirmado via teste
+   empirico que archive em conta Pro nao expoe estado via endpoints
+   publicos. Pra mapear listagem: contributor Enterprise testa.
+   **Sem urgencia** — em Pro, archive eh no-op observavel.
+
+2. **Validar mutacao de `privacy_state` em share** — metodologia
+   incremental nao captura toggle. Pra validar, precisaria 2 capturas
+   intercaladas com mudanca no UI. Baixa prioridade (sabemos os 3
+   niveis: Private / Specific people / Anyone with link).
+
+3. **Validar list_pinned_ask_threads em conta sem Pro** — confirmado
+   funcionar em Pro (`d20e2c86` capturada). Em conta free a feature
+   pode nem existir no UI (item 1.5 da batiera anterior usou conta Pro).
+
 ### ⏸ Fase 4 — reconciler de Spaces (depois)
 `src/reconcilers/perplexity.py` precisa estender pra reconciliar tambem
 `spaces/_index.json` (preservation analoga a project_sources do ChatGPT)

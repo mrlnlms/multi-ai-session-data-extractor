@@ -99,6 +99,10 @@ async def fetch_spaces(
             with open(space_dir / "files.json", "w", encoding="utf-8") as f:
                 json.dump(files, f, ensure_ascii=False, indent=2)
 
+            skills = await client.list_collection_skills(uuid)
+            with open(space_dir / "skills.json", "w", encoding="utf-8") as f:
+                json.dump(skills, f, ensure_ascii=False, indent=2)
+
             pages_count = 0
             if page is not None:
                 pages_meta = await discover_pages_in_space(page, slug, uuid)
@@ -109,7 +113,7 @@ async def fetch_spaces(
                         errors.extend([(f"{uuid}/page/{s}", e) for s, e in pages_errs])
 
             ok += 1
-            print(f"  [{i}/{len(collections)}] {title!r}: {len(threads_summary)} threads, {len(files)} files, {pages_count} pages")
+            print(f"  [{i}/{len(collections)}] {title!r}: {len(threads_summary)} threads, {len(files)} files, {len(skills)} skills, {pages_count} pages")
         except Exception as e:
             errors.append((uuid, str(e)[:200]))
             print(f"  [{i}/{len(collections)}] {title!r}: ERRO {str(e)[:120]}")

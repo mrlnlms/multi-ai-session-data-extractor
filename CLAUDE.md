@@ -127,6 +127,28 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
 - **Comportamento do servidor mapeado:** rename bumpa `last_query_datetime`
   (igual ChatGPT), delete via menu = ENTRY_DELETED some de tudo, threads
   antigas em space podem virar orphan se deletadas (caso d344c501)
+- **Bateria UI 2026-05-01 + probe direto Chrome MCP fechou 3 gaps:**
+  - Pin de thread em library: bug em `list_all_threads` (seen como `set`
+    em vez de `dict`) descartava `is_pinned: true` da thread quando ela
+    ja aparecia em `list_ask_threads`. Fix: merge dict-based propaga
+    flag. Validado: `d20e2c86` agora aparece com `is_pinned=True`.
+  - Skills em spaces: endpoint `/rest/skills?scope=collection&scope_id=<UUID>`
+    descoberto via probe (scope enum: `global`/`organization`/`collection`/
+    `individual`). Implementado `list_collection_skills` + `list_user_skills`.
+    Saida em `spaces/{uuid}/skills.json` e `user/skills.json`. Validado:
+    1 skill `heatmap-explainer` capturado em Heatmaps Study.
+  - Archive de thread: feature **Enterprise-only**. Endpoints write
+    descobertos (`POST /rest/thread/archive_thread` body `{context_uuid}`
+    + `DELETE /rest/thread/unarchive_thread/<context_uuid>`) e ate ACEITAM
+    request de Pro (200 success), mas backend NAO expoe estado archived em
+    `list_ask_threads` nem `fetch_thread` (testado: zero diff antes/depois).
+    Frontend tenta carregar `restricted-feature-loader` que vai pra
+    Cloudflare Access (zero-trust auth) — gated Enterprise. **Pra contas
+    Pro: archive eh no-op observavel — sem gap no extractor.** Listagem
+    archived fica TODO permanente Enterprise.
+  - Voice em Perplexity: nao-bug, comportamento upstream (servidor
+    transcreve e descarta audio, sem `is_voice` no schema).
+- **Conta usada na bateria: Pro** (`display_model: pplx_pro_upgraded`).
 - **Comandos:**
   ```bash
   PYTHONPATH=. .venv/bin/python scripts/perplexity-sync.py
