@@ -115,6 +115,12 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
   `blocks[*].web_result_block.web_results`. Idempotente (~1s pra rodar).
 - **Quarto descritivo** (`notebooks/perplexity.qmd`): 22MB HTML self-contained
 - **Findings empiricos:** `docs/perplexity-audit-findings.md`
+- **Journey + dificuldades:** `docs/perplexity-journey-2026-05-01.md`
+  (10 licoes transferiveis pras outras 5 plataformas)
+- **Validacoes pendentes:** `docs/perplexity-pending-validations.md`
+  (Parte 1: 8 acoes do user na proxima sessao sem Pro;
+   Parte 2: 8 features Pro deferidas como TODO publico;
+   Parte 3: 4 limitacoes upstream documentadas como nao-bug)
 - **Probes:** 7 scripts em `scripts/perplexity-probe-*.py` (features, spaces,
   pages-*, artifacts, tabs-user, more)
 - **Auth:** profile copiado do projeto pai (`.storage/perplexity-profile/`)
