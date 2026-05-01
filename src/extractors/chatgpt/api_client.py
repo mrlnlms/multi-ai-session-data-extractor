@@ -5,6 +5,7 @@ auth.py sao enviados automaticamente.
 """
 
 import asyncio
+import json as _json
 import logging
 from typing import Any
 
@@ -80,11 +81,16 @@ class ChatGPTAPIClient:
             if method == "GET":
                 response = await self._ctx.get(url, params=params, headers=headers)
             elif method == "POST":
-                # Playwright APIRequestContext.post aceita `data=` pra JSON body
-                # (converte internamente). Se body for None, envia sem payload.
-                # Importante: NAO e form-encoded, e JSON com Content-Type application/json.
+                # Playwright APIRequestContext.post: `data=dict` vira form-encoded.
+                # Pra JSON proper (com content-type application/json), usar `data=`
+                # com STRING (json.dumps) ou parametro `multipart=False` + headers
+                # explicitos. Forma mais confiavel: dump pra string e header.
                 if json is not None:
-                    response = await self._ctx.post(url, data=json, headers=headers)
+                    response = await self._ctx.post(
+                        url,
+                        data=_json.dumps(json),
+                        headers={**headers, "Content-Type": "application/json"},
+                    )
                 else:
                     response = await self._ctx.post(url, headers=headers)
             else:
@@ -139,18 +145,28 @@ class ChatGPTAPIClient:
     async def fetch_conversations_batch(self, conv_ids: list[str]) -> list[dict]:
         """Batch fetch com truncation detection (fix v2.7).
 
+        Endpoint `/conversations/batch` aceita NO MAXIMO 10 IDs por request
+        (descoberto empiricamente 2026-05-01: 50 IDs retorna 422 com mensagem
+        "conversation_ids must contain at most 10 entries"). Se vier mais que 10,
+        chunkamos internamente e concatenamos os resultados.
+
         Se alguma conv vier com _mapping_node_count > 0 mas 0 msgs extraidas,
         re-fetch via single endpoint e substitui no resultado.
         """
         url = f"{BASE_URL}/conversations/batch"
-        data = await self._request_with_retry(
-            "POST", url, json={"conversation_ids": conv_ids}
-        )
-        # API pode retornar list direto OU dict com "conversations" — empirico confirmou list
-        if isinstance(data, list):
-            convs = data
-        else:
-            convs = data.get("conversations", [])
+        BATCH_LIMIT = 10
+        all_convs: list[dict] = []
+        for i in range(0, len(conv_ids), BATCH_LIMIT):
+            chunk = conv_ids[i : i + BATCH_LIMIT]
+            data = await self._request_with_retry(
+                "POST", url, json={"conversation_ids": chunk}
+            )
+            # API pode retornar list direto OU dict com "conversations"
+            if isinstance(data, list):
+                all_convs.extend(data)
+            elif isinstance(data, dict):
+                all_convs.extend(data.get("conversations", []))
+        convs = all_convs
 
         result = []
         for conv in convs:
