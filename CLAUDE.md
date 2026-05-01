@@ -217,7 +217,13 @@ captura. Lista crescente conforme aprendemos:
     antigo nao tinha nenhuma conv pinada).
   - **Gizmo:** endpoint `/backend-api/gizmos/pinned` retorna lista. Capturado
     em `data/raw/ChatGPT/gizmos_pinned.json` (sidecar separado).
-- **Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek:** ⏸ verificar quando
+- **Claude.ai:** ✅ tem `is_starred` (pin) + `is_temporary` no schema da API
+  (`/api/organizations/{org}/chat_conversations_v2`, validado 2026-05-01 via
+  probe Chrome MCP em 835 convs). Extractor ja extrai `is_starred` em discovery
+  e preserva `is_temporary` no JSON cru. **Falta:** parser canonico v3 mapear
+  pra `Conversation.is_pinned` / `is_temporary`. **Sem campo `is_archived`** no
+  schema visivel.
+- **Gemini, NotebookLM, Qwen, DeepSeek:** ⏸ verificar quando
   extractor for atualizado pra schema v3.
 
 ### Archive de thread/conv
