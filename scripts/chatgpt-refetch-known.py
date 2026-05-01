@@ -18,6 +18,7 @@ import argparse
 import asyncio
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from playwright.async_api import async_playwright
@@ -53,7 +54,8 @@ async def fetch_batch(page, ids: list[str]) -> tuple[list[dict], str | None]:
 
 
 async def refetch(account: str, batch_size: int = 50) -> None:
-    raw_path = Path("data/raw/ChatGPT/chatgpt_raw.json")
+    raw_dir = Path("data/raw/ChatGPT")
+    raw_path = raw_dir / "chatgpt_raw.json"
     if not raw_path.exists():
         print(f"raw nao existe: {raw_path}")
         sys.exit(1)
@@ -62,6 +64,7 @@ async def refetch(account: str, batch_size: int = 50) -> None:
     conv_ids = list(raw["conversations"].keys())
     total = len(conv_ids)
     print(f"Refetching {total} convs em batches de {batch_size} (page.evaluate)...")
+    started_at = datetime.now(timezone.utc)
 
     profile_dir = get_profile_dir(account)
     async with async_playwright() as p:
@@ -103,10 +106,40 @@ async def refetch(account: str, batch_size: int = 50) -> None:
             await context.close()
 
     raw_path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    finished_at = datetime.now(timezone.utc)
+    duration = (finished_at - started_at).total_seconds()
+
+    # Append no capture_log.jsonl pro dashboard ver a captura
+    log_entry = {
+        "run_started_at": started_at.isoformat(),
+        "run_finished_at": finished_at.isoformat(),
+        "duration_seconds": duration,
+        "mode": "refetch_known",
+        "discovery": {"total": total},
+        "fetch": {"attempted": total, "succeeded": updated},
+        "errors": [],
+    }
+    log_path = raw_dir / "capture_log.jsonl"
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry) + "\n")
+
+    # LAST_CAPTURE.md humano
+    last_md = raw_dir / "LAST_CAPTURE.md"
+    last_md.write_text(
+        f"# Last capture (refetch_known)\n\n"
+        f"- **Quando:** {started_at.isoformat()}\n"
+        f"- **Duracao:** {duration:.1f}s\n"
+        f"- **Modo:** refetch_known (state-only refresh de IDs conhecidas)\n"
+        f"- **Convs atualizadas:** {updated}/{total}\n"
+        f"- **Errors:** {errors}\n",
+        encoding="utf-8",
+    )
+
     print(f"\nDone. Updated {updated}/{total}, errors={errors}")
     print(f"Raw atualizado: {raw_path}")
+    print(f"capture_log.jsonl atualizado")
     print("\nProximo passo:")
-    print("  PYTHONPATH=. .venv/bin/python scripts/chatgpt-reconcile.py")
+    print("  PYTHONPATH=. .venv/bin/python scripts/chatgpt-reconcile.py data/raw/ChatGPT")
     print("  PYTHONPATH=. .venv/bin/python scripts/chatgpt-parse.py")
 
 
