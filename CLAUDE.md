@@ -203,12 +203,14 @@ Quando descobrimos uma feature numa plataforma (pin, archive, voice, share),
 **checar empiricamente nas outras** se ela tambem existe e se o extractor
 captura. Lista crescente conforme aprendemos:
 
-### Pin de thread/conv
-- **Perplexity:** ✅ tem (UI em `/library`, endpoint `list_pinned_ask_threads`,
-  campo `is_pinned: true` na thread). Schema canonico: `Conversation.is_pinned`.
-  Capturado via `discovery.py` summary + parser. Validado 2026-05-01.
-- **ChatGPT:** ❌ feature nao existe na UI nem no schema raw (sem campo pin
-  em 1168 convs verificadas 2026-05-01). `Conversation.is_pinned=None`.
+### Pin
+- **Perplexity:** ✅ pin de **thread** (`list_pinned_ask_threads`, campo
+  `is_pinned: true`). Schema canonico: `Conversation.is_pinned`. Validado
+  2026-05-01.
+- **ChatGPT:** ✅ pin de **GPT (gizmo)** — feature em entidade diferente.
+  Endpoint `/backend-api/gizmos/pinned` (descoberto via probe Chrome MCP
+  2026-05-01). Capturado em `data/raw/ChatGPT/gizmos_pinned.json`.
+  ChatGPT **nao** tem pin de conversation (`/conversations/pinned` → 404).
 - **Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek:** ⏸ verificar quando
   extractor for atualizado pra schema v3.
 

@@ -271,6 +271,14 @@ async def run_capture(output_dir: Path, options: CaptureOptions) -> CaptureRepor
         except Exception as exc:
             logger.warning(f"Instructions fetch falhou: {exc}")
 
+        try:
+            pinned_gizmos = await client.list_pinned_gizmos()
+            (output_dir / "gizmos_pinned.json").write_text(
+                json.dumps(pinned_gizmos, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+        except Exception as exc:
+            logger.warning(f"Pinned gizmos fetch falhou: {exc}")
+
         await context.close()
 
     _finalize_report(report, started_at)

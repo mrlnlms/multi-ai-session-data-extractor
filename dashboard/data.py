@@ -98,15 +98,16 @@ class PlatformState:
         return cand if cand.exists() else None
 
     def status(self, now: Optional[datetime] = None) -> str:
-        """green | yellow | red | gray"""
+        """green | yellow | red | gray. Cadencia de sync e variavel por
+        plataforma — nao tem rotina diaria. Thresholds soltos: 7d/30d."""
         ref = self.last_capture.started_at if self.last_capture else None
         if ref is None:
             return "gray"
         now = now or datetime.now(timezone.utc)
         delta = (now - ref).total_seconds()
-        if delta < 86400:
+        if delta < 86400 * 7:
             return "green"
-        if delta < 86400 * 3:
+        if delta < 86400 * 30:
             return "yellow"
         return "red"
 

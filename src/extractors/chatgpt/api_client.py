@@ -198,6 +198,18 @@ class ChatGPTAPIClient:
         )
         return [_meta_from_shared_item(item) for item in data.get("items", [])]
 
+    async def list_pinned_gizmos(self) -> list[dict]:
+        """Lista GPTs (gizmos) pinados na sidebar do user.
+
+        Endpoint descoberto via probe direto no Chrome MCP (2026-05-01):
+        `GET /backend-api/gizmos/pinned`. Schema: `{items: [...], cursor}`.
+        ChatGPT NAO tem pin de conversation (`/conversations/pinned` retorna
+        404), so de gizmo. Equivalente conceitual ao `is_pinned` em
+        `Conversation` do Perplexity, mas em entidade diferente."""
+        url = f"{BASE_URL}/gizmos/pinned"
+        data = await self._request_with_retry("GET", url)
+        return data.get("items") or []
+
     async def fetch_memories(self) -> str:
         """Retorna memories como markdown. API retorna JSON, convertemos pra .md."""
         url = f"{BASE_URL}/memories"
