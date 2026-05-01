@@ -80,6 +80,36 @@ class PerplexityAPIClient:
         data = await self._fetch(path)
         return data if isinstance(data, list) else []
 
+    async def list_user_assets(self, limit: int = 50) -> list[dict]:
+        """Lista assets (UI: 'Artifacts') do user. Tipicamente imagens geradas
+        pela IA, visualizations, e outros artifacts gerados em threads.
+        Endpoint descoberto via probe 2026-05-01 em /library?tab=artifacts.
+        Schema: {assets: [...], next_token}. Paginacao via next_token."""
+        all_assets: list[dict] = []
+        token: str | None = None
+        while True:
+            qs = f"limit={limit}&version=2.18&source=default"
+            if token:
+                qs += f"&next_token={token}"
+            path = f"{API_BASE}/rest/assets/?{qs}"
+            data = await self._fetch(path)
+            if not isinstance(data, dict):
+                break
+            batch = data.get("assets") or []
+            all_assets.extend(batch)
+            token = data.get("next_token")
+            if not token or not batch:
+                break
+        return all_assets
+
+    async def list_user_pinned_assets(self, limit: int = 50) -> list[dict]:
+        """Assets pinados pelo user. Mesmo schema que list_user_assets."""
+        path = f"{API_BASE}/rest/assets/pins?limit={limit}&version=2.18&source=default"
+        data = await self._fetch(path)
+        if isinstance(data, dict):
+            return data.get("assets") or []
+        return []
+
     async def get_collection(self, slug: str) -> dict:
         """Metadata completa de 1 collection. API usa slug, nao uuid."""
         path = f"{API_BASE}/rest/collections/get_collection?collection_slug={slug}&version=2.18&source=default"

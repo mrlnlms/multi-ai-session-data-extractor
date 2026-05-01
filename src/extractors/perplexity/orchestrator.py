@@ -98,6 +98,19 @@ async def run_export(
         collections = await discover_spaces(client, output_dir)
         spaces_ok, _, spaces_errs = await fetch_spaces(client, collections, output_dir, page=page)
 
+        # Assets (UI: 'Artifacts') — descobertos via probe /library?tab=artifacts em 2026-05-01
+        print("Capturando assets (artifacts)...")
+        assets_all = await client.list_user_assets()
+        assets_pinned = await client.list_user_pinned_assets()
+        pinned_ids = {a.get("uuid") or a.get("id") for a in assets_pinned}
+        assets_dir = output_dir / "assets"
+        assets_dir.mkdir(parents=True, exist_ok=True)
+        with open(assets_dir / "_index.json", "w", encoding="utf-8") as f:
+            json.dump([{**a, "is_pinned": (a.get("uuid") or a.get("id")) in pinned_ids} for a in assets_all], f, ensure_ascii=False, indent=2)
+        with open(assets_dir / "_pinned_raw.json", "w", encoding="utf-8") as f:
+            json.dump(assets_pinned, f, ensure_ascii=False, indent=2)
+        print(f"  {len(assets_all)} assets ({len(assets_pinned)} pinados)")
+
         log = {
             "started_at": started_at.isoformat(),
             "finished_at": datetime.now(timezone.utc).isoformat(),
@@ -113,6 +126,8 @@ async def run_export(
                 "spaces_discovered": len(collections),
                 "spaces_fetched": spaces_ok,
                 "spaces_errors": len(spaces_errs),
+                "assets_total": len(assets_all),
+                "assets_pinned": len(assets_pinned),
             },
             "errors": {"threads": errs[:50], "spaces": spaces_errs[:20]},
         }
