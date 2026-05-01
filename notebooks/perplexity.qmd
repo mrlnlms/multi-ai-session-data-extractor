@@ -11,6 +11,7 @@ jupyter: python3
 import sys
 from pathlib import Path
 
+# Resolve project root dinamicamente (parent do notebooks/)
 _this = Path.cwd()
 _project_root = _this if (_this / "src").exists() else _this.parent
 sys.path.insert(0, str(_project_root))
@@ -23,6 +24,7 @@ from itables import init_notebook_mode, show
 
 init_notebook_mode(all_interactive=False)
 
+# --- DuckDB sobre os parquets ---
 PROCESSED = _project_root / "data" / "processed" / "Perplexity"
 con = duckdb.connect()
 for table in ("conversations", "messages", "tool_events", "branches"):
@@ -30,18 +32,26 @@ for table in ("conversations", "messages", "tool_events", "branches"):
         f"CREATE VIEW {table} AS SELECT * FROM read_parquet('{PROCESSED}/{table}.parquet')"
     )
 
-# Perplexity teal primary
-SOURCE_COLOR = "#20808D"
+# --- Constantes visuais ---
+SOURCE_COLOR = "#20808D"  # Perplexity teal
 ACCENT = "#1FB8CD"
 MUTED = "#D1D5DB"
 
 
 def fmt_pct(n, total):
+    """Formata 'n/total (XX%)' pra colunas de cobertura."""
     pct = n / total * 100 if total else 0
     return f"{n:,}/{total:,} ({pct:.0f}%)"
 
 
+def show_df(df, **kwargs):
+    """Mostra DataFrame com estilo padrao (sem index)."""
+    from IPython.display import display
+    display(df.style.hide(axis="index"))
+
+
 def plotly_bar(x, y, title, color=SOURCE_COLOR, height=350, orientation="v"):
+    """Helper pra Plotly bar consistente."""
     if orientation == "h":
         fig = go.Figure(go.Bar(y=x, x=y, marker_color=color, orientation="h"))
     else:
@@ -69,282 +79,868 @@ totals = con.execute("""
 
 range_dt = con.execute("""
     SELECT
-        MIN(created_at) AS earliest,
-        MAX(updated_at) AS latest
+        MIN(created_at) AS oldest,
+        MAX(created_at) AS newest_created,
+        MAX(updated_at) AS newest_updated
     FROM conversations
 """).df()
 
-print(f"Conversations: {totals.iloc[0]['conversations']:,}")
-print(f"Messages:      {totals.iloc[0]['messages']:,}")
-print(f"Tool events:   {totals.iloc[0]['tool_events']:,}")
-print(f"Branches:      {totals.iloc[0]['branches']:,}")
-print()
-print(f"Janela temporal: {range_dt.iloc[0]['earliest']} a {range_dt.iloc[0]['latest']}")
+show_df(pd.DataFrame([
+    {"Tabela": "conversations.parquet", "Rows": f"{totals['conversations'].iloc[0]:,}", "Periodo": f"{range_dt['oldest'].iloc[0]:%Y-%m-%d} → {range_dt['newest_created'].iloc[0]:%Y-%m-%d}"},
+    {"Tabela": "messages.parquet", "Rows": f"{totals['messages'].iloc[0]:,}", "Periodo": "—"},
+    {"Tabela": "tool_events.parquet", "Rows": f"{totals['tool_events'].iloc[0]:,}", "Periodo": "—"},
+    {"Tabela": "branches.parquet", "Rows": f"{totals['branches'].iloc[0]:,}", "Periodo": "—"},
+]))
 ```
+
+> **Sobre este documento.** Catalogo descritivo dos parquets gerados pelo
+> parser canonico do Perplexity (`src/parsers/perplexity.py`). Apresenta o que
+> esta nos dados — schema, cobertura, distribuicoes, preservation. **Nao
+> interpreta** conteudo (sem sentiment, clustering, topic detection). Pra
+> analise qualitativa, ver projeto `~/Desktop/AI Interaction Analysis/`.
 
 # 1. Dados disponiveis
 
-## Modes (canonical)
+Cada uma das 4 tabelas tem schema proprio. Aqui mostramos os campos, sua
+cobertura nesta base (quantas linhas tem o campo preenchido) e amostras
+diversificadas — registros que ilustram a variedade de cada tabela.
+
+## 1.1 Conversations
+
+A tabela de conversas eh a unidade central. Cada linha representa um
+chat do Perplexity — com seus metadados (titulo, modelo, space, datas) e
+campos de preservation criados pelo parser. **Pages** (Perplexity Pages
+publicaveis = articles na API) tambem sao Conversations, identificadas
+por `conversation_id LIKE 'page:%'`.
 
 ```{python}
-#| label: modes-distribution
-
-modes = con.execute("""
-    SELECT mode, COUNT(*) AS n
-    FROM conversations
-    GROUP BY mode
-    ORDER BY n DESC
-""").df()
-
-fig = plotly_bar(
-    x=modes["mode"].tolist(),
-    y=modes["n"].tolist(),
-    title="Conversas por mode (mapping API -> canonico)",
-)
-fig.show()
-
-print()
-for _, row in modes.iterrows():
-    pct = row["n"] / totals.iloc[0]["conversations"] * 100
-    print(f"  {row['mode']}: {row['n']} ({pct:.0f}%)")
-```
-
-Mapping de mode (API Perplexity → canonico):
-
-- **CONCISE** → `concise` (Auto/quick search)
-- **COPILOT** → `copilot` (Deep Research, nome legacy do servidor)
-- **ASI** → `research` (Computer mode, Pro-only)
-- **ARTICLE** → `research` (Pages — bookmarks de pages publicadas por outros users)
-
-## Pages vs Threads do user
-
-```{python}
-#| label: pages-vs-threads
-
-p_t = con.execute("""
-    SELECT
-        SUM(CASE WHEN conversation_id LIKE 'page:%' THEN 1 ELSE 0 END) AS pages,
-        SUM(CASE WHEN conversation_id NOT LIKE 'page:%' THEN 1 ELSE 0 END) AS threads
-    FROM conversations
-""").df().iloc[0]
-
-print(f"Threads (do user): {p_t['threads']:,}")
-print(f"Pages (bookmarks de articles externos): {p_t['pages']:,}")
-```
-
-## Spaces (collections)
-
-```{python}
-#| label: spaces-distribution
-
-spaces = con.execute("""
-    SELECT
-        COALESCE(project_id, '<sem space>') AS space,
-        COUNT(*) AS conversas,
-        SUM(CASE WHEN conversation_id LIKE 'page:%' THEN 1 ELSE 0 END) AS pages,
-        SUM(CASE WHEN conversation_id NOT LIKE 'page:%' THEN 1 ELSE 0 END) AS threads
-    FROM conversations
-    GROUP BY space
-    ORDER BY conversas DESC
-""").df()
-
-show(spaces, lengthMenu=[10, 25, 50])
-```
-
-# 2. Cobertura por campo
-
-```{python}
-#| label: coverage-conversations
+#| label: conv-schema
+#| code-summary: "Cobertura por campo — conversations"
 
 cov = con.execute("""
     SELECT
         COUNT(*) AS total,
-        COUNT(title) AS titulo,
+        COUNT(title) AS title,
         COUNT(model) AS model,
-        COUNT(mode) AS mode,
-        COUNT(project_id) AS in_space,
-        SUM(CASE WHEN is_preserved_missing THEN 1 ELSE 0 END) AS preserved
+        COUNT("mode") AS "mode",
+        COUNT(project) AS project,
+        COUNT(project_id) AS project_id,
+        COUNT(last_seen_in_server) AS last_seen_in_server,
+        SUM(is_preserved_missing::INT) AS preserved_count,
+        SUM(CASE WHEN conversation_id LIKE 'page:%' THEN 1 ELSE 0 END) AS pages_count,
+        SUM(CASE WHEN conversation_id NOT LIKE 'page:%' THEN 1 ELSE 0 END) AS threads_count
     FROM conversations
-""").df().iloc[0]
+""").df()
+total = cov["total"].iloc[0]
 
-total = cov['total']
-rows = [
-    ("title", fmt_pct(cov['titulo'], total)),
-    ("model", fmt_pct(cov['model'], total)),
-    ("mode", fmt_pct(cov['mode'], total)),
-    ("project_id (em space)", fmt_pct(cov['in_space'], total)),
-    ("is_preserved_missing", fmt_pct(cov['preserved'], total)),
-]
-df_cov = pd.DataFrame(rows, columns=["Campo", "Cobertura"])
-show(df_cov, lengthMenu=[10, 25])
+def conv_cov(field):
+    return fmt_pct(int(cov[field].iloc[0]), int(total))
+
+schema_conv = pd.DataFrame([
+    {"Campo": "conversation_id", "Tipo": "str", "Descricao": "UUID do thread, ou 'page:<slug>' pra Pages", "Cobertura": f"{total:,}/{total:,} (100%)"},
+    {"Campo": "source", "Tipo": "str", "Descricao": "Sempre 'perplexity' nesta tabela", "Cobertura": f"{total:,}/{total:,} (100%)"},
+    {"Campo": "title", "Tipo": "str?", "Descricao": "Titulo da thread (servidor bumpa em rename)", "Cobertura": conv_cov("title")},
+    {"Campo": "created_at", "Tipo": "timestamp", "Descricao": "Quando a conv foi criada (entry_created_datetime)", "Cobertura": "100%"},
+    {"Campo": "updated_at", "Tipo": "timestamp", "Descricao": "Ultima query — bumpa em rename (igual ChatGPT)", "Cobertura": "100%"},
+    {"Campo": "message_count", "Tipo": "int", "Descricao": "user+assistant msgs (1 entry = 2 msgs)", "Cobertura": "100%"},
+    {"Campo": "model", "Tipo": "str?", "Descricao": "display_model do servidor (turbo, pplx_alpha, default)", "Cobertura": conv_cov("model")},
+    {"Campo": "mode", "Tipo": "str", "Descricao": "concise/copilot/research — mapping da API CONCISE/COPILOT/ASI/ARTICLE", "Cobertura": conv_cov("mode")},
+    {"Campo": "project", "Tipo": "str?", "Descricao": "uuid do Space (alias de project_id)", "Cobertura": conv_cov("project")},
+    {"Campo": "project_id", "Tipo": "str?", "Descricao": "uuid do Space (Bookmarks, GAS, etc)", "Cobertura": conv_cov("project_id")},
+    {"Campo": "is_preserved_missing", "Tipo": "bool", "Descricao": "True se thread sumiu do listing (preservada local)", "Cobertura": f"{int(cov['preserved_count'].iloc[0])} flagged"},
+    {"Campo": "last_seen_in_server", "Tipo": "timestamp", "Descricao": "Data da ultima run em que servidor retornou", "Cobertura": conv_cov("last_seen_in_server")},
+    {"Campo": "interaction_type", "Tipo": "str", "Descricao": "'human_ai' (user) ou 'ai_ai' (Pages de outros users bookmarkadas)", "Cobertura": "100%"},
+    {"Campo": "url", "Tipo": "str", "Descricao": "Link direto: /search/<uuid> ou /page/<slug>", "Cobertura": "100%"},
+])
+show_df(schema_conv)
+
+print(f"\nDistribuicao: {int(cov['threads_count'].iloc[0])} threads do user + {int(cov['pages_count'].iloc[0])} pages bookmarkadas")
 ```
 
-## Cobertura messages
+```{python}
+#| label: conv-sample
+#| code-summary: "Amostra diversificada — conversations"
+#| column: page
+
+sample_conv = con.execute("""
+    WITH
+    in_space AS (
+        SELECT * FROM conversations WHERE project_id IS NOT NULL AND conversation_id NOT LIKE 'page:%' ORDER BY created_at DESC LIMIT 1
+    ),
+    standalone AS (
+        SELECT * FROM conversations WHERE project_id IS NULL AND conversation_id NOT LIKE 'page:%' ORDER BY created_at DESC LIMIT 1
+    ),
+    page_conv AS (
+        SELECT * FROM conversations WHERE conversation_id LIKE 'page:%' LIMIT 1
+    ),
+    copilot AS (
+        SELECT * FROM conversations WHERE mode='copilot' ORDER BY created_at DESC LIMIT 1
+    ),
+    concise AS (
+        SELECT * FROM conversations WHERE mode='concise' ORDER BY created_at DESC LIMIT 1
+    ),
+    longest AS (
+        SELECT * FROM conversations ORDER BY message_count DESC LIMIT 1
+    ),
+    shortest AS (
+        SELECT * FROM conversations WHERE message_count > 0 ORDER BY message_count ASC LIMIT 1
+    )
+    SELECT DISTINCT ON (conversation_id)
+        substr(conversation_id, 1, 14) AS conv_id,
+        substr(title, 1, 50) AS title,
+        message_count AS msgs, model, mode,
+        substr(project_id, 1, 8) AS space,
+        interaction_type,
+        is_preserved_missing AS preserved,
+        strftime(created_at, '%Y-%m-%d') AS created
+    FROM (
+        SELECT * FROM in_space
+        UNION ALL SELECT * FROM standalone
+        UNION ALL SELECT * FROM page_conv
+        UNION ALL SELECT * FROM copilot
+        UNION ALL SELECT * FROM concise
+        UNION ALL SELECT * FROM longest
+        UNION ALL SELECT * FROM shortest
+    )
+    ORDER BY conversation_id
+""").df()
+show_df(sample_conv)
+```
+
+## 1.2 Messages
+
+Mensagens user/assistant. **Cada entry no JSON da thread vira 2 messages**
+(user query + assistant answer). Perplexity nao tem mensagens hidden tipo
+ChatGPT — tools/sources viram `tool_events` e nao messages.
 
 ```{python}
-#| label: coverage-messages
+#| label: msg-schema
+#| code-summary: "Cobertura por campo — messages"
 
 mcov = con.execute("""
     SELECT
         COUNT(*) AS total,
-        COUNT(content) AS content,
-        SUM(CASE WHEN content IS NOT NULL AND content != '' THEN 1 ELSE 0 END) AS content_nonempty,
-        SUM(CASE WHEN asset_paths IS NOT NULL THEN 1 ELSE 0 END) AS with_assets
+        COUNT(model) AS model,
+        SUM(CASE WHEN role='user' THEN 1 ELSE 0 END) AS user_msgs,
+        SUM(CASE WHEN role='assistant' THEN 1 ELSE 0 END) AS assistant_msgs,
+        COUNT(asset_paths) AS asset_paths,
+        COUNT(content_types) AS content_types,
+        SUM(CASE WHEN content IS NOT NULL AND content != '' THEN 1 ELSE 0 END) AS content_nonempty
     FROM messages
-""").df().iloc[0]
+""").df()
+mtotal = mcov["total"].iloc[0]
 
-t = mcov['total']
-rows = [
-    ("content (nao vazio)", fmt_pct(mcov['content_nonempty'], t)),
-    ("asset_paths", fmt_pct(mcov['with_assets'], t)),
-]
-df_mcov = pd.DataFrame(rows, columns=["Campo", "Cobertura"])
-show(df_mcov)
+def msg_cov(field):
+    return fmt_pct(int(mcov[field].iloc[0]), int(mtotal))
+
+schema_msg = pd.DataFrame([
+    {"Campo": "message_id", "Tipo": "str", "Descricao": "<entry_uuid>_user ou <entry_uuid>_asst", "Cobertura": "100%"},
+    {"Campo": "conversation_id", "Tipo": "str", "Descricao": "FK pra conversations", "Cobertura": "100%"},
+    {"Campo": "branch_id", "Tipo": "str", "Descricao": "Sempre <conv>_main (Perplexity eh linear)", "Cobertura": "100%"},
+    {"Campo": "sequence", "Tipo": "int", "Descricao": "Ordem na conv (1=primeira user query)", "Cobertura": "100%"},
+    {"Campo": "role", "Tipo": "str", "Descricao": "'user' ou 'assistant' (sempre alternam)", "Cobertura": "100%"},
+    {"Campo": "content", "Tipo": "str", "Descricao": "Texto: query_str (user) ou concat dos blocks (assistant)", "Cobertura": msg_cov("content_nonempty")},
+    {"Campo": "model", "Tipo": "str?", "Descricao": "display_model — preenchido em assistant msgs", "Cobertura": msg_cov("model")},
+    {"Campo": "created_at", "Tipo": "timestamp", "Descricao": "entry_created_datetime", "Cobertura": "100%"},
+    {"Campo": "content_types", "Tipo": "str", "Descricao": "Sempre 'text' (Perplexity nao tem rich content)", "Cobertura": msg_cov("content_types")},
+    {"Campo": "asset_paths", "Tipo": "list[str]?", "Descricao": "Paths de attachments do user (ou URL truncada se irrecuperavel)", "Cobertura": msg_cov("asset_paths")},
+    {"Campo": "is_voice", "Tipo": "bool", "Descricao": "Sempre False (mic existe mas nao testado)", "Cobertura": "0 flagged"},
+    {"Campo": "is_hidden", "Tipo": "bool", "Descricao": "Sempre False (Perplexity nao tem hidden msgs)", "Cobertura": "0 flagged"},
+])
+show_df(schema_msg)
+
+print(f"\nUser msgs: {int(mcov['user_msgs'].iloc[0])}  |  Assistant msgs: {int(mcov['assistant_msgs'].iloc[0])}")
 ```
 
-# 3. Volumes
+```{python}
+#| label: msg-sample
+#| code-summary: "Amostra diversificada — messages"
+#| column: page
 
-## Mensagens por conversa
+sample_msg = con.execute("""
+    WITH
+    user_q AS (
+        SELECT * FROM messages WHERE role='user'
+        ORDER BY created_at DESC LIMIT 1
+    ),
+    asst_a AS (
+        SELECT * FROM messages WHERE role='assistant'
+        ORDER BY created_at DESC LIMIT 1
+    ),
+    user_long AS (
+        SELECT * FROM messages WHERE role='user' AND length(content) > 200 LIMIT 1
+    ),
+    asst_long AS (
+        SELECT * FROM messages WHERE role='assistant' AND length(content) > 1000 LIMIT 1
+    ),
+    with_asset AS (
+        SELECT * FROM messages WHERE asset_paths IS NOT NULL LIMIT 1
+    ),
+    in_page AS (
+        SELECT * FROM messages WHERE conversation_id LIKE 'page:%' LIMIT 1
+    )
+    SELECT
+        substr(message_id, 1, 16) AS msg_id, role,
+        substr(content, 1, 80) AS content_preview,
+        length(content) AS content_len,
+        model,
+        asset_paths IS NOT NULL AS has_asset,
+        substr(conversation_id, 1, 14) AS conv_id
+    FROM (
+        SELECT * FROM user_q
+        UNION ALL SELECT * FROM asst_a
+        UNION ALL SELECT * FROM user_long
+        UNION ALL SELECT * FROM asst_long
+        UNION ALL SELECT * FROM with_asset
+        UNION ALL SELECT * FROM in_page
+    )
+""").df()
+show_df(sample_msg)
+```
+
+## 1.3 Tool Events
+
+Operacoes nao-conversacionais: search results (web), media references
+(imagens/videos externos citados), asset generation (Perplexity Artifacts:
+CODE_FILE, CHART, GENERATED_IMAGE).
 
 ```{python}
-#| label: msgs-per-conv
+#| label: evt-schema
+#| code-summary: "Cobertura por campo — tool_events"
 
-dist = con.execute("""
-    SELECT message_count
-    FROM conversations
-    ORDER BY message_count DESC
+ecov = con.execute("""
+    SELECT
+        COUNT(*) AS total,
+        COUNT(tool_name) AS tool_name,
+        COUNT(file_path) AS file_path,
+        COUNT(metadata_json) AS metadata_json,
+        SUM(CASE WHEN event_type='search_result' THEN 1 ELSE 0 END) AS search,
+        SUM(CASE WHEN event_type='media_reference' THEN 1 ELSE 0 END) AS media,
+        SUM(CASE WHEN event_type='asset_generation' THEN 1 ELSE 0 END) AS asset
+    FROM tool_events
+""").df()
+etotal = ecov["total"].iloc[0]
+
+def evt_cov(field):
+    return fmt_pct(int(ecov[field].iloc[0]), int(etotal))
+
+schema_evt = pd.DataFrame([
+    {"Campo": "event_id", "Tipo": "str", "Descricao": "<entry_uuid>_<src/media>_<idx> ou asset:<slug>", "Cobertura": "100%"},
+    {"Campo": "conversation_id", "Tipo": "str", "Descricao": "FK pra conversations (thread origem)", "Cobertura": "100%"},
+    {"Campo": "message_id", "Tipo": "str", "Descricao": "Msg assistant que produziu o evento", "Cobertura": "100%"},
+    {"Campo": "event_type", "Tipo": "str", "Descricao": "search_result / media_reference / asset_generation", "Cobertura": "100%"},
+    {"Campo": "tool_name", "Tipo": "str?", "Descricao": "web_search (search), source nome (media), asset_type (asset)", "Cobertura": evt_cov("tool_name")},
+    {"Campo": "file_path", "Tipo": "str?", "Descricao": "Path do binario (so asset_generation tem)", "Cobertura": evt_cov("file_path")},
+    {"Campo": "metadata_json", "Tipo": "str", "Descricao": "JSON com url/title/snippet (search) ou caption (asset)", "Cobertura": evt_cov("metadata_json")},
+])
+show_df(schema_evt)
+
+print(f"\nDistribuicao: search_result={int(ecov['search'].iloc[0])}, media_reference={int(ecov['media'].iloc[0])}, asset_generation={int(ecov['asset'].iloc[0])}")
+```
+
+```{python}
+#| label: evt-sample
+#| code-summary: "Amostra — 1 tool_event de cada event_type"
+#| column: page
+
+sample_evt = con.execute("""
+    SELECT DISTINCT ON (event_type)
+        event_type,
+        tool_name,
+        substr(metadata_json, 1, 120) AS metadata_preview,
+        file_path IS NOT NULL AS has_file_path
+    FROM tool_events
+    ORDER BY event_type
+""").df()
+show_df(sample_evt)
+```
+
+## 1.4 Branches
+
+Perplexity threads sao **lineares** (nao tem fork tipo ChatGPT). Logo,
+todas as branches sao `<conv>_main`, sem parent_branch_id, todas active.
+
+```{python}
+#| label: br-schema
+#| code-summary: "Cobertura por campo — branches"
+
+bcov = con.execute("""
+    SELECT
+        COUNT(*) AS total,
+        SUM(is_active::INT) AS active,
+        SUM((parent_branch_id IS NULL)::INT) AS main,
+        SUM((parent_branch_id IS NOT NULL)::INT) AS forks
+    FROM branches
 """).df()
 
-fig = px.histogram(
-    dist, x="message_count", nbins=30,
-    title="Distribuicao: mensagens por conversa",
-    color_discrete_sequence=[SOURCE_COLOR],
+schema_br = pd.DataFrame([
+    {"Campo": "branch_id", "Tipo": "str", "Descricao": "<conv>_main (sempre)", "Cobertura": "100%"},
+    {"Campo": "conversation_id", "Tipo": "str", "Descricao": "FK pra conversations", "Cobertura": "100%"},
+    {"Campo": "root_message_id", "Tipo": "str", "Descricao": "Primeira user query da thread", "Cobertura": "100%"},
+    {"Campo": "leaf_message_id", "Tipo": "str", "Descricao": "Ultima assistant response", "Cobertura": "100%"},
+    {"Campo": "is_active", "Tipo": "bool", "Descricao": "Sempre True (Perplexity sem fork)", "Cobertura": f"{int(bcov['active'].iloc[0]):,} (100%)"},
+    {"Campo": "created_at", "Tipo": "timestamp", "Descricao": "created_at da conv (alinhado)", "Cobertura": "100%"},
+    {"Campo": "parent_branch_id", "Tipo": "str?", "Descricao": "Sempre NULL (sem fork)", "Cobertura": f"{int(bcov['forks'].iloc[0])} forks"},
+])
+show_df(schema_br)
+```
+
+```{python}
+#| label: br-sample
+#| code-summary: "Amostra — branch tipica"
+
+sample_br = con.execute("""
+    SELECT b.*, c.title, c.message_count
+    FROM branches b
+    JOIN conversations c USING (conversation_id)
+    ORDER BY c.message_count DESC
+    LIMIT 3
+""").df()
+
+show_df(sample_br[['title', 'message_count', 'is_active', 'parent_branch_id']].rename(
+    columns={'message_count': 'msgs', 'parent_branch_id': 'parent'}
+))
+```
+
+# 2. Cobertura e gaps
+
+Onde estao as lacunas — campos que nem sempre o servidor preenche, ou
+artefatos que o parser nao consegue resolver completamente.
+
+## 2.1 Convs sem `model`
+
+`Conversation.model` sai do `display_model` da primeira entry. Quando
+o servidor nao retornou (raro), fica NULL.
+
+```{python}
+#| label: model-gap-temporal
+#| code-summary: "Distribuicao temporal das convs sem model"
+
+no_model = con.execute("""
+    SELECT
+        strftime(created_at, '%Y-%m') AS mes,
+        COUNT(*) FILTER (WHERE model IS NULL) AS sem_model,
+        COUNT(*) FILTER (WHERE model IS NOT NULL) AS com_model
+    FROM conversations
+    GROUP BY mes ORDER BY mes
+""").df()
+
+fig = go.Figure()
+fig.add_trace(go.Bar(x=no_model["mes"], y=no_model["com_model"],
+                     name="Com model", marker_color=SOURCE_COLOR))
+fig.add_trace(go.Bar(x=no_model["mes"], y=no_model["sem_model"],
+                     name="Sem model", marker_color=MUTED))
+fig.update_layout(
+    barmode="stack", title="Convs por mes — com e sem model",
+    height=350, template="plotly_white",
+    xaxis=dict(type="category"),
+    margin=dict(t=50, b=80, l=40, r=20),
+    legend=dict(orientation="h", y=-0.2),
 )
-fig.update_layout(height=350, template="plotly_white",
-                  margin=dict(t=50, b=40, l=40, r=20))
 fig.show()
 
-q = con.execute("""
+perfil = con.execute("""
     SELECT
-        MIN(message_count) AS min,
-        AVG(message_count)::INT AS avg,
-        MEDIAN(message_count)::INT AS median,
-        MAX(message_count) AS max
-    FROM conversations
+        CASE WHEN model IS NULL THEN 'Sem model' ELSE 'Com model' END AS grupo,
+        COUNT(*) AS n,
+        ROUND(AVG(message_count), 1) AS avg_msgs,
+        MEDIAN(message_count)::INT AS median_msgs,
+        MAX(message_count) AS max_msgs
+    FROM conversations GROUP BY grupo
 """).df()
-print(q.to_string(index=False))
+show_df(perfil)
 ```
 
-## Tool events por tipo
+## 2.2 Cobertura de `model` em messages
+
+`Message.model` so eh preenchido em msgs `role=assistant` (user msgs
+sao sempre NULL por design — user nao escolhe model).
 
 ```{python}
-#| label: tool-events-types
+#| label: model-msg-coverage
+#| code-summary: "Cobertura de model em messages por role"
 
-te = con.execute("""
-    SELECT event_type, COUNT(*) AS n
+mcov_role = con.execute("""
+    SELECT
+        role,
+        COUNT(*) AS total,
+        COUNT(model) AS com_model,
+        COUNT(*) - COUNT(model) AS sem_model,
+        ROUND(COUNT(model) * 100.0 / COUNT(*), 1) AS pct_cobertura
+    FROM messages GROUP BY role ORDER BY role
+""").df()
+show_df(mcov_role)
+```
+
+## 2.3 Asset paths e attachments irrecuperaveis
+
+Perplexity faz cleanup de uploads antigos no S3. Attachments com
+`status='failed_upstream_deleted'` no manifest sao referenciados na msg
+mas o binario nao existe mais. Equivalente aos 8 assets irrecuperaveis
+do ChatGPT.
+
+```{python}
+#| label: asset-resolved
+#| code-summary: "Cobertura de file_path em asset_generation events"
+
+asset_cov = con.execute("""
+    SELECT event_type,
+        COUNT(*) AS total,
+        COUNT(file_path) AS resolved,
+        ROUND(COUNT(file_path) * 100.0 / COUNT(*), 1) AS pct
     FROM tool_events
+    WHERE event_type = 'asset_generation'
     GROUP BY event_type
-    ORDER BY n DESC
+""").df()
+show_df(asset_cov)
+```
+
+```{python}
+#| label: attachment-status
+#| code-summary: "Status dos attachments no manifest (raw)"
+
+import json
+manifest_path = _project_root / "data" / "raw" / "Perplexity" / "thread_attachments_manifest.json"
+if manifest_path.exists():
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    statuses = {}
+    for entry in manifest.values():
+        s = entry.get("status", "ok") if entry.get("relpath") else "failed_upstream_deleted"
+        statuses[s] = statuses.get(s, 0) + 1
+    df_status = pd.DataFrame([
+        {"Status": k, "Count": v} for k, v in statuses.items()
+    ])
+    show_df(df_status)
+else:
+    print("Manifest nao encontrado")
+```
+
+```{python}
+#| label: msg-asset-distrib
+#| code-summary: "Quantos asset_paths por msg (uploads do user)"
+
+asset_count = con.execute("""
+    SELECT len(asset_paths) AS n_assets, COUNT(*) AS n_msgs
+    FROM messages WHERE asset_paths IS NOT NULL
+    GROUP BY n_assets ORDER BY n_assets
+""").df()
+
+if len(asset_count) > 0:
+    fig = plotly_bar(
+        x=asset_count["n_assets"].astype(str), y=asset_count["n_msgs"],
+        title=f"Distribuicao de uploads por msg ({int(asset_count['n_msgs'].sum()):,} msgs com pelo menos 1 asset)",
+        height=300,
+    )
+    fig.update_xaxes(title="Assets na msg")
+    fig.update_yaxes(title="N msgs")
+    fig.show()
+```
+
+## 2.4 Threads em Spaces (mapping)
+
+Spaces (collections na API) sao colecoes de threads + pages + files. O
+parser preenche `Conversation.project_id` com o uuid do space quando a
+thread pertence a algum.
+
+```{python}
+#| label: space-mapping
+#| code-summary: "Distribuicao de threads por space"
+
+space_dist = con.execute("""
+    SELECT
+        COALESCE(substr(project_id, 1, 8), '<sem space>') AS space_uuid,
+        SUM(CASE WHEN conversation_id LIKE 'page:%' THEN 1 ELSE 0 END) AS pages,
+        SUM(CASE WHEN conversation_id NOT LIKE 'page:%' THEN 1 ELSE 0 END) AS threads,
+        COUNT(*) AS total
+    FROM conversations
+    GROUP BY space_uuid
+    ORDER BY total DESC
+""").df()
+show_df(space_dist)
+```
+
+# 3. Volumes e distribuicoes
+
+Counts e timelines do que esta nos dados. **Sem interpretacao** — so o
+"o que tem".
+
+## 3.1 Conversas criadas por mes
+
+```{python}
+#| label: conv-timeline
+#| code-summary: "Convs por mes (timeline)"
+
+timeline = con.execute("""
+    SELECT strftime(created_at, '%Y-%m') AS mes, COUNT(*) AS n
+    FROM conversations GROUP BY mes ORDER BY mes
 """).df()
 
 fig = plotly_bar(
-    x=te["event_type"].tolist(),
-    y=te["n"].tolist(),
-    title="Tool events por tipo",
+    x=timeline["mes"], y=timeline["n"],
+    title=f"Conversas criadas por mes ({len(timeline)} meses cobertos)",
+    height=350,
+)
+fig.update_xaxes(title="Mes", type="category")
+fig.update_yaxes(title="N convs")
+fig.show()
+```
+
+## 3.2 Mensagens por role
+
+```{python}
+#| label: msgs-by-role
+#| code-summary: "Mensagens por role (user vs assistant)"
+
+by_role = con.execute("""
+    SELECT role,
+        COUNT(*) AS total,
+        ROUND(AVG(length(content)), 1) AS avg_chars,
+        MAX(length(content)) AS max_chars
+    FROM messages GROUP BY role
+""").df()
+show_df(by_role)
+
+fig = plotly_bar(
+    x=by_role["role"].tolist(), y=by_role["total"].tolist(),
+    title="Mensagens por role",
+    height=300,
 )
 fig.show()
 ```
 
-- **search_result**: web sources usadas pra responder (extraidos de blocks[*].web_result_block.web_results)
-- **media_reference**: refs externas (YouTube, imagens web) — nao baixadas, so referenciadas
-- **asset_generation**: artifacts gerados pela IA (CODE_FILE, CHART, GENERATED_IMAGE)
-
-## Artifacts (assets gerados)
+## 3.3 ToolEvents por event_type
 
 ```{python}
-#| label: artifacts-distribution
+#| label: events-by-type
+#| code-summary: "ToolEvents por event_type"
 
-art = con.execute("""
-    SELECT tool_name, COUNT(*) AS n
-    FROM tool_events
-    WHERE event_type = 'asset_generation'
-    GROUP BY tool_name
-    ORDER BY n DESC
+evt_types = con.execute("""
+    SELECT event_type, COUNT(*) AS n,
+           COUNT(DISTINCT conversation_id) AS n_convs
+    FROM tool_events GROUP BY event_type ORDER BY n DESC
+""").df()
+show_df(evt_types)
+
+fig = plotly_bar(
+    x=evt_types["event_type"], y=evt_types["n"],
+    title="ToolEvents por categoria",
+    height=350,
+)
+fig.update_xaxes(title="event_type")
+fig.update_yaxes(title="N events")
+fig.show()
+```
+
+- **search_result**: web sources (extraidos de `blocks[*].web_result_block.web_results`)
+- **media_reference**: refs externas (YouTube, imagens web) — citadas mas nao baixadas
+- **asset_generation**: artifacts gerados pela IA (CODE_FILE / CHART / GENERATED_IMAGE)
+
+## 3.4 Modelos top 10
+
+```{python}
+#| label: top-models
+#| code-summary: "Top 10 model_slugs"
+
+top_models = con.execute("""
+    SELECT model, COUNT(*) AS n FROM conversations
+    WHERE model IS NOT NULL GROUP BY model ORDER BY n DESC LIMIT 10
 """).df()
 
-if len(art) > 0:
+if len(top_models) > 0:
     fig = plotly_bar(
-        x=art["tool_name"].tolist(),
-        y=art["n"].tolist(),
-        title="Artifacts gerados por tipo",
-        color=ACCENT,
+        x=top_models["model"], y=top_models["n"],
+        title="Top modelos (Conversation.model = display_model do servidor)",
+        height=350,
     )
+    fig.update_xaxes(title="model")
+    fig.update_yaxes(title="N convs")
     fig.show()
+```
 
-show(art)
+## 3.5 Distribuicao por mode (concise vs copilot vs research)
+
+Mapping da API Perplexity → canonico v3:
+
+- `CONCISE` → `concise` (Auto/quick)
+- `COPILOT` → `copilot` (Deep Research, nome legacy do servidor)
+- `ASI` → `research` (Computer mode, Pro-only)
+- `ARTICLE` → `research` (Pages = articles)
+
+```{python}
+#| label: mode-distrib
+#| code-summary: "Distribuicao de mode"
+
+mode_dist = con.execute("""
+    SELECT mode, COUNT(*) AS n,
+        ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 1) AS pct
+    FROM conversations
+    GROUP BY mode ORDER BY n DESC
+""").df()
+
+fig = go.Figure(go.Pie(
+    labels=mode_dist["mode"],
+    values=mode_dist["n"],
+    marker=dict(colors=[SOURCE_COLOR, ACCENT, "#9CC1B5", MUTED]),
+    textinfo="label+percent+value",
+))
+fig.update_layout(
+    title="Convs por mode",
+    height=350, template="plotly_white",
+    margin=dict(t=50, b=40),
+)
+fig.show()
+show_df(mode_dist)
+```
+
+## 3.6 Convs em Spaces vs standalone vs Pages
+
+```{python}
+#| label: project-distrib
+#| code-summary: "Distribuicao em Spaces / Pages / standalone"
+
+distrib = con.execute("""
+    SELECT
+        CASE
+            WHEN conversation_id LIKE 'page:%' THEN 'Page (bookmarked)'
+            WHEN project_id IS NOT NULL THEN 'Em Space'
+            ELSE 'Standalone'
+        END AS categoria,
+        COUNT(*) AS n
+    FROM conversations
+    GROUP BY categoria ORDER BY n DESC
+""").df()
+
+fig = go.Figure(go.Pie(
+    labels=distrib["categoria"], values=distrib["n"],
+    marker=dict(colors=[SOURCE_COLOR, ACCENT, MUTED]),
+    textinfo="label+percent+value",
+))
+fig.update_layout(
+    title="Convs por categoria",
+    height=350, template="plotly_white",
+    margin=dict(t=50, b=40),
+)
+fig.show()
+show_df(distrib)
+```
+
+## 3.7 Top Spaces
+
+```{python}
+#| label: top-spaces
+#| code-summary: "Top spaces por count de convs"
+
+top_spaces = con.execute("""
+    SELECT
+        substr(project_id, 1, 8) AS space_uuid,
+        COUNT(*) AS n,
+        SUM(CASE WHEN conversation_id LIKE 'page:%' THEN 1 ELSE 0 END) AS pages,
+        SUM(CASE WHEN conversation_id NOT LIKE 'page:%' THEN 1 ELSE 0 END) AS threads
+    FROM conversations
+    WHERE project_id IS NOT NULL
+    GROUP BY space_uuid ORDER BY n DESC
+""").df()
+
+# Tenta enriquecer com title do space
+spaces_dir = _project_root / "data" / "merged" / "Perplexity" / "spaces"
+if spaces_dir.exists():
+    titles = {}
+    for sd in spaces_dir.iterdir():
+        if sd.is_dir():
+            meta = sd / "metadata.json"
+            if meta.exists():
+                try:
+                    d = json.loads(meta.read_text(encoding="utf-8"))
+                    titles[d.get("uuid", "")[:8]] = d.get("title", "")
+                except Exception:
+                    pass
+    top_spaces["title"] = top_spaces["space_uuid"].map(titles).fillna("?")
+
+show_df(top_spaces[["title", "space_uuid", "threads", "pages", "n"]].rename(columns={"n": "total"}))
+```
+
+## 3.8 Distribuicao de tamanho (msgs por conv)
+
+```{python}
+#| label: size-histogram
+#| code-summary: "Histograma de message_count"
+
+sizes = con.execute("""
+    SELECT
+        CASE
+            WHEN message_count <= 2 THEN '1-2'
+            WHEN message_count <= 5 THEN '3-5'
+            WHEN message_count <= 10 THEN '6-10'
+            WHEN message_count <= 20 THEN '11-20'
+            WHEN message_count <= 50 THEN '21-50'
+            ELSE '50+'
+        END AS bin,
+        COUNT(*) AS n
+    FROM conversations GROUP BY bin
+""").df()
+order = ['1-2', '3-5', '6-10', '11-20', '21-50', '50+']
+sizes['bin'] = pd.Categorical(sizes['bin'], categories=order, ordered=True)
+sizes = sizes.sort_values('bin')
+
+fig = plotly_bar(
+    x=sizes["bin"].astype(str), y=sizes["n"],
+    title="Distribuicao de tamanho de conv (msgs user+assistant)",
+    height=300,
+)
+fig.update_xaxes(title="N msgs por conv")
+fig.update_yaxes(title="N convs")
+fig.show()
+
+stats = con.execute("""
+    SELECT MIN(message_count) AS min, MAX(message_count) AS max,
+           ROUND(AVG(message_count), 1) AS avg, MEDIAN(message_count)::INT AS median
+    FROM conversations
+""").df()
+show_df(stats)
 ```
 
 # 4. Preservation
 
+Campos canonicos do parser pra distinguir convs **ativas no servidor** das
+**preservadas localmente** (que sumiram do servidor mas continuam no
+nosso merged). Tambem cobre **orphans** em spaces (caso especifico do
+Perplexity).
+
+## 4.1 Active vs preserved_missing
+
 ```{python}
-#| label: preservation-status
+#| label: preservation-counts
+#| code-summary: "Active vs preserved_missing"
 
-pres = con.execute("""
+preservation = con.execute("""
     SELECT
-        SUM(CASE WHEN is_preserved_missing THEN 1 ELSE 0 END) AS preserved_threads,
-        COUNT(*) AS total_convs,
-        SUM(CASE WHEN last_seen_in_server IS NOT NULL THEN 1 ELSE 0 END) AS with_last_seen
-    FROM conversations
-""").df().iloc[0]
-
-print(f"Conversations preservadas (deletadas do servidor): {pres['preserved_threads']}")
-print(f"Conversations com last_seen_in_server: {pres['with_last_seen']:,}/{pres['total_convs']:,}")
+        CASE WHEN is_preserved_missing THEN 'Preserved missing' ELSE 'Active' END AS status,
+        COUNT(*) AS n,
+        MIN(last_seen_in_server) AS first_seen,
+        MAX(last_seen_in_server) AS last_seen
+    FROM conversations GROUP BY is_preserved_missing
+""").df()
+show_df(preservation)
 ```
 
-## Orphans em spaces
+## 4.2 Orphans em spaces
 
-Threads que aparecem em `list_collection_threads` (dentro de space) mas nao em
-`list_ask_threads` (listing global) — foram deletadas globalmente mas o
-space preserva metadata como reference. Comportamento empirico do servidor
-Perplexity (validado 2026-05-01).
+Threads que aparecem em `list_collection_threads` (dentro de space) mas
+nao em `list_ask_threads` (listing global) — foram deletadas globalmente
+mas o space preserva metadata como reference. Comportamento empirico do
+servidor Perplexity (validado 2026-05-01).
 
-A flag `_orphan` esta no `threads_index.json` de cada space dentro do merged.
+A flag `_orphan` esta no `threads_index.json` de cada space dentro do
+merged.
 
 ```{python}
-#| label: orphan-count
+#| label: orphan-detail
+#| code-summary: "Orphans em cada space"
 
-import json
-spaces_dir = _project_root / "data" / "merged" / "Perplexity" / "spaces"
-total_orphans = 0
+orphans_by_space = []
 if spaces_dir.exists():
     for sd in spaces_dir.iterdir():
         if not sd.is_dir():
             continue
         ti = sd / "threads_index.json"
+        meta = sd / "metadata.json"
         if not ti.exists():
             continue
         try:
             arr = json.loads(ti.read_text(encoding="utf-8"))
-            total_orphans += sum(1 for t in arr if isinstance(t, dict) and t.get("_orphan"))
+            orphans = [t for t in arr if isinstance(t, dict) and t.get("_orphan")]
+            title = "?"
+            if meta.exists():
+                try:
+                    title = json.loads(meta.read_text(encoding="utf-8")).get("title", "?")
+                except Exception:
+                    pass
+            orphans_by_space.append({
+                "space": title,
+                "space_uuid": sd.name[:8],
+                "threads_total": len(arr),
+                "orphans": len(orphans),
+            })
         except Exception:
             continue
 
-print(f"Threads orphan em spaces (delete global, ref preservada): {total_orphans}")
+if orphans_by_space:
+    df_orph = pd.DataFrame(orphans_by_space)
+    show_df(df_orph)
+    print(f"\nTotal orphans em spaces: {df_orph['orphans'].sum()}")
 ```
 
----
+## 4.3 Pages vs Threads (distinction)
 
-# Sobre
+| Aspecto | Threads | Pages |
+|---|---|---|
+| `conversation_id` | UUID original | `page:<slug>` |
+| `mode` | concise / copilot | research |
+| `interaction_type` | human_ai | ai_ai (autor != user) |
+| `url` | /search/<uuid> | /page/<slug> |
+| Origem | Criadas pelo user | Bookmarkadas de outros users |
 
-Schema canonico v3 alinhado com ChatGPT. Cobertura empirica validada em
-2026-05-01 com:
+```{python}
+#| label: pages-detail
+#| code-summary: "Detalhe das Pages capturadas"
 
-- 4 spaces (Bookmarks default + GAS + Heatmaps + Brainstorm Buddy)
-- 1 file uploadado em space
-- 9 artifacts (4 CODE_FILE + 4 CHART + 1 GENERATED_IMAGE) gerados em 2 threads (analise VoC + analise Smiles)
-- 6 thread attachments (todos `failed_upstream_deleted` no S3 da Perplexity)
-- 1 thread orphan em GAS (caso `d344c501`, Sept/2024)
+pages_detail = con.execute("""
+    SELECT
+        substr(conversation_id, 1, 30) AS conv_id,
+        substr(title, 1, 60) AS title,
+        message_count AS msgs,
+        substr(project_id, 1, 8) AS space_uuid,
+        interaction_type
+    FROM conversations
+    WHERE conversation_id LIKE 'page:%'
+    ORDER BY title
+""").df()
+show_df(pages_detail)
+```
 
-Pipeline: `extractor` (data/raw/Perplexity/) -> `reconciler` (data/merged/Perplexity/) -> `parser v3` (data/processed/Perplexity/{4 parquets}).
+## 4.4 Tabela completa filtravel
 
-Comando: `PYTHONPATH=. .venv/bin/python scripts/perplexity-sync.py && scripts/perplexity-parse.py`
+Todas as conversations. Use a barra de busca pra filtrar por titulo,
+space, ou qualquer campo. Click nos cabecalhos pra ordenar.
+
+```{python}
+#| label: full-table
+#| code-summary: "Tabela filtravel (itables)"
+#| column: page
+
+from itables import show as itable_show
+
+full = con.execute("""
+    SELECT
+        substr(conversation_id, 1, 16) AS conv_id,
+        title,
+        mode,
+        substr(project_id, 1, 8) AS space,
+        message_count AS msgs,
+        model,
+        interaction_type AS itype,
+        strftime(created_at, '%Y-%m-%d') AS created,
+        strftime(updated_at, '%Y-%m-%d') AS updated,
+        is_preserved_missing AS preserved
+    FROM conversations
+    ORDER BY created_at DESC
+""").df()
+
+itable_show(
+    full,
+    paging=True,
+    searching=True,
+    ordering=True,
+    info=True,
+    lengthMenu=[10, 25, 50, 100],
+    classes="display compact",
+)
+```
+
+```{python}
+#| label: cleanup
+#| code-summary: "Fechar conexao"
+#| echo: false
+
+con.close()
+```
