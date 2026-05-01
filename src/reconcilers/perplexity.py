@@ -98,12 +98,16 @@ class PerplexityReconcileReport:
 
 
 def _load_discovery(raw_dir: Path) -> dict[str, dict]:
-    """Carrega discovery_ids.json (lista de threads minimas)."""
-    p = raw_dir / "discovery_ids.json"
-    if not p.exists():
-        return {}
-    data = json.loads(p.read_text(encoding="utf-8"))
-    return {e["uuid"]: e for e in data if isinstance(e, dict) and e.get("uuid")}
+    """Carrega discovery (lista de threads minimas).
+
+    Tenta `discovery_ids.json` (pasta raw) E `threads_discovery.json` (merged).
+    """
+    for filename in ("discovery_ids.json", "threads_discovery.json"):
+        p = raw_dir / filename
+        if p.exists():
+            data = json.loads(p.read_text(encoding="utf-8"))
+            return {e["uuid"]: e for e in data if isinstance(e, dict) and e.get("uuid")}
+    return {}
 
 
 def _load_spaces_index(spaces_dir: Path) -> dict[str, dict]:

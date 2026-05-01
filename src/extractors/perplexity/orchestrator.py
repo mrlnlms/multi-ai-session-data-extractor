@@ -1,6 +1,9 @@
-"""Orchestrator Perplexity: auth + warmup + discovery + fetch + capture_log.
+"""Orchestrator Perplexity: pasta unica cumulativa em data/raw/Perplexity/.
 
-Default headless=False pra passar Cloudflare challenge (headless detectado como bot).
+Padrao alinhado com ChatGPT (sem timestamp, sem subpastas datadas).
+Threads, spaces, pages, assets metadata + binarios todos cumulativos.
+
+Default headless=False pra passar Cloudflare challenge.
 """
 
 import json
@@ -16,33 +19,38 @@ from src.extractors.perplexity.artifact_downloader import download_artifacts
 from src.extractors.perplexity.asset_downloader import download_assets as download_thread_attachments
 
 
-BASE_DIR = Path("data/raw/Perplexity Data")
-
-
-def _make_output_dir() -> Path:
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M")
-    return BASE_DIR / ts
-
-
-def _find_previous_raw(exclude: Path) -> Path | None:
-    if not BASE_DIR.exists():
-        return None
-    candidates = [
-        p for p in BASE_DIR.iterdir()
-        if p.is_dir() and len(p.name) == 16 and "T" in p.name
-        and p.resolve() != exclude.resolve()
-    ]
-    candidates.sort(key=lambda p: p.stat().st_mtime)
-    return candidates[-1] if candidates else None
+BASE_DIR = Path("data/raw/Perplexity")
 
 
 def _tag_map(raw_dir: Path) -> dict[str, str]:
+    """Le discovery_ids.json existente -> {uuid: last_query_datetime}."""
     disc = raw_dir / "discovery_ids.json"
     if not disc.exists():
         return {}
     with open(disc, encoding="utf-8") as f:
         data = json.load(f)
     return {t["uuid"]: t.get("last_query_datetime", "") or "" for t in data}
+
+
+def _write_last_capture_md(output_dir: Path, log: dict) -> None:
+    """Regenera LAST_CAPTURE.md com snapshot da run."""
+    totals = log.get("totals", {})
+    md = (
+        "# Last capture\n\n"
+        f"- **Quando:** {log.get('finished_at')}\n"
+        f"- **Modo:** {log.get('mode')}\n"
+        f"- **Threads:** {totals.get('threads_discovered', 0)} discovered, "
+        f"{totals.get('threads_fetched', 0)} fetched, "
+        f"{totals.get('threads_reused_incremental', 0)} reused\n"
+        f"- **Spaces:** {totals.get('spaces_discovered', 0)} ({totals.get('spaces_pinned', 0)} pinados)\n"
+        f"- **Assets (artifacts):** {totals.get('assets_total', 0)} metadata, "
+        f"{totals.get('assets_downloaded', 0) + totals.get('assets_download_skipped', 0)} binarios em disco\n"
+        f"- **Thread attachments:** {totals.get('thread_attachments_downloaded', 0)} dl, "
+        f"{totals.get('thread_attachments_errors', 0)} irrecuperaveis (S3 cleanup upstream)\n"
+        f"- **Errors:** threads={totals.get('threads_errors', 0)}, spaces={totals.get('spaces_errors', 0)}\n\n"
+        "Ver `capture_log.jsonl` pro historico completo.\n"
+    )
+    (output_dir / "LAST_CAPTURE.md").write_text(md, encoding="utf-8")
 
 
 async def run_export(
@@ -52,14 +60,14 @@ async def run_export(
     headless: bool = False,
 ) -> Path:
     started_at = datetime.now(timezone.utc)
-    output_dir = _make_output_dir()
+    output_dir = BASE_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"Raw output: {output_dir}")
 
-    prev_raw = None if full else _find_previous_raw(exclude=output_dir)
-    prev_map = _tag_map(prev_raw) if prev_raw else {}
-    if prev_raw:
-        print(f"Modo incremental: cutoff vs {prev_raw.name} ({len(prev_map)} threads conhecidas)")
+    # Modo incremental: tag_map vem da propria pasta unica (estado atual)
+    prev_map = {} if full else _tag_map(output_dir)
+    if prev_map and not full:
+        print(f"Modo incremental: {len(prev_map)} threads no estado anterior")
     else:
         print("Modo full")
 
@@ -91,6 +99,8 @@ async def run_export(
 
         threads = await discover(client, output_dir)
 
+        # Plano incremental: thread JA existe no disco com mesmo last_query_datetime?
+        # Mantem (skip fetch). Mudou ou nova → fetch.
         to_fetch = []
         reused = 0
         for t in threads:
@@ -98,14 +108,10 @@ async def run_export(
             if not uid:
                 continue
             tag = t.get("last_query_datetime", "") or ""
-            if uid in prev_map and prev_map[uid] == tag and prev_raw is not None:
-                old = prev_raw / "threads" / f"{uid}.json"
-                new = output_dir / "threads" / f"{uid}.json"
-                new.parent.mkdir(parents=True, exist_ok=True)
-                if old.exists():
-                    new.write_bytes(old.read_bytes())
-                    reused += 1
-                    continue
+            existing = output_dir / "threads" / f"{uid}.json"
+            if uid in prev_map and prev_map[uid] == tag and existing.exists():
+                reused += 1
+                continue
             to_fetch.append(uid)
 
         if smoke_limit is not None:
@@ -115,12 +121,18 @@ async def run_export(
         print(f"Fetching {len(to_fetch)} threads ({reused} reusadas)")
         ok, skipped, errs = await fetch_threads(client, to_fetch, output_dir)
 
-        # Spaces (collections) — descobertos via auditoria empirica 2026-04-29
-        # Pages dentro de spaces — DOM-click scrape adicionado em 2026-05-01
+        # Spaces (collections) + pages
         collections = await discover_spaces(client, output_dir)
+        spaces_pinned_count = sum(1 for c in collections if c.get("uuid") and (output_dir / "spaces" / "_pinned_raw.json").exists())
+        # pinned count real vai do _pinned_raw.json
+        try:
+            pinned_data = json.loads((output_dir / "spaces" / "_pinned_raw.json").read_text(encoding="utf-8"))
+            spaces_pinned_count = len(pinned_data) if isinstance(pinned_data, list) else 0
+        except Exception:
+            spaces_pinned_count = 0
         spaces_ok, _, spaces_errs = await fetch_spaces(client, collections, output_dir, page=page)
 
-        # Assets (UI: 'Artifacts') — descobertos via probe /library?tab=artifacts em 2026-05-01
+        # Assets (artifacts)
         print("Capturando assets (artifacts)...")
         assets_all = await client.list_user_assets()
         assets_pinned = await client.list_user_pinned_assets()
@@ -128,12 +140,15 @@ async def run_export(
         assets_dir = output_dir / "assets"
         assets_dir.mkdir(parents=True, exist_ok=True)
         with open(assets_dir / "_index.json", "w", encoding="utf-8") as f:
-            json.dump([{**a, "is_pinned": (a.get("uuid") or a.get("id")) in pinned_ids} for a in assets_all], f, ensure_ascii=False, indent=2)
+            json.dump(
+                [{**a, "is_pinned": (a.get("uuid") or a.get("id")) in pinned_ids} for a in assets_all],
+                f, ensure_ascii=False, indent=2,
+            )
         with open(assets_dir / "_pinned_raw.json", "w", encoding="utf-8") as f:
             json.dump(assets_pinned, f, ensure_ascii=False, indent=2)
         print(f"  {len(assets_all)} assets ({len(assets_pinned)} pinados)")
 
-        # Download dos binarios dos artifacts (CloudFront/S3) — adicionado em 2026-05-01
+        # Download binarios artifacts
         if assets_all:
             print("Baixando binarios dos artifacts...")
             dl_stats = await download_artifacts(context, assets_all, output_dir)
@@ -141,8 +156,7 @@ async def run_export(
         else:
             dl_stats = {"downloaded": 0, "skipped_existing": 0, "failed": 0, "total": 0}
 
-        # Thread attachments (uploads do user) — usa /rest/file-repository/download-attachment
-        # pra refresh URL (S3 presigned expiram). Saida em thread_attachments/.
+        # Thread attachments
         print("Baixando thread attachments + featured images...")
         try:
             att_stats = await download_thread_attachments(context, output_dir)
@@ -157,13 +171,13 @@ async def run_export(
             "mode": "full" if full else "incremental",
             "smoke_limit": smoke_limit,
             "headless": headless,
-            "previous_raw": prev_raw.name if prev_raw else None,
             "totals": {
                 "threads_discovered": len(threads),
                 "threads_fetched": ok,
                 "threads_reused_incremental": reused,
                 "threads_errors": len(errs),
                 "spaces_discovered": len(collections),
+                "spaces_pinned": spaces_pinned_count,
                 "spaces_fetched": spaces_ok,
                 "spaces_errors": len(spaces_errs),
                 "assets_total": len(assets_all),
@@ -177,8 +191,14 @@ async def run_export(
             },
             "errors": {"threads": errs[:50], "spaces": spaces_errs[:20]},
         }
-        with open(output_dir / "capture_log.json", "w", encoding="utf-8") as f:
-            json.dump(log, f, ensure_ascii=False, indent=2)
+
+        # Append em capture_log.jsonl (historico cumulativo)
+        log_jsonl = output_dir / "capture_log.jsonl"
+        with open(log_jsonl, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log, ensure_ascii=False) + "\n")
+
+        # LAST_CAPTURE.md (snapshot)
+        _write_last_capture_md(output_dir, log)
 
         print()
         print("=== SUMMARY ===")
