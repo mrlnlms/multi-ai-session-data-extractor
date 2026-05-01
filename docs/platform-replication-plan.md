@@ -7,17 +7,17 @@ adaptar gotchas.
 
 ---
 
-## 1. Estado atual (2026-04-28)
+## 1. Estado atual (atualizado 2026-05-01)
 
 | Plataforma | Extractor | Reconciler | Sync orquestr. | Pasta única | Parser canônico | Script parse | QMD |
 |---|---|---|---|---|---|---|---|
 | **ChatGPT** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Perplexity** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Claude.ai | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
 | Gemini | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
 | NotebookLM | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
 | Qwen | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
 | DeepSeek | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
-| Perplexity | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
 
 **⚠️ legacy:** existe `src/parsers/<source>.py` mas é o MVP do projeto-mãe
 (não no schema v3 — sem branches table, sem campos preservation, sem
@@ -209,12 +209,19 @@ Lista informada pelo backlog do projeto-mãe e empírica observada.
 
 **Captura:** headless ✅. Reconciler v2 com FEATURES_VERSION + build_plan.
 
-### Qwen / DeepSeek / Perplexity
+### Perplexity ✅ shipped (2026-05-01)
+
+Equiparado ao ChatGPT. Detalhes em `perplexity-audit-findings.md` e
+`perplexity-journey-2026-05-01.md`. Sync + parser + Quarto entregues.
+Gaps fechados via probes Chrome MCP: pin (bug em `list_all_threads`
+corrigido), skills em spaces (`/rest/skills?scope=collection&scope_id=<UUID>`),
+archive (Enterprise-only — backend aceita mas no-op pra Pro).
+
+### Qwen / DeepSeek
 
 **Complexidade baixa-média.**
 
 - Padrão simples (chat texto + algumas tools básicas).
-- Perplexity: **headed** ⚠️ (Cloudflare detecta headless).
 - Qwen, DeepSeek: headless ✅.
 - Reconcilers ainda estão **pendentes** (item #46 do projeto-mãe) —
   fazer junto com sync orquestrador.
@@ -237,12 +244,16 @@ Cada plataforma só está "shipped" quando:
 
 ---
 
-## 7. Ordem sugerida
+## 7. Ordem sugerida (atualizada 2026-05-01)
 
 **Por que importa:** cada plataforma é um pacote ~3-5 dias de trabalho.
 Ordem certa minimiza retrabalho e gera momentum.
 
 ```
+✅ Perplexity   ← shipped 2026-05-01 (sync + parser + Quarto + gaps fechados)
+
+A fazer:
+
 1. Claude.ai     ← maior complexidade, maior valor (thinking + MCPs)
                    destrava 80% do conteúdo hoje descartado
 
@@ -257,32 +268,29 @@ Ordem certa minimiza retrabalho e gera momentum.
 
 5. DeepSeek      ← simples, similar ao Qwen
                    reconciler precisa primeiro
-
-6. Perplexity    ← headed, simples
-                   exercita caminho headed (igual ChatGPT)
-                   reconciler precisa primeiro
 ```
 
-**Justificativa da ordem:** Claude.ai primeiro porque (a) é a plataforma
-mais complexa — se o schema v3 não comportar, descobrimos cedo; (b) é a
-de maior volume de conteúdo descartado pelo parser legacy (thinking,
-MCP). NotebookLM segundo porque os 9 tipos de output testam a robustez
-do schema. Gemini, Qwen, DeepSeek, Perplexity por ordem decrescente de
-complexidade — exercitam variações do padrão estabelecido.
+**Justificativa da ordem:** Perplexity foi feita primeiro (fora da ordem
+original) porque é a de menor complexidade entre as headed e serviu de
+"warm-up" pra confirmar a transferibilidade do padrão ChatGPT. Claude.ai
+vem next porque (a) é a plataforma mais complexa — se o schema v3 não
+comportar, descobrimos cedo; (b) é a de maior volume de conteúdo descartado
+pelo parser legacy (thinking, MCP). NotebookLM em sequência porque os 9
+tipos de output testam a robustez do schema.
 
 ---
 
 ## 8. Estimativa de esforço
 
-| Plataforma | Sync + parser | Quarto | Total |
-|---|---|---|---|
-| Claude.ai | 3-5 dias | 0.5 dia | 3.5-5.5 dias |
-| NotebookLM | 3-4 dias | 0.5 dia | 3.5-4.5 dias |
-| Gemini | 1-2 dias | 0.5 dia | 1.5-2.5 dias |
-| Qwen | 1 dia | 0.5 dia | 1.5 dias |
-| DeepSeek | 1 dia | 0.5 dia | 1.5 dias |
-| Perplexity | 1 dia | 0.5 dia | 1.5 dias |
-| **Total** | | | **~13-17 dias** |
+| Plataforma | Sync + parser | Quarto | Total | Status |
+|---|---|---|---|---|
+| Perplexity | 1 dia | 0.5 dia | 1.5 dias | ✅ shipped 2026-05-01 |
+| Claude.ai | 3-5 dias | 0.5 dia | 3.5-5.5 dias | pendente |
+| NotebookLM | 3-4 dias | 0.5 dia | 3.5-4.5 dias | pendente |
+| Gemini | 1-2 dias | 0.5 dia | 1.5-2.5 dias | pendente |
+| Qwen | 1 dia | 0.5 dia | 1.5 dias | pendente |
+| DeepSeek | 1 dia | 0.5 dia | 1.5 dias | pendente |
+| **Pendente** | | | **~11-15 dias** |
 
 Estimativas otimistas se padrão fluir. Add 30% de buffer pra surpresas
 (API mudou, feature nova que não estava no findings, etc).

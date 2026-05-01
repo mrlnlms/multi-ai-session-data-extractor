@@ -251,11 +251,35 @@ onde fica isso?"
 | `/rest/page/get_related_pages` | GET | Recomendações (não capturado) |
 
 ### Endpoints chutados que retornam 404 ou Pro-only
-- `/rest/spaces/{uuid}/skills` → 404 (provável Pro)
+- ~~`/rest/spaces/{uuid}/skills` → 404~~ (path errado — ver errata abaixo)
 - `/rest/spaces/{uuid}/links` → 404
 - `/rest/collections/{uuid}/threads` → 404 (usa `slug`, não uuid)
 - `/rest/page/list*`, `/rest/articles/list*` → 404 (não há listing
   de pages — vêm via SSR no HTML do space)
+
+### Errata 2026-05-01 (probes Chrome MCP)
+
+Descobertas posteriores via probe direto na sessão Chrome (depois da
+publicação inicial deste journey):
+
+- **Skills:** endpoint correto é `GET /rest/skills?scope=<X>&scope_id=<UUID>`,
+  não `/rest/spaces/{uuid}/skills`. Scopes válidos: `global`, `organization`,
+  `collection`, `individual`. Funciona em Pro.
+- **Pin de thread:** bug no extractor (`list_all_threads` com `seen: set`
+  descartava `is_pinned: true` propagado de `list_pinned_ask_threads`).
+  Fix: `seen: dict` + `update()`. `list_pinned_ask_threads` POST `{}`
+  sempre funcionou — não era gap de endpoint.
+- **Archive de thread:** endpoints write descobertos
+  (`POST /rest/thread/archive_thread` body `{context_uuid}` +
+  `DELETE /rest/thread/unarchive_thread/<context_uuid>`). Mas testado
+  empiricamente: archive em conta Pro é **no-op observável** — backend
+  retorna 200 success mas estado não muda em `list_ask_threads`,
+  `fetch_thread`, nem em filtros. Feature gated Enterprise via
+  `restricted-feature-loader` em Cloudflare Access.
+- **Voice:** servidor transcreve áudio e descarta — `query_str` vira
+  texto normal. Sem campo distintivo. Limitação upstream.
+
+Detalhes em `perplexity-audit-findings.md`.
 
 ---
 
