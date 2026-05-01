@@ -183,14 +183,15 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
 - **Sync orquestrador 3 etapas:** `scripts/claude-sync.py` (capture + assets +
   reconcile)
 - **Cobertura completa na captura:** 835 conversations + 83 projects descobertos
-  (829 fetched com sucesso, 6 erros — investigar TODO), 2.110 binarios baixados,
-  1.117 artifacts extraidos (code/markdown/html/react via tool_use)
+  e capturados (1 timeout transiente no full sync, recuperado via
+  `scripts/claude-refetch-known.py` na primeira tentativa). 2.110 binarios
+  baixados, 1.117 artifacts extraidos (code/markdown/html/react via tool_use)
 - **Reconciler v3 (FEATURES_VERSION=2):** preservation completa (convs +
   projects), idempotente, pasta unica `data/merged/Claude.ai/conversations/<uuid>.json`
   + `projects/<uuid>.json` + `assets/`. Saida: `claude_ai_merged_summary.json`
   + `LAST_RECONCILE.md` + `reconcile_log.jsonl`
 - **Parser canonico v3** (`src/parsers/claude_ai.py` + `_claude_ai_helpers.py`):
-  834 convs / 24.397 msgs / 16.044 tool_events / 1.151 branches / 83 projects.
+  835 convs / 24.504 msgs / 16.180 tool_events / 1.160 branches / 83 projects.
   Cobertura:
   - **Branches via DAG plano** (`parent_message_uuid` + `current_leaf_message_uuid`)
     — diferente do tree-walk do ChatGPT. 832 main + 319 secundarias (28%
@@ -222,6 +223,8 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
 - **Comandos:**
   ```bash
   PYTHONPATH=. .venv/bin/python scripts/claude-sync.py
+  # Se o sync deixou gaps (timeouts transientes):
+  PYTHONPATH=. .venv/bin/python scripts/claude-refetch-known.py
   PYTHONPATH=. .venv/bin/python scripts/claude-parse.py
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/claude-ai.qmd
   ```

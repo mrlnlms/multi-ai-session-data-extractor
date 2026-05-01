@@ -407,28 +407,31 @@ def _apply_kind(
         else:
             report.warnings.append(f"to_use {kind}/{uuid}: arquivo faltando em raw")
 
-    # to_copy: do merged anterior, atualizando _last_seen_in_server
+    # to_copy: do merged anterior, atualizando _last_seen_in_server.
+    # Fallback: se merged anterior nao tem (gap por erro em run passada), tenta raw.
+    # Cobre cenario claude-refetch-known: conv aparece na discovery prev MAS
+    # nunca foi salva no merged porque o fetch falhou; agora o raw tem ela.
     for uuid in to_copy:
-        if not previous_merged:
-            report.warnings.append(f"to_copy {kind}/{uuid} mas sem previous_merged")
-            continue
-        src = previous_merged / kind / f"{uuid}.json"
         dst = output_dir / kind / f"{uuid}.json"
-        # Se previous_merged == output_dir (pasta unica self-update),
-        # ler e reescrever com _last_seen_in_server bumpado e clear de preserved_missing.
-        if src.exists():
-            try:
-                obj = json.loads(src.read_text(encoding="utf-8"))
-                obj["_last_seen_in_server"] = today
-                obj.pop("_preserved_missing", None)
-                dst.write_text(
-                    json.dumps(obj, ensure_ascii=False, indent=2),
-                    encoding="utf-8",
-                )
-            except Exception as e:
-                report.warnings.append(f"to_copy {kind}/{uuid}: erro lendo merged anterior: {e}")
-        else:
-            report.warnings.append(f"to_copy {kind}/{uuid}: merged anterior nao tem arquivo")
+        prev_src = (previous_merged / kind / f"{uuid}.json") if previous_merged else None
+        raw_src = raw_dir / kind / f"{uuid}.json"
+
+        src = prev_src if (prev_src and prev_src.exists()) else raw_src
+        if not src.exists():
+            report.warnings.append(
+                f"to_copy {kind}/{uuid}: nem merged anterior nem raw tem arquivo"
+            )
+            continue
+        try:
+            obj = json.loads(src.read_text(encoding="utf-8"))
+            obj["_last_seen_in_server"] = today
+            obj.pop("_preserved_missing", None)
+            dst.write_text(
+                json.dumps(obj, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception as e:
+            report.warnings.append(f"to_copy {kind}/{uuid}: erro lendo {src.name}: {e}")
 
     # preserved_missing: marca flag, NAO atualiza _last_seen_in_server
     for uuid in preserved:
