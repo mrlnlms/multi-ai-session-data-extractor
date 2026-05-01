@@ -272,8 +272,14 @@ def compute_platform_metrics(state: PlatformState) -> PlatformMetrics:
 
 
 def discovery_drop_flag(state: PlatformState, threshold: float = 0.20) -> bool:
-    """True se a discovery mais recente caiu mais que o threshold vs a maior historica."""
-    totals = [r.discovery_total for r in state.capture_runs if r.discovery_total]
+    """True se a discovery mais recente caiu mais que o threshold vs a maior historica.
+
+    Modos `refetch_known` sao ignorados — eles capturam um subset proposital
+    (ex: 1 conv que errou na run anterior), nao representam discovery do
+    listing global.
+    """
+    full_runs = [r for r in state.capture_runs if r.mode != "refetch_known"]
+    totals = [r.discovery_total for r in full_runs if r.discovery_total]
     if len(totals) < 2:
         return False
     max_known = max(totals)

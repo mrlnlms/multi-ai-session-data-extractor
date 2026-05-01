@@ -47,6 +47,7 @@ class CaptureRun:
     fetch_attempted: Optional[int]
     fetch_succeeded: Optional[int]
     errors_count: int = 0
+    mode: Optional[str] = None  # 'full' | 'incremental' | 'refetch_known' | None
 
 
 @dataclass
@@ -159,6 +160,7 @@ def _load_capture_log(path: Path) -> list[CaptureRun]:
                     started_at=started,
                     finished_at=finished,
                     duration_seconds=duration,
+                    mode=d.get("mode"),
                     discovery_total=(
                         discovery.get("total")
                         or totals.get("threads_discovered")
