@@ -43,7 +43,7 @@ Lista de imports pendentes em `memory/project_pending_imports_from_old.md`.
 | Claude.ai | ✅ | ✅ | ❌ | ❌ | ❌ | Falta sync equivalente |
 | Gemini | ✅ | ✅ | ❌ | ❌ | ❌ | Idem |
 | NotebookLM | ✅ | ✅ | ❌ | ❌ | ❌ | 9 tipos de outputs (audio, video, slide deck PDF+PPTX, blog, flashcards, quiz, data table, infographic, mind map) |
-| Perplexity | ✅ + Spaces | ⚠️ legacy | ❌ | ⚠️ legacy | ❌ | Auditoria 2026-04-29: pinned bug fixado, Spaces (collections) capturados, 1 orphan detectado em GAS |
+| Perplexity | ✅ | ✅ | ✅ | ✅ | ✅ | Auditoria + reconciler + parser v3 + Quarto. 81 conversations (77 threads + 4 pages), 9 artifacts c/ binarios, 1 orphan, 4 spaces |
 | Qwen / DeepSeek | ✅ | ❌ | ❌ | ❌ | ❌ | Reconcilers + sync pendentes |
 
 Backlog principal: replicar o padrao do ChatGPT-sync nas outras 6 plataformas
@@ -95,6 +95,38 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
 - Pasta ainda com timestamp + nome legacy "Perplexity Data" (Fase A do
   plan de replicacao, nao feita ainda — escopo dessa auditoria foi so
   fechar gaps no extractor).
+
+**Perplexity — ciclo completo end-to-end validado em 2026-05-01:**
+- **Pasta unica cumulativa:** `data/raw/Perplexity/` e `data/merged/Perplexity/`
+  (sem espaco no nome, sem timestamps)
+- **Sync orquestrador 2 etapas:** `scripts/perplexity-sync.py` (capture + reconcile)
+- **Cobertura completa:** threads (77) + spaces (4) + pages (4 dentro de Bookmarks)
+  + threads em spaces + files de space (1) + assets/artifacts metadata (9)
+  + assets binarios (9 baixados, ~1.9MB) + thread attachments (6 com manifest
+  failed_upstream_deleted, S3 cleanup upstream — equivalente aos 8 do ChatGPT)
+  + user metadata (info, settings, ai_profile)
+- **Reconciler:** preservation completa (orphans + ENTRY_DELETED), idempotente,
+  pasta unica `data/merged/Perplexity/perplexity_merged_summary.json` +
+  LAST_RECONCILE.md + reconcile_log.jsonl
+- **Parser canonico v3** (`src/parsers/perplexity.py`): 81 conversations
+  (41 copilot + 36 concise + 4 research/pages), 372 messages, 2311 tool_events
+  (2134 search_result + 168 media_reference + 9 asset_generation), 81 branches.
+  Pages tem `conversation_id='page:<slug>'`. Search results extraidos de
+  `blocks[*].web_result_block.web_results`. Idempotente (~1s pra rodar).
+- **Quarto descritivo** (`notebooks/perplexity.qmd`): 22MB HTML self-contained
+- **Findings empiricos:** `docs/perplexity-audit-findings.md`
+- **Probes:** 7 scripts em `scripts/perplexity-probe-*.py` (features, spaces,
+  pages-*, artifacts, tabs-user, more)
+- **Auth:** profile copiado do projeto pai (`.storage/perplexity-profile/`)
+- **Comportamento do servidor mapeado:** rename bumpa `last_query_datetime`
+  (igual ChatGPT), delete via menu = ENTRY_DELETED some de tudo, threads
+  antigas em space podem virar orphan se deletadas (caso d344c501)
+- **Comandos:**
+  ```bash
+  PYTHONPATH=. .venv/bin/python scripts/perplexity-sync.py
+  PYTHONPATH=. .venv/bin/python scripts/perplexity-parse.py
+  QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/perplexity.qmd
+  ```
 
 **Estado atual `data/merged/ChatGPT/chatgpt_merged.json`:**
 - 1171 convs cumulativas (1168 active + 3 preserved_missing)

@@ -1,0 +1,350 @@
+---
+title: "Perplexity — Data Profile"
+subtitle: "Catalogo descritivo dos parquets do parser canonico v3"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+
+import sys
+from pathlib import Path
+
+_this = Path.cwd()
+_project_root = _this if (_this / "src").exists() else _this.parent
+sys.path.insert(0, str(_project_root))
+
+import pandas as pd
+import duckdb
+import plotly.graph_objects as go
+import plotly.express as px
+from itables import init_notebook_mode, show
+
+init_notebook_mode(all_interactive=False)
+
+PROCESSED = _project_root / "data" / "processed" / "Perplexity"
+con = duckdb.connect()
+for table in ("conversations", "messages", "tool_events", "branches"):
+    con.execute(
+        f"CREATE VIEW {table} AS SELECT * FROM read_parquet('{PROCESSED}/{table}.parquet')"
+    )
+
+# Perplexity teal primary
+SOURCE_COLOR = "#20808D"
+ACCENT = "#1FB8CD"
+MUTED = "#D1D5DB"
+
+
+def fmt_pct(n, total):
+    pct = n / total * 100 if total else 0
+    return f"{n:,}/{total:,} ({pct:.0f}%)"
+
+
+def plotly_bar(x, y, title, color=SOURCE_COLOR, height=350, orientation="v"):
+    if orientation == "h":
+        fig = go.Figure(go.Bar(y=x, x=y, marker_color=color, orientation="h"))
+    else:
+        fig = go.Figure(go.Bar(x=x, y=y, marker_color=color))
+    fig.update_layout(
+        title=title, height=height, template="plotly_white",
+        margin=dict(t=50, b=40, l=40, r=20),
+    )
+    return fig
+```
+
+# Visao geral
+
+```{python}
+#| label: overview
+#| code-summary: "Totais por tabela"
+
+totals = con.execute("""
+    SELECT
+        (SELECT COUNT(*) FROM conversations) AS conversations,
+        (SELECT COUNT(*) FROM messages) AS messages,
+        (SELECT COUNT(*) FROM tool_events) AS tool_events,
+        (SELECT COUNT(*) FROM branches) AS branches
+""").df()
+
+range_dt = con.execute("""
+    SELECT
+        MIN(created_at) AS earliest,
+        MAX(updated_at) AS latest
+    FROM conversations
+""").df()
+
+print(f"Conversations: {totals.iloc[0]['conversations']:,}")
+print(f"Messages:      {totals.iloc[0]['messages']:,}")
+print(f"Tool events:   {totals.iloc[0]['tool_events']:,}")
+print(f"Branches:      {totals.iloc[0]['branches']:,}")
+print()
+print(f"Janela temporal: {range_dt.iloc[0]['earliest']} a {range_dt.iloc[0]['latest']}")
+```
+
+# 1. Dados disponiveis
+
+## Modes (canonical)
+
+```{python}
+#| label: modes-distribution
+
+modes = con.execute("""
+    SELECT mode, COUNT(*) AS n
+    FROM conversations
+    GROUP BY mode
+    ORDER BY n DESC
+""").df()
+
+fig = plotly_bar(
+    x=modes["mode"].tolist(),
+    y=modes["n"].tolist(),
+    title="Conversas por mode (mapping API -> canonico)",
+)
+fig.show()
+
+print()
+for _, row in modes.iterrows():
+    pct = row["n"] / totals.iloc[0]["conversations"] * 100
+    print(f"  {row['mode']}: {row['n']} ({pct:.0f}%)")
+```
+
+Mapping de mode (API Perplexity → canonico):
+
+- **CONCISE** → `concise` (Auto/quick search)
+- **COPILOT** → `copilot` (Deep Research, nome legacy do servidor)
+- **ASI** → `research` (Computer mode, Pro-only)
+- **ARTICLE** → `research` (Pages — bookmarks de pages publicadas por outros users)
+
+## Pages vs Threads do user
+
+```{python}
+#| label: pages-vs-threads
+
+p_t = con.execute("""
+    SELECT
+        SUM(CASE WHEN conversation_id LIKE 'page:%' THEN 1 ELSE 0 END) AS pages,
+        SUM(CASE WHEN conversation_id NOT LIKE 'page:%' THEN 1 ELSE 0 END) AS threads
+    FROM conversations
+""").df().iloc[0]
+
+print(f"Threads (do user): {p_t['threads']:,}")
+print(f"Pages (bookmarks de articles externos): {p_t['pages']:,}")
+```
+
+## Spaces (collections)
+
+```{python}
+#| label: spaces-distribution
+
+spaces = con.execute("""
+    SELECT
+        COALESCE(project_id, '<sem space>') AS space,
+        COUNT(*) AS conversas,
+        SUM(CASE WHEN conversation_id LIKE 'page:%' THEN 1 ELSE 0 END) AS pages,
+        SUM(CASE WHEN conversation_id NOT LIKE 'page:%' THEN 1 ELSE 0 END) AS threads
+    FROM conversations
+    GROUP BY space
+    ORDER BY conversas DESC
+""").df()
+
+show(spaces, lengthMenu=[10, 25, 50])
+```
+
+# 2. Cobertura por campo
+
+```{python}
+#| label: coverage-conversations
+
+cov = con.execute("""
+    SELECT
+        COUNT(*) AS total,
+        COUNT(title) AS titulo,
+        COUNT(model) AS model,
+        COUNT(mode) AS mode,
+        COUNT(project_id) AS in_space,
+        SUM(CASE WHEN is_preserved_missing THEN 1 ELSE 0 END) AS preserved
+    FROM conversations
+""").df().iloc[0]
+
+total = cov['total']
+rows = [
+    ("title", fmt_pct(cov['titulo'], total)),
+    ("model", fmt_pct(cov['model'], total)),
+    ("mode", fmt_pct(cov['mode'], total)),
+    ("project_id (em space)", fmt_pct(cov['in_space'], total)),
+    ("is_preserved_missing", fmt_pct(cov['preserved'], total)),
+]
+df_cov = pd.DataFrame(rows, columns=["Campo", "Cobertura"])
+show(df_cov, lengthMenu=[10, 25])
+```
+
+## Cobertura messages
+
+```{python}
+#| label: coverage-messages
+
+mcov = con.execute("""
+    SELECT
+        COUNT(*) AS total,
+        COUNT(content) AS content,
+        SUM(CASE WHEN content IS NOT NULL AND content != '' THEN 1 ELSE 0 END) AS content_nonempty,
+        SUM(CASE WHEN asset_paths IS NOT NULL THEN 1 ELSE 0 END) AS with_assets
+    FROM messages
+""").df().iloc[0]
+
+t = mcov['total']
+rows = [
+    ("content (nao vazio)", fmt_pct(mcov['content_nonempty'], t)),
+    ("asset_paths", fmt_pct(mcov['with_assets'], t)),
+]
+df_mcov = pd.DataFrame(rows, columns=["Campo", "Cobertura"])
+show(df_mcov)
+```
+
+# 3. Volumes
+
+## Mensagens por conversa
+
+```{python}
+#| label: msgs-per-conv
+
+dist = con.execute("""
+    SELECT message_count
+    FROM conversations
+    ORDER BY message_count DESC
+""").df()
+
+fig = px.histogram(
+    dist, x="message_count", nbins=30,
+    title="Distribuicao: mensagens por conversa",
+    color_discrete_sequence=[SOURCE_COLOR],
+)
+fig.update_layout(height=350, template="plotly_white",
+                  margin=dict(t=50, b=40, l=40, r=20))
+fig.show()
+
+q = con.execute("""
+    SELECT
+        MIN(message_count) AS min,
+        AVG(message_count)::INT AS avg,
+        MEDIAN(message_count)::INT AS median,
+        MAX(message_count) AS max
+    FROM conversations
+""").df()
+print(q.to_string(index=False))
+```
+
+## Tool events por tipo
+
+```{python}
+#| label: tool-events-types
+
+te = con.execute("""
+    SELECT event_type, COUNT(*) AS n
+    FROM tool_events
+    GROUP BY event_type
+    ORDER BY n DESC
+""").df()
+
+fig = plotly_bar(
+    x=te["event_type"].tolist(),
+    y=te["n"].tolist(),
+    title="Tool events por tipo",
+)
+fig.show()
+```
+
+- **search_result**: web sources usadas pra responder (extraidos de blocks[*].web_result_block.web_results)
+- **media_reference**: refs externas (YouTube, imagens web) — nao baixadas, so referenciadas
+- **asset_generation**: artifacts gerados pela IA (CODE_FILE, CHART, GENERATED_IMAGE)
+
+## Artifacts (assets gerados)
+
+```{python}
+#| label: artifacts-distribution
+
+art = con.execute("""
+    SELECT tool_name, COUNT(*) AS n
+    FROM tool_events
+    WHERE event_type = 'asset_generation'
+    GROUP BY tool_name
+    ORDER BY n DESC
+""").df()
+
+if len(art) > 0:
+    fig = plotly_bar(
+        x=art["tool_name"].tolist(),
+        y=art["n"].tolist(),
+        title="Artifacts gerados por tipo",
+        color=ACCENT,
+    )
+    fig.show()
+
+show(art)
+```
+
+# 4. Preservation
+
+```{python}
+#| label: preservation-status
+
+pres = con.execute("""
+    SELECT
+        SUM(CASE WHEN is_preserved_missing THEN 1 ELSE 0 END) AS preserved_threads,
+        COUNT(*) AS total_convs,
+        SUM(CASE WHEN last_seen_in_server IS NOT NULL THEN 1 ELSE 0 END) AS with_last_seen
+    FROM conversations
+""").df().iloc[0]
+
+print(f"Conversations preservadas (deletadas do servidor): {pres['preserved_threads']}")
+print(f"Conversations com last_seen_in_server: {pres['with_last_seen']:,}/{pres['total_convs']:,}")
+```
+
+## Orphans em spaces
+
+Threads que aparecem em `list_collection_threads` (dentro de space) mas nao em
+`list_ask_threads` (listing global) — foram deletadas globalmente mas o
+space preserva metadata como reference. Comportamento empirico do servidor
+Perplexity (validado 2026-05-01).
+
+A flag `_orphan` esta no `threads_index.json` de cada space dentro do merged.
+
+```{python}
+#| label: orphan-count
+
+import json
+spaces_dir = _project_root / "data" / "merged" / "Perplexity" / "spaces"
+total_orphans = 0
+if spaces_dir.exists():
+    for sd in spaces_dir.iterdir():
+        if not sd.is_dir():
+            continue
+        ti = sd / "threads_index.json"
+        if not ti.exists():
+            continue
+        try:
+            arr = json.loads(ti.read_text(encoding="utf-8"))
+            total_orphans += sum(1 for t in arr if isinstance(t, dict) and t.get("_orphan"))
+        except Exception:
+            continue
+
+print(f"Threads orphan em spaces (delete global, ref preservada): {total_orphans}")
+```
+
+---
+
+# Sobre
+
+Schema canonico v3 alinhado com ChatGPT. Cobertura empirica validada em
+2026-05-01 com:
+
+- 4 spaces (Bookmarks default + GAS + Heatmaps + Brainstorm Buddy)
+- 1 file uploadado em space
+- 9 artifacts (4 CODE_FILE + 4 CHART + 1 GENERATED_IMAGE) gerados em 2 threads (analise VoC + analise Smiles)
+- 6 thread attachments (todos `failed_upstream_deleted` no S3 da Perplexity)
+- 1 thread orphan em GAS (caso `d344c501`, Sept/2024)
+
+Pipeline: `extractor` (data/raw/Perplexity/) -> `reconciler` (data/merged/Perplexity/) -> `parser v3` (data/processed/Perplexity/{4 parquets}).
+
+Comando: `PYTHONPATH=. .venv/bin/python scripts/perplexity-sync.py && scripts/perplexity-parse.py`
