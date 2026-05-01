@@ -13,10 +13,12 @@ from src.extractors.perplexity.api_client import PerplexityAPIClient
 
 
 async def discover_spaces(client: PerplexityAPIClient, output_dir: Path) -> list[dict]:
-    """Lista todas as collections do user, salva _index.json enxuto."""
+    """Lista todas as collections do user + pins, salva _index.json enxuto."""
     print("Descobrindo spaces...")
     collections = await client.list_user_collections()
-    print(f"  {len(collections)} spaces")
+    pinned = await client.list_user_pinned_spaces()
+    pinned_uuids = {c.get("uuid") for c in pinned if c.get("uuid")}
+    print(f"  {len(collections)} spaces ({len(pinned_uuids)} pinados)")
 
     spaces_dir = output_dir / "spaces"
     spaces_dir.mkdir(parents=True, exist_ok=True)
@@ -32,11 +34,15 @@ async def discover_spaces(client: PerplexityAPIClient, output_dir: Path) -> list
             "page_count": c.get("page_count"),
             "file_count": c.get("file_count"),
             "updated_datetime": c.get("updated_datetime"),
+            "is_pinned": c.get("uuid") in pinned_uuids,
         }
         for c in collections if c.get("uuid")
     ]
     with open(spaces_dir / "_index.json", "w", encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
+    # Preserva resposta crua de user-pins tambem (caso schema tenha info extra)
+    with open(spaces_dir / "_pinned_raw.json", "w", encoding="utf-8") as f:
+        json.dump(pinned, f, ensure_ascii=False, indent=2)
     return collections
 
 

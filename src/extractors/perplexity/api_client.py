@@ -74,6 +74,12 @@ class PerplexityAPIClient:
         data = await self._fetch(path)
         return data if isinstance(data, list) else []
 
+    async def list_user_pinned_spaces(self) -> list[dict]:
+        """Spaces pinados pelo user (sidebar). Retorna o mesmo schema de collection."""
+        path = f"{API_BASE}/rest/spaces/user-pins?version=2.18&source=default"
+        data = await self._fetch(path)
+        return data if isinstance(data, list) else []
+
     async def get_collection(self, slug: str) -> dict:
         """Metadata completa de 1 collection. API usa slug, nao uuid."""
         path = f"{API_BASE}/rest/collections/get_collection?collection_slug={slug}&version=2.18&source=default"
