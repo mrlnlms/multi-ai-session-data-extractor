@@ -94,8 +94,9 @@ async def run_export(
         ok, skipped, errs = await fetch_threads(client, to_fetch, output_dir)
 
         # Spaces (collections) — descobertos via auditoria empirica 2026-04-29
+        # Pages dentro de spaces — DOM-click scrape adicionado em 2026-05-01
         collections = await discover_spaces(client, output_dir)
-        spaces_ok, _, spaces_errs = await fetch_spaces(client, collections, output_dir)
+        spaces_ok, _, spaces_errs = await fetch_spaces(client, collections, output_dir, page=page)
 
         log = {
             "started_at": started_at.isoformat(),

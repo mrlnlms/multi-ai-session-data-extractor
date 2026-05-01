@@ -122,6 +122,15 @@ class PerplexityAPIClient:
             offset += page_size
         return all_threads
 
+    async def fetch_article(self, slug: str) -> dict:
+        """Fetcha 1 Perplexity Page (UI Page = API article). Endpoint descoberto
+        via probe 2026-05-01 (XHR disparado em /page/{slug})."""
+        path = f"{API_BASE}/rest/article/{slug}"
+        data = await self._fetch(path)
+        if not isinstance(data, dict):
+            raise RuntimeError(f"fetch_article retornou nao-dict: {type(data).__name__}")
+        return data
+
     async def list_collection_files(self, uuid: str, limit: int = 50) -> list[dict]:
         """Files anexados a uma collection. Body precisa de file_repository_info."""
         path = f"{API_BASE}/rest/file-repository/list-files?version=2.18&source=default"

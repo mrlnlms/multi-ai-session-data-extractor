@@ -9,7 +9,10 @@ thread bodies. Mas o mapping thread->space e preservado em threads_index.json.
 import json
 from pathlib import Path
 
+from playwright.async_api import Page as PlaywrightPage
+
 from src.extractors.perplexity.api_client import PerplexityAPIClient
+from src.extractors.perplexity.pages import discover_pages_in_space, fetch_pages_in_space
 
 
 async def discover_spaces(client: PerplexityAPIClient, output_dir: Path) -> list[dict]:
@@ -50,8 +53,11 @@ async def fetch_spaces(
     client: PerplexityAPIClient,
     collections: list[dict],
     output_dir: Path,
+    page: PlaywrightPage | None = None,
 ) -> tuple[int, int, list[tuple[str, str]]]:
-    """Pra cada space: salva metadata + threads_index + files. Retorna (ok, skip, errors)."""
+    """Pra cada space: salva metadata + threads_index + files + pages.
+    Pages exigem playwright Page pra DOM-click scrape. Se page=None, pula pages.
+    Retorna (ok, skip, errors)."""
     spaces_dir = output_dir / "spaces"
     spaces_dir.mkdir(parents=True, exist_ok=True)
 
@@ -93,8 +99,17 @@ async def fetch_spaces(
             with open(space_dir / "files.json", "w", encoding="utf-8") as f:
                 json.dump(files, f, ensure_ascii=False, indent=2)
 
+            pages_count = 0
+            if page is not None:
+                pages_meta = await discover_pages_in_space(page, slug, uuid)
+                if pages_meta:
+                    pages_ok, pages_errs = await fetch_pages_in_space(client, uuid, pages_meta, output_dir)
+                    pages_count = len(pages_meta)
+                    if pages_errs:
+                        errors.extend([(f"{uuid}/page/{s}", e) for s, e in pages_errs])
+
             ok += 1
-            print(f"  [{i}/{len(collections)}] {title!r}: {len(threads_summary)} threads, {len(files)} files")
+            print(f"  [{i}/{len(collections)}] {title!r}: {len(threads_summary)} threads, {len(files)} files, {pages_count} pages")
         except Exception as e:
             errors.append((uuid, str(e)[:200]))
             print(f"  [{i}/{len(collections)}] {title!r}: ERRO {str(e)[:120]}")
