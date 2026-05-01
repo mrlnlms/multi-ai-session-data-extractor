@@ -1,7 +1,7 @@
-"""Download binarios (imagens) dos files referenciados no raw mais recente.
+"""Download binarios (imagens) dos files referenciados no raw atual.
 
 Uso: python scripts/claude-download-assets.py [raw_dir]
-Se nao passar raw_dir, pega o mais recente em data/raw/Claude Data */.
+Se nao passar raw_dir, usa data/raw/Claude.ai/ (pasta unica cumulativa).
 
 Flags:
   --thumbnail    tambem baixa variant thumbnail (400px)
@@ -16,15 +16,22 @@ from pathlib import Path
 from src.extractors.claude_ai.auth import load_context
 from src.extractors.claude_ai.api_client import ClaudeAPIClient
 from src.extractors.claude_ai.asset_downloader import download_assets, extract_artifacts
+from src.extractors.claude_ai.orchestrator import BASE_DIR
 
 
-def _find_latest_raw() -> Path | None:
+def _default_raw() -> Path | None:
+    """Pasta unica cumulativa (data/raw/Claude.ai/). Backward compat com layout antigo."""
+    if BASE_DIR.exists() and (BASE_DIR / "conversations").exists():
+        return BASE_DIR
+    # Backward compat: layout antigo timestampado
     base = Path("data/raw")
-    candidates = sorted(
+    if not base.exists():
+        return None
+    legacy = sorted(
         [p for p in base.iterdir() if p.is_dir() and p.name.startswith("Claude Data ")],
         key=lambda p: p.stat().st_mtime,
     )
-    return candidates[-1] if candidates else None
+    return legacy[-1] if legacy else None
 
 
 async def main(raw_dir: Path, include_thumbnail: bool, profile: str, skip_binaries: bool):
@@ -75,9 +82,9 @@ if __name__ == "__main__":
     if args.raw_dir:
         raw = Path(args.raw_dir)
     else:
-        raw = _find_latest_raw()
+        raw = _default_raw()
         if not raw:
-            print("ERRO: nao foi possivel achar raw em data/raw/Claude Data */")
+            print("ERRO: nao foi possivel achar raw — rode scripts/claude-export.py primeiro")
             sys.exit(1)
         print(f"Usando raw: {raw}")
 
