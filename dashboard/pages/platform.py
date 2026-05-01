@@ -18,6 +18,7 @@ from dashboard import quarto
 from dashboard.data import PlatformState, directory_size_bytes, load_platform_state
 from dashboard.metrics import (
     compute_merged_stats,
+    compute_processed_stats,
     compute_project_sources_stats,
     discovery_drop_flag,
 )
@@ -27,6 +28,11 @@ from dashboard.sync import has_sync_script, run_sync, sync_command
 @st.cache_data(show_spinner=False)
 def _cached_merged_stats(merged_path_str: str, mtime: float):
     return compute_merged_stats(Path(merged_path_str))
+
+
+@st.cache_data(show_spinner=False)
+def _cached_processed_stats(parquet_path_str: str, mtime: float):
+    return compute_processed_stats(Path(parquet_path_str))
 
 
 @st.cache_data(show_spinner=False)
@@ -253,11 +259,14 @@ def _render_quarto_section(state: PlatformState) -> None:
 
 def _render_metrics(state: PlatformState) -> None:
     st.subheader("Conteudo capturado")
-    if state.merged_json_path is None:
-        st.caption("Nenhum merged.json encontrado para esta plataforma.")
+    parquet = state.conversations_parquet_path
+    if parquet is not None:
+        merged = _cached_processed_stats(str(parquet), parquet.stat().st_mtime)
+    elif state.merged_json_path is not None:
+        merged = _cached_merged_stats(str(state.merged_json_path), state.merged_json_path.stat().st_mtime)
+    else:
+        st.caption("Nenhum parquet ou merged.json encontrado para esta plataforma.")
         return
-
-    merged = _cached_merged_stats(str(state.merged_json_path), state.merged_json_path.stat().st_mtime)
 
     cols = st.columns(4)
     cols[0].metric("Total convs", f"{merged.total_convs:,}")

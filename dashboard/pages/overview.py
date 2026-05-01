@@ -24,8 +24,19 @@ def _cached_merged_stats(merged_path_str: str, mtime: float):
     return compute_merged_stats(Path(merged_path_str))
 
 
+@st.cache_data(show_spinner=False)
+def _cached_processed_stats(parquet_path_str: str, mtime: float):
+    from dashboard.metrics import compute_processed_stats
+    return compute_processed_stats(Path(parquet_path_str))
+
+
 def _quick_stats(state: PlatformState) -> tuple[int, int, int, "datetime | None"]:
-    """Retorna (total, active, preserved, newest_update_time) — None/0 se sem merged."""
+    """Retorna (total, active, preserved, newest_update_time) — None/0 se sem dados.
+    Prefere parquet canonico; fallback pro merged JSON (legacy ChatGPT)."""
+    parquet = state.conversations_parquet_path
+    if parquet is not None:
+        stats = _cached_processed_stats(str(parquet), parquet.stat().st_mtime)
+        return (stats.total_convs, stats.active, stats.preserved_missing, stats.newest_update_time)
     merged = state.merged_json_path
     if merged is None:
         return (0, 0, 0, None)

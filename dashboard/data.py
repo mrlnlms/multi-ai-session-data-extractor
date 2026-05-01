@@ -15,6 +15,7 @@ from typing import Optional
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_RAW = PROJECT_ROOT / "data" / "raw"
 DATA_MERGED = PROJECT_ROOT / "data" / "merged"
+DATA_PROCESSED = PROJECT_ROOT / "data" / "processed"
 
 KNOWN_PLATFORMS: list[str] = [
     "ChatGPT",
@@ -63,6 +64,7 @@ class PlatformState:
     name: str
     raw_dir: Optional[Path]
     merged_dir: Optional[Path]
+    processed_dir: Optional[Path] = None
     capture_runs: list[CaptureRun] = field(default_factory=list)
     reconcile_runs: list[ReconcileRun] = field(default_factory=list)
 
@@ -85,6 +87,15 @@ class PlatformState:
         for cand in sorted(self.merged_dir.glob("*_merged.json")):
             return cand
         return None
+
+    @property
+    def conversations_parquet_path(self) -> Optional[Path]:
+        """Parquet canonico (cross-platform). Preferir sobre merged_json_path
+        quando disponivel — schema uniforme entre plataformas."""
+        if self.processed_dir is None:
+            return None
+        cand = self.processed_dir / "conversations.parquet"
+        return cand if cand.exists() else None
 
     def status(self, now: Optional[datetime] = None) -> str:
         """green | yellow | red | gray"""
@@ -170,8 +181,10 @@ def _load_reconcile_log(path: Path) -> list[ReconcileRun]:
 def load_platform_state(name: str) -> PlatformState:
     raw_dir = DATA_RAW / name
     merged_dir = DATA_MERGED / name
+    processed_dir = DATA_PROCESSED / name
     raw_dir = raw_dir if raw_dir.exists() else None
     merged_dir = merged_dir if merged_dir.exists() else None
+    processed_dir = processed_dir if processed_dir.exists() else None
 
     capture_runs = _load_capture_log(raw_dir / "capture_log.jsonl") if raw_dir else []
     reconcile_runs = _load_reconcile_log(merged_dir / "reconcile_log.jsonl") if merged_dir else []
@@ -180,6 +193,7 @@ def load_platform_state(name: str) -> PlatformState:
         name=name,
         raw_dir=raw_dir,
         merged_dir=merged_dir,
+        processed_dir=processed_dir,
         capture_runs=capture_runs,
         reconcile_runs=reconcile_runs,
     )

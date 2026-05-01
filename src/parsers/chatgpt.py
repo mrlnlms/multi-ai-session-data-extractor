@@ -357,6 +357,8 @@ class ChatGPTParser(BaseParser):
             gizmo_resolved=gizmo_resolved,
             is_preserved_missing=is_preserved_missing,
             last_seen_in_server=last_seen_ts if not pd.isna(last_seen_ts) else None,
+            is_archived=bool(conv_data.get("is_archived")) if conv_data.get("is_archived") is not None else None,
+            is_temporary=bool(conv_data.get("is_temporary_chat")) if conv_data.get("is_temporary_chat") is not None else None,
         ))
         self.messages.extend(messages)
         self.events.extend(tool_events)

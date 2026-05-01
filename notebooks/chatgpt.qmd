@@ -869,7 +869,71 @@ custom_gpts = con.execute("""
 show_df(custom_gpts)
 ```
 
-## 4.3 Tabela completa filtravel
+## 4.3 Estados especiais (archived / temporary / pinned)
+
+Campos canonicos `is_archived`, `is_temporary`, `is_pinned` capturam
+estados especiais da conv no ChatGPT. **Pin nao existe na UI do ChatGPT
+hoje** (verificado empiricamente em todo o schema raw — 0 campos pin/star/
+favorite/bookmark a nivel de conv). Archive e Temporary chats existem.
+
+```{python}
+#| label: special-states
+#| code-summary: "Counts de archived / temporary / pinned"
+
+import pandas as pd
+states = con.execute("""
+    SELECT
+        COUNT(*) FILTER (WHERE is_archived) AS archived,
+        COUNT(*) FILTER (WHERE is_temporary) AS temporary,
+        COUNT(*) FILTER (WHERE is_pinned) AS pinned,
+        COUNT(*) AS total
+    FROM conversations
+""").df()
+show_df(states)
+```
+
+Threads arquivadas (se houver):
+
+```{python}
+#| label: archived-detail
+#| code-summary: "Threads com is_archived=true"
+
+archived = con.execute("""
+    SELECT
+        substr(conversation_id, 1, 12) AS conv_id,
+        substr(title, 1, 70) AS title,
+        message_count AS msgs,
+        substr(project_id, 1, 8) AS project,
+        date_trunc('day', updated_at) AS last_update
+    FROM conversations
+    WHERE is_archived = true
+    ORDER BY updated_at DESC
+""").df()
+print(f"Total arquivadas: {len(archived)}")
+show_df(archived) if len(archived) else None
+```
+
+Threads temporarias (se houver — efemeras, nao persistem):
+
+```{python}
+#| label: temp-detail
+#| code-summary: "Threads com is_temporary=true"
+
+temp = con.execute("""
+    SELECT
+        substr(conversation_id, 1, 12) AS conv_id,
+        substr(title, 1, 70) AS title,
+        message_count AS msgs,
+        date_trunc('day', updated_at) AS last_update
+    FROM conversations
+    WHERE is_temporary = true
+    ORDER BY updated_at DESC
+""").df()
+print(f"Total temporarias: {len(temp)}")
+show_df(temp) if len(temp) else None
+```
+
+## 4.4 Tabela completa filtravel
 
 Todas as 1.171 conversas. Use a barra de busca pra filtrar por titulo,
 project, ou qualquer campo. Click nos cabecalhos pra ordenar.

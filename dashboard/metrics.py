@@ -100,6 +100,60 @@ def _extract_models(mapping: dict, sink: Counter) -> None:
             sink[model] += 1
 
 
+def compute_processed_stats(parquet_path: Path) -> MergedStats:
+    """Le stats do conversations.parquet (canonico cross-platform).
+    Preferir sobre compute_merged_stats: schema uniforme entre plataformas."""
+    import duckdb
+    con = duckdb.connect()
+    p = str(parquet_path)
+    stats = MergedStats()
+    row = con.execute(f"""
+        SELECT
+            COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE NOT is_preserved_missing) AS active,
+            COUNT(*) FILTER (WHERE is_preserved_missing) AS preserved,
+            COUNT(*) FILTER (WHERE is_archived) AS archived,
+            COUNT(*) FILTER (WHERE project_id IS NOT NULL) AS in_proj,
+            COUNT(*) FILTER (WHERE project_id IS NULL) AS standalone,
+            COUNT(DISTINCT project_id) FILTER (WHERE project_id IS NOT NULL) AS distinct_proj,
+            SUM(message_count) AS total_msgs,
+            MIN(created_at) AS oldest,
+            MAX(updated_at) AS newest
+        FROM '{p}'
+    """).fetchone()
+    stats.total_convs = row[0] or 0
+    stats.active = row[1] or 0
+    stats.preserved_missing = row[2] or 0
+    stats.archived = row[3] or 0
+    stats.in_projects = row[4] or 0
+    stats.standalone = row[5] or 0
+    stats.distinct_projects = row[6] or 0
+    stats.total_messages_estimated = int(row[7] or 0)
+    if row[8]:
+        ot = row[8] if isinstance(row[8], datetime) else datetime.fromisoformat(str(row[8]))
+        stats.oldest_create_time = ot if ot.tzinfo else ot.replace(tzinfo=timezone.utc)
+    if row[9]:
+        nt = row[9] if isinstance(row[9], datetime) else datetime.fromisoformat(str(row[9]))
+        stats.newest_update_time = nt if nt.tzinfo else nt.replace(tzinfo=timezone.utc)
+
+    # Models top
+    for model, n in con.execute(f"SELECT model, COUNT(*) FROM '{p}' WHERE model IS NOT NULL GROUP BY model").fetchall():
+        stats.models[model] = n
+    # Per-project
+    for pid, n in con.execute(f"SELECT project_id, COUNT(*) FROM '{p}' WHERE project_id IS NOT NULL GROUP BY project_id").fetchall():
+        stats.convs_per_project[pid] = n
+    for pid, pname in con.execute(f"SELECT project_id, ANY_VALUE(project) FROM '{p}' WHERE project_id IS NOT NULL AND project IS NOT NULL GROUP BY project_id").fetchall():
+        if pname:
+            stats.project_names[pid] = pname
+    # Preserved titles
+    for cid, title in con.execute(f"SELECT conversation_id, title FROM '{p}' WHERE is_preserved_missing").fetchall():
+        stats.preserved_titles.append((cid, title or "(sem titulo)"))
+    # Creation by month
+    for month, n in con.execute(f"SELECT strftime(created_at, '%Y-%m'), COUNT(*) FROM '{p}' WHERE created_at IS NOT NULL GROUP BY 1 ORDER BY 1").fetchall():
+        stats.creation_by_month[month] = n
+    return stats
+
+
 def compute_merged_stats(merged_json_path: Path) -> MergedStats:
     """Le e agrega stats do merged.json. Custo proporcional ao arquivo."""
     with merged_json_path.open() as f:
@@ -206,9 +260,14 @@ def compute_platform_metrics(state: PlatformState) -> PlatformMetrics:
         metrics.project_sources = compute_project_sources_stats(state.raw_dir)
     if state.merged_dir is not None:
         metrics.merged_size_bytes = directory_size_bytes(state.merged_dir)
-    merged_path = state.merged_json_path
-    if merged_path is not None:
-        metrics.merged = compute_merged_stats(merged_path)
+    # Preferir parquet canonico; fallback pro merged JSON (schema ChatGPT-only)
+    parquet_path = state.conversations_parquet_path
+    if parquet_path is not None:
+        metrics.merged = compute_processed_stats(parquet_path)
+    else:
+        merged_path = state.merged_json_path
+        if merged_path is not None:
+            metrics.merged = compute_merged_stats(merged_path)
     return metrics
 
 
