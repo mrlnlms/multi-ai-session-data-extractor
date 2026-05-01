@@ -13,6 +13,7 @@ from src.extractors.perplexity.discovery import discover
 from src.extractors.perplexity.fetcher import fetch_threads
 from src.extractors.perplexity.spaces import discover_spaces, fetch_spaces
 from src.extractors.perplexity.artifact_downloader import download_artifacts
+from src.extractors.perplexity.asset_downloader import download_assets as download_thread_attachments
 
 
 BASE_DIR = Path("data/raw/Perplexity Data")
@@ -68,6 +69,26 @@ async def run_export(
         client = PerplexityAPIClient(context, page)
         await client.warmup()
 
+        # User metadata (info, settings, ai_profile) — preservation completa
+        print("Capturando user metadata...")
+        user_dir = output_dir / "user"
+        user_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            (user_dir / "info.json").write_text(
+                json.dumps(await client.get_user_info(), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            (user_dir / "settings.json").write_text(
+                json.dumps(await client.get_user_settings(), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            (user_dir / "ai_profile.json").write_text(
+                json.dumps(await client.get_user_ai_profile(), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception as e:
+            print(f"  warn user metadata: {str(e)[:100]}")
+
         threads = await discover(client, output_dir)
 
         to_fetch = []
@@ -120,6 +141,16 @@ async def run_export(
         else:
             dl_stats = {"downloaded": 0, "skipped_existing": 0, "failed": 0, "total": 0}
 
+        # Thread attachments (uploads do user) — usa /rest/file-repository/download-attachment
+        # pra refresh URL (S3 presigned expiram). Saida em thread_attachments/.
+        print("Baixando thread attachments + featured images...")
+        try:
+            att_stats = await download_thread_attachments(context, output_dir)
+            print(f"  downloaded={att_stats['downloaded']} skipped={att_stats['skipped']} errors={len(att_stats['errors'])}")
+        except Exception as e:
+            print(f"  ERRO: {str(e)[:200]}")
+            att_stats = {"downloaded": 0, "skipped": 0, "errors": [(None, str(e))]}
+
         log = {
             "started_at": started_at.isoformat(),
             "finished_at": datetime.now(timezone.utc).isoformat(),
@@ -140,6 +171,9 @@ async def run_export(
                 "assets_downloaded": dl_stats["downloaded"],
                 "assets_download_skipped": dl_stats["skipped_existing"],
                 "assets_download_failed": dl_stats["failed"],
+                "thread_attachments_downloaded": att_stats.get("downloaded", 0),
+                "thread_attachments_skipped": att_stats.get("skipped", 0),
+                "thread_attachments_errors": len(att_stats.get("errors", [])),
             },
             "errors": {"threads": errs[:50], "spaces": spaces_errs[:20]},
         }

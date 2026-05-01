@@ -65,7 +65,7 @@ def _collect_urls(raw_dir: Path) -> dict[str, dict]:
                             "source_type": "user_upload",
                         })
 
-    # 2) threads-index.featured_images
+    # 2) threads-index.featured_images (top-level)
     idx = raw_dir / "threads-index.json"
     if idx.exists():
         try:
@@ -81,6 +81,24 @@ def _collect_urls(raw_dir: Path) -> dict[str, dict]:
                         "thread_uuid": tuuid,
                         "source_type": "featured_image",
                     })
+
+    # 3) entries.featured_images (por entry — alguns threads tem aqui)
+    if threads_dir.exists():
+        for jp in threads_dir.glob("*.json"):
+            try:
+                with open(jp, encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                continue
+            tuuid = jp.stem
+            for entry in data.get("entries", []) or []:
+                for fi in entry.get("featured_images") or []:
+                    u = fi if isinstance(fi, str) else (fi.get("url") if isinstance(fi, dict) else None)
+                    if u and u.startswith("http") and _is_own_asset(u):
+                        urls.setdefault(u, {
+                            "thread_uuid": tuuid,
+                            "source_type": "featured_image_entry",
+                        })
     return urls
 
 
@@ -98,19 +116,21 @@ def _target_path(assets_dir: Path, url: str, info: dict, content_type: str) -> P
     return folder / f"{prefix}_{h}{ext}"
 
 
-async def _refresh_url_via_api(page, stale_url: str) -> str | None:
+async def _refresh_url_via_api(page, stale_url: str, thread_id: str | None = None) -> str | None:
     """Chama /rest/file-repository/download-attachment pra pegar URL fresh.
 
-    A UI usa esse endpoint: envia a URL antiga (mesmo expirada), backend
-    retorna uma nova presigned URL.
-
-    Se o endpoint retornar 404, tenta /download (variante diferente usada
-    pra paste.txt). Ambos falhando significa file deletado upstream.
+    Schema atualizado em 2026-05-01: endpoint agora exige campo `thread_id`
+    no body alem da URL. Sem thread_id retorna 422 missing field.
     """
-    for ep, field_in, field_out in [
-        ("/rest/file-repository/download-attachment", "url", "file_url"),
-        ("/rest/file-repository/download", "file_url", "file_url"),
-    ]:
+    payloads = []
+    if thread_id:
+        payloads.append(("/rest/file-repository/download-attachment", {"url": stale_url, "thread_id": thread_id}, "file_url"))
+        payloads.append(("/rest/file-repository/download", {"file_url": stale_url, "thread_id": thread_id}, "file_url"))
+    # Fallback sem thread_id
+    payloads.append(("/rest/file-repository/download-attachment", {"url": stale_url}, "file_url"))
+    payloads.append(("/rest/file-repository/download", {"file_url": stale_url}, "file_url"))
+
+    for ep, payload, field_out in payloads:
         result = await page.evaluate("""async ({ep, payload}) => {
             const res = await fetch(ep + '?version=2.18&source=default', {
                 method: 'POST',
@@ -119,7 +139,7 @@ async def _refresh_url_via_api(page, stale_url: str) -> str | None:
             });
             const txt = await res.text();
             return {status: res.status, body: txt};
-        }""", {"ep": ep, "payload": {field_in: stale_url}})
+        }""", {"ep": ep, "payload": payload})
         if result["status"] == 200:
             try:
                 parsed = json.loads(result["body"])
@@ -148,10 +168,12 @@ async def download_assets(
     urls_info = _collect_urls(raw_dir)
     print(f"Encontradas {len(urls_info)} URLs unicas (filtradas a dominios Perplexity)")
 
-    assets_dir = raw_dir / "assets"
+    # Pasta separada pra nao conflitar com artifacts (assets/ usado por
+    # artifact_downloader.py). Aqui sao uploads do user EM threads.
+    assets_dir = raw_dir / "thread_attachments"
     assets_dir.mkdir(parents=True, exist_ok=True)
 
-    manifest_path = raw_dir / "assets_manifest.json"
+    manifest_path = raw_dir / "thread_attachments_manifest.json"
     manifest: dict = {}
     if manifest_path.exists():
         try:
@@ -164,42 +186,74 @@ async def download_assets(
     done = 0
     total = len(urls_info)
 
+    async def _try_download(url: str) -> tuple[bytes | None, str, str]:
+        """Tenta baixar 1 URL. Retorna (bytes, content_type, error_str)."""
+        try:
+            resp = await context.request.get(url, timeout=60000)
+            if not resp.ok:
+                body = ""
+                try: body = (await resp.text())[:120]
+                except Exception: pass
+                return None, "", f"HTTP {resp.status}: {body}"
+            blob = await resp.body()
+            ct = resp.headers.get("content-type", "application/octet-stream")
+            return blob, ct, ""
+        except Exception as e:
+            return None, "", str(e)[:200]
+
     async def _one(stale_url: str, info: dict):
         nonlocal done
         h = hashlib.sha1(stale_url.encode()).hexdigest()[:16]
         async with sem:
             if skip_existing and h in manifest:
-                existing = assets_dir / manifest[h].get("relpath", "")
-                if existing.exists():
+                # Skip se ja baixado E arquivo existe
+                relpath = manifest[h].get("relpath")
+                if relpath and (assets_dir / relpath).exists():
                     stats["skipped"] += 1
                     done += 1
                     return
-            # 1) Refresh URL via /rest/file-repository/*
-            fresh = await _refresh_url_via_api(page, stale_url)
-            if not fresh:
-                stats["errors"].append((stale_url[:100], "refresh api returned no fresh URL (file likely deleted upstream)"))
-                done += 1
-                return
-            # 2) Download direto do S3 com URL fresh
-            try:
-                resp = await context.request.get(fresh, timeout=60000)
-                if not resp.ok:
-                    body_snip = ""
-                    try:
-                        body_snip = (await resp.text())[:120]
-                    except Exception:
-                        pass
-                    stats["errors"].append((stale_url[:100], f"HTTP {resp.status}: {body_snip}"))
+                # Skip se ja tentou e falhou por upstream deletion (idempotencia)
+                if manifest[h].get("status") == "failed_upstream_deleted":
+                    stats["skipped"] += 1
                     done += 1
                     return
-                blob = await resp.body()
-                ct = resp.headers.get("content-type", "application/octet-stream")
+
+            # 1) Tenta URL original direto (pode estar valida ainda)
+            blob, ct, err = await _try_download(stale_url)
+            url_used = stale_url
+            url_fresh: str | None = None
+
+            # 2) Falhou? Tenta refresh via /rest/file-repository/* (URL S3 expirou)
+            if blob is None:
+                url_fresh = await _refresh_url_via_api(page, stale_url, thread_id=info.get("thread_uuid"))
+                if url_fresh:
+                    blob, ct, err = await _try_download(url_fresh)
+                    url_used = url_fresh
+                else:
+                    err = f"original failed ({err}), refresh returned no fresh URL"
+
+            if blob is None:
+                # Preserva entry no manifest mesmo com erro — distingue "ja tentei e falhou"
+                # vs "nunca tentei". Permite skip futuro em re-runs idempotentes.
+                manifest[h] = {
+                    "url_stale": stale_url,
+                    "url_fresh": url_fresh,
+                    "thread_uuid": info["thread_uuid"],
+                    "source_type": info["source_type"],
+                    "status": "failed_upstream_deleted" if "404" in err or "NoSuchKey" in err else "failed",
+                    "error": err[:200],
+                }
+                stats["errors"].append((stale_url[:100], err))
+                done += 1
+                return
+
+            try:
                 target = _target_path(assets_dir, stale_url, info, ct)
                 target.write_bytes(blob)
                 relpath = target.relative_to(assets_dir).as_posix()
                 manifest[h] = {
                     "url_stale": stale_url,
-                    "url_fresh": fresh,
+                    "url_fresh": url_fresh,
                     "thread_uuid": info["thread_uuid"],
                     "source_type": info["source_type"],
                     "content_type": ct,
@@ -208,7 +262,7 @@ async def download_assets(
                 }
                 stats["downloaded"] += 1
             except Exception as e:
-                stats["errors"].append((stale_url[:100], str(e)[:200]))
+                stats["errors"].append((stale_url[:100], f"write failed: {str(e)[:200]}"))
             done += 1
             if done % 20 == 0:
                 print(f"  [{done}/{total}] dl={stats['downloaded']} "

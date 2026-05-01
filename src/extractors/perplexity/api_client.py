@@ -102,6 +102,24 @@ class PerplexityAPIClient:
                 break
         return all_assets
 
+    async def get_user_info(self) -> dict:
+        """Status do user (is_enterprise, is_student, etc)."""
+        path = f"{API_BASE}/rest/user/info?version=2.18&source=default"
+        data = await self._fetch(path)
+        return data if isinstance(data, dict) else {}
+
+    async def get_user_settings(self) -> dict:
+        """Limites do user (pages_limit, upload_limit, connector_limits)."""
+        path = f"{API_BASE}/rest/user/settings?version=2.18&source=default"
+        data = await self._fetch(path)
+        return data if isinstance(data, dict) else {}
+
+    async def get_user_ai_profile(self) -> dict:
+        """AI profile (bio, location, language preferences). Pode estar disabled."""
+        path = f"{API_BASE}/rest/user/get_user_ai_profile?version=2.18&source=default"
+        data = await self._fetch(path)
+        return data if isinstance(data, dict) else {}
+
     async def list_user_pinned_assets(self, limit: int = 50) -> list[dict]:
         """Assets pinados pelo user. Mesmo schema que list_user_assets."""
         path = f"{API_BASE}/rest/assets/pins?limit={limit}&version=2.18&source=default"
