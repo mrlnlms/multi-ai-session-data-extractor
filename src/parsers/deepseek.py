@@ -124,13 +124,16 @@ class DeepSeekParser(BaseParser):
             conv_id, chat_messages, current_msg_id
         )
 
-        # Mode: agent (chat|agent) + model_type
+        # Mode: agent (chat|agent) + model_type (default|expert|thinking|reasoner)
+        # `expert` = R1 reasoner mode (validado empirico 2026-05-01).
         agent = sess.get("agent") or "chat"
         model_type = sess.get("model_type") or "default"
-        if model_type == "thinking" or "reason" in (model_type or "").lower():
+        if model_type in ("thinking", "expert", "reasoner"):
+            mode = "research"
+        elif "reason" in (model_type or "").lower():
             mode = "research"
         elif agent == "agent":
-            mode = "research"  # agent mode → research-like
+            mode = "research"
         else:
             mode = "chat"
 
@@ -276,6 +279,25 @@ class DeepSeekParser(BaseParser):
             else None
         )
 
+        # Metadata adicional do msg DeepSeek: feedback (thumbs), tips (sugestoes
+        # da plataforma), ban_edit/regenerate (UI flags), thinking_elapsed_secs.
+        # Coloca em attachments_json (campo livre) pra rastreabilidade sem
+        # poluir Conversation.settings_json.
+        msg_metadata = {}
+        if msg.get("feedback"):
+            msg_metadata["feedback"] = msg["feedback"]
+        if msg.get("tips"):
+            msg_metadata["tips"] = msg["tips"]
+        if msg.get("ban_edit"):
+            msg_metadata["ban_edit"] = True
+        if msg.get("ban_regenerate"):
+            msg_metadata["ban_regenerate"] = True
+        if msg.get("thinking_elapsed_secs"):
+            msg_metadata["thinking_elapsed_secs"] = msg["thinking_elapsed_secs"]
+        if msg.get("incomplete_message"):
+            msg_metadata["incomplete_message"] = msg["incomplete_message"]
+        attachments_json = json.dumps(msg_metadata, ensure_ascii=False) if msg_metadata else None
+
         model = msg.get("model") if role == "assistant" else None
         # Empty string como model? deixa None
         if model == "":
@@ -309,7 +331,7 @@ class DeepSeekParser(BaseParser):
             asset_paths=None,
             finish_reason=finish_reason,
             citations_json=citations_json,
-            attachments_json=None,  # DeepSeek nao tem extracted_content
+            attachments_json=attachments_json,  # feedback/tips/ban_*/thinking_elapsed
             start_timestamp=self._ts(start_ts) if start_ts else None,
             stop_timestamp=self._ts(stop_ts) if stop_ts else None,
         )

@@ -143,6 +143,44 @@ def test_thinking_model_type_to_research(tmp_path):
     assert p.conversations[0].mode == "research"
 
 
+def test_expert_model_type_to_research(tmp_path):
+    """`expert` = R1 reasoner mode, validado empirico 2026-05-01."""
+    merged = _write_merged(tmp_path, [_basic_session(model_type="expert")])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    assert p.conversations[0].mode == "research"
+
+
+def test_status_enum_handling(tmp_path):
+    """Schema empirico: FINISHED, INCOMPLETE, WIP."""
+    sess = _basic_session()
+    sess["chat_messages"][1]["status"] = "WIP"
+    merged = _write_merged(tmp_path, [sess])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    msg_asst = next(m for m in p.messages if m.role == "assistant")
+    assert msg_asst.finish_reason == "wip"
+
+
+def test_msg_metadata_in_attachments_json(tmp_path):
+    """feedback, tips, ban_edit, ban_regenerate, thinking_elapsed_secs vao
+    em attachments_json (campo livre) pra rastreabilidade per-msg."""
+    sess = _basic_session()
+    sess["chat_messages"][1]["feedback"] = {"rating": "thumbs_up"}
+    sess["chat_messages"][1]["tips"] = ["sugestao 1", "sugestao 2"]
+    sess["chat_messages"][1]["ban_edit"] = True
+    sess["chat_messages"][1]["thinking_elapsed_secs"] = 4.2
+    merged = _write_merged(tmp_path, [sess])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    msg_asst = next(m for m in p.messages if m.role == "assistant")
+    meta = json.loads(msg_asst.attachments_json)
+    assert meta["feedback"] == {"rating": "thumbs_up"}
+    assert meta["tips"] == ["sugestao 1", "sugestao 2"]
+    assert meta["ban_edit"] is True
+    assert meta["thinking_elapsed_secs"] == 4.2
+
+
 def test_r1_reasoning_to_thinking(tmp_path):
     sess = _basic_session()
     sess["chat_messages"][1]["thinking_content"] = "Hmm, let me reason..."
