@@ -207,10 +207,16 @@ captura. Lista crescente conforme aprendemos:
 - **Perplexity:** ✅ pin de **thread** (`list_pinned_ask_threads`, campo
   `is_pinned: true`). Schema canonico: `Conversation.is_pinned`. Validado
   2026-05-01.
-- **ChatGPT:** ✅ pin de **GPT (gizmo)** — feature em entidade diferente.
-  Endpoint `/backend-api/gizmos/pinned` (descoberto via probe Chrome MCP
-  2026-05-01). Capturado em `data/raw/ChatGPT/gizmos_pinned.json`.
-  ChatGPT **nao** tem pin de conversation (`/conversations/pinned` → 404).
+- **ChatGPT:** ✅ pin de **conversation** + pin de **GPT (gizmo)** — duas
+  features distintas, ambas existem.
+  - **Conv:** campos `is_starred` e `pinned_time` no schema raw (UI: "Pin"
+    no menu da conv). NAO existe endpoint dedicado tipo `/pinned` — vem
+    no payload normal de `/conversations` e `/conversation/{id}`. Parser
+    mapeia `is_starred` → `Conversation.is_pinned`. Validado 2026-05-01
+    via probe Chrome MCP (initial probe foi enganoso porque `chatgpt_raw.json`
+    antigo nao tinha nenhuma conv pinada).
+  - **Gizmo:** endpoint `/backend-api/gizmos/pinned` retorna lista. Capturado
+    em `data/raw/ChatGPT/gizmos_pinned.json` (sidecar separado).
 - **Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek:** ⏸ verificar quando
   extractor for atualizado pra schema v3.
 

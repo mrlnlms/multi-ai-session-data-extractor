@@ -293,6 +293,50 @@ def test_parse_idempotent_two_runs_produce_same_output(tmp_path):
     assert [e.to_dict() for e in p1.events] == [e.to_dict() for e in p2.events]
 
 
+def test_parse_is_pinned_propagates_from_is_starred(tmp_path):
+    """ChatGPT marca conv pinada via is_starred + pinned_time. Parser
+    canonico mapeia is_starred -> Conversation.is_pinned (uniformiza com
+    Perplexity). Validado empiricamente via probe Chrome MCP 2026-05-01."""
+    def _conv(cid, **extra):
+        c = {
+            "id": cid, "title": cid,
+            "create_time": "2025-01-01T00:00:00Z",
+            "update_time": "2025-01-01T00:01:00Z",
+            "current_node": "msg1",
+            "mapping": {
+                "root": {"id": "root", "children": ["msg1"], "parent": None},
+                "msg1": {
+                    "id": "msg1", "parent": "root", "children": [],
+                    "message": {
+                        "id": "msg1",
+                        "author": {"role": "user"},
+                        "content": {"content_type": "text", "parts": ["hi"]},
+                        "create_time": 1735689600,
+                        "status": "finished_successfully",
+                        "metadata": {},
+                    },
+                },
+            },
+        }
+        c.update(extra)
+        return c
+
+    merged = {"conversations": {
+        "conv-pinned": _conv("conv-pinned", is_starred=True, pinned_time=1700000050, is_archived=False, is_temporary_chat=False),
+        "conv-not-pinned": _conv("conv-not-pinned", is_starred=False),
+        "conv-archived": _conv("conv-archived", is_archived=True),
+    }}
+    out = tmp_path / "chatgpt_merged.json"
+    out.write_text(json.dumps(merged), encoding="utf-8")
+    parser = ChatGPTParser(raw_root=tmp_path)
+    parser.parse(out)
+    by_id = {c.conversation_id: c for c in parser.conversations}
+    assert by_id["conv-pinned"].is_pinned is True
+    assert by_id["conv-not-pinned"].is_pinned is False
+    assert by_id["conv-archived"].is_archived is True
+    assert by_id["conv-archived"].is_pinned is None  # is_starred ausente
+
+
 def test_save_writes_parquets_without_source_prefix(tmp_path):
     """Plan §5: paths sao data/processed/<Source>/conversations.parquet (sem prefix)."""
     merged = _make_merged("raw_with_voice.json", tmp_path)
