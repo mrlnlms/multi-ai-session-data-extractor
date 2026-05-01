@@ -88,6 +88,43 @@ def extract_search_results(msg: dict) -> Optional[list[dict]]:
     return None
 
 
+def load_assets_manifest(merged_root) -> dict[str, str]:
+    """Carrega assets_manifest.json (gerado pelo download_assets) → {url: relpath}.
+
+    Manifest format: {hash: {url, relpath, ...}}. Inverte pra {url: relpath}
+    pra lookup rapido a partir das URLs presentes em msgs.
+    """
+    from pathlib import Path
+    import json
+    p = Path(merged_root) / "assets_manifest.json"
+    if not p.exists():
+        return {}
+    try:
+        manifest = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return {entry["url"]: entry["relpath"] for entry in manifest.values()
+            if isinstance(entry, dict) and entry.get("url") and entry.get("relpath")}
+
+
+def resolve_msg_assets(files: list, assets_root, url_to_relpath: dict[str, str]) -> list[str]:
+    """Resolve URLs dos files de uma msg pra paths em disco."""
+    from pathlib import Path
+    paths: list[str] = []
+    for fl in files or []:
+        if not isinstance(fl, dict):
+            continue
+        url = fl.get("url")
+        if not url:
+            continue
+        relpath = url_to_relpath.get(url)
+        if relpath:
+            full = Path(assets_root) / relpath
+            if full.exists():
+                paths.append(str(full))
+    return paths
+
+
 def collect_file_names(files: list) -> list[str]:
     """Nomes dos files anexados a uma msg."""
     out = []

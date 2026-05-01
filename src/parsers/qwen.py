@@ -36,6 +36,8 @@ from src.parsers._qwen_helpers import (
     collect_file_names,
     collect_text_from_content_list,
     extract_search_results,
+    load_assets_manifest,
+    resolve_msg_assets,
     serialize_settings,
 )
 from src.parsers.base import BaseParser
@@ -89,6 +91,7 @@ class QwenParser(BaseParser):
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Qwen")
         self.projects: list[dict] = []
         self.project_docs: list[ProjectDoc] = []
+        self._url_to_relpath: dict[str, str] = {}
 
     def reset(self):
         super().reset()
@@ -116,6 +119,8 @@ class QwenParser(BaseParser):
         self.merged_root = merged_root
         conv_dir = merged_root / "conversations"
         last_run_date = self._compute_last_run_date(conv_dir)
+        # Carrega manifest dos assets baixados (se houver)
+        self._url_to_relpath = load_assets_manifest(merged_root)
 
         # Conversations
         if conv_dir.exists():
@@ -288,6 +293,12 @@ class QwenParser(BaseParser):
         # Files
         files = msg.get("files") or []
         file_names = collect_file_names(files)
+        # Resolve asset_paths via manifest (URLs baixadas locais)
+        asset_paths = resolve_msg_assets(
+            files, self.merged_root / "assets", self._url_to_relpath,
+        ) if self._url_to_relpath else None
+        if asset_paths == []:
+            asset_paths = None
 
         # Block types
         block_types = ["text"] if text_content else []
@@ -328,7 +339,7 @@ class QwenParser(BaseParser):
             content_types=",".join(block_types) if block_types else "text",
             thinking=reasoning,
             branch_id=branch_id,
-            asset_paths=None,  # Qwen assets nao integrados ainda no parser
+            asset_paths=asset_paths,
             finish_reason=finish_reason,
             citations_json=None,  # search_results vao em ToolEvent, nao em citations
             attachments_json=None,  # Qwen nao tem extracted_content como Claude.ai

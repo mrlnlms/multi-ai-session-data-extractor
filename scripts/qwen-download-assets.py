@@ -1,9 +1,9 @@
-"""Baixa user uploads + assets gerados (t2i/t2v) de um raw Qwen.
+"""Baixa user uploads + assets gerados (t2i/t2v) + project files do raw Qwen.
 
 Uso:
   python scripts/qwen-download-assets.py [raw_dir]
 
-Sem argumento, usa o raw mais recente em data/raw/Qwen Data/.
+Sem argumento, usa pasta unica data/raw/Qwen/.
 """
 
 import argparse
@@ -14,17 +14,21 @@ from pathlib import Path
 
 from src.extractors.qwen.auth import load_context
 from src.extractors.qwen.asset_downloader import download_assets
+from src.extractors.qwen.orchestrator import BASE_DIR
 
 
-def _find_latest_raw() -> Path | None:
+def _default_raw() -> Path | None:
+    if BASE_DIR.exists() and (BASE_DIR / "discovery_ids.json").exists():
+        return BASE_DIR
+    # Backward compat com layout antigo
     base = Path("data/raw/Qwen Data")
     if not base.exists():
         return None
-    candidates = sorted(
-        [p for p in base.iterdir() if p.is_dir() and len(p.name) == 16 and "T" in p.name],
+    legacy = sorted(
+        [p for p in base.iterdir() if p.is_dir() and len(p.name) == 16],
         key=lambda p: p.stat().st_mtime,
     )
-    return candidates[-1] if candidates else None
+    return legacy[-1] if legacy else None
 
 
 async def main(raw_dir: Path, account: str):
@@ -47,9 +51,9 @@ if __name__ == "__main__":
     parser.add_argument("--account", type=str, default="default")
     args = parser.parse_args()
 
-    raw = Path(args.raw_dir) if args.raw_dir else _find_latest_raw()
+    raw = Path(args.raw_dir) if args.raw_dir else _default_raw()
     if not raw or not raw.exists():
-        print("ERRO: nenhum raw achado em data/raw/Qwen Data/")
+        print(f"ERRO: nenhum raw achado em {BASE_DIR}/")
         sys.exit(1)
     print(f"Usando raw: {raw}")
 

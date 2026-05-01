@@ -225,7 +225,7 @@ def run_reconciliation(
     report.projects_preserved_missing = len(projs_preserved)
 
     # ============================================================
-    # ASSETS (cumulativos, skip-existing)
+    # ASSETS (cumulativos, skip-existing) + manifest
     # ============================================================
     _merge_dir(raw_dir / "assets", merged_output / "assets")
     if previous_merged and previous_merged != merged_output:
@@ -233,6 +233,12 @@ def run_reconciliation(
     assets_dir = merged_output / "assets"
     if assets_dir.exists():
         report.asset_binaries_total = sum(1 for p in assets_dir.rglob("*") if p.is_file())
+
+    # Manifest dos assets (gerado pelo download_assets) — copiar pro merged
+    # pra parser conseguir resolver asset_paths via lookup.
+    raw_manifest = raw_dir / "assets_manifest.json"
+    if raw_manifest.exists():
+        shutil.copy2(raw_manifest, merged_output / "assets_manifest.json")
 
     # ============================================================
     # DISCOVERY CUMULATIVO
