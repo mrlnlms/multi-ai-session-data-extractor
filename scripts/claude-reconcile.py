@@ -1,52 +1,42 @@
-"""Reconciler Claude.ai — merge raw atual com merged anterior.
+"""Reconciler Claude.ai standalone.
 
 Uso:
-    python scripts/claude-reconcile.py [raw_dir]
+    python scripts/claude-reconcile.py            # raw=data/raw/Claude.ai/, merged=data/merged/Claude.ai/
     python scripts/claude-reconcile.py --full
     python scripts/claude-reconcile.py --refetch-features attachments_extracted_content
 
-Default: auto-detecta raw mais recente em data/raw/Claude Data <date>/ + merged anterior.
+Default: pasta unica cumulativa. claude-sync.py ja chama internamente.
 """
 
 import argparse
 import sys
 from pathlib import Path
 
+from src.extractors.claude_ai.orchestrator import BASE_DIR as RAW_DIR
 from src.reconcilers.claude_ai import run_reconciliation, FEATURE_FLAGS
 
 
-def _find_latest_raw() -> Path | None:
-    base = Path("data/raw")
-    if not base.exists():
-        return None
-    cands = sorted(
-        [p for p in base.iterdir() if p.is_dir() and p.name.startswith("Claude Data ")],
-        key=lambda p: p.stat().st_mtime,
-    )
-    return cands[-1] if cands else None
+MERGED_DIR = Path("data/merged/Claude.ai")
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("raw_dir", nargs="?", default=None)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("raw_dir", nargs="?", default=None,
+                        help=f"Raw dir (default: {RAW_DIR})")
     parser.add_argument("--full", action="store_true",
                         help="Forca to_use em tudo (refetch completo)")
     parser.add_argument("--refetch-features", default=None,
                         help=f"Lista csv de features a forcar refetch (disponiveis: {','.join(sorted(FEATURE_FLAGS))})")
     parser.add_argument("--previous-merged", default=None,
-                        help="Override do merged anterior (default: auto-detect)")
+                        help="Override do merged anterior (default: pasta unica self-merge)")
     args = parser.parse_args()
 
-    if args.raw_dir:
-        raw = Path(args.raw_dir)
-    else:
-        raw = _find_latest_raw()
-        if not raw:
-            print("ERRO: nenhum raw em data/raw/Claude Data */")
-            sys.exit(1)
-        print(f"Raw: {raw}")
+    raw = Path(args.raw_dir) if args.raw_dir else RAW_DIR
+    if not raw.exists() or not (raw / "discovery_ids.json").exists():
+        print(f"ERRO: raw nao encontrado em {raw}. Rode scripts/claude-export.py primeiro.")
+        sys.exit(1)
+    print(f"Raw: {raw}")
 
-    merged_base = Path("data/merged/Claude_ai")
     prev_merged = Path(args.previous_merged) if args.previous_merged else None
 
     force_feats = None
@@ -61,7 +51,7 @@ def main():
 
     report = run_reconciliation(
         raw_dir=raw,
-        merged_output_base=merged_base,
+        merged_output=MERGED_DIR,
         previous_merged=prev_merged,
         force_refetch_features=force_feats,
         full=args.full,
@@ -75,7 +65,7 @@ def main():
         print(f"\nWarnings ({len(report.warnings)}) primeiros 10:")
         for w in report.warnings[:10]:
             print(f"  {w}")
-    print(f"\nMerged em: {merged_base}")
+    print(f"\nMerged em: {MERGED_DIR}")
 
 
 if __name__ == "__main__":

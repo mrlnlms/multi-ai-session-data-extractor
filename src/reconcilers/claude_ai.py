@@ -1,24 +1,34 @@
-"""Reconciler do Claude.ai — merge entre raws de datas diferentes preservando historico.
+"""Reconciler Claude.ai — pasta unica cumulativa em data/merged/Claude.ai/.
 
-Layout do raw:
-  - conversations/<uuid>.json
-  - projects/<uuid>.json
-  - assets/<file_uuid>_<variant>.webp
-  - assets/artifacts/<conv_uuid>/<artifact_id>_v<N>.<ext>
-  - discovery_ids.json: {"conversations": [...], "projects": [...]}
+Padrao alinhado com ChatGPT e Perplexity (sem subpastas datadas). Layout:
 
-Saida em data/merged/Claude_ai/<date>/ com mesma estrutura.
+  data/merged/Claude.ai/
+  ├── conversations/<uuid>.json         # 1 conv per file, com _last_seen_in_server
+  ├── projects/<uuid>.json              # 1 project per file
+  ├── assets/                           # cumulativo (binarios + artifacts extraidos)
+  │   ├── {file_uuid}_preview.webp
+  │   └── artifacts/<conv_uuid>/...
+  ├── discovery_ids.json                # cumulativo (current + preserved)
+  ├── claude_ai_merged_summary.json     # estado consolidado (counts)
+  ├── reconcile_log.jsonl               # historico append-only
+  └── LAST_RECONCILE.md                 # snapshot human-readable
 
-Padrao build_plan:
-  - to_use: UUIDs do raw atual (novos ou updated_at > anterior)
-  - to_copy: UUIDs inalterados — copia do merged anterior, nao toca API
-  - preserved_missing: UUIDs no anterior mas nao no atual — deletados no servidor
+Logica:
 
-Aplica separadamente a conversations e projects.
+1. Conversations:
+   - updated_at bumpou ou nova → to_use (do raw)
+   - inalterada → to_copy (do merged anterior, atualiza _last_seen_in_server)
+   - sumiu da discovery → preserved_missing (mantem arquivo, marca flag)
 
-Feature flags pra refetch seletivo de rpcids novos. Bumpar FEATURES_VERSION
-quando adicionamos fetches novos (notebookLM pattern).
+2. Projects: mesma logica.
+
+3. Assets binarios: cumulativos (skip-existing). Garantia 'capturar uma vez,
+   nunca rebaixar'.
+
+4. Idempotente: rodar 2x produz mesmos bytes.
 """
+
+from __future__ import annotations
 
 import json
 import logging
@@ -30,7 +40,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-FEATURES_VERSION = 1
+FEATURES_VERSION = 2  # bumpado pra layout pasta unica
 
 FEATURE_FLAGS = {
     "conversations",
@@ -39,7 +49,7 @@ FEATURE_FLAGS = {
     "project_docs_content",
 }
 
-DROP_THRESHOLD = 0.5
+DROP_THRESHOLD = 0.5  # current/previous < 0.5 aborta
 
 
 @dataclass
@@ -58,10 +68,14 @@ class ClaudeReconcileReport:
     convs_updated: int = 0
     convs_copied: int = 0
     convs_preserved_missing: int = 0
+    convs_total: int = 0
     projects_added: int = 0
     projects_updated: int = 0
     projects_copied: int = 0
     projects_preserved_missing: int = 0
+    projects_total: int = 0
+    asset_binaries_total: int = 0
+    artifacts_total: int = 0
     features_refetched: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     aborted: bool = False
@@ -69,12 +83,14 @@ class ClaudeReconcileReport:
 
     def summary(self) -> str:
         return (
-            f"Reconciliacao Claude.ai:\n"
-            f"  convs: added={self.convs_added}, updated={self.convs_updated}, "
-            f"copied={self.convs_copied}, preserved_missing={self.convs_preserved_missing}\n"
-            f"  projects: added={self.projects_added}, updated={self.projects_updated}, "
-            f"copied={self.projects_copied}, preserved_missing={self.projects_preserved_missing}\n"
-            f"  warnings={len(self.warnings)}"
+            f"Reconciliacao Claude.ai: "
+            f"convs={self.convs_added}+/{self.convs_updated}~/"
+            f"{self.convs_copied}={self.convs_preserved_missing}preserved "
+            f"(total={self.convs_total}), "
+            f"projects={self.projects_added}+/{self.projects_updated}~/"
+            f"{self.projects_copied}={self.projects_preserved_missing}preserved "
+            f"(total={self.projects_total}), "
+            f"assets={self.asset_binaries_total}bin / artifacts={self.artifacts_total}"
         )
 
 
@@ -114,7 +130,9 @@ def _decide(
             continue
         curr_ut = current[uuid].get("updated_at") or ""
         prev_ut = previous[uuid].get("updated_at") or ""
-        if curr_ut > prev_ut:
+        # Title rename detection: discovery title diferente do que tinhamos
+        title_changed = (current[uuid].get("name") or "") != (previous[uuid].get("name") or "")
+        if curr_ut > prev_ut or title_changed:
             to_use.append(uuid)
         else:
             to_copy.append(uuid)
@@ -131,25 +149,38 @@ def build_plan(
 ) -> ClaudePlan:
     """Constroi plan pra convs + projects."""
     curr_disc = _load_discovery(current_raw)
-    prev_disc = _load_discovery(previous_merged) if previous_merged else {"conversations": {}, "projects": {}}
+    prev_disc = (
+        _load_discovery(previous_merged) if previous_merged
+        else {"conversations": {}, "projects": {}}
+    )
 
-    # Checa version bump
+    # Version bump force-all (espelho ChatGPT)
     version_bumped = False
     if previous_merged:
-        log_path = previous_merged / "reconcile_log.json"
+        log_path = previous_merged / "reconcile_log.jsonl"
         if log_path.exists():
             try:
-                prev_log = json.loads(log_path.read_text(encoding="utf-8"))
-                prev_v = prev_log.get("features_version")
-                if prev_v is not None and prev_v < FEATURES_VERSION:
-                    version_bumped = True
+                with open(log_path, encoding="utf-8") as f:
+                    last_line = None
+                    for line in f:
+                        if line.strip():
+                            last_line = line
+                if last_line:
+                    prev_log = json.loads(last_line)
+                    prev_v = prev_log.get("features_version")
+                    if prev_v is not None and prev_v < FEATURES_VERSION:
+                        version_bumped = True
             except Exception:
                 pass
 
     force_all = full or version_bumped or bool(force_refetch_features)
 
-    c_use, c_copy, c_miss = _decide(curr_disc["conversations"], prev_disc["conversations"], force_all)
-    p_use, p_copy, p_miss = _decide(curr_disc["projects"], prev_disc["projects"], force_all)
+    c_use, c_copy, c_miss = _decide(
+        curr_disc["conversations"], prev_disc["conversations"], force_all
+    )
+    p_use, p_copy, p_miss = _decide(
+        curr_disc["projects"], prev_disc["projects"], force_all
+    )
 
     return ClaudePlan(
         convs_to_use=c_use,
@@ -163,29 +194,30 @@ def build_plan(
 
 def run_reconciliation(
     raw_dir: Path,
-    merged_output_base: Path,
+    merged_output: Path,
     previous_merged: Path | None = None,
     force_refetch_features: set[str] | None = None,
     full: bool = False,
 ) -> ClaudeReconcileReport:
-    """Executa reconciliacao.
+    """Executa reconciliacao em pasta unica.
 
     Args:
-        raw_dir: raw atual (com conversations/, projects/, assets/, discovery_ids.json)
-        merged_output_base: data/merged/Claude_ai/ (cria subdir datado)
-        previous_merged: override; None = auto-detect mais recente
+        raw_dir: raw atual (data/raw/Claude.ai/)
+        merged_output: pasta unica merged (data/merged/Claude.ai/) — pode nao existir
+        previous_merged: override; None = usa merged_output se existir
         force_refetch_features: forca refetch de features especificas
         full: True = ignora previous, to_use tudo
     """
     if previous_merged is None:
-        previous_merged = _find_latest_merged(merged_output_base)
-    if previous_merged and not previous_merged.exists():
-        previous_merged = None
+        previous_merged = merged_output if merged_output.exists() else None
 
     plan = build_plan(raw_dir, previous_merged, force_refetch_features, full)
 
     curr_disc = _load_discovery(raw_dir)
-    prev_disc = _load_discovery(previous_merged) if previous_merged else {"conversations": {}, "projects": {}}
+    prev_disc = (
+        _load_discovery(previous_merged) if previous_merged
+        else {"conversations": {}, "projects": {}}
+    )
 
     # Validacao: queda drastica de convs aborta
     prev_c = len(prev_disc["conversations"])
@@ -202,82 +234,147 @@ def run_reconciliation(
             )
 
     today = datetime.now().strftime("%Y-%m-%d")
-    output_dir = merged_output_base / today
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "conversations").mkdir(exist_ok=True)
-    (output_dir / "projects").mkdir(exist_ok=True)
-    (output_dir / "assets").mkdir(exist_ok=True)
-
+    reconciled_at = datetime.now().isoformat()
     report = ClaudeReconcileReport()
 
-    # Apply plan — convs
+    merged_output.mkdir(parents=True, exist_ok=True)
+    (merged_output / "conversations").mkdir(exist_ok=True)
+    (merged_output / "projects").mkdir(exist_ok=True)
+    (merged_output / "assets").mkdir(exist_ok=True)
+
+    # ============================================================
+    # 1. CONVERSATIONS
+    # ============================================================
     _apply_kind(
         plan.convs_to_use, plan.convs_to_copy, plan.convs_preserved_missing,
-        "conversations", raw_dir, previous_merged, output_dir, today, report,
+        "conversations", raw_dir, previous_merged, merged_output, today, report,
     )
-    report.convs_added = len(set(plan.convs_to_use) - set(prev_disc["conversations"].keys()))
+    new_conv_ids = set(plan.convs_to_use) - set(prev_disc["conversations"].keys())
+    report.convs_added = len(new_conv_ids)
     report.convs_updated = len(plan.convs_to_use) - report.convs_added
     report.convs_copied = len(plan.convs_to_copy)
     report.convs_preserved_missing = len(plan.convs_preserved_missing)
+    report.convs_total = (
+        report.convs_added + report.convs_updated + report.convs_copied
+        + report.convs_preserved_missing
+    )
 
+    # ============================================================
+    # 2. PROJECTS
+    # ============================================================
     _apply_kind(
         plan.projects_to_use, plan.projects_to_copy, plan.projects_preserved_missing,
-        "projects", raw_dir, previous_merged, output_dir, today, report,
+        "projects", raw_dir, previous_merged, merged_output, today, report,
     )
-    report.projects_added = len(set(plan.projects_to_use) - set(prev_disc["projects"].keys()))
+    new_proj_ids = set(plan.projects_to_use) - set(prev_disc["projects"].keys())
+    report.projects_added = len(new_proj_ids)
     report.projects_updated = len(plan.projects_to_use) - report.projects_added
     report.projects_copied = len(plan.projects_to_copy)
     report.projects_preserved_missing = len(plan.projects_preserved_missing)
+    report.projects_total = (
+        report.projects_added + report.projects_updated + report.projects_copied
+        + report.projects_preserved_missing
+    )
 
-    # Merge assets (skip-existing)
-    _merge_assets(raw_dir, previous_merged, output_dir)
+    # ============================================================
+    # 3. ASSETS (cumulativos, skip-existing)
+    # ============================================================
+    _merge_assets(raw_dir, previous_merged, merged_output)
+    assets_dir = merged_output / "assets"
+    if assets_dir.exists():
+        # binarios = arquivos diretos em assets/ (excluindo subpasta artifacts/)
+        report.asset_binaries_total = sum(
+            1 for p in assets_dir.glob("*") if p.is_file()
+        )
+        artifacts_root = assets_dir / "artifacts"
+        if artifacts_root.exists():
+            # Conta soh arquivos de conteudo (nao .meta.json)
+            report.artifacts_total = sum(
+                1 for p in artifacts_root.rglob("*")
+                if p.is_file() and not p.name.endswith(".meta.json")
+            )
 
-    # Discovery merged: atual + preserved_missing marcados
-    merged_disc = {
-        "conversations": list(curr_disc["conversations"].values()),
-        "projects": list(curr_disc["projects"].values()),
-    }
+    # ============================================================
+    # 4. DISCOVERY CUMULATIVO
+    # ============================================================
+    cumulative_convs = list(curr_disc["conversations"].values())
     for uuid in plan.convs_preserved_missing:
         if uuid in prev_disc["conversations"]:
             entry = dict(prev_disc["conversations"][uuid])
-            entry["_deleted_from_server"] = True
-            merged_disc["conversations"].append(entry)
+            entry["_preserved_missing"] = True
+            cumulative_convs.append(entry)
+
+    cumulative_projs = list(curr_disc["projects"].values())
     for uuid in plan.projects_preserved_missing:
         if uuid in prev_disc["projects"]:
             entry = dict(prev_disc["projects"][uuid])
-            entry["_deleted_from_server"] = True
-            merged_disc["projects"].append(entry)
-    (output_dir / "discovery_ids.json").write_text(
-        json.dumps(merged_disc, ensure_ascii=False, indent=2)
+            entry["_preserved_missing"] = True
+            cumulative_projs.append(entry)
+
+    (merged_output / "discovery_ids.json").write_text(
+        json.dumps(
+            {"conversations": cumulative_convs, "projects": cumulative_projs},
+            ensure_ascii=False, indent=2,
+        ),
+        encoding="utf-8",
     )
 
+    # ============================================================
+    # 5. SUMMARY + LOGS
+    # ============================================================
     if force_refetch_features:
         report.features_refetched = sorted(force_refetch_features)
 
-    # reconcile_log
-    log = {
-        "reconciled_at": datetime.now().isoformat(),
-        "raw_source": str(raw_dir),
-        "previous_merged": str(previous_merged) if previous_merged else None,
+    summary = {
+        "reconciled_at": reconciled_at,
         "features_version": FEATURES_VERSION,
         "convs": {
             "added": report.convs_added,
             "updated": report.convs_updated,
             "copied": report.convs_copied,
             "preserved_missing": report.convs_preserved_missing,
+            "total": report.convs_total,
         },
         "projects": {
             "added": report.projects_added,
             "updated": report.projects_updated,
             "copied": report.projects_copied,
             "preserved_missing": report.projects_preserved_missing,
+            "total": report.projects_total,
         },
+        "asset_binaries_total": report.asset_binaries_total,
+        "artifacts_total": report.artifacts_total,
+        "features_refetched": report.features_refetched,
+    }
+    (merged_output / "claude_ai_merged_summary.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    log_entry = {
+        "reconciled_at": reconciled_at,
+        "raw_source": str(raw_dir),
+        "features_version": FEATURES_VERSION,
+        "convs_total": report.convs_total,
+        "convs_added": report.convs_added,
+        "convs_updated": report.convs_updated,
+        "convs_copied": report.convs_copied,
+        "convs_preserved_missing": report.convs_preserved_missing,
+        "projects_total": report.projects_total,
+        "projects_added": report.projects_added,
+        "projects_updated": report.projects_updated,
+        "projects_copied": report.projects_copied,
+        "projects_preserved_missing": report.projects_preserved_missing,
+        "asset_binaries_total": report.asset_binaries_total,
+        "artifacts_total": report.artifacts_total,
         "features_refetched": report.features_refetched,
         "warnings": report.warnings,
     }
-    (output_dir / "reconcile_log.json").write_text(
-        json.dumps(log, ensure_ascii=False, indent=2)
-    )
+    log_path = merged_output / "reconcile_log.jsonl"
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+
+    _write_last_reconcile_md(merged_output, report, reconciled_at)
 
     return report
 
@@ -293,7 +390,7 @@ def _apply_kind(
     today: str,
     report: ClaudeReconcileReport,
 ) -> None:
-    """Copia arquivos do kind (conversations ou projects) do raw/merged pra output."""
+    """Copia arquivos do kind (conversations ou projects) raw/merged → output."""
     # to_use: do raw atual + injeta _last_seen_in_server
     for uuid in to_use:
         src = raw_dir / kind / f"{uuid}.json"
@@ -301,36 +398,59 @@ def _apply_kind(
         if src.exists():
             obj = json.loads(src.read_text(encoding="utf-8"))
             obj["_last_seen_in_server"] = today
-            dst.write_text(json.dumps(obj, ensure_ascii=False, indent=2))
+            # Garante que _preserved_missing nao persiste se reapareceu
+            obj.pop("_preserved_missing", None)
+            dst.write_text(
+                json.dumps(obj, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
         else:
             report.warnings.append(f"to_use {kind}/{uuid}: arquivo faltando em raw")
 
-    # to_copy: do merged anterior
+    # to_copy: do merged anterior, atualizando _last_seen_in_server
     for uuid in to_copy:
         if not previous_merged:
             report.warnings.append(f"to_copy {kind}/{uuid} mas sem previous_merged")
             continue
         src = previous_merged / kind / f"{uuid}.json"
         dst = output_dir / kind / f"{uuid}.json"
+        # Se previous_merged == output_dir (pasta unica self-update),
+        # ler e reescrever com _last_seen_in_server bumpado e clear de preserved_missing.
         if src.exists():
-            obj = json.loads(src.read_text(encoding="utf-8"))
-            obj["_last_seen_in_server"] = today
-            dst.write_text(json.dumps(obj, ensure_ascii=False, indent=2))
+            try:
+                obj = json.loads(src.read_text(encoding="utf-8"))
+                obj["_last_seen_in_server"] = today
+                obj.pop("_preserved_missing", None)
+                dst.write_text(
+                    json.dumps(obj, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+            except Exception as e:
+                report.warnings.append(f"to_copy {kind}/{uuid}: erro lendo merged anterior: {e}")
         else:
-            report.warnings.append(f"to_copy {kind}/{uuid}: merged anterior nao tem")
+            report.warnings.append(f"to_copy {kind}/{uuid}: merged anterior nao tem arquivo")
 
-    # preserved_missing: do anterior sem atualizar _last_seen_in_server
+    # preserved_missing: marca flag, NAO atualiza _last_seen_in_server
     for uuid in preserved:
         if not previous_merged:
             continue
         src = previous_merged / kind / f"{uuid}.json"
         dst = output_dir / kind / f"{uuid}.json"
         if src.exists():
-            shutil.copy2(src, dst)
+            try:
+                obj = json.loads(src.read_text(encoding="utf-8"))
+                obj["_preserved_missing"] = True
+                dst.write_text(
+                    json.dumps(obj, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+            except Exception:
+                # Fallback: copy bytes (sem injetar flag se JSON corromper)
+                shutil.copy2(src, dst)
 
 
 def _merge_assets(raw_dir: Path, previous_merged: Path | None, output_dir: Path) -> None:
-    """Copia assets de raw + anterior pro output (skip-existing)."""
+    """Copia assets de raw + anterior pro output (skip-existing). Cumulativo."""
     def _copy_tree(src: Path, dst: Path) -> None:
         if not src.exists():
             return
@@ -345,12 +465,26 @@ def _merge_assets(raw_dir: Path, previous_merged: Path | None, output_dir: Path)
             shutil.copy2(item, tgt)
 
     _copy_tree(raw_dir / "assets", output_dir / "assets")
-    if previous_merged:
+    if previous_merged and previous_merged != output_dir:
         _copy_tree(previous_merged / "assets", output_dir / "assets")
 
 
-def _find_latest_merged(merged_base: Path) -> Path | None:
-    if not merged_base.exists():
-        return None
-    candidates = sorted([d for d in merged_base.iterdir() if d.is_dir()])
-    return candidates[-1] if candidates else None
+def _write_last_reconcile_md(
+    output_dir: Path, report: ClaudeReconcileReport, reconciled_at: str
+) -> None:
+    """LAST_RECONCILE.md — snapshot human-readable, sobrescreve a cada run."""
+    md = (
+        "# Last reconcile\n\n"
+        f"- **Quando:** {reconciled_at}\n"
+        f"- **Conversations:** {report.convs_total} totais "
+        f"({report.convs_added} added, {report.convs_updated} updated, "
+        f"{report.convs_copied} copied, {report.convs_preserved_missing} preserved)\n"
+        f"- **Projects:** {report.projects_total} totais "
+        f"({report.projects_added} added, {report.projects_updated} updated, "
+        f"{report.projects_copied} copied, {report.projects_preserved_missing} preserved)\n"
+        f"- **Asset binarios:** {report.asset_binaries_total} (cumulativo)\n"
+        f"- **Artifacts extraidos:** {report.artifacts_total}\n"
+        f"- **Warnings:** {len(report.warnings)}\n\n"
+        "Ver `reconcile_log.jsonl` pro historico completo.\n"
+    )
+    (output_dir / "LAST_RECONCILE.md").write_text(md, encoding="utf-8")
