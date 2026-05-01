@@ -1,14 +1,14 @@
-"""Orchestrator DeepSeek: auth + warmup + discovery + fetch + capture_log.
+"""Orchestrator DeepSeek: pasta unica cumulativa em data/raw/DeepSeek/.
 
-Raw vai pra data/raw/DeepSeek Data/<YYYY-MM-DDTHH-MM>/:
-  - discovery_ids.json
-  - conversations/<conv_id>.json (biz_data do history_messages)
-  - capture_log.json
+Padrao alinhado com ChatGPT, Claude.ai, Perplexity, Qwen (sem timestamp).
+DeepSeek nao tem projects nem folders — so threads (chat_sessions).
 
-Modo default: incremental — compara updated_at com dump anterior.
+Modo default: incremental — re-fetcha so sessions com updated_at > o que ja
+temos em disco. Sessions inalteradas ficam intocadas.
 """
 
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,33 +18,67 @@ from src.extractors.deepseek.discovery import discover
 from src.extractors.deepseek.fetcher import fetch_conversations
 
 
-BASE_DIR = Path("data/raw/DeepSeek Data")
+BASE_DIR = Path("data/raw/DeepSeek")
+
+logger = logging.getLogger(__name__)
 
 
-def _make_output_dir() -> Path:
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M")
-    return BASE_DIR / ts
+DISCOVERY_DROP_ABORT_THRESHOLD = 0.20
 
 
-def _find_previous_raw(exclude: Path) -> Path | None:
-    if not BASE_DIR.exists():
-        return None
-    candidates = [
-        p for p in BASE_DIR.iterdir()
-        if p.is_dir() and len(p.name) == 16 and "T" in p.name
-        and p.resolve() != exclude.resolve()
-    ]
-    candidates.sort(key=lambda p: p.stat().st_mtime)
-    return candidates[-1] if candidates else None
+def _get_max_known_discovery(raw_root: Path) -> int:
+    if not raw_root.exists():
+        return 0
+    max_count = 0
+    for log_path in raw_root.rglob("capture_log.jsonl"):
+        try:
+            with open(log_path) as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    data = json.loads(line)
+                    count = (data.get("totals") or {}).get("conversations_discovered", 0)
+                    if count > max_count:
+                        max_count = count
+        except Exception:
+            continue
+    for log_path in raw_root.rglob("capture_log.json"):
+        try:
+            with open(log_path) as f:
+                data = json.load(f)
+            count = (data.get("totals") or {}).get("conversations_discovered", 0)
+            if count > max_count:
+                max_count = count
+        except Exception:
+            continue
+    return max_count
 
 
-def _conv_tag_map(raw_dir: Path) -> dict[str, float]:
+def _existing_disc_map(raw_dir: Path) -> dict[str, float]:
+    """Le discovery_ids.json existente -> {id: updated_at (epoch float)}."""
     disc = raw_dir / "discovery_ids.json"
     if not disc.exists():
         return {}
-    with open(disc, encoding="utf-8") as f:
-        data = json.load(f)
-    return {c["id"]: c.get("updated_at", 0) or 0 for c in data}
+    try:
+        data = json.loads(disc.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return {c["id"]: c.get("updated_at", 0) or 0 for c in data if c.get("id")}
+
+
+def _write_last_capture_md(output_dir: Path, log: dict) -> None:
+    totals = log.get("totals", {})
+    md = (
+        "# Last capture\n\n"
+        f"- **Quando:** {log.get('finished_at')}\n"
+        f"- **Modo:** {log.get('mode')}\n"
+        f"- **Sessions:** {totals.get('conversations_discovered', 0)} discovered, "
+        f"{totals.get('conversations_fetched', 0)} fetched, "
+        f"{totals.get('conversations_reused_incremental', 0)} reused\n"
+        f"- **Errors:** {totals.get('conversations_errors', 0)}\n\n"
+        "Ver `capture_log.jsonl` pro historico completo.\n"
+    )
+    (output_dir / "LAST_CAPTURE.md").write_text(md, encoding="utf-8")
 
 
 async def run_export(
@@ -53,14 +87,13 @@ async def run_export(
     account: str = "default",
 ) -> Path:
     started_at = datetime.now(timezone.utc)
-    output_dir = _make_output_dir()
+    output_dir = BASE_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"Raw output: {output_dir}")
 
-    prev_raw = None if full else _find_previous_raw(exclude=output_dir)
-    prev_map = _conv_tag_map(prev_raw) if prev_raw else {}
-    if prev_raw:
-        print(f"Modo incremental: cutoff vs {prev_raw.name} ({len(prev_map)} convs conhecidas)")
+    prev_map = {} if full else _existing_disc_map(output_dir)
+    if prev_map and not full:
+        print(f"Modo incremental: {len(prev_map)} sessions no estado anterior")
     else:
         print("Modo full")
 
@@ -72,19 +105,40 @@ async def run_export(
 
         sessions = await discover(client, output_dir)
 
-        to_fetch = []
+        # Fail-fast
+        baseline = _get_max_known_discovery(output_dir.parent)
+        curr = len(sessions)
+        if baseline > 0:
+            drop = (baseline - curr) / baseline
+            if drop > DISCOVERY_DROP_ABORT_THRESHOLD:
+                raise RuntimeError(
+                    f"Discovery suspeita: {curr} sessions vs {baseline} no historico "
+                    f"(queda {drop:.0%}, limite {DISCOVERY_DROP_ABORT_THRESHOLD:.0%})."
+                )
+            print(f"Discovery OK: {curr} sessions (baseline historico: {baseline})")
+
+        today = started_at.strftime("%Y-%m-%d")
+        conv_dir = output_dir / "conversations"
+        conv_dir.mkdir(parents=True, exist_ok=True)
+
+        to_fetch: list[str] = []
         reused = 0
         for s in sessions:
             sid = s["id"]
-            upd = s.get("updated_at") or 0
-            if sid in prev_map and prev_map[sid] == upd and prev_raw is not None:
-                old = prev_raw / "conversations" / f"{sid}.json"
-                new = output_dir / "conversations" / f"{sid}.json"
-                new.parent.mkdir(parents=True, exist_ok=True)
-                if old.exists():
-                    new.write_bytes(old.read_bytes())
+            curr_upd = s.get("updated_at") or 0
+            prev_upd = prev_map.get(sid, 0)
+            existing = conv_dir / f"{sid}.json"
+            # Comparacao com tolerancia (epoch float pode ter diferencas microscopicas)
+            same = (sid in prev_map) and abs(prev_upd - curr_upd) < 0.001
+            if same and existing.exists():
+                try:
+                    obj = json.loads(existing.read_text(encoding="utf-8"))
+                    obj["_last_seen_in_server"] = today
+                    existing.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
                     reused += 1
                     continue
+                except Exception:
+                    pass
             to_fetch.append(sid)
 
         if smoke_limit is not None:
@@ -92,14 +146,25 @@ async def run_export(
             print(f"SMOKE: limitado a {smoke_limit} convs")
 
         print(f"Fetching {len(to_fetch)} convs ({reused} reusadas)")
-        ok, skipped, errs = await fetch_conversations(client, to_fetch, output_dir)
+        ok, skipped, errs = await fetch_conversations(
+            client, to_fetch, output_dir, skip_existing=False
+        )
+
+        for sid in to_fetch:
+            f = conv_dir / f"{sid}.json"
+            if f.exists():
+                try:
+                    obj = json.loads(f.read_text(encoding="utf-8"))
+                    obj["_last_seen_in_server"] = today
+                    f.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
+                except Exception:
+                    pass
 
         log = {
             "started_at": started_at.isoformat(),
             "finished_at": datetime.now(timezone.utc).isoformat(),
             "mode": "full" if full else "incremental",
             "smoke_limit": smoke_limit,
-            "previous_raw": prev_raw.name if prev_raw else None,
             "totals": {
                 "conversations_discovered": len(sessions),
                 "conversations_fetched": ok,
@@ -108,8 +173,12 @@ async def run_export(
             },
             "errors": {"conversations": errs[:50]},
         }
-        with open(output_dir / "capture_log.json", "w", encoding="utf-8") as f:
-            json.dump(log, f, ensure_ascii=False, indent=2)
+
+        log_jsonl = output_dir / "capture_log.jsonl"
+        with open(log_jsonl, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log, ensure_ascii=False) + "\n")
+
+        _write_last_capture_md(output_dir, log)
 
         print()
         print("=== SUMMARY ===")
