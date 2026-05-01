@@ -1,306 +1,285 @@
+"""Testes do parser DeepSeek v3 (schema canonico).
+
+Cobertura:
+- Schema chat_session + chat_messages (formato API atual)
+- thinking_content (R1) → Message.thinking
+- search_results → ToolEvent + citations_json
+- pinned, agent, model_type → settings_json + mode
+- Branches via parent_id + current_message_id (int IDs)
+- accumulated_token_usage → Message.token_count
+- finish_reason via status + incomplete_message
+- Files per msg → attachment_names
+- Preservation
+"""
+
+from __future__ import annotations
+
 import json
-import pytest
 from pathlib import Path
+
+import pandas as pd
+import pytest
+
 from src.parsers.deepseek import DeepSeekParser
 
 
-FIXTURE_SIMPLE = [
-    {
-        "id": "conv-001",
-        "title": "Test conversation",
-        "inserted_at": "2025-02-15T10:00:00.000+08:00",
-        "updated_at": "2025-02-15T10:05:00.000+08:00",
-        "mapping": {
-            "root": {
-                "id": "root",
-                "parent": None,
-                "children": ["1"],
-                "message": None,
-            },
-            "1": {
-                "id": "1",
-                "parent": "root",
-                "children": ["2"],
-                "message": {
-                    "files": [],
-                    "model": "deepseek-chat",
-                    "inserted_at": "2025-02-15T10:00:00.000+08:00",
-                    "fragments": [
-                        {"type": "REQUEST", "content": "Hello, how are you?"}
-                    ],
-                },
-            },
-            "2": {
-                "id": "2",
-                "parent": "1",
-                "children": [],
-                "message": {
-                    "files": [],
-                    "model": "deepseek-chat",
-                    "inserted_at": "2025-02-15T10:00:05.000+08:00",
-                    "fragments": [
-                        {"type": "RESPONSE", "content": "I'm doing well!"}
-                    ],
-                },
-            },
-        },
+def _write_merged(tmp_path: Path, sessions: list[dict]) -> Path:
+    merged = tmp_path / "DeepSeek"
+    (merged / "conversations").mkdir(parents=True, exist_ok=True)
+    for s in sessions:
+        sid = s["chat_session"]["id"]
+        (merged / "conversations" / f"{sid}.json").write_text(
+            json.dumps(s, ensure_ascii=False), encoding="utf-8"
+        )
+    return merged
+
+
+def _basic_session(sid="sess-1", title="Test", agent="chat", model_type="default", **session_overrides) -> dict:
+    sess = {
+        "id": sid,
+        "title": title,
+        "title_type": "SYSTEM",
+        "model_type": model_type,
+        "agent": agent,
+        "version": 2,
+        "is_empty": False,
+        "pinned": False,
+        "current_message_id": 2,
+        "seq_id": 1,
+        "inserted_at": 1774238947.92,
+        "updated_at": 1774238984.83,
     }
-]
-
-FIXTURE_WITH_THINKING = [
-    {
-        "id": "conv-002",
-        "title": "Thinking conversation",
-        "inserted_at": "2025-03-01T14:00:00.000+08:00",
-        "updated_at": "2025-03-01T14:02:00.000+08:00",
-        "mapping": {
-            "root": {
-                "id": "root",
-                "parent": None,
-                "children": ["1"],
-                "message": None,
-            },
-            "1": {
-                "id": "1",
-                "parent": "root",
-                "children": ["2"],
-                "message": {
-                    "files": [],
-                    "model": "deepseek-chat",
-                    "inserted_at": "2025-03-01T14:00:00.000+08:00",
-                    "fragments": [
-                        {"type": "REQUEST", "content": "Explain quantum computing"}
-                    ],
-                },
-            },
-            "2": {
-                "id": "2",
-                "parent": "1",
-                "children": [],
-                "message": {
-                    "files": [],
-                    "model": "deepseek-chat",
-                    "inserted_at": "2025-03-01T14:00:10.000+08:00",
-                    "fragments": [
-                        {"type": "THINK", "content": "User wants explanation of QC..."},
-                        {"type": "RESPONSE", "content": "Quantum computing uses qubits..."},
-                    ],
-                },
-            },
-        },
-    }
-]
-
-FIXTURE_WITH_SEARCH = [
-    {
-        "id": "conv-003",
-        "title": "Search conversation",
-        "inserted_at": "2025-03-10T09:00:00.000+08:00",
-        "updated_at": "2025-03-10T09:03:00.000+08:00",
-        "mapping": {
-            "root": {
-                "id": "root",
-                "parent": None,
-                "children": ["1"],
-                "message": None,
-            },
-            "1": {
-                "id": "1",
-                "parent": "root",
-                "children": ["2"],
-                "message": {
-                    "files": [],
-                    "model": "deepseek-chat",
-                    "inserted_at": "2025-03-10T09:00:00.000+08:00",
-                    "fragments": [
-                        {"type": "REQUEST", "content": "Search for accessibility research"}
-                    ],
-                },
-            },
-            "2": {
-                "id": "2",
-                "parent": "1",
-                "children": [],
-                "message": {
-                    "files": [],
-                    "model": "deepseek-chat",
-                    "inserted_at": "2025-03-10T09:00:15.000+08:00",
-                    "fragments": [
-                        {"type": "SEARCH", "content": "{\"results\": [{\"url\": \"https://example.com\"}]}"},
-                        {"type": "RESPONSE", "content": "I found several studies..."},
-                    ],
-                },
-            },
-        },
-    }
-]
-
-FIXTURE_WITH_BRANCH = [
-    {
-        "id": "conv-004",
-        "title": "Branched conversation",
-        "inserted_at": "2025-04-01T12:00:00.000+08:00",
-        "updated_at": "2025-04-01T12:05:00.000+08:00",
-        "mapping": {
-            "root": {
-                "id": "root",
-                "parent": None,
-                "children": ["1"],
-                "message": None,
-            },
-            "1": {
-                "id": "1",
-                "parent": "root",
-                "children": ["2", "3"],
-                "message": {
-                    "files": [],
-                    "model": "deepseek-chat",
-                    "inserted_at": "2025-04-01T12:00:00.000+08:00",
-                    "fragments": [
-                        {"type": "REQUEST", "content": "Hello"}
-                    ],
-                },
-            },
-            "2": {
-                "id": "2",
-                "parent": "1",
-                "children": [],
-                "message": {
-                    "files": [],
-                    "model": "deepseek-chat",
-                    "inserted_at": "2025-04-01T12:00:05.000+08:00",
-                    "fragments": [
-                        {"type": "RESPONSE", "content": "First response (old branch)"}
-                    ],
-                },
-            },
-            "3": {
-                "id": "3",
-                "parent": "1",
-                "children": [],
-                "message": {
-                    "files": [],
-                    "model": "deepseek-chat",
-                    "inserted_at": "2025-04-01T12:01:00.000+08:00",
-                    "fragments": [
-                        {"type": "RESPONSE", "content": "Second response (latest branch)"}
-                    ],
-                },
-            },
-        },
-    }
-]
-
-
-def _write_fixture(tmp_path, data):
-    p = tmp_path / "conversations.json"
-    p.write_text(json.dumps(data))
-    return p
-
-
-def test_deepseek_simple_conversation(tmp_path):
-    path = _write_fixture(tmp_path, FIXTURE_SIMPLE)
-    parser = DeepSeekParser()
-    parser.parse(path)
-    assert len(parser.conversations) == 1
-    assert len(parser.messages) == 2
-    conv = parser.conversations[0]
-    assert conv.conversation_id == "conv-001"
-    assert conv.source == "deepseek"
-    assert conv.title == "Test conversation"
-    assert conv.model == "deepseek-chat"
-    assert conv.message_count == 2
-    assert conv.mode == "chat"
-    user_msg = parser.messages[0]
-    assert user_msg.role == "user"
-    assert user_msg.content == "Hello, how are you?"
-    assert user_msg.sequence == 1
-    assert user_msg.content_types == "text"
-    asst_msg = parser.messages[1]
-    assert asst_msg.role == "assistant"
-    assert asst_msg.content == "I'm doing well!"
-    assert asst_msg.sequence == 2
-    assert asst_msg.thinking is None
-    assert asst_msg.tool_results is None
-
-
-def test_deepseek_thinking(tmp_path):
-    path = _write_fixture(tmp_path, FIXTURE_WITH_THINKING)
-    parser = DeepSeekParser()
-    parser.parse(path)
-    assert len(parser.messages) == 2
-    asst_msg = parser.messages[1]
-    assert asst_msg.role == "assistant"
-    assert asst_msg.content == "Quantum computing uses qubits..."
-    assert asst_msg.thinking == "User wants explanation of QC..."
-
-
-def test_deepseek_search(tmp_path):
-    path = _write_fixture(tmp_path, FIXTURE_WITH_SEARCH)
-    parser = DeepSeekParser()
-    parser.parse(path)
-    conv = parser.conversations[0]
-    assert conv.mode == "search"
-    asst_msg = parser.messages[1]
-    assert asst_msg.tool_results is not None
-    assert "example.com" in asst_msg.tool_results
-
-
-def test_deepseek_branch_follows_last_child(tmp_path):
-    path = _write_fixture(tmp_path, FIXTURE_WITH_BRANCH)
-    parser = DeepSeekParser()
-    parser.parse(path)
-    assert len(parser.messages) == 2
-    asst_msg = parser.messages[1]
-    assert asst_msg.content == "Second response (latest branch)"
-
-
-def test_deepseek_timestamps_utc(tmp_path):
-    path = _write_fixture(tmp_path, FIXTURE_SIMPLE)
-    parser = DeepSeekParser()
-    parser.parse(path)
-    conv = parser.conversations[0]
-    # 10:00+08:00 = 02:00 UTC = 23:00 BRT do dia anterior
-    assert conv.created_at.hour == 23
-
-
-def test_deepseek_duplicate_fragments_concatenated(tmp_path):
-    """Multiplos RESPONSE fragments sao concatenados, nao sobrescritos."""
-    fixture = [
+    sess.update(session_overrides)
+    msgs = [
         {
-            "id": "conv-dup",
-            "title": "Duplicate fragments",
-            "inserted_at": "2025-03-15T10:00:00.000+08:00",
-            "updated_at": "2025-03-15T10:01:00.000+08:00",
-            "mapping": {
-                "root": {
-                    "id": "root",
-                    "parent": None,
-                    "children": ["1"],
-                    "message": None,
-                },
-                "1": {
-                    "id": "1",
-                    "parent": "root",
-                    "children": [],
-                    "message": {
-                        "files": [],
-                        "model": "deepseek-chat",
-                        "inserted_at": "2025-03-15T10:00:00.000+08:00",
-                        "fragments": [
-                            {"type": "RESPONSE", "content": "Parte 1 da resposta."},
-                            {"type": "RESPONSE", "content": "Parte 2 da resposta."},
-                        ],
-                    },
-                },
-            },
-        }
+            "message_id": 1,
+            "parent_id": None,
+            "role": "USER",
+            "content": "ola",
+            "model": "",
+            "inserted_at": 1774238950.0,
+            "status": "FINISHED",
+            "thinking_content": None,
+            "thinking_elapsed_secs": None,
+            "thinking_enabled": False,
+            "search_enabled": False,
+            "search_results": None,
+            "search_status": None,
+            "accumulated_token_usage": 0,
+            "files": [],
+            "feedback": None,
+            "incomplete_message": None,
+            "tips": [],
+            "ban_edit": False,
+            "ban_regenerate": False,
+        },
+        {
+            "message_id": 2,
+            "parent_id": 1,
+            "role": "ASSISTANT",
+            "content": "oi!",
+            "model": "deepseek-chat",
+            "inserted_at": 1774238955.5,
+            "status": "FINISHED",
+            "thinking_content": None,
+            "thinking_elapsed_secs": None,
+            "thinking_enabled": False,
+            "search_enabled": False,
+            "search_results": None,
+            "search_status": None,
+            "accumulated_token_usage": 100,
+            "files": [],
+            "feedback": None,
+            "incomplete_message": None,
+            "tips": [],
+            "ban_edit": False,
+            "ban_regenerate": False,
+        },
     ]
-    path = _write_fixture(tmp_path, fixture)
-    parser = DeepSeekParser()
-    parser.parse(path)
+    return {"chat_session": sess, "chat_messages": msgs}
 
-    assert len(parser.messages) == 1
-    msg = parser.messages[0]
-    assert "Parte 1" in msg.content
-    assert "Parte 2" in msg.content
+
+def test_basic_parse(tmp_path):
+    merged = _write_merged(tmp_path, [_basic_session()])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    assert len(p.conversations) == 1
+    assert len(p.messages) == 2
+    c = p.conversations[0]
+    assert c.conversation_id == "sess-1"
+    assert c.source == "deepseek"
+    assert c.title == "Test"
+    assert c.mode == "chat"
+    assert c.url == "https://chat.deepseek.com/a/chat/s/sess-1"
+
+
+def test_role_mapping_uppercase(tmp_path):
+    """DeepSeek retorna USER/ASSISTANT (uppercase) — parser deve mapear."""
+    merged = _write_merged(tmp_path, [_basic_session()])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    assert p.messages[0].role == "user"
+    assert p.messages[1].role == "assistant"
+
+
+def test_pinned_flag(tmp_path):
+    merged = _write_merged(tmp_path, [_basic_session(pinned=True)])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    assert p.conversations[0].is_pinned is True
+
+
+def test_agent_mode_to_research(tmp_path):
+    merged = _write_merged(tmp_path, [_basic_session(agent="agent")])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    assert p.conversations[0].mode == "research"
+
+
+def test_thinking_model_type_to_research(tmp_path):
+    merged = _write_merged(tmp_path, [_basic_session(model_type="thinking")])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    assert p.conversations[0].mode == "research"
+
+
+def test_r1_reasoning_to_thinking(tmp_path):
+    sess = _basic_session()
+    sess["chat_messages"][1]["thinking_content"] = "Hmm, let me reason..."
+    sess["chat_messages"][1]["thinking_elapsed_secs"] = 5.89
+    sess["chat_messages"][1]["thinking_enabled"] = True
+    merged = _write_merged(tmp_path, [sess])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    msg_asst = next(m for m in p.messages if m.role == "assistant")
+    assert msg_asst.thinking == "Hmm, let me reason..."
+
+
+def test_token_count_from_accumulated(tmp_path):
+    merged = _write_merged(tmp_path, [_basic_session()])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    msg_asst = next(m for m in p.messages if m.role == "assistant")
+    assert msg_asst.token_count == 100
+
+
+def test_finish_reason_from_status(tmp_path):
+    merged = _write_merged(tmp_path, [_basic_session()])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    assert all(m.finish_reason == "stop" for m in p.messages)
+
+
+def test_finish_reason_incomplete(tmp_path):
+    sess = _basic_session()
+    sess["chat_messages"][1]["incomplete_message"] = "User stopped"
+    merged = _write_merged(tmp_path, [sess])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    msg_asst = next(m for m in p.messages if m.role == "assistant")
+    assert msg_asst.finish_reason == "incomplete"
+
+
+def test_search_results_to_event_and_citations(tmp_path):
+    sess = _basic_session()
+    sess["chat_messages"][1]["search_enabled"] = True
+    sess["chat_messages"][1]["search_results"] = [
+        {"title": "Result A", "url": "https://a.com"},
+        {"title": "Result B", "url": "https://b.com"},
+    ]
+    sess["chat_messages"][1]["search_status"] = "DONE"
+    merged = _write_merged(tmp_path, [sess])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    # ToolEvents
+    assert len(p.events) == 2
+    call = next(e for e in p.events if e.event_type == "search_call")
+    result = next(e for e in p.events if e.event_type == "search_result")
+    assert call.tool_name == "web_search"
+    assert json.loads(result.result)[0]["title"] == "Result A"
+    # Citations inline em msg
+    msg_asst = next(m for m in p.messages if m.role == "assistant")
+    cits = json.loads(msg_asst.citations_json)
+    assert len(cits) == 2
+
+
+def test_branches_via_parent_id(tmp_path):
+    """Branch fork: msg-1 tem 2 children (msg-2 main, msg-3 alternativa)."""
+    sess = _basic_session(sid="sess-fork")
+    sess["chat_session"]["current_message_id"] = 2
+    sess["chat_messages"].append({
+        "message_id": 3,
+        "parent_id": 1,
+        "role": "ASSISTANT",
+        "content": "alternative answer",
+        "model": "deepseek-chat",
+        "inserted_at": 1774238960.0,
+        "status": "FINISHED",
+        "thinking_content": None,
+        "thinking_enabled": False,
+        "search_enabled": False,
+        "search_results": None,
+        "search_status": None,
+        "accumulated_token_usage": 80,
+        "files": [],
+        "feedback": None,
+        "incomplete_message": None,
+        "tips": [],
+        "ban_edit": False,
+        "ban_regenerate": False,
+    })
+    merged = _write_merged(tmp_path, [sess])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    branches = {b.branch_id: b for b in p.branches}
+    assert "sess-fork_main" in branches
+    assert any(bid.startswith("sess-fork_branch_") for bid in branches)
+    msg3 = next(m for m in p.messages if m.message_id == "3")
+    assert msg3.branch_id != "sess-fork_main"
+
+
+def test_files_to_attachment_names(tmp_path):
+    sess = _basic_session()
+    sess["chat_messages"][0]["files"] = [
+        {"name": "data.csv"},
+        {"name": "image.png"},
+    ]
+    merged = _write_merged(tmp_path, [sess])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    msg_user = next(m for m in p.messages if m.role == "user")
+    names = json.loads(msg_user.attachment_names)
+    assert "data.csv" in names
+
+
+def test_settings_json_includes_thinking_total(tmp_path):
+    sess = _basic_session()
+    sess["chat_messages"][1]["thinking_enabled"] = True
+    sess["chat_messages"][1]["thinking_elapsed_secs"] = 3.5
+    merged = _write_merged(tmp_path, [sess])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    settings = json.loads(p.conversations[0].settings_json)
+    assert settings["thinking_elapsed_total_secs"] == 3.5
+    assert settings["agent"] == "chat"
+
+
+def test_save_writes_parquets(tmp_path):
+    merged = _write_merged(tmp_path, [_basic_session()])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    out = tmp_path / "processed"
+    p.save(out)
+    assert (out / "deepseek_conversations.parquet").exists()
+    assert (out / "deepseek_messages.parquet").exists()
+    assert (out / "deepseek_branches.parquet").exists()
+
+
+def test_preservation_via_explicit_flag(tmp_path):
+    sess = _basic_session()
+    sess["_preserved_missing"] = True
+    sess["_last_seen_in_server"] = "2026-04-01"
+    merged = _write_merged(tmp_path, [sess])
+    p = DeepSeekParser(merged_root=merged)
+    p.parse(merged)
+    assert p.conversations[0].is_preserved_missing is True
