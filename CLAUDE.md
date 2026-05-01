@@ -62,6 +62,8 @@ Lista de imports pendentes em `memory/project_pending_imports_from_old.md`.
 |---|---|---|---|---|---|---|
 | ChatGPT | ✅ | ✅ | ✅ (4 etapas, pasta unica) | ✅ (Fase 2 done) | ✅ (Fase 3.1 done) | Preservation completa, rename detection, fail-fast, parser cobrindo branches + ToolEvents, data-profile renderizando |
 | Claude.ai | ✅ | ✅ | ✅ (3 etapas, pasta unica) | ✅ v3 | ✅ | thinking, tool_use/result+MCP, branches via parent_uuid, is_pinned/is_temporary mapeados, 24k msgs / 16k events |
+| Qwen | ✅ | ✅ | ✅ (2 etapas, pasta unica) | ✅ v3 | ✅ | 8 chat_types (t2t/search/research/t2i/t2v/artifacts/learn), reasoning_content, branches, projects c/ custom_instruction |
+| DeepSeek | ✅ | ✅ | ✅ (2 etapas, pasta unica) | ✅ v3 | ✅ | R1 reasoning chain (222/722 msgs = 31%), token_count, branches via parent_id, search_results estruturados |
 | Gemini | ✅ | ✅ | ❌ | ❌ | ❌ | Idem |
 | NotebookLM | ✅ | ✅ | ❌ | ❌ | ❌ | 9 tipos de outputs (audio, video, slide deck PDF+PPTX, blog, flashcards, quiz, data table, infographic, mind map) |
 | Perplexity | ✅ | ✅ | ✅ | ✅ | ✅ | Auditoria + reconciler + parser v3 + Quarto. 81 conversations (77 threads + 4 pages), 9 artifacts c/ binarios, 1 orphan, 4 spaces |
@@ -247,6 +249,76 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
   - pin via UI → `is_starred=true` reflete em discovery?
   - temporary chat → comportamento na captura?
   - project archive → `archived_at` populado?
+
+**Qwen — ciclo completo end-to-end validado em 2026-05-01:**
+- **Pasta unica cumulativa:** `data/raw/Qwen/` e `data/merged/Qwen/`
+- **Sync orquestrador 2 etapas:** `scripts/qwen-sync.py` (capture + reconcile)
+- **Cobertura:** 115 chats / 3 projects / 4 project files capturados
+- **Reconciler v3 (FEATURES_VERSION=2):** preservation completa convs + projects
+- **Parser canonico v3** (`src/parsers/qwen.py` + `_qwen_helpers.py`):
+  115 convs / 1.799 msgs / 9 tool_events / 133 branches / 3 projects /
+  4 project_docs. Cobertura:
+  - **8 chat_types** mapeados pra modes: chat (80) / search (19) /
+    research (12, deep_research) / dalle (4, t2i+t2v)
+  - **Branches via DAG plano** (`parentId`/`childrenIds` + `currentId`) —
+    113 main + 20 secondary
+  - **reasoning_content** → `Message.thinking` (raro nesta base — feature
+    de modelos QwQ-style, condicional)
+  - **search_results** (de blocks `info.search_results`) → ToolEvent
+  - **t2i/t2v/artifacts** sempre emitem ToolEvent (image/video_generation, artifact)
+  - **`pinned` → `is_pinned`** (cross-platform), **`archived` → `is_archived`**
+  - **`meta.tags` + `feature_config`** preservados em `settings_json`
+  - **content_list[*].timestamp** → `Message.start_timestamp`/`stop_timestamp`
+  - **Project com `custom_instruction`** + `_files` (com presigned S3 URLs,
+    expiram 6h) → `project_metadata` + `project_docs` parquets
+- **Quarto descritivo** (`notebooks/qwen.qmd`): 17MB HTML, render < 30s,
+  cor primaria roxo (#615CED)
+- **Findings empiricos:** `docs/qwen-probe-findings-2026-05-01.md`
+- **Tests:** 14 parser-specific (incluindo coverage dos 8 chat_types)
+- **Auth:** profile copiado de `~/Desktop/AI Interaction Analysis/.storage/qwen-profile-default/`
+- **Comandos:**
+  ```bash
+  PYTHONPATH=. .venv/bin/python scripts/qwen-sync.py
+  PYTHONPATH=. .venv/bin/python scripts/qwen-parse.py
+  QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/qwen.qmd
+  ```
+- **TODO:** download local dos project files (presigned S3 expira 6h);
+  validar cenarios CRUD (rename/delete/pin/archive) — bateria manual
+
+**DeepSeek — ciclo completo end-to-end validado em 2026-05-01:**
+- **Pasta unica cumulativa:** `data/raw/DeepSeek/` e `data/merged/DeepSeek/`
+- **Sync orquestrador 2 etapas:** `scripts/deepseek-sync.py` (capture + reconcile)
+- **Cobertura:** 79 chat_sessions capturadas
+- **Reconciler v3 (FEATURES_VERSION=2):** sem projects (DeepSeek nao expoe)
+- **Parser canonico v3** (`src/parsers/deepseek.py` + `_deepseek_helpers.py`):
+  79 convs / 722 msgs / 20 tool_events / 271 branches. Cobertura:
+  - **R1 reasoning** → `Message.thinking` (**222 msgs / 31% das msgs!**)
+  - **`thinking_elapsed_secs`** sumarizado em `settings_json.thinking_elapsed_total_secs`
+  - **`accumulated_token_usage`** → `Message.token_count` (98% cobertura)
+  - **`pinned` → `is_pinned`** (cross-platform)
+  - **`agent`** (chat/agent) + **`model_type`** (default/thinking) → `mode`
+  - **`current_message_id`** + **`parent_id`** (int IDs) → branches DAG plano.
+    79 main + **192 secundarias** (DeepSeek tem MUITO regenerate — 2.4 branches/conv)
+  - **`search_results`** (estrutura rica com title/url/metadata) → ToolEvent +
+    `Message.citations_json`
+  - **`incomplete_message`** + **`status`** → `Message.finish_reason` (100% cob.)
+  - **Files** per msg → `attachment_names`
+- **Quarto descritivo** (`notebooks/deepseek.qmd`): 8MB HTML, cor azul royal
+- **Findings empiricos:** `docs/deepseek-probe-findings-2026-05-01.md`
+- **Tests:** 15 parser-specific
+- **Schema antigo do legacy parser estava DESATUALIZADO** (esperava `mapping`
+  + `fragments`, mas API atual retorna `chat_messages` flat com campos
+  dedicados). Parser v3 eh rewrite total.
+- **Auth:** profile copiado de `~/Desktop/AI Interaction Analysis/.storage/deepseek-profile-default/`
+- **Comandos:**
+  ```bash
+  PYTHONPATH=. .venv/bin/python scripts/deepseek-sync.py
+  PYTHONPATH=. .venv/bin/python scripts/deepseek-parse.py
+  QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/deepseek.qmd
+  ```
+- **TODO:** validar cenarios CRUD; testar agent mode (visto no schema mas
+  nao capturado nesta base); R1 reasoner com `model_type='thinking'` validar
+  comportamento
 
 **Estado atual `data/merged/ChatGPT/chatgpt_merged.json`:**
 - 1171 convs cumulativas (1168 active + 3 preserved_missing)

@@ -1,0 +1,255 @@
+---
+title: "DeepSeek — Data Profile"
+subtitle: "Catalogo descritivo dos parquets do parser canonico"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+
+import sys
+from pathlib import Path
+
+_this = Path.cwd()
+_project_root = _this if (_this / "src").exists() else _this.parent
+sys.path.insert(0, str(_project_root))
+
+import json
+import pandas as pd
+import duckdb
+import plotly.graph_objects as go
+from itables import init_notebook_mode, show
+
+init_notebook_mode(all_interactive=False)
+
+PROCESSED = _project_root / "data" / "processed" / "DeepSeek"
+con = duckdb.connect()
+for table in ("conversations", "messages", "tool_events", "branches"):
+    p = PROCESSED / f"deepseek_{table}.parquet"
+    if p.exists():
+        con.execute(f"CREATE VIEW {table} AS SELECT * FROM read_parquet('{p}')")
+
+# DeepSeek brand: blue royal
+SOURCE_COLOR = "#4D6BFE"
+ACCENT = "#1E2856"
+MUTED = "#D1D5DB"
+
+
+def fmt_pct(n, total):
+    pct = n / total * 100 if total else 0
+    return f"{n:,}/{total:,} ({pct:.0f}%)"
+
+
+def show_df(df, **kwargs):
+    from IPython.display import display
+    display(df.style.hide(axis="index"))
+
+
+def plotly_bar(x, y, title, color=SOURCE_COLOR, height=350, orientation="v"):
+    fig = (go.Figure(go.Bar(y=x, x=y, marker_color=color, orientation="h"))
+           if orientation == "h" else
+           go.Figure(go.Bar(x=x, y=y, marker_color=color)))
+    fig.update_layout(title=title, height=height, template="plotly_white",
+                      margin=dict(t=50, b=40, l=40, r=20))
+    return fig
+```
+
+# Visao geral
+
+```{python}
+#| label: overview
+
+totals = con.execute("""
+    SELECT
+        (SELECT COUNT(*) FROM conversations) AS conversations,
+        (SELECT COUNT(*) FROM messages) AS messages,
+        (SELECT COUNT(*) FROM tool_events) AS tool_events,
+        (SELECT COUNT(*) FROM branches) AS branches
+""").df()
+
+range_dt = con.execute("SELECT MIN(created_at) AS oldest, MAX(created_at) AS newest FROM conversations").df()
+
+show_df(pd.DataFrame([
+    {"Tabela": "conversations.parquet", "Rows": f"{totals['conversations'].iloc[0]:,}", "Periodo": f"{range_dt['oldest'].iloc[0]:%Y-%m-%d} → {range_dt['newest'].iloc[0]:%Y-%m-%d}"},
+    {"Tabela": "messages.parquet", "Rows": f"{totals['messages'].iloc[0]:,}", "Periodo": "—"},
+    {"Tabela": "tool_events.parquet", "Rows": f"{totals['tool_events'].iloc[0]:,}", "Periodo": "—"},
+    {"Tabela": "branches.parquet", "Rows": f"{totals['branches'].iloc[0]:,}", "Periodo": "—"},
+]))
+```
+
+> **Sobre.** Catalogo descritivo do DeepSeek. Highlights: R1 reasoning chain
+> (`thinking_content`), latency (`thinking_elapsed_secs`), token usage
+> cumulativo, search_results estruturados, branches via parent_id (DAG plano).
+
+# 1. Conversations
+
+```{python}
+#| label: conv-stats
+
+cov = con.execute("""
+    SELECT
+        COUNT(*) AS total,
+        COUNT(title) AS title,
+        COUNT(model) AS model,
+        SUM(is_pinned::INT) AS pinned,
+        SUM(is_preserved_missing::INT) AS preserved
+    FROM conversations
+""").df()
+total = cov["total"].iloc[0]
+def cv(f): return fmt_pct(int(cov[f].iloc[0]), int(total))
+
+show_df(pd.DataFrame([
+    {"Campo": "title", "Cobertura": cv("title")},
+    {"Campo": "model", "Cobertura": cv("model")},
+    {"Campo": "is_pinned", "Cobertura": f"{int(cov['pinned'].iloc[0])} flagged"},
+    {"Campo": "is_preserved_missing", "Cobertura": f"{int(cov['preserved'].iloc[0])} flagged"},
+]))
+```
+
+## 1.1 Mode (chat / agent / R1 thinking)
+
+```{python}
+#| label: modes
+
+modes = con.execute("""
+    SELECT mode, COUNT(*) AS n FROM conversations GROUP BY mode ORDER BY n DESC
+""").df()
+show_df(modes)
+fig = plotly_bar(x=modes["mode"], y=modes["n"], title="Sessions por mode", height=300)
+fig.show()
+```
+
+## 1.2 Top models
+
+```{python}
+#| label: top-models
+
+top = con.execute("""
+    SELECT model, COUNT(*) AS n FROM conversations
+    WHERE model IS NOT NULL GROUP BY model ORDER BY n DESC LIMIT 10
+""").df()
+if not top.empty:
+    show_df(top)
+```
+
+# 2. Messages
+
+```{python}
+#| label: msg-stats
+
+mc = con.execute("""
+    SELECT
+        COUNT(*) AS total,
+        COUNT(thinking) AS with_thinking,
+        COUNT(citations_json) AS with_citations,
+        COUNT(token_count) AS with_tokens,
+        COUNT(attachment_names) AS with_files,
+        COUNT(finish_reason) AS with_finish
+    FROM messages
+""").df()
+mtotal = mc["total"].iloc[0]
+def mv(f): return fmt_pct(int(mc[f].iloc[0]), int(mtotal))
+
+show_df(pd.DataFrame([
+    {"Campo": "thinking (R1 reasoning chain)", "Cobertura": mv("with_thinking")},
+    {"Campo": "citations_json (search_results inline)", "Cobertura": mv("with_citations")},
+    {"Campo": "token_count (accumulated_token_usage)", "Cobertura": mv("with_tokens")},
+    {"Campo": "attachment_names (files)", "Cobertura": mv("with_files")},
+    {"Campo": "finish_reason (status + incomplete_message)", "Cobertura": mv("with_finish")},
+]))
+```
+
+## 2.1 R1 reasoning — uso por modelo
+
+```{python}
+#| label: r1-by-model
+
+r1 = con.execute("""
+    SELECT
+        model,
+        COUNT(*) AS total,
+        COUNT(thinking) AS with_thinking,
+        ROUND(100.0 * COUNT(thinking) / COUNT(*), 1) AS pct
+    FROM messages
+    WHERE role = 'assistant'
+    GROUP BY model
+    ORDER BY total DESC
+""").df()
+show_df(r1)
+```
+
+## 2.2 Token usage (accumulated)
+
+```{python}
+#| label: tokens
+
+t = con.execute("""
+    SELECT
+        AVG(token_count) AS avg, MEDIAN(token_count)::INT AS median,
+        MAX(token_count) AS max,
+        SUM(token_count) AS total
+    FROM messages WHERE token_count IS NOT NULL
+""").df()
+show_df(t)
+```
+
+## 2.3 finish_reason distribution
+
+```{python}
+#| label: finish-reason
+
+f = con.execute("""
+    SELECT finish_reason, COUNT(*) AS n
+    FROM messages WHERE finish_reason IS NOT NULL
+    GROUP BY finish_reason ORDER BY n DESC
+""").df()
+show_df(f)
+```
+
+# 3. ToolEvents
+
+```{python}
+#| label: tool-events
+
+ev = con.execute("""
+    SELECT event_type, COUNT(*) AS n FROM tool_events GROUP BY event_type ORDER BY n DESC
+""").df()
+if not ev.empty:
+    show_df(ev)
+```
+
+# 4. Branches (forks via parent_id)
+
+```{python}
+#| label: branches
+
+br = con.execute("""
+    SELECT
+        SUM(is_active::INT) AS main,
+        SUM((NOT is_active)::INT) AS secondary,
+        COUNT(*) AS total
+    FROM branches
+""").df()
+show_df(br)
+
+# Distribuicao de N branches por session
+distrib = con.execute("""
+    WITH counts AS (SELECT conversation_id, COUNT(*) AS n_br FROM branches GROUP BY conversation_id)
+    SELECT n_br, COUNT(*) AS n_sessions FROM counts GROUP BY n_br ORDER BY n_br
+""").df()
+show_df(distrib)
+```
+
+# 5. Preservation
+
+```{python}
+#| label: preservation
+
+p = con.execute("""
+    SELECT
+        CASE WHEN is_preserved_missing THEN 'Preserved' ELSE 'Active' END AS status,
+        COUNT(*) AS n
+    FROM conversations GROUP BY is_preserved_missing
+""").df()
+show_df(p)
+```

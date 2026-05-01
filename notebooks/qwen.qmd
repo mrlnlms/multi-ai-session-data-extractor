@@ -1,0 +1,273 @@
+---
+title: "Qwen — Data Profile"
+subtitle: "Catalogo descritivo dos parquets do parser canonico"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+
+import sys
+from pathlib import Path
+
+_this = Path.cwd()
+_project_root = _this if (_this / "src").exists() else _this.parent
+sys.path.insert(0, str(_project_root))
+
+import json
+import pandas as pd
+import duckdb
+import plotly.graph_objects as go
+import plotly.express as px
+from itables import init_notebook_mode, show
+
+init_notebook_mode(all_interactive=False)
+
+PROCESSED = _project_root / "data" / "processed" / "Qwen"
+con = duckdb.connect()
+for table in ("conversations", "messages", "tool_events", "branches", "project_metadata", "project_docs"):
+    p = PROCESSED / f"qwen_{table}.parquet"
+    if p.exists():
+        con.execute(f"CREATE VIEW {table} AS SELECT * FROM read_parquet('{p}')")
+
+# Qwen brand: roxo/violeta
+SOURCE_COLOR = "#615CED"
+ACCENT = "#3D2A88"
+MUTED = "#D1D5DB"
+
+
+def fmt_pct(n, total):
+    pct = n / total * 100 if total else 0
+    return f"{n:,}/{total:,} ({pct:.0f}%)"
+
+
+def show_df(df, **kwargs):
+    from IPython.display import display
+    display(df.style.hide(axis="index"))
+
+
+def plotly_bar(x, y, title, color=SOURCE_COLOR, height=350, orientation="v"):
+    fig = (go.Figure(go.Bar(y=x, x=y, marker_color=color, orientation="h"))
+           if orientation == "h" else
+           go.Figure(go.Bar(x=x, y=y, marker_color=color)))
+    fig.update_layout(title=title, height=height, template="plotly_white",
+                      margin=dict(t=50, b=40, l=40, r=20))
+    return fig
+```
+
+# Visao geral
+
+```{python}
+#| label: overview
+
+totals = con.execute("""
+    SELECT
+        (SELECT COUNT(*) FROM conversations) AS conversations,
+        (SELECT COUNT(*) FROM messages) AS messages,
+        (SELECT COUNT(*) FROM tool_events) AS tool_events,
+        (SELECT COUNT(*) FROM branches) AS branches
+""").df()
+
+range_dt = con.execute("SELECT MIN(created_at) AS oldest, MAX(created_at) AS newest FROM conversations").df()
+
+n_proj = con.execute("SELECT COUNT(*) FROM project_metadata").fetchone()[0]
+n_docs = con.execute("SELECT COUNT(*) FROM project_docs").fetchone()[0]
+
+show_df(pd.DataFrame([
+    {"Tabela": "conversations.parquet", "Rows": f"{totals['conversations'].iloc[0]:,}", "Periodo": f"{range_dt['oldest'].iloc[0]:%Y-%m-%d} → {range_dt['newest'].iloc[0]:%Y-%m-%d}"},
+    {"Tabela": "messages.parquet", "Rows": f"{totals['messages'].iloc[0]:,}", "Periodo": "—"},
+    {"Tabela": "tool_events.parquet", "Rows": f"{totals['tool_events'].iloc[0]:,}", "Periodo": "—"},
+    {"Tabela": "branches.parquet", "Rows": f"{totals['branches'].iloc[0]:,}", "Periodo": "—"},
+    {"Tabela": "project_metadata.parquet", "Rows": f"{n_proj:,}", "Periodo": "—"},
+    {"Tabela": "project_docs.parquet", "Rows": f"{n_docs:,}", "Periodo": "—"},
+]))
+```
+
+> **Sobre.** Catalogo descritivo dos parquets do parser canonico do Qwen.
+> Descobertas-chave: 8 chat_types distintos (t2t, search, deep_research,
+> t2i, t2v, artifacts, learn), pinned/archived flags, projects com
+> custom_instruction, reasoning_content condicional ao modelo (R1-equivalente).
+
+# 1. Conversations
+
+```{python}
+#| label: conv-overview
+
+cov = con.execute("""
+    SELECT
+        COUNT(*) AS total,
+        COUNT(title) AS title,
+        COUNT(model) AS model,
+        SUM(is_pinned::INT) AS pinned,
+        SUM(is_archived::INT) AS archived,
+        SUM(is_preserved_missing::INT) AS preserved,
+        COUNT(project_id) AS in_project,
+        COUNT(settings_json) AS with_settings
+    FROM conversations
+""").df()
+total = cov["total"].iloc[0]
+def cv(f): return fmt_pct(int(cov[f].iloc[0]), int(total))
+
+show_df(pd.DataFrame([
+    {"Campo": "title", "Cobertura": cv("title")},
+    {"Campo": "model", "Cobertura": cv("model")},
+    {"Campo": "is_pinned", "Cobertura": f"{int(cov['pinned'].iloc[0])} flagged"},
+    {"Campo": "is_archived", "Cobertura": f"{int(cov['archived'].iloc[0])} flagged"},
+    {"Campo": "is_preserved_missing", "Cobertura": f"{int(cov['preserved'].iloc[0])} flagged"},
+    {"Campo": "project_id", "Cobertura": cv("in_project")},
+    {"Campo": "settings_json (meta + feature_config)", "Cobertura": cv("with_settings")},
+]))
+```
+
+## 1.1 chat_type → mode (8 tipos)
+
+```{python}
+#| label: chat-types
+
+modes = con.execute("""
+    SELECT mode, COUNT(*) AS n
+    FROM conversations GROUP BY mode ORDER BY n DESC
+""").df()
+fig = plotly_bar(x=modes["mode"], y=modes["n"],
+                 title="Conversations por mode (mapeado de chat_type)",
+                 height=300)
+fig.show()
+show_df(modes)
+```
+
+## 1.2 Top models
+
+```{python}
+#| label: top-models
+
+top = con.execute("""
+    SELECT model, COUNT(*) AS n FROM conversations
+    WHERE model IS NOT NULL GROUP BY model ORDER BY n DESC LIMIT 10
+""").df()
+if not top.empty:
+    fig = plotly_bar(x=top["model"], y=top["n"], title="Top modelos", height=300)
+    fig.update_xaxes(tickangle=-30)
+    fig.show()
+```
+
+# 2. Messages
+
+```{python}
+#| label: msg-stats
+
+mc = con.execute("""
+    SELECT
+        COUNT(*) AS total,
+        COUNT(thinking) AS with_thinking,
+        COUNT(attachment_names) AS with_files,
+        COUNT(start_timestamp) AS with_block_ts,
+        COUNT(citations_json) AS with_citations
+    FROM messages
+""").df()
+mtotal = mc["total"].iloc[0]
+def mv(f): return fmt_pct(int(mc[f].iloc[0]), int(mtotal))
+
+show_df(pd.DataFrame([
+    {"Campo": "thinking (reasoning_content do modelo)", "Cobertura": mv("with_thinking")},
+    {"Campo": "attachment_names (files)", "Cobertura": mv("with_files")},
+    {"Campo": "start_timestamp/stop_timestamp (latencia)", "Cobertura": mv("with_block_ts")},
+    {"Campo": "citations_json", "Cobertura": mv("with_citations")},
+]))
+```
+
+## 2.1 Mensagens por role
+
+```{python}
+#| label: msgs-by-role
+
+by_role = con.execute("""
+    SELECT role, COUNT(*) AS total,
+           ROUND(AVG(word_count), 1) AS avg_words
+    FROM messages GROUP BY role
+""").df()
+show_df(by_role)
+```
+
+# 3. ToolEvents
+
+```{python}
+#| label: tool-events
+
+ev = con.execute("""
+    SELECT event_type, COUNT(*) AS n
+    FROM tool_events GROUP BY event_type ORDER BY n DESC
+""").df()
+if not ev.empty:
+    show_df(ev)
+    fig = plotly_bar(x=ev["event_type"], y=ev["n"],
+                     title="ToolEvents por tipo", height=300)
+    fig.show()
+else:
+    print("Nenhum tool_event nesta base.")
+```
+
+# 4. Branches
+
+```{python}
+#| label: branches
+
+br = con.execute("""
+    SELECT
+        SUM(is_active::INT) AS main,
+        SUM((NOT is_active)::INT) AS secondary,
+        COUNT(*) AS total
+    FROM branches
+""").df()
+show_df(br)
+```
+
+# 5. Projects
+
+```{python}
+#| label: projects
+
+if n_proj > 0:
+    proj = con.execute("""
+        SELECT name, custom_instruction, files_count,
+               strftime(created_at, '%Y-%m-%d') AS created
+        FROM project_metadata ORDER BY files_count DESC
+    """).df()
+    show_df(proj)
+
+if n_docs > 0:
+    print("\n## Project docs")
+    docs = con.execute("""
+        SELECT file_name, content_size, substr(project_id, 1, 8) AS proj_id
+        FROM project_docs ORDER BY content_size DESC
+    """).df()
+    show_df(docs)
+```
+
+# 6. Preservation
+
+```{python}
+#| label: preservation
+
+p = con.execute("""
+    SELECT
+        CASE WHEN is_preserved_missing THEN 'Preserved' ELSE 'Active' END AS status,
+        COUNT(*) AS n
+    FROM conversations GROUP BY is_preserved_missing
+""").df()
+show_df(p)
+```
+
+## 6.1 Pin / Temporary / Archived (cross-platform check)
+
+```{python}
+#| label: cross-platform-flags
+
+ct = con.execute("""
+    SELECT
+        SUM(is_pinned::INT) AS pinned,
+        SUM(is_archived::INT) AS archived,
+        SUM(is_temporary::INT) AS temporary
+    FROM conversations
+""").df()
+show_df(ct)
+```
