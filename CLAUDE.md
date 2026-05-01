@@ -62,8 +62,8 @@ Lista de imports pendentes em `memory/project_pending_imports_from_old.md`.
 |---|---|---|---|---|---|---|
 | ChatGPT | ✅ | ✅ | ✅ (4 etapas, pasta unica) | ✅ (Fase 2 done) | ✅ (Fase 3.1 done) | Preservation completa, rename detection, fail-fast, parser cobrindo branches + ToolEvents, data-profile renderizando |
 | Claude.ai | ✅ | ✅ | ✅ (3 etapas, pasta unica) | ✅ v3 | ✅ | thinking, tool_use/result+MCP, branches via parent_uuid, is_pinned/is_temporary mapeados, 24k msgs / 16k events |
-| Qwen | ✅ | ✅ | ✅ (2 etapas, pasta unica) | ✅ v3 | ✅ | 8 chat_types (t2t/search/research/t2i/t2v/artifacts/learn), reasoning_content, branches, projects c/ custom_instruction |
-| DeepSeek | ✅ | ✅ | ✅ (2 etapas, pasta unica) | ✅ v3 | ✅ | R1 reasoning chain (222/722 msgs = 31%), token_count, branches via parent_id, search_results estruturados |
+| Qwen | ✅ | ✅ | ✅ (3 etapas, pasta unica) | ✅ v3 | ✅ | **NAO shipped — pendente bateria CRUD UI** (rename/delete/pin/archive). Pipeline funciona, parser cobre 8 chat_types + reasoning + projects + asset_paths via manifest, mas caminhos de delete/pin/archive nunca rodaram em dado real |
+| DeepSeek | ✅ | ✅ | ✅ (2 etapas, pasta unica) | ✅ v3 | ✅ | **NAO shipped — pendente bateria CRUD UI** (rename/delete/pin). Pipeline funciona, parser cobre R1 reasoning + token_count + 220 msgs com metadata, mas delete/pin nunca rodaram em dado real |
 | Gemini | ✅ | ✅ | ❌ | ❌ | ❌ | Idem |
 | NotebookLM | ✅ | ✅ | ❌ | ❌ | ❌ | 9 tipos de outputs (audio, video, slide deck PDF+PPTX, blog, flashcards, quiz, data table, infographic, mind map) |
 | Perplexity | ✅ | ✅ | ✅ | ✅ | ✅ | Auditoria + reconciler + parser v3 + Quarto. 81 conversations (77 threads + 4 pages), 9 artifacts c/ binarios, 1 orphan, 4 spaces |
@@ -286,9 +286,11 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
   326 URLs detectadas em msgs/projects, 321 baixadas com sucesso,
   196MB local. Parser resolve `asset_paths` via `assets_manifest.json`:
   171 msgs com `asset_paths` populados.
-- **CRUD historico validado** via 4 snapshots do projeto-pai (`docs/qwen-server-behavior.md`):
-  +6 added, 0 deletes/renames/pins. Bateria manual UI fica como TODO
-  futuro nao-bloqueante
+- **STATUS: NAO shipped.** Pipeline tecnico completo, mas pendente bateria
+  CRUD UI (rename/delete/pin/archive) — caminhos de codigo nunca rodaram
+  em dado real. Snapshots historicos so cobrem add (+6 chats em 7 dias).
+  Pra fechar: usuario precisa clicar nos 4 cenarios em UI (~5 min). Ate
+  la, NAO chamar de shipped.
 
 **DeepSeek — ciclo completo end-to-end validado em 2026-05-01:**
 - **Pasta unica cumulativa:** `data/raw/DeepSeek/` e `data/merged/DeepSeek/`
@@ -325,8 +327,10 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
 - **`status` enum descoberto:** `FINISHED`/`INCOMPLETE`/`WIP` (716/5/1 msgs)
 - **`feedback`/`tips`/`ban_edit`/`ban_regenerate`/`thinking_elapsed_secs`**
   preservados em `Message.attachments_json` (220 msgs com metadata)
-- **CRUD historico validado** via 2 snapshots (`docs/deepseek-server-behavior.md`):
-  +1 added, 0 deletes
+- **STATUS: NAO shipped.** Pipeline tecnico completo, mas pendente bateria
+  CRUD UI (rename/delete/pin) — caminhos nunca rodaram em dado real.
+  Snapshots historicos so cobrem add (+1 chat). Pra fechar: usuario
+  precisa clicar nos 3 cenarios em UI (~3 min).
 
 **Estado atual `data/merged/ChatGPT/chatgpt_merged.json`:**
 - 1171 convs cumulativas (1168 active + 3 preserved_missing)
