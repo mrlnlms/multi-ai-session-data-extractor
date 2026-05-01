@@ -156,13 +156,27 @@ revelou 6 gaps de cobertura. Fechados em sequência, schema bumped.
 
 | Gap | Impl |
 |---|---|
-| `Conversation.summary` (auto-gerado pelo servidor) | ✅ 466/835 convs (56%) |
+| `Conversation.summary` (auto-gerado pelo servidor) | ✅ 466/835 convs (56%)¹ |
 | `Conversation.settings_json` (paprika_mode, web_search, etc) | ✅ 835/835 (100%) |
 | `Message.citations_json` (citations em text blocks) | ✅ 115 msgs |
 | `Message.attachments_json` (extracted_content inline) | ✅ 1.344 msgs |
-| `Message.start_timestamp` + `stop_timestamp` (latência por block) | ✅ 23.930 msgs (98%) |
+| `Message.start_timestamp` + `stop_timestamp` (latência por block) | ✅ 23.930 msgs (98%)¹ |
 | MCP detection completa (`integration_name` + `mcp_server_url` + `is_mcp_app`) | ✅ 791 MCP calls (vs 716 antes) |
 | Nova tabela `project_docs` (content inline, 23M chars) | ✅ 546 docs / 23.182.481 chars |
+
+**¹ Por que summary e block timestamps não são 100%?** Investigação mostra
+correlação forte com idade da conv:
+
+| Ano da conv | Summary cobertura | Block timestamps cobertura |
+|---|---|---|
+| 2024 | 18% (2/11) | 1% (2/160) |
+| 2025 | 44% (282/634) | 98% (19.214/19.630) |
+| 2026 | **96% (182/190)** | **100% (4.714/4.714)** |
+
+Ambas features são **rollouts retroativos parciais** do servidor — Claude.ai
+gera summary/timestamps pra convs novas mas não preenche convs antigas
+(2024 e parte de 2025). Não é gap do parser — é estado real do servidor.
+Convs novas terão 100% das duas.
 
 Bate com a spec do projeto-mãe (item #41): "23M chars em 546 docs" ✅
 exato; "1.8k+ attachments" → 1.344 (próximo); "16k+ tool_use" → 16.180 ✅.
