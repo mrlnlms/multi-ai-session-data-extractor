@@ -136,17 +136,31 @@ def _load_capture_log(path: Path) -> list[CaptureRun]:
                 d = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            # ChatGPT schema: run_started_at, discovery.total, fetch.{attempted,succeeded}
+            # Perplexity schema: started_at, totals.{threads_discovered,threads_fetched}
+            started = _parse_iso(d.get("run_started_at") or d.get("started_at"))
+            finished = _parse_iso(d.get("run_finished_at") or d.get("finished_at"))
+            duration = d.get("duration_seconds")
+            if duration is None and started and finished:
+                duration = (finished - started).total_seconds()
             discovery = d.get("discovery") or {}
             fetch = d.get("fetch") or {}
+            totals = d.get("totals") or {}
+            errors = d.get("errors")
+            errors_count = (
+                len(errors) if isinstance(errors, list)
+                else sum(len(v) for v in errors.values() if isinstance(v, list)) if isinstance(errors, dict)
+                else 0
+            )
             runs.append(
                 CaptureRun(
-                    started_at=_parse_iso(d.get("run_started_at")),
-                    finished_at=_parse_iso(d.get("run_finished_at")),
-                    duration_seconds=d.get("duration_seconds"),
-                    discovery_total=discovery.get("total"),
-                    fetch_attempted=fetch.get("attempted"),
-                    fetch_succeeded=fetch.get("succeeded"),
-                    errors_count=len(d.get("errors") or []),
+                    started_at=started,
+                    finished_at=finished,
+                    duration_seconds=duration,
+                    discovery_total=discovery.get("total") or totals.get("threads_discovered"),
+                    fetch_attempted=fetch.get("attempted") or totals.get("threads_fetched"),
+                    fetch_succeeded=fetch.get("succeeded") or totals.get("threads_fetched"),
+                    errors_count=errors_count,
                 )
             )
     return runs
@@ -200,10 +214,18 @@ def load_platform_state(name: str) -> PlatformState:
 
 
 def discover_platforms() -> list[PlatformState]:
-    """Une KNOWN_PLATFORMS com qualquer pasta extra encontrada em data/."""
-    found_raw = {p.name for p in DATA_RAW.iterdir()} if DATA_RAW.exists() else set()
-    found_merged = {p.name for p in DATA_MERGED.iterdir()} if DATA_MERGED.exists() else set()
+    """Une KNOWN_PLATFORMS com qualquer pasta extra encontrada em data/.
+    Ignora pastas com espaco ou prefixos legacy (e.g. 'Perplexity Data')."""
+    def _is_valid_extra(name: str) -> bool:
+        # Ignora legacy: pastas com espaco, prefixos timestamp, etc
+        if " " in name or name.startswith((".", "_")):
+            return False
+        return True
+
+    found_raw = {p.name for p in DATA_RAW.iterdir() if p.is_dir()} if DATA_RAW.exists() else set()
+    found_merged = {p.name for p in DATA_MERGED.iterdir() if p.is_dir()} if DATA_MERGED.exists() else set()
     extras = sorted((found_raw | found_merged) - set(KNOWN_PLATFORMS))
+    extras = [n for n in extras if _is_valid_extra(n)]
     names = list(KNOWN_PLATFORMS) + extras
     return [load_platform_state(n) for n in names]
 
