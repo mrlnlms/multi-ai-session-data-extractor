@@ -177,6 +177,37 @@ fetcher legacy capturava ambos mas extraction misturou.
 - ❌ Versionamento histórico de outputs (não exposto pelo NotebookLM)
 - ❌ Reimport de `more.design` (profile perdido — raw preservado no pai)
 
+## Gaps conhecidos (TODO próxima iteração)
+
+Decidido durante full sync 2026-05-02 — não bloqueia "shipped" mas vale
+documentar pra refinar depois.
+
+### 1. Page images dos sources falham silenciosamente
+
+`_extract_page_images` no `asset_downloader.py` extrai URLs lh3
+de 363/974 sources (37%) mas downloads estão falhando — `source_pages/`
+tem 20 dirs vazias. Possíveis causas:
+- Timeout 60s muito curto pras imagens lh3
+- URLs requerem auth diferente
+- URLs expiram rápido
+
+**Impacto baixo:** texto extraído dos sources (`sources/<uuid>.json`) é o
+que importa — page images são thumbnails visuais "nice to have".
+
+**Fix:** aumentar timeout, investigar response, ou capturar URL e
+re-tentar quando expirado. Tarefa: ~30min de probe.
+
+### 2. Source-level summary + tags não capturados
+
+NotebookLM gera resumo + tags por source na sidebar (visível na UI). Provável
+que requeira RPC adicional (não mapeado em `api_client.py`). `hizoJc`
+retorna apenas texto extraído + URLs de page images, **não** o summary
+processado pelo modelo.
+
+**Fix:** probe Chrome MCP clicando num source na UI pra ver qual RPC
+busca o summary. Adicionar `fetch_source_summary` no `api_client.py` +
+campo `summary_json` em `notebooklm_sources.parquet`.
+
 ## Validação cruzada vs legacy do projeto pai
 
 Pai (`~/Desktop/AI Interaction Analysis/data/processed/`) tem 4 parquets
