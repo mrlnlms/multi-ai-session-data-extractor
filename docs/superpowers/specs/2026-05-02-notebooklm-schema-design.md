@@ -152,24 +152,31 @@ Reusa dataclass `Conversation` ja existente em `src/schema/models.py`:
 Demais campos (project_id, gizmo_*, is_archived, is_temporary, settings_json,
 citations_json, etc) ficam `None`/default.
 
-### 5.2. `notebooklm_messages.parquet` (chat turns apenas)
+### 5.2. `notebooklm_messages.parquet` (chat turns + system summary)
 
-Reusa dataclass `Message`:
+Reusa dataclass `Message`. **Cada notebook gera no minimo 1 system message
+(guide.summary)** — garante `message_count >= 1` mesmo pra notebooks sem
+chat (76% dos notebooks no legacy do pai tem chat=None).
 
 | Campo | Valor |
 |---|---|
-| `message_id` | UUID extraido do chat raw |
+| `message_id` | UUID extraido do chat raw OR `<conv>_guide_summary` (sintetico) |
 | `conversation_id` | `account-{N}_{notebook_uuid}` |
-| `role` | `'user'` ou `'assistant'` |
-| `content` | texto da msg |
-| `created_at` | timestamp do turn |
+| `role` | `'system'` (guide.summary) OR `'user'`/`'assistant'` (chat real) |
+| `content` | guide.summary OR texto do chat turn |
+| `sequence` | 0 = system summary, 1+ = chat turns |
+| `created_at` | created_at do notebook (system msg) OR timestamp do turn |
 | `branch_id` | `<conv>_main` (default) |
 | `account` | `'1'` ou `'2'` |
 | `model` | `'gemini'` |
 
-**NotebookLM tem chat?** RPC khqZz existe; smoke (5 notebooks) retornou
-`chat: None` em todos. Provavel: chat so populado quando user interage.
-Empirical findings vao confirmar.
+**Stats reais (legacy projeto pai, 2026-05-02):** 149 conversations,
+**apenas 114 messages totais** = ~76% dos notebooks tem chat=None.
+**Decisao aprovada:** garantir minimo 1 system msg por notebook (guide.summary).
+Sem isso, dashboard cross-plataforma marca 3/4 dos notebooks como vazios.
+
+Notes/briefs continuam em `notebooklm_notes.parquet` (NAO viram messages —
+evita duplicacao). Quem quiser unificar tudo em uma view faz JOIN/DuckDB.
 
 ### 5.3. `notebooklm_tool_events.parquet`
 
@@ -461,10 +468,50 @@ Aplicar **desde o primeiro commit** — nao esperar review pegar:
 | 13 | Review cruzado + CLAUDE.md update | 0.25 dia |
 | **Total** | | **~5 dias** |
 
-## 18. Anexos
+## 18. Validacao cruzada vs projeto pai
+
+Projeto pai (`~/Desktop/AI Interaction Analysis/`) tem cobertura legacy
+completa, util como ground truth pra paridade.
+
+**Disponibilidade:**
+- `data/raw/NotebookLM Data/` — 15GB raw, 97 notebooks na conta hello
+  (multi-conta: hello.marlonlemes, marloonlemes, more.design)
+- `data/merged/NotebookLM/` — merged reconciliado (legacy)
+- `data/processed/` — 4 parquets legacy:
+  - `notebooklm_conversations.parquet` (149 rows, schema v1)
+  - `notebooklm_guides.parquet` (144 rows: guide_summary, source_count, source_names)
+  - `notebooklm_messages.parquet` (apenas 114 rows — 76% notebooks sem chat)
+  - `notebooklm_sources.parquet` (1306 rows: so source_uuid + source_name,
+    SEM content extraido)
+
+**Cobertura legacy ⊆ v3 trivialmente:**
+
+| Tabela | Legacy (pai) | v3 (novo) |
+|---|---|---|
+| Conversations | 149 rows, schema v1 | + schema v3 fields, multi-account namespace |
+| Messages | 114 rows | + guide.summary como system msg, multi-account |
+| Sources | 1306 rows (so nomes) | + content extraido, content_size, token_count |
+| Guides | 144 rows (so summary) | summary movido pra `Conversation.summary` + tabela `guide_questions` separada |
+| Notes | ❌ ausente | ✅ tabela auxiliar nova |
+| Outputs (9 tipos) | ❌ ausente | ✅ tabela auxiliar nova com asset_paths + content |
+| Tool events | ❌ ausente | ✅ canonico (vazio se chat sem tools) |
+| Branches | ❌ ausente | ✅ canonico (`<conv>_main` sempre) |
+| Mind map | ❌ ausente | ✅ em `outputs.parquet` (type=10) |
+
+**Validation strategy (Fase G):**
+1. Rodar parser v3 contra merged do projeto **deste** repo (apos sync novo)
+2. Comparar contagens vs legacy do pai pra notebooks sobrepostos
+3. Documentar em `docs/notebooklm-parser-validation.md`
+4. Criterio: counts v3 >= counts legacy. Diferencas justificadas
+   (account-N namespace renames conversation_id, sources tem +1306 rows
+   com content que pai nao tinha, etc).
+
+## 19. Anexos
 
 - Brief: `~/.claude/projects/-Users-mosx-Desktop-multi-ai-session-data-extractor/memory/project_pickup_brief_notebooklm.md`
 - Plan generico: `docs/platform-replication-plan.md` (8 fases por plataforma)
 - Glossary: `docs/glossary.md`
 - Estado das 6 plataformas shipped: `CLAUDE.md` §"Estado validado"
 - Refs cross-plataforma: `notebooks/gemini.qmd` (modelo multi-conta)
+- Raw pai (ground truth): `~/Desktop/AI Interaction Analysis/data/raw/NotebookLM Data/`
+- Processed pai (legacy parquets): `~/Desktop/AI Interaction Analysis/data/processed/notebooklm_*.parquet`
