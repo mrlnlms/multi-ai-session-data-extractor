@@ -14,7 +14,7 @@ from src.parsers.perplexity import PerplexityParser
 if __name__ == "__main__":
     parser = PerplexityParser()
     parser.parse()
-    stats = parser.write()
+    stats = parser.save()
     print("=== Perplexity parse done ===")
     for k, v in stats.items():
         print(f"  {k}: {v}")

@@ -100,7 +100,31 @@ async def run_export(
         client = PerplexityAPIClient(context, page)
         await client.warmup()
 
-        # User metadata (info, settings, ai_profile) — preservation completa
+        threads = await discover(client, output_dir)
+
+        # Fail-fast: queda drastica vs baseline historico. Persistencia da
+        # discovery acontece SO depois do clear — escrever antes corrompe
+        # baseline incremental se abortar (mesmo bug 2 corrigido em qwen/
+        # deepseek/gemini/claude_ai).
+        baseline = _get_max_known_discovery(output_dir)
+        curr = len(threads)
+        if baseline > 0:
+            drop = (baseline - curr) / baseline
+            if drop > DISCOVERY_DROP_ABORT_THRESHOLD:
+                raise RuntimeError(
+                    f"Discovery suspeita: {curr} threads vs {baseline} no historico "
+                    f"(queda {drop:.0%}, limite {DISCOVERY_DROP_ABORT_THRESHOLD:.0%}). "
+                    f"Possivel Cloudflare challenge / sessao expirada / endpoint flakey. "
+                    f"Tente novamente."
+                )
+            print(f"Discovery OK: {curr} threads (baseline historico: {baseline})")
+
+        persist_discovery(threads, output_dir)
+
+        # User metadata (info, settings, ai_profile, skills) — preservation
+        # completa. Capturado APOS fail-fast pra nao escrever lixo se discovery
+        # tiver corrompida (alinha com chatgpt que escreve memories/instructions
+        # depois do raw save).
         print("Capturando user metadata...")
         user_dir = output_dir / "user"
         user_dir.mkdir(parents=True, exist_ok=True)
@@ -123,27 +147,6 @@ async def run_export(
             )
         except Exception as e:
             print(f"  warn user metadata: {str(e)[:100]}")
-
-        threads = await discover(client, output_dir)
-
-        # Fail-fast: queda drastica vs baseline historico. Persistencia da
-        # discovery acontece SO depois do clear — escrever antes corrompe
-        # baseline incremental se abortar (mesmo bug 2 corrigido em qwen/
-        # deepseek/gemini/claude_ai).
-        baseline = _get_max_known_discovery(output_dir)
-        curr = len(threads)
-        if baseline > 0:
-            drop = (baseline - curr) / baseline
-            if drop > DISCOVERY_DROP_ABORT_THRESHOLD:
-                raise RuntimeError(
-                    f"Discovery suspeita: {curr} threads vs {baseline} no historico "
-                    f"(queda {drop:.0%}, limite {DISCOVERY_DROP_ABORT_THRESHOLD:.0%}). "
-                    f"Possivel Cloudflare challenge / sessao expirada / endpoint flakey. "
-                    f"Tente novamente."
-                )
-            print(f"Discovery OK: {curr} threads (baseline historico: {baseline})")
-
-        persist_discovery(threads, output_dir)
 
         # Plano incremental: thread JA existe no disco com mesmo last_query_datetime?
         # Mantem (skip fetch). Mudou ou nova → fetch.

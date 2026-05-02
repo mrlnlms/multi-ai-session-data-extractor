@@ -494,12 +494,20 @@ class PerplexityParser(BaseParser):
             }, ensure_ascii=False),
         ))
 
-    def write(self, output_dir: Optional[Path] = None) -> dict:
+    def save(self, output_dir: Optional[Path] = None) -> dict:
+        """Override de BaseParser.save — alinha API com claude_ai/qwen/deepseek/
+        gemini/chatgpt (todos usam save()). Nome legacy `write()` mantido como
+        alias pra compat retroativa."""
         out = Path(output_dir) if output_dir else Path("data/processed/Perplexity")
         out.mkdir(parents=True, exist_ok=True)
 
+        # word_count enrichment (mesma logica de BaseParser.save)
+        msg_df = messages_to_df(self.messages)
+        if not msg_df.empty:
+            msg_df["word_count"] = msg_df["content"].fillna("").str.split().str.len()
+
         conversations_to_df(self.conversations).to_parquet(out / "perplexity_conversations.parquet", index=False)
-        messages_to_df(self.messages).to_parquet(out / "perplexity_messages.parquet", index=False)
+        msg_df.to_parquet(out / "perplexity_messages.parquet", index=False)
         tool_events_to_df(self.tool_events).to_parquet(out / "perplexity_tool_events.parquet", index=False)
         branches_to_df(self.branches).to_parquet(out / "perplexity_branches.parquet", index=False)
 
@@ -510,3 +518,6 @@ class PerplexityParser(BaseParser):
             "branches": len(self.branches),
             "output_dir": str(out),
         }
+
+    # alias retro-compat
+    write = save

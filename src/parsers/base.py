@@ -66,7 +66,9 @@ class BaseParser(ABC):
 
         evt_df = self.events_df()
         if not evt_df.empty:
-            evt_df.to_parquet(output_dir / f"{self.source_name}_events.parquet")
+            # Convencao canonica: tool_events.parquet (alinha com todas as
+            # subclasses concretas que ja sobrescrevem save()).
+            evt_df.to_parquet(output_dir / f"{self.source_name}_tool_events.parquet")
 
     @staticmethod
     def _ts(value) -> pd.Timestamp:

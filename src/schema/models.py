@@ -112,6 +112,10 @@ class ToolEvent:
     # parser v3
     result: Optional[str] = None
 
+    def __post_init__(self):
+        if self.source not in VALID_SOURCES:
+            raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
+
     def to_dict(self) -> dict:
         return asdict(self)
 
@@ -122,6 +126,11 @@ class ConversationProject:
     project_tag: str
     tagged_by: str
     confidence: Optional[float] = None
+    source: Optional[str] = None
+
+    def __post_init__(self):
+        if self.source is not None and self.source not in VALID_SOURCES:
+            raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
 
     def to_dict(self) -> dict:
         return asdict(self)
