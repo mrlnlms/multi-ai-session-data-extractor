@@ -192,14 +192,11 @@ def _render_sync_button(state: PlatformState) -> None:
 
 
 def _render_quarto_section(state: PlatformState) -> None:
-    """Botao + link pra abrir o data-profile Quarto da plataforma.
+    """Botoes + links pra abrir os data-profile Quarto da plataforma.
 
-    Estados possiveis:
-    - Quarto nao instalado → hint amigavel, sem botao
-    - QMD nao existe pra plataforma → mensagem informativa
-    - HTML existe e atualizado → link "Ver dados detalhados" (nova aba)
-    - HTML existe mas stale → link + botao "Re-renderizar"
-    - HTML nao existe → botao "Renderizar dados detalhados"
+    Suporta:
+    - .qmd consolidado (`notebooks/<plat>.qmd`)
+    - .qmd per-account (`notebooks/<plat>-acc-{N}.qmd`) — multi-conta
     """
     if not quarto.quarto_installed():
         st.caption(
@@ -208,8 +205,10 @@ def _render_quarto_section(state: PlatformState) -> None:
         )
         return
 
-    qmd = quarto.qmd_path(state.name)
-    if not qmd.exists():
+    consolidated = quarto.qmd_path(state.name)
+    per_account = quarto.qmd_paths_per_account(state.name)
+
+    if not consolidated.exists() and not per_account:
         st.caption(
             f"📝 Notebook descritivo Quarto não existe pra {state.name} ainda. "
             f"Implementar `notebooks/{state.name.lower()}.qmd` (modelo: "
@@ -217,37 +216,45 @@ def _render_quarto_section(state: PlatformState) -> None:
         )
         return
 
-    html_src = quarto.html_output_path(state.name)
-    static_dst = quarto.html_static_path(state.name)
-    stale = quarto.is_html_stale(state.name)
+    # 1) Consolidado
+    if consolidated.exists():
+        _render_qmd_row(state, consolidated, label_suffix="(consolidado)")
+
+    # 2) Per-account
+    for acc_label, qmd in per_account:
+        _render_qmd_row(state, qmd, label_suffix=f"({acc_label})")
+
+
+def _render_qmd_row(state: PlatformState, qmd, label_suffix: str) -> None:
+    """Linha pra 1 .qmd (consolidado ou per-account): link + botao re-render."""
+    html_src = quarto.html_output_path_for_qmd(qmd)
+    static_dst = quarto.html_static_path_for_qmd(qmd)
+    stale = quarto.is_html_stale_for_qmd(state.name, qmd)
 
     cols = st.columns([3, 1])
 
     with cols[0]:
         if html_src.exists() and not stale:
-            # Garante que static/ tem cópia atualizada (idempotente — só copia
-            # se mtime diferir)
             if not static_dst.exists() or static_dst.stat().st_mtime < html_src.stat().st_mtime:
-                quarto.copy_to_static(state.name)
-            url = quarto.streamlit_static_url(state.name)
+                quarto.copy_to_static_for_qmd(qmd)
+            url = quarto.streamlit_static_url_for_qmd(qmd)
             st.markdown(
-                f'📊 **[Ver dados detalhados ({state.name})]({url})** — '
+                f'📊 **[Ver dados detalhados {label_suffix}]({url})** — '
                 f'HTML self-contained, abre em nova aba',
                 unsafe_allow_html=True,
             )
         elif html_src.exists() and stale:
             st.warning(
-                "⚠️ Dados detalhados desatualizados — parquet mais novo que último render. "
-                "Use o botão pra re-renderizar."
+                f"⚠️ Dados detalhados {label_suffix} desatualizados — parquet mais novo que último render."
             )
         else:
-            st.caption("📊 Dados detalhados ainda não rendirizados.")
+            st.caption(f"📊 Dados detalhados {label_suffix} ainda não rendirizados.")
 
     with cols[1]:
         label = "🔄 Re-render" if html_src.exists() else "📊 Renderizar"
-        if st.button(label, key=f"render-quarto-{state.name}"):
-            with st.spinner(f"Renderizando {state.name}.qmd... (~20s)"):
-                ok, err = quarto.render_and_publish(state.name)
+        if st.button(label, key=f"render-quarto-{qmd.stem}"):
+            with st.spinner(f"Renderizando {qmd.name}... (~20s)"):
+                ok, err = quarto.render_and_publish_qmd(qmd)
             if ok:
                 st.success("✅ Rendirizado e disponível")
                 st.rerun()
