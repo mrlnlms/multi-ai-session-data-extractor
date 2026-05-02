@@ -479,30 +479,31 @@ class ChatGPTParser(BaseParser):
         return branches_to_df(self.branches)
 
     def save(self, output_dir: Path) -> None:
-        """Override de BaseParser.save — paths sem prefix de source.
+        """Override de BaseParser.save — paths source-prefixed (alinha com
+        claude_ai/qwen/deepseek/gemini/perplexity).
 
-        Layout (plan §5):
-            <output_dir>/conversations.parquet
-            <output_dir>/messages.parquet
-            <output_dir>/tool_events.parquet
-            <output_dir>/branches.parquet
+        Layout:
+            <output_dir>/chatgpt_conversations.parquet
+            <output_dir>/chatgpt_messages.parquet
+            <output_dir>/chatgpt_tool_events.parquet
+            <output_dir>/chatgpt_branches.parquet
         """
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         conv_df = conversations_to_df(self.conversations)
         if not conv_df.empty:
-            conv_df.to_parquet(output_dir / "conversations.parquet", index=False)
+            conv_df.to_parquet(output_dir / "chatgpt_conversations.parquet", index=False)
 
         msg_df = messages_to_df(self.messages)
         if not msg_df.empty:
             msg_df["word_count"] = msg_df["content"].fillna("").str.split().str.len()
-            msg_df.to_parquet(output_dir / "messages.parquet", index=False)
+            msg_df.to_parquet(output_dir / "chatgpt_messages.parquet", index=False)
 
         evt_df = tool_events_to_df(self.events)
         if not evt_df.empty:
-            evt_df.to_parquet(output_dir / "tool_events.parquet", index=False)
+            evt_df.to_parquet(output_dir / "chatgpt_tool_events.parquet", index=False)
 
         br_df = self.branches_df()
         if not br_df.empty:
-            br_df.to_parquet(output_dir / "branches.parquet", index=False)
+            br_df.to_parquet(output_dir / "chatgpt_branches.parquet", index=False)

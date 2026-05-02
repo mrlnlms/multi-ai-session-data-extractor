@@ -337,15 +337,16 @@ def test_parse_is_pinned_propagates_from_is_starred(tmp_path):
     assert by_id["conv-archived"].is_pinned is None  # is_starred ausente
 
 
-def test_save_writes_parquets_without_source_prefix(tmp_path):
-    """Plan §5: paths sao data/processed/<Source>/conversations.parquet (sem prefix)."""
+def test_save_writes_parquets_with_source_prefix(tmp_path):
+    """Paths source-prefixed: data/processed/ChatGPT/chatgpt_<table>.parquet
+    (alinha com claude_ai/qwen/deepseek/gemini/perplexity)."""
     merged = _make_merged("raw_with_voice.json", tmp_path)
     parser = ChatGPTParser(raw_root=tmp_path)
     parser.parse(merged)
     out = tmp_path / "out"
     parser.save(out)
-    assert (out / "conversations.parquet").is_file()
-    assert (out / "messages.parquet").is_file()
+    assert (out / "chatgpt_conversations.parquet").is_file()
+    assert (out / "chatgpt_messages.parquet").is_file()
     # tool_events pode ou nao existir dependendo da fixture; voice nao tem
 
 
@@ -482,7 +483,7 @@ def test_parse_branches_saved_in_parquet(tmp_path):
     parser.parse(merged)
     out = tmp_path / "out"
     parser.save(out)
-    assert (out / "branches.parquet").is_file()
+    assert (out / "chatgpt_branches.parquet").is_file()
 
 
 def test_parse_preservation_fields_present(tmp_path):

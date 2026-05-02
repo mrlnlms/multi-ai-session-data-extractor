@@ -498,10 +498,10 @@ class PerplexityParser(BaseParser):
         out = Path(output_dir) if output_dir else Path("data/processed/Perplexity")
         out.mkdir(parents=True, exist_ok=True)
 
-        conversations_to_df(self.conversations).to_parquet(out / "conversations.parquet", index=False)
-        messages_to_df(self.messages).to_parquet(out / "messages.parquet", index=False)
-        tool_events_to_df(self.tool_events).to_parquet(out / "tool_events.parquet", index=False)
-        branches_to_df(self.branches).to_parquet(out / "branches.parquet", index=False)
+        conversations_to_df(self.conversations).to_parquet(out / "perplexity_conversations.parquet", index=False)
+        messages_to_df(self.messages).to_parquet(out / "perplexity_messages.parquet", index=False)
+        tool_events_to_df(self.tool_events).to_parquet(out / "perplexity_tool_events.parquet", index=False)
+        branches_to_df(self.branches).to_parquet(out / "perplexity_branches.parquet", index=False)
 
         return {
             "conversations": len(self.conversations),

@@ -29,7 +29,7 @@ PROCESSED = _project_root / "data" / "processed" / "ChatGPT"
 con = duckdb.connect()
 for table in ("conversations", "messages", "tool_events", "branches"):
     con.execute(
-        f"CREATE VIEW {table} AS SELECT * FROM read_parquet('{PROCESSED}/{table}.parquet')"
+        f"CREATE VIEW {table} AS SELECT * FROM read_parquet('{PROCESSED}/chatgpt_{table}.parquet')"
     )
 
 # --- Constantes visuais ---
@@ -85,10 +85,10 @@ range_dt = con.execute("""
 """).df()
 
 show_df(pd.DataFrame([
-    {"Tabela": "conversations.parquet", "Rows": f"{totals['conversations'].iloc[0]:,}", "Periodo": f"{range_dt['oldest'].iloc[0]:%Y-%m-%d} → {range_dt['newest_created'].iloc[0]:%Y-%m-%d}"},
-    {"Tabela": "messages.parquet", "Rows": f"{totals['messages'].iloc[0]:,}", "Periodo": "—"},
-    {"Tabela": "tool_events.parquet", "Rows": f"{totals['tool_events'].iloc[0]:,}", "Periodo": "—"},
-    {"Tabela": "branches.parquet", "Rows": f"{totals['branches'].iloc[0]:,}", "Periodo": "—"},
+    {"Tabela": "chatgpt_conversations.parquet", "Rows": f"{totals['conversations'].iloc[0]:,}", "Periodo": f"{range_dt['oldest'].iloc[0]:%Y-%m-%d} → {range_dt['newest_created'].iloc[0]:%Y-%m-%d}"},
+    {"Tabela": "chatgpt_messages.parquet", "Rows": f"{totals['messages'].iloc[0]:,}", "Periodo": "—"},
+    {"Tabela": "chatgpt_tool_events.parquet", "Rows": f"{totals['tool_events'].iloc[0]:,}", "Periodo": "—"},
+    {"Tabela": "chatgpt_branches.parquet", "Rows": f"{totals['branches'].iloc[0]:,}", "Periodo": "—"},
 ]))
 ```
 

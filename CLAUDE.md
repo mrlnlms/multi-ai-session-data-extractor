@@ -66,7 +66,7 @@ Lista de imports pendentes em `memory/project_pending_imports_from_old.md`.
 | DeepSeek | ✅ | ✅ | ✅ (2 etapas, pasta unica) | ✅ v3 | ✅ | shipped (3/3 CRUD validados em 2026-05-01) |
 | Gemini | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ v3 | ✅ | shipped (4/4 CRUD validados em 2026-05-02; share eh URL upstream-only, nao gap). 47+33=80 convs / 560 msgs / 889 tool_events / 215 imgs / ~18 Deep Research. 8 modelos. Pin descoberto via probe em `c[2]` do listing MaZiqc |
 | NotebookLM | ✅ | ✅ | ❌ | ❌ | ❌ | 9 tipos de outputs (audio, video, slide deck PDF+PPTX, blog, flashcards, quiz, data table, infographic, mind map) |
-| Perplexity | ✅ | ✅ | ✅ | ✅ | ✅ | Auditoria + reconciler + parser v3 + Quarto. 81 conversations (77 threads + 4 pages), 9 artifacts c/ binarios, 1 orphan, 4 spaces |
+| Perplexity | ✅ | ✅ | ✅ | ✅ | ✅ | Auditoria + reconciler + parser v3 + Quarto. 82 conversations (78 threads + 4 pages), 9 artifacts c/ binarios, 1 orphan, 4 spaces |
 
 Backlog principal: NotebookLM (sync + parser v3 + Quarto).
 
@@ -129,8 +129,8 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
 - **Reconciler:** preservation completa (orphans + ENTRY_DELETED), idempotente,
   pasta unica `data/merged/Perplexity/perplexity_merged_summary.json` +
   LAST_RECONCILE.md + reconcile_log.jsonl
-- **Parser canonico v3** (`src/parsers/perplexity.py`): 81 conversations
-  (41 copilot + 36 concise + 4 research/pages), 372 messages, 2311 tool_events
+- **Parser canonico v3** (`src/parsers/perplexity.py`): 82 conversations
+  (~41 copilot + ~37 concise + 4 research/pages), 374 messages, 2312 tool_events
   (2134 search_result + 168 media_reference + 9 asset_generation), 81 branches.
   Pages tem `conversation_id='page:<slug>'`. Search results extraidos de
   `blocks[*].web_result_block.web_results`. Idempotente (~1s pra rodar).
