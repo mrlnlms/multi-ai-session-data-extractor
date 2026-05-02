@@ -15,7 +15,7 @@ from pathlib import Path
 
 from src.extractors.qwen.auth import load_context
 from src.extractors.qwen.api_client import QwenAPIClient
-from src.extractors.qwen.discovery import discover
+from src.extractors.qwen.discovery import discover, persist_discovery
 from src.extractors.qwen.fetcher import fetch_conversations
 
 
@@ -113,10 +113,11 @@ async def run_export(
         client = QwenAPIClient(context, page)
         await client.warmup()
 
-        chats = await discover(client, output_dir)
+        chats, projects_disc = await discover(client, output_dir)
 
-        # Fail-fast: queda drastica
-        baseline = _get_max_known_discovery(output_dir.parent)
+        # Fail-fast: queda drastica. Persistencia da discovery acontece SO depois
+        # do clear — escrever antes corrompe baseline incremental se abortar.
+        baseline = _get_max_known_discovery(output_dir)
         curr = len(chats)
         if baseline > 0:
             drop = (baseline - curr) / baseline
@@ -127,6 +128,8 @@ async def run_export(
                     f"Tente novamente."
                 )
             print(f"Discovery OK: {curr} chats (baseline historico: {baseline})")
+
+        persist_discovery(chats, projects_disc, output_dir)
 
         today = started_at.strftime("%Y-%m-%d")
         conv_dir = output_dir / "conversations"
@@ -173,21 +176,8 @@ async def run_export(
                 except Exception:
                     pass
 
-        # Projects + project files (sempre — sao baratos)
-        projects = await client.list_projects()
-        if projects:
-            for proj in projects:
-                pid = proj.get("id")
-                if not pid:
-                    continue
-                try:
-                    proj["_files"] = await client.list_project_files(pid)
-                except Exception:
-                    proj["_files"] = []
-            (output_dir / "projects.json").write_text(
-                json.dumps(projects, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
+        # Projects ja foram listados+persistidos no persist_discovery acima
+        projects = projects_disc
 
         # Build log
         log = {

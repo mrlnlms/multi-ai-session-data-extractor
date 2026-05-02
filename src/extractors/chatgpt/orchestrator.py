@@ -104,7 +104,7 @@ async def run_capture(output_dir: Path, options: CaptureOptions) -> CaptureRepor
         # Fail-fast: aborta se discovery caiu muito vs maior valor historico ja visto.
         # Sem isso, raw fica corrompido (snapshot incompleto vira base do proximo
         # incremental, que entao refetcha tudo que reapareceu — confusao garantida).
-        baseline = _get_max_known_discovery(output_dir.parent)
+        baseline = _get_max_known_discovery(output_dir)
         if baseline > 0:
             drop = (baseline - len(metas)) / baseline
             if drop > DISCOVERY_DROP_ABORT_THRESHOLD:

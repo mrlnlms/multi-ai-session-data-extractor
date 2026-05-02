@@ -142,7 +142,7 @@ async def run_export(
         disc = await discover(client, output_dir)
 
         # Fail-fast: queda drastica vs baseline historico
-        baseline = _get_max_known_discovery(output_dir.parent)
+        baseline = _get_max_known_discovery(output_dir)
         curr = len(disc["conversations"])
         if baseline > 0:
             drop = (baseline - curr) / baseline

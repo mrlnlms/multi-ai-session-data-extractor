@@ -41,16 +41,68 @@ sobre **4 snapshots** (3 do projeto-pai + 1 atual), 2026-04-24 → 2026-05-01.
 - ✅ 8 `chat_type`: t2t / search / deep_research / t2i / t2v / artifacts /
   learn / null
 
-## Pendencias (requerem UI do usuario)
+## Bateria CRUD UI — 2026-05-01 (Pro account)
 
-- [ ] **Rename:** `updated_at` bumpa no servidor?
-- [ ] **Delete via menu:** chat some completamente OU vai pra archived?
-- [ ] **Pin/unpin:** flag `pinned` no discovery reflete imediatamente?
-- [ ] **Archive:** flag `archived` reflete? esta no listing principal ou
-  separado?
-- [ ] **Share:** populando `share_id` cria URL publica?
-- [ ] **Move pra folder:** chats em folder retornam em listing default ou
-  precisam filtro por `folder_id`?
-- [ ] **Move pra project:** behavior do `project_id` quando muda
+User executou 4 acoes na UI; sync `--full` rodou apos cada lote pra
+forcar refetch dos bodies.
 
-Bateria manual a documentar aqui quando rodar.
+| Acao | Chat | Resultado parquet | updated_at no servidor |
+|---|---|---|---|
+| Rename → "Codemarker V2 from mqda" | `8c97d9ab` | ✅ title bate | bumpa (2026-02-17 → 2026-05-02) |
+| Pin | `240ac30f` | ✅ `is_pinned=True` | bumpa (2026-02-20 → 2026-05-02) |
+| Archive | `75924b8e` | ⚠️ `is_archived=False` | bumpa, mas flag NAO persiste |
+| Delete | `2d7e6a81` | ✅ `is_preserved_missing=True` | sumiu do listing |
+
+## Inferencias confirmadas
+
+- **Rename bumpa `updated_at`** (igual ChatGPT, igual Perplexity). Caminho
+  incremental normal cobre — guardrail title-diff fica como defesa.
+- **Pin reflete em `pinned`** no body do chat retornado pelo `/v2/chats/{id}`
+  E no listing `/v2/chats/?page=N`. Endpoint dedicado `/v2/chats/pinned`
+  tambem retorna o chat. Bumpa `updated_at`.
+- **Delete remove do listing** + reconciler marca `_preserved_missing: True`
+  no merged. `last_seen_in_server` preserva data anterior.
+- **Archive eh no-op observavel upstream** (limitacao Qwen Pro/free):
+    - Servidor aceita request (`updated_at` bumpa de fato)
+    - Body retorna `archived: False` mesmo apos action
+    - Endpoint `/v2/chats/archived` existe mas retorna `len=0`
+    - TODOS os listings (`?archived=true`, `?show_archived=true`,
+      `?include_archived=true`, `/all`) ainda incluem o chat com mesmos campos
+    - Mesmo padrao do Perplexity Enterprise-only archive
+    - **Nao eh gap do extractor** — schema canonico tem `is_archived` field,
+      so nunca True em conta Pro/free
+    - Probe: `scripts/qwen-probe-archived.py`
+
+## Bugs descobertos+fixados nesta bateria
+
+1. **`_get_max_known_discovery(output_dir.parent)` vazava entre plataformas.**
+   Antes da migracao pra pasta unica, `output_dir.parent` era a pasta da
+   plataforma (com subpastas timestampeadas). Apos migracao, virou
+   `data/raw/` → rglob caminhava todas as plataformas e pegava maximo de
+   ChatGPT (1171) ou Claude.ai (835). Fix: passar `output_dir`.
+   Aplicado em todos os 4 orchestrators (qwen, deepseek, claude_ai, chatgpt).
+
+2. **`discover()` persistia antes do fail-fast.** Se fail-fast abortava,
+   discovery_ids.json ja estava com novos timestamps e proxima run carregava
+   prev_map ja com novos ts → 0 refetched mesmo havendo mudancas. Fix:
+   separar `discover()` (puro fetch) de `persist_discovery()` (chamado pelo
+   orchestrator pos fail-fast). Aplicado em qwen.
+
+3. **`qwen-sync.py --full` nao propagava pro reconcile.** `--full` so
+   forcava extractor refetch. Reconciler usava `to_copy` (read merged anterior)
+   pra chats sem updated_at diff, mantendo bodies stale. Fix: passar
+   `full=args.full` ao `run_reconciliation`. Aplicado em qwen-sync.py +
+   deepseek-sync.py + claude-sync.py.
+
+## Outras features observadas (nao testadas via parser nesta bateria)
+
+- ✅ **Clone:** opcao no menu (per-chat). Semantica: cria novo `chat_id`
+  com historico copiado — equivalente a "add" no diff. Skip pq nao testa
+  preservation/state-machine novo.
+- ✅ **Download:** menu per-chat exporta JSON (`.json`) ou plain text
+  (`.txt`). Confirma que o schema parseado eh essencialmente o oficial
+  exposto ao usuario. Sem implicacao pro extractor.
+- ✅ **Move to Project:** opcao no menu — testavel via probe `project_id`
+  diff em snapshots consecutivos.
+- ✅ **Share:** opcao no menu, popula `share_id`. Nao exercitado.
+- ✅ **Folder:** `folder_id` no schema, nao exercitado.

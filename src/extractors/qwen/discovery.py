@@ -1,4 +1,7 @@
-"""Discovery: lista chats + projects, salva discovery_ids.json + projects.json."""
+"""Discovery: lista chats + projects. Persistencia eh feita pelo orchestrator
+APOS o fail-fast clear — escrever antes corrompe a baseline incremental se o
+fail-fast abortar (proxima run carrega prev_map ja com timestamps novos e
+deixa de refetchar chats que mudaram)."""
 
 import json
 from pathlib import Path
@@ -6,7 +9,10 @@ from pathlib import Path
 from src.extractors.qwen.api_client import QwenAPIClient
 
 
-async def discover(client: QwenAPIClient, output_dir: Path) -> list[dict]:
+async def discover(
+    client: QwenAPIClient, output_dir: Path
+) -> tuple[list[dict], list[dict]]:
+    """Retorna (chats, projects). Nao persiste — quem chama decide quando."""
     print("Descobrindo chats...")
     chats = await client.list_all_chats()
     print(f"  {len(chats)} chats")
@@ -21,6 +27,11 @@ async def discover(client: QwenAPIClient, output_dir: Path) -> list[dict]:
     total_pfiles = sum(len(p.get("_files") or []) for p in projects)
     print(f"  {len(projects)} projects, {total_pfiles} project files")
 
+    return chats, projects
+
+
+def persist_discovery(chats: list[dict], projects: list[dict], output_dir: Path) -> None:
+    """Persiste discovery_ids.json + projects.json. Chamar so apos fail-fast clear."""
     output_dir.mkdir(parents=True, exist_ok=True)
     summary = [
         {
@@ -38,4 +49,3 @@ async def discover(client: QwenAPIClient, output_dir: Path) -> list[dict]:
         json.dump(summary, f, ensure_ascii=False, indent=2)
     with open(output_dir / "projects.json", "w", encoding="utf-8") as f:
         json.dump(projects, f, ensure_ascii=False, indent=2)
-    return chats

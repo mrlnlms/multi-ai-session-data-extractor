@@ -55,7 +55,7 @@ async def main(args: argparse.Namespace) -> int:
         return 0
 
     _section("Etapa 2/2 — Reconcile")
-    report = run_reconciliation(raw_dir, MERGED_DIR)
+    report = run_reconciliation(raw_dir, MERGED_DIR, full=args.full)
     print(report.summary())
     if report.aborted:
         print(f"  ABORTED: {report.abort_reason}")

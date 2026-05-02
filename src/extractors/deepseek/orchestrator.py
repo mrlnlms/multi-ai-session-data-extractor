@@ -14,7 +14,7 @@ from pathlib import Path
 
 from src.extractors.deepseek.auth import load_context
 from src.extractors.deepseek.api_client import DeepSeekAPIClient
-from src.extractors.deepseek.discovery import discover
+from src.extractors.deepseek.discovery import discover, persist_discovery
 from src.extractors.deepseek.fetcher import fetch_conversations
 
 
@@ -105,8 +105,9 @@ async def run_export(
 
         sessions = await discover(client, output_dir)
 
-        # Fail-fast
-        baseline = _get_max_known_discovery(output_dir.parent)
+        # Fail-fast. Persistencia da discovery acontece SO depois do clear —
+        # escrever antes corrompe baseline incremental se abortar.
+        baseline = _get_max_known_discovery(output_dir)
         curr = len(sessions)
         if baseline > 0:
             drop = (baseline - curr) / baseline
@@ -116,6 +117,8 @@ async def run_export(
                     f"(queda {drop:.0%}, limite {DISCOVERY_DROP_ABORT_THRESHOLD:.0%})."
                 )
             print(f"Discovery OK: {curr} sessions (baseline historico: {baseline})")
+
+        persist_discovery(sessions, output_dir)
 
         today = started_at.strftime("%Y-%m-%d")
         conv_dir = output_dir / "conversations"
