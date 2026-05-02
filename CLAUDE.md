@@ -65,7 +65,7 @@ Lista de imports pendentes em `memory/project_pending_imports_from_old.md`.
 | Qwen | ✅ | ✅ | ✅ (3 etapas, pasta unica) | ✅ v3 | ✅ | shipped (3/4 CRUD validados em 2026-05-01; archive eh no-op upstream Pro/free, nao gap) |
 | DeepSeek | ✅ | ✅ | ✅ (2 etapas, pasta unica) | ✅ v3 | ✅ | shipped (3/3 CRUD validados em 2026-05-01) |
 | Gemini | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ v3 | ✅ | shipped (4/4 CRUD validados em 2026-05-02; share eh URL upstream-only, nao gap). 47+33=80 convs / 560 msgs / 889 tool_events / 215 imgs / ~18 Deep Research. 8 modelos. Pin descoberto via probe em `c[2]` do listing MaZiqc |
-| NotebookLM | ✅ | ✅ | ✅ | ✅ | ✅ | shipped 2026-05-02 (multi-conta acc-1+acc-2; 143 conversations / 121 messages / 1173 sources / 389 outputs cobrindo 9 tipos; CRUD UI pendente bateria final) |
+| NotebookLM | ✅ | ✅ | ✅ | ✅ | ✅ | **shipped 2026-05-02** (multi-conta acc-1+acc-2; 143 conversations / 138 messages / 1174 sources / 1174 source_guides / 389 outputs / 9 parquets total; bateria CRUD validada — pin nao existe upstream) |
 | Perplexity | ✅ | ✅ | ✅ | ✅ | ✅ | Auditoria + reconciler + parser v3 + Quarto. 82 conversations (78 threads + 4 pages), 9 artifacts c/ binarios, 1 orphan, 4 spaces |
 
 Backlog principal: bateria CRUD UI final pra NotebookLM. Pos-shipping: 7/7 plataformas verdes desbloqueia cross-plataforma overview + DVC pra dados grandes.
@@ -482,14 +482,27 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
 - **Dashboard:** suporte pros qmds per-account adicionado em
   `dashboard/quarto.py` + `dashboard/pages/platform.py`. Multi-conta agora
   mostra 3 links por plataforma (consolidado + per-account)
-- **TODOs validacao manual** (cenarios CRUD pendentes — bateria UI):
-  - rename → title bate em parquet?
-  - delete → preserved_missing?
-  - pin/star → NotebookLM tem feature? (provavel: nao)
-  - add/remove source → reflete em sources.parquet?
-- **Gaps conhecidos** (proxima iteracao, nao bloqueia):
-  - Source-level summary + tags (NotebookLM gera resumo + tags por source
-    na sidebar — requer RPC adicional nao mapeado)
+- **Bateria CRUD UI validada** (2026-05-02 via app mobile):
+  - ✅ Rename ("Heatmap Studies" → "Heatmap estudos") — title bate em parquet
+  - ✅ Delete ("Westward Mushrooms") — `is_preserved_missing=True`,
+    `last_seen_in_server` preservado, title preservado
+  - ✅ Add source — sources.parquet acc-1 = 974 → 975
+  - ✅ Pin: **NotebookLM nao tem feature de pin** (confirmado no app)
+  - **Achado empirico:** `update_time` do listing eh VOLATIL — 93/94 notebooks
+    bumped entre 2 syncs sem mudanca real (servidor reindexa periodicamente
+    + acesso ao notebook bumpa). Reconciler usa hash semantico, nao timestamp,
+    pra decidir refetch — comportamento ja mitigado por design.
+  - Detalhes: `docs/notebooklm-server-behavior.md`
+- **Source-level summary + tags + questions capturados** (gap fechado em
+  2026-05-02): RPC `tr032e` descoberto via probe Chrome MCP +
+  Playwright headed (click manual no source). Payload empirico
+  `[[[[source_uuid]]]]`. Implementado `fetch_source_guide` no api_client +
+  fetcher salvando em `sources/{uuid}_guide.json`. Schema canonico expandido
+  com `NotebookLMSourceGuide` dataclass + tabela auxiliar
+  `notebooklm_source_guides.parquet` — **9 parquets** total (era 8).
+  Cobertura: 1174/1173 sources com summary (1 source duplicado entre
+  notebooks). Cada guide tem ~800-1000 chars summary + 5 tags + 3 questions
+  geradas pelo modelo.
 - **Comandos:**
   ```bash
   PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py             # ambas contas

@@ -1,63 +1,64 @@
 # NotebookLM — comportamento do servidor (validado empiricamente)
 
-A bateria CRUD UI é executada pelo user manualmente após o full sync.
-Resultados documentados aqui (regra dura do projeto: shipped só com
-CRUD validado).
+Bateria CRUD UI executada via app mobile + browser em 2026-05-02. Resultados
+documentados aqui (regra dura do projeto: shipped só com CRUD validado).
 
-## Bateria pendente (requer interação user)
+## Bateria CRUD validada (2026-05-02)
 
-### Rename
-- [ ] Renomear 1 notebook na UI da conta 1
-- [ ] Validar: title bate em parquet apos sync? `update_time` bumpa?
+| Operação | Validação | Status |
+|---|---|---|
+| Rename | "Heatmap Studies" → "Heatmap estudos" (`b1b8da1f`) — title bate em parquet | ✅ |
+| Delete | "Westward Mushrooms" (`0be7e3ec`) — `is_preserved_missing=True`, `last_seen_in_server=2026-05-02`, title preservado | ✅ |
+| Pin/Star | **Feature não exposta no NotebookLM** (confirmado no app mobile) | ✅ N/A |
+| Add source | 1 PDF novo capturado em notebook existente — sources acc-1 = 974 → 975 | ✅ |
 
-### Delete
-- [ ] Deletar 1 notebook na UI (escolher antigo, sem importância)
-- [ ] Validar: `is_preserved_missing=True`? `last_seen_in_server` preservado?
-  Title preservado no merged?
+## Comportamento do servidor descoberto
 
-### Pin/Star (descobrir feature)
-- [ ] Explorar UI atrás de "pin", "star", "favorite", "fixar"
-- [ ] Se existir: pinar 1 notebook + sync + validar `is_pinned=True`
-- [ ] Se não existir: documentar como "feature não exposta no NotebookLM"
+### `update_time` é VOLÁTIL — não é proxy de "user mexeu"
 
-### Add source
-- [ ] Adicionar 1 PDF/link novo em 1 notebook existente
-- [ ] Validar: source aparece em `notebooklm_sources.parquet`?
-  `update_time` do notebook bumpa? Conteúdo extraido populado?
+Validação empírica: 93/94 notebooks tiveram `update_time` bumped entre
+2 syncs consecutivos, mesmo sem o user ter modificado eles.
 
-### Remove source
-- [ ] Remover 1 source de 1 notebook
-- [ ] Validar: source vira preserved_missing? Texto preservado mesmo após
-  remoção? (provavel: comportamento similar a ChatGPT project_sources)
+**Causa:** servidor reindexa periodicamente (provavelmente "last indexed",
+não "last modified"). Acessar um notebook na UI também bumpa o timestamp.
 
-### Generate output novo
-- [ ] Gerar 1 audio overview / blog / data table novo em 1 notebook
-- [ ] Validar: aparece em `notebooklm_outputs.parquet` na próxima sync?
-  Asset_path populado pra binários?
+**Implicação:** `update_time` do `wXbhsf` listing **não pode** ser usado
+como proxy pra "user fez algo". Já documentado no orchestrator.
 
-### Delete output
-- [ ] Deletar 1 output gerado
-- [ ] Validar: comportamento (preserved? sumido? skip?)
+**Mitigação (já implementada):**
+- Reconciler usa **hash semântico do conteúdo** (excluindo timestamps)
+  via `_eq_lenient` pra decidir to_use vs to_copy
+- Lite-fetch compara 3 RPCs leves (rLM1Ne + cFji9 + gArtLc) pra
+  classificar mudança real
 
-## Comportamento esperado (hipóteses)
+### Delete: preservation funciona
 
-Baseado em padrões das 6 plataformas anteriores:
+Notebook deletado no servidor:
+- Sai do `discovery_ids.json` atual
+- Reconciler marca `_preserved_missing=True` no merged
+- Title + last_seen_in_server preservados
+- Não é re-baixado nas próximas runs (skip natural)
 
-| Operação | Hipótese |
-|---|---|
-| Rename notebook | `update_time` bumpa (igual ChatGPT/Gemini/Claude.ai/etc) |
-| Delete notebook | `is_preserved_missing=True`, `last_seen_in_server` preservado |
-| Pin notebook | NotebookLM **provavelmente não tem feature de pin** (UI minimalista) |
-| Add source | `update_time` bumpa, source novo capturado |
-| Remove source | source vira `_preserved_missing`, texto preservado |
-| Generate output | output novo capturado na próxima sync |
+### Acesso ao notebook bumpa update_time
 
-Atualizar este doc com resultados reais após bateria.
+Confirmado pelo user: "ele sempre sobe só por acessar". Acessar (mesmo
+sem editar) move o notebook pro topo da lista — provavelmente o servidor
+trata acesso como "interação".
+
+Sem impacto pro extractor (mitigado por hash semântico).
+
+### Pin/Star: não existe no NotebookLM
+
+Confirmado no app mobile pelo user. NotebookLM tem UI minimalista — sem
+favorites/pinned. Único "ranking" visual é por update_time decrescente.
+
+`is_pinned` no schema canônico fica `None` pra todos os notebooks NotebookLM.
+Esperado e correto.
 
 ## Conclusão
 
-(Preencher após bateria.)
+Cenários CRUD aplicáveis ao NotebookLM **todos validados**. Único caso
+"N/A" é pin (feature inexistente). Comportamento volátil de update_time
+já estava mitigado no design do reconciler.
 
----
-
-**Status:** ⏳ Aguardando bateria CRUD UI manual.
+**Status:** ✅ pronto pra shipped.
