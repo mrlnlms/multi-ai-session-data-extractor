@@ -1,0 +1,374 @@
+---
+title: "NotebookLM — account-2 — Data Profile"
+subtitle: "Catalogo descritivo dos 8 parquets do parser v3 (so account-2, pt-BR)"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+
+import sys
+from pathlib import Path
+
+_this = Path.cwd()
+_project_root = _this if (_this / "src").exists() else _this.parent
+sys.path.insert(0, str(_project_root))
+
+import json
+import pandas as pd
+import duckdb
+import plotly.graph_objects as go
+from itables import init_notebook_mode, show
+
+init_notebook_mode(all_interactive=False)
+
+ACCOUNT_FILTER = "2"
+
+PROCESSED = _project_root / "data" / "processed" / "NotebookLM"
+con = duckdb.connect()
+
+# Tabelas com coluna account → filtra direto
+for table in ("conversations", "messages", "notes", "outputs", "guide_questions"):
+    p = PROCESSED / f"notebooklm_{table}.parquet"
+    if p.exists():
+        con.execute(
+            f"CREATE VIEW {table} AS "
+            f"SELECT * FROM read_parquet('{p}') WHERE account = '{ACCOUNT_FILTER}'"
+        )
+
+# Tabelas sem account → filtra via conversation_id
+for table, fk in [("tool_events", "conversation_id"), ("branches", "conversation_id")]:
+    p = PROCESSED / f"notebooklm_{table}.parquet"
+    if p.exists():
+        con.execute(
+            f"CREATE VIEW {table} AS "
+            f"SELECT * FROM read_parquet('{p}') "
+            f"WHERE {fk} IN (SELECT conversation_id FROM conversations)"
+        )
+
+# Sources usa project_id (= conversation_id)
+p = PROCESSED / "notebooklm_sources.parquet"
+if p.exists():
+    con.execute(
+        "CREATE VIEW sources AS "
+        f"SELECT * FROM read_parquet('{p}') "
+        "WHERE project_id IN (SELECT conversation_id FROM conversations)"
+    )
+
+# NotebookLM palette: laranja Google + secundario
+SOURCE_COLOR = "#F4B400"   # Google Yellow/Orange (NotebookLM brand)
+SECONDARY = "#DB8B00"      # Darker orange
+ACCENT = "#EA8600"         # Saturated
+MUTED = "#FBE9B7"          # Light orange
+
+
+def fmt_pct(n, total):
+    pct = n / total * 100 if total else 0
+    return f"{n:,}/{total:,} ({pct:.0f}%)"
+
+
+def show_df(df, **kwargs):
+    from IPython.display import display
+    display(df.style.hide(axis="index"))
+
+
+def plotly_bar(x, y, title, color=SOURCE_COLOR, height=350, orientation="v"):
+    if orientation == "h":
+        fig = go.Figure(go.Bar(y=x, x=y, marker_color=color, orientation="h"))
+    else:
+        fig = go.Figure(go.Bar(x=x, y=y, marker_color=color))
+    fig.update_layout(
+        title=title, height=height, template="plotly_white",
+        margin=dict(t=50, b=40, l=40, r=20),
+    )
+    return fig
+```
+
+# Visao geral
+
+```{python}
+#| label: overview
+
+totals = con.execute("""
+    SELECT
+        (SELECT COUNT(*) FROM conversations) AS conversations,
+        (SELECT COUNT(*) FROM messages) AS messages,
+        (SELECT COUNT(*) FROM tool_events) AS tool_events,
+        (SELECT COUNT(*) FROM branches) AS branches,
+        (SELECT COUNT(*) FROM sources) AS sources,
+        (SELECT COUNT(*) FROM notes) AS notes,
+        (SELECT COUNT(*) FROM outputs) AS outputs,
+        (SELECT COUNT(*) FROM guide_questions) AS guide_questions
+""").df()
+
+show_df(pd.DataFrame([
+    {"Tabela": "conversations.parquet", "Rows": f"{totals['conversations'].iloc[0]:,}"},
+    {"Tabela": "messages.parquet", "Rows": f"{totals['messages'].iloc[0]:,}"},
+    {"Tabela": "tool_events.parquet", "Rows": f"{totals['tool_events'].iloc[0]:,}"},
+    {"Tabela": "branches.parquet", "Rows": f"{totals['branches'].iloc[0]:,}"},
+    {"Tabela": "sources.parquet", "Rows": f"{totals['sources'].iloc[0]:,}"},
+    {"Tabela": "notes.parquet", "Rows": f"{totals['notes'].iloc[0]:,}"},
+    {"Tabela": "outputs.parquet", "Rows": f"{totals['outputs'].iloc[0]:,}"},
+    {"Tabela": "guide_questions.parquet", "Rows": f"{totals['guide_questions'].iloc[0]:,}"},
+]))
+```
+
+> **Sobre este documento.** Catalogo descritivo dos 8 parquets do NotebookLM
+> filtrados pra **account-2** (pt-BR, original "marloon"). Para a visao
+> consolidada das 2 contas, ver `notebooklm.qmd`.
+>
+> NotebookLM nao eh chat puro — cada notebook gera ate 9 tipos de outputs
+> distintos (audio, blog, video, flashcards, quiz, data table, slide deck,
+> infographic, mind map). Schema canonico (Conversation/Message/ToolEvent/
+> Branch) eh complementado por 4 tabelas auxiliares (sources, notes,
+> outputs, guide_questions) pra capturar essa especificidade.
+>
+> `guide.summary` vira system message (sequence=0) em todo notebook —
+> garante `message_count >= 1` mesmo quando chat=None.
+
+# 1. Cobertura
+
+## 1.1 Notebooks com chat real
+
+```{python}
+#| label: chat-coverage
+
+# Cada notebook gera 1 system msg (guide.summary). Notebooks com chat real
+# tem msgs adicionais com role=user/assistant.
+cov = con.execute("""
+    SELECT
+        COUNT(DISTINCT conversation_id) AS total_convs,
+        COUNT(DISTINCT CASE WHEN role IN ('user','assistant') THEN conversation_id END) AS with_chat,
+        COUNT(DISTINCT CASE WHEN role='system' THEN conversation_id END) AS with_summary
+    FROM messages
+""").df()
+
+total = int(cov["total_convs"].iloc[0])
+with_chat = int(cov["with_chat"].iloc[0])
+with_summary = int(cov["with_summary"].iloc[0])
+
+show_df(pd.DataFrame([
+    {"Categoria": "Total notebooks", "Cobertura": f"{total:,}"},
+    {"Categoria": "Com guide.summary (system msg)", "Cobertura": fmt_pct(with_summary, total)},
+    {"Categoria": "Com chat real (user/assistant)", "Cobertura": fmt_pct(with_chat, total)},
+]))
+```
+
+## 1.2 Cobertura de outputs por tipo
+
+```{python}
+#| label: output-coverage
+
+types_df = con.execute("""
+    SELECT
+        output_type,
+        output_type_name,
+        COUNT(*) AS count,
+        COUNT(DISTINCT conversation_id) AS notebooks
+    FROM outputs
+    GROUP BY output_type, output_type_name
+    ORDER BY output_type
+""").df()
+
+if len(types_df):
+    fig = plotly_bar(
+        types_df["output_type_name"].tolist(),
+        types_df["notebooks"].tolist(),
+        f"Notebooks com cada tipo de output (de {total} totais)",
+        color=SOURCE_COLOR,
+    )
+    fig.show()
+
+show_df(types_df.rename(columns={
+    "output_type": "Type", "output_type_name": "Nome",
+    "count": "Outputs", "notebooks": "Notebooks",
+}))
+```
+
+## 1.3 Sources por notebook
+
+```{python}
+#| label: sources-coverage
+
+src_dist = con.execute("""
+    SELECT project_id, COUNT(*) AS source_count, SUM(content_size) AS total_chars
+    FROM sources
+    GROUP BY project_id
+    ORDER BY source_count DESC
+""").df()
+
+if len(src_dist):
+    fig = plotly_bar(
+        list(range(1, len(src_dist) + 1)),
+        src_dist["source_count"].tolist(),
+        f"Sources por notebook (top-{len(src_dist)} ordenados por count)",
+        color=SECONDARY,
+    )
+    fig.update_xaxes(title="Notebook (rank)")
+    fig.update_yaxes(title="Num sources")
+    fig.show()
+
+print(f"\nTotal sources: {len(con.execute('SELECT * FROM sources').df()):,}")
+print(f"Conteudo extraido total: {int(src_dist['total_chars'].sum()):,} chars")
+```
+
+# 2. Outputs (9 tipos)
+
+## 2.1 Distribuicao com tamanho de conteudo
+
+```{python}
+#| label: outputs-content
+
+content_stats = con.execute("""
+    SELECT
+        output_type_name,
+        COUNT(*) AS count,
+        AVG(LENGTH(content)) AS avg_chars,
+        SUM(LENGTH(content)) AS total_chars
+    FROM outputs
+    WHERE content IS NOT NULL
+    GROUP BY output_type_name
+    ORDER BY count DESC
+""").df()
+
+show_df(content_stats.assign(
+    avg_chars=content_stats["avg_chars"].fillna(0).astype(int),
+    total_chars=content_stats["total_chars"].fillna(0).astype(int),
+).rename(columns={
+    "output_type_name": "Tipo", "count": "Com conteudo",
+    "avg_chars": "Avg chars", "total_chars": "Total chars",
+}))
+```
+
+## 2.2 Sample de output por tipo
+
+```{python}
+#| label: outputs-sample
+
+samples = con.execute("""
+    SELECT output_type_name, title, status, LENGTH(content) AS content_size
+    FROM outputs
+    ORDER BY output_type_name, content_size DESC NULLS LAST
+""").df()
+
+# Pega 1 row por tipo
+top_per_type = samples.groupby("output_type_name").head(1).reset_index(drop=True)
+show_df(top_per_type)
+```
+
+# 3. Sources
+
+```{python}
+#| label: sources-table
+
+src = con.execute("""
+    SELECT
+        project_id,
+        file_name,
+        content_size,
+        estimated_token_count
+    FROM sources
+    ORDER BY content_size DESC
+    LIMIT 15
+""").df()
+
+show_df(src)
+```
+
+# 4. Guide questions
+
+```{python}
+#| label: guide-questions
+
+q = con.execute("""
+    SELECT
+        conversation_id,
+        question_text,
+        order_,
+        LENGTH(full_prompt) AS prompt_chars
+    FROM (
+        SELECT
+            conversation_id,
+            question_text,
+            "order" AS order_,
+            full_prompt
+        FROM guide_questions
+    )
+    ORDER BY conversation_id, order_
+    LIMIT 20
+""").df()
+
+show_df(q)
+
+q_count = con.execute("""
+    SELECT COUNT(*) AS questions, COUNT(DISTINCT conversation_id) AS notebooks
+    FROM guide_questions
+""").df()
+print(f"\nTotal: {int(q_count['questions'].iloc[0])} questions em {int(q_count['notebooks'].iloc[0])} notebooks")
+```
+
+# 5. Notes
+
+```{python}
+#| label: notes-stats
+
+n_stats = con.execute("""
+    SELECT
+        kind,
+        COUNT(*) AS count,
+        AVG(LENGTH(content)) AS avg_chars
+    FROM notes
+    GROUP BY kind
+    ORDER BY count DESC
+""").df()
+
+if len(n_stats):
+    show_df(n_stats.assign(
+        avg_chars=n_stats["avg_chars"].fillna(0).astype(int),
+    ))
+else:
+    print("Nenhuma note nesta conta.")
+```
+
+# 6. Preservation
+
+```{python}
+#| label: preservation
+
+pres = con.execute("""
+    SELECT
+        is_preserved_missing,
+        COUNT(*) AS count
+    FROM conversations
+    GROUP BY is_preserved_missing
+""").df()
+
+show_df(pres.rename(columns={"is_preserved_missing": "Preserved missing", "count": "Notebooks"}))
+```
+
+```{python}
+#| label: preserved-list
+
+preserved = con.execute("""
+    SELECT
+        conversation_id,
+        title,
+        last_seen_in_server
+    FROM conversations
+    WHERE is_preserved_missing = TRUE
+    ORDER BY last_seen_in_server DESC
+""").df()
+
+if len(preserved):
+    show_df(preserved)
+else:
+    print("Nenhum notebook preservado (deletado do servidor).")
+```
+
+---
+
+**Account:** 2 (pt-BR) — original `marloon`
+
+**Render:** auto-gerado via Quarto. Para regenerar:
+`QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/notebooklm-acc-2.qmd`

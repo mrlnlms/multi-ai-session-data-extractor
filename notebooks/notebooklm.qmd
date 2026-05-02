@@ -1,0 +1,271 @@
+---
+title: "NotebookLM — Data Profile (consolidado, multi-conta)"
+subtitle: "Catalogo descritivo dos 8 parquets do parser v3 (account-1 + account-2)"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+
+import sys
+from pathlib import Path
+
+_this = Path.cwd()
+_project_root = _this if (_this / "src").exists() else _this.parent
+sys.path.insert(0, str(_project_root))
+
+import json
+import pandas as pd
+import duckdb
+import plotly.graph_objects as go
+from itables import init_notebook_mode, show
+
+init_notebook_mode(all_interactive=False)
+
+PROCESSED = _project_root / "data" / "processed" / "NotebookLM"
+con = duckdb.connect()
+
+for table in ("conversations", "messages", "tool_events", "branches",
+              "sources", "notes", "outputs", "guide_questions"):
+    p = PROCESSED / f"notebooklm_{table}.parquet"
+    if p.exists():
+        con.execute(f"CREATE VIEW {table} AS SELECT * FROM read_parquet('{p}')")
+
+# NotebookLM palette: laranja Google
+ACC1_COLOR = "#F4B400"   # Google Yellow/Orange (account-1, en)
+ACC2_COLOR = "#DB8B00"   # Darker orange (account-2, pt-BR)
+SOURCE_COLOR = "#F4B400"
+SECONDARY = "#DB8B00"
+ACCENT = "#EA8600"
+MUTED = "#FBE9B7"
+
+
+def fmt_pct(n, total):
+    pct = n / total * 100 if total else 0
+    return f"{n:,}/{total:,} ({pct:.0f}%)"
+
+
+def show_df(df, **kwargs):
+    from IPython.display import display
+    display(df.style.hide(axis="index"))
+
+
+def stacked_bars_by_account(df, x_col, y_col, title, height=350):
+    """Stacked bars: x_col x y_col, agrupado por account ('1' azul, '2' laranja)."""
+    fig = go.Figure()
+    for acc, color, name in [("1", ACC1_COLOR, "account-1 (en)"),
+                              ("2", ACC2_COLOR, "account-2 (pt-BR)")]:
+        sub = df[df["account"] == acc]
+        if len(sub) > 0:
+            fig.add_trace(go.Bar(
+                x=sub[x_col].tolist(), y=sub[y_col].tolist(),
+                name=name, marker_color=color,
+            ))
+    fig.update_layout(
+        barmode="stack", title=title, height=height, template="plotly_white",
+        margin=dict(t=50, b=40, l=40, r=20),
+    )
+    return fig
+```
+
+# Visao geral
+
+```{python}
+#| label: overview
+
+totals = con.execute("""
+    SELECT
+        (SELECT COUNT(*) FROM conversations) AS conversations,
+        (SELECT COUNT(*) FROM messages) AS messages,
+        (SELECT COUNT(*) FROM tool_events) AS tool_events,
+        (SELECT COUNT(*) FROM branches) AS branches,
+        (SELECT COUNT(*) FROM sources) AS sources,
+        (SELECT COUNT(*) FROM notes) AS notes,
+        (SELECT COUNT(*) FROM outputs) AS outputs,
+        (SELECT COUNT(*) FROM guide_questions) AS guide_questions
+""").df()
+
+show_df(pd.DataFrame([
+    {"Tabela": "conversations.parquet", "Rows": f"{totals['conversations'].iloc[0]:,}"},
+    {"Tabela": "messages.parquet", "Rows": f"{totals['messages'].iloc[0]:,}"},
+    {"Tabela": "tool_events.parquet", "Rows": f"{totals['tool_events'].iloc[0]:,}"},
+    {"Tabela": "branches.parquet", "Rows": f"{totals['branches'].iloc[0]:,}"},
+    {"Tabela": "sources.parquet", "Rows": f"{totals['sources'].iloc[0]:,}"},
+    {"Tabela": "notes.parquet", "Rows": f"{totals['notes'].iloc[0]:,}"},
+    {"Tabela": "outputs.parquet", "Rows": f"{totals['outputs'].iloc[0]:,}"},
+    {"Tabela": "guide_questions.parquet", "Rows": f"{totals['guide_questions'].iloc[0]:,}"},
+]))
+```
+
+> **Sobre este documento.** Catalogo descritivo dos 8 parquets do NotebookLM
+> agregando ambas as contas (1=en, 2=pt-BR). Para vista de uma conta so,
+> ver `notebooklm-acc-1.qmd` ou `notebooklm-acc-2.qmd`.
+>
+> NotebookLM nao eh chat puro — cada notebook gera ate 9 tipos de outputs
+> distintos (audio, blog, video, flashcards, quiz, data table, slide deck,
+> infographic, mind map). Schema canonico (Conversation/Message/ToolEvent/
+> Branch) eh complementado por 4 tabelas auxiliares (sources, notes,
+> outputs, guide_questions) pra capturar essa especificidade.
+>
+> `guide.summary` vira system message (sequence=0) em todo notebook —
+> garante `message_count >= 1` mesmo quando chat=None.
+
+## Distribuicao por conta
+
+```{python}
+#| label: by-account
+
+by_acc = con.execute("""
+    SELECT account,
+        COUNT(*) AS notebooks,
+        SUM(message_count) AS messages,
+        AVG(message_count) AS avg_msg
+    FROM conversations
+    GROUP BY account
+    ORDER BY account
+""").df()
+
+show_df(by_acc.assign(avg_msg=by_acc["avg_msg"].fillna(0).round(1)))
+```
+
+# 1. Cobertura
+
+## 1.1 Notebooks com chat real
+
+```{python}
+#| label: chat-coverage
+
+cov = con.execute("""
+    SELECT account,
+        COUNT(DISTINCT conversation_id) AS total_convs,
+        COUNT(DISTINCT CASE WHEN role IN ('user','assistant') THEN conversation_id END) AS with_chat,
+        COUNT(DISTINCT CASE WHEN role='system' THEN conversation_id END) AS with_summary
+    FROM messages
+    GROUP BY account
+    ORDER BY account
+""").df()
+
+show_df(cov)
+```
+
+## 1.2 Outputs por tipo (stacked per-account)
+
+```{python}
+#| label: output-coverage
+
+types_df = con.execute("""
+    SELECT account, output_type_name, COUNT(*) AS count
+    FROM outputs
+    GROUP BY account, output_type_name
+    ORDER BY output_type_name, account
+""").df()
+
+if len(types_df):
+    fig = stacked_bars_by_account(
+        types_df, "output_type_name", "count",
+        "Outputs por tipo (stacked: account-1 + account-2)",
+    )
+    fig.show()
+
+# Tabela com totais
+totals_per_type = con.execute("""
+    SELECT output_type, output_type_name, COUNT(*) AS total,
+        SUM(CASE WHEN account='1' THEN 1 ELSE 0 END) AS acc1,
+        SUM(CASE WHEN account='2' THEN 1 ELSE 0 END) AS acc2
+    FROM outputs
+    GROUP BY output_type, output_type_name
+    ORDER BY output_type
+""").df()
+show_df(totals_per_type)
+```
+
+## 1.3 Sources stats
+
+```{python}
+#| label: sources-stats
+
+src_stats = con.execute("""
+    SELECT
+        COUNT(*) AS total_sources,
+        SUM(content_size) AS total_chars,
+        AVG(content_size) AS avg_chars
+    FROM sources
+""").df()
+
+show_df(src_stats.assign(
+    total_chars=src_stats["total_chars"].fillna(0).astype(int),
+    avg_chars=src_stats["avg_chars"].fillna(0).astype(int),
+))
+```
+
+# 2. Outputs (9 tipos)
+
+## 2.1 Conteudo por tipo
+
+```{python}
+#| label: outputs-content
+
+content_stats = con.execute("""
+    SELECT
+        output_type_name,
+        COUNT(*) AS count,
+        COUNT(content) AS with_content,
+        AVG(LENGTH(content)) AS avg_chars,
+        SUM(LENGTH(content)) AS total_chars
+    FROM outputs
+    GROUP BY output_type_name
+    ORDER BY count DESC
+""").df()
+
+show_df(content_stats.assign(
+    avg_chars=content_stats["avg_chars"].fillna(0).astype(int),
+    total_chars=content_stats["total_chars"].fillna(0).astype(int),
+))
+```
+
+# 3. Notes stats
+
+```{python}
+#| label: notes-stats
+
+n_stats = con.execute("""
+    SELECT
+        account,
+        kind,
+        COUNT(*) AS count,
+        AVG(LENGTH(content)) AS avg_chars
+    FROM notes
+    GROUP BY account, kind
+    ORDER BY account, count DESC
+""").df()
+
+if len(n_stats):
+    show_df(n_stats.assign(
+        avg_chars=n_stats["avg_chars"].fillna(0).astype(int),
+    ))
+else:
+    print("Nenhuma note.")
+```
+
+# 4. Preservation
+
+```{python}
+#| label: preservation
+
+pres = con.execute("""
+    SELECT
+        account,
+        is_preserved_missing,
+        COUNT(*) AS count
+    FROM conversations
+    GROUP BY account, is_preserved_missing
+    ORDER BY account, is_preserved_missing
+""").df()
+
+show_df(pres)
+```
+
+---
+
+**Render:** `QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/notebooklm.qmd`
