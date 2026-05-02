@@ -28,7 +28,7 @@ RPC_MIND_MAP = RPC_MIND_MAP_UUID
 
 class NotebookLMClient:
     def __init__(self, context: BrowserContext, session: dict, hl: str = "en"):
-        """hl: 'en' pra conta hello, 'pt-BR' pra marloon (afeta labels de metadata)."""
+        """hl: 'en' pra account-1, 'pt-BR' pra account-2 (afeta labels de metadata)."""
         self.context = context
         self.session = session
         self.hl = hl

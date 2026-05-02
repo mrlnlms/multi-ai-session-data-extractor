@@ -1,6 +1,7 @@
 """Playwright login persistente pra NotebookLM.
 
-2 contas ativas: hello e marloon. more.design foi perdida (raw antigo preservado).
+2 contas ativas: account-1 (en, original "hello") e account-2 (pt-BR, original
+"marloon"). more.design foi perdida (raw antigo preservado no projeto pai).
 """
 
 from pathlib import Path
@@ -8,13 +9,13 @@ from pathlib import Path
 from playwright.async_api import async_playwright, BrowserContext
 
 
-VALID_ACCOUNTS = ("hello", "marloon")
+VALID_ACCOUNTS = ("1", "2")
 
 # Lang (hl param) por conta — afeta labels em metadata de RPCs (ex: "Deep Dive" vs "Aprofundar").
 # Conteudo do user (chat, notes, source text) eh na lingua que foi escrito, independente do hl.
 ACCOUNT_LANG = {
-    "hello": "en",
-    "marloon": "pt-BR",
+    "1": "en",
+    "2": "pt-BR",
 }
 
 

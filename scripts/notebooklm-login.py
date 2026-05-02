@@ -1,6 +1,6 @@
 """Thin wrapper pra login NotebookLM com profile persistente.
 
-2 contas: hello, marloon. more.design nao mais disponivel.
+2 contas: 1 (en), 2 (pt-BR). more.design nao mais disponivel.
 """
 
 import argparse
