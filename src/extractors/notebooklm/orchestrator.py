@@ -4,98 +4,97 @@ NOTA: NotebookLM API NAO expoe sinal confiavel de incremental no discovery.
 O campo `update_time` do `wXbhsf` (em nb[5][5]) bumpa periodicamente mesmo
 sem mudancas reais no notebook (provavelmente "last indexed" do servidor).
 2 fetches consecutivos retornam TUDO IGUAL, mas com gap de ~1h os timestamps
-bumpam em todos. Por isso, orchestrator SEMPRE refetcha tudo (~2-3min).
+bumpam em todos. Por isso, orchestrator aplica lite-fetch (3 RPCs leves) pra
+classificar fetch vs copy contra o estado anterior.
 
 A incrementalidade real fica no reconciler, que compara o conteudo do JSON
-(excluindo timestamps voláteis) pra decidir to_use vs to_copy. Pos-merge, o
-download_assets reusa via --copy-from-prev. Resultado pratico: re-fetch e
-relativamente barato e o storage economiza via cópia.
+(excluindo timestamps voláteis) pra decidir to_use vs to_copy.
 
---full mantido por compat (no-op atual: ja sempre refetcha).
+--full mantido por compat (no-op atual: ja sempre considera tudo).
+
+PASTA UNICA CUMULATIVA per-account (sem timestamps), espelhando padrao
+das outras 6 plataformas. Saida: data/raw/NotebookLM/account-{N}/.
 """
 
 import asyncio
 import json
-import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
 from src.extractors.notebooklm.auth import load_context, ACCOUNT_LANG
 from src.extractors.notebooklm.api_client import NotebookLMClient
 from src.extractors.notebooklm.batchexecute import load_session
-from src.extractors.notebooklm.discovery import discover
+from src.extractors.notebooklm.discovery import discover, persist_discovery
 from src.extractors.notebooklm.fetcher import fetch_notebook, lite_fetch_notebook
 
 
-ACCOUNT_DIR_MAP = {
-    "hello": "hello.marlonlemes",
-    "marloon": "marloonlemes",
-}
+BASE_DIR = Path("data/raw/NotebookLM")
+DISCOVERY_DROP_ABORT_THRESHOLD = 0.20
 
 
 def _account_dir(account: str) -> Path:
-    return Path("data/raw/NotebookLM Data") / ACCOUNT_DIR_MAP[account]
+    return BASE_DIR / f"account-{account}"
 
 
-def _make_output_dir(account: str) -> Path:
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M")
-    return _account_dir(account) / ts
+def _resolve_output_dir(account: str) -> Path:
+    """Pasta unica cumulativa per-account. Sem timestamps."""
+    out = _account_dir(account)
+    out.mkdir(parents=True, exist_ok=True)
+    return out
 
 
-def _list_raws(account: str) -> list[Path]:
-    base = _account_dir(account)
-    if not base.exists():
-        return []
-    return sorted(
-        [p for p in base.iterdir() if p.is_dir() and len(p.name) == 16 and "T" in p.name],
-        key=lambda p: p.stat().st_mtime,
-    )
+def _get_max_known_discovery(output_dir: Path) -> int:
+    """Maior count historico em capture_log.jsonl per-account.
 
-
-def _load_prev_discovery(prev_raw: Path) -> dict[str, dict]:
-    p = prev_raw / "discovery_ids.json"
-    if not p.exists():
-        return {}
-    try:
-        data = json.loads(p.read_text(encoding="utf-8"))
-        return {e["uuid"]: e for e in data if isinstance(e, dict) and e.get("uuid")}
-    except Exception:
-        return {}
-
-
-def _copy_notebook_and_sources(prev_raw: Path, target: Path, uuid: str) -> tuple[bool, int]:
-    """Copia notebooks/<uuid>.json + sources referenciados pro target.
-
-    Retorna (notebook_copied, sources_copied).
+    IMPORTANTE: usa output_dir, NAO output_dir.parent — bug preventivo #1
+    (em Gemini, counts vazavam entre plataformas via rglob no parent).
     """
-    src_nb = prev_raw / "notebooks" / f"{uuid}.json"
-    dst_nb = target / "notebooks" / f"{uuid}.json"
-    dst_nb.parent.mkdir(parents=True, exist_ok=True)
-    if not src_nb.exists():
-        return (False, 0)
-    shutil.copy2(src_nb, dst_nb)
+    log_path = output_dir / "capture_log.jsonl"
+    if not log_path.exists():
+        return 0
+    max_count = 0
+    for line in log_path.read_text(encoding="utf-8").splitlines():
+        try:
+            entry = json.loads(line)
+            count = entry.get("totals", {}).get("notebooks_discovered", 0)
+            if count > max_count:
+                max_count = count
+        except Exception:
+            continue
+    return max_count
 
-    # Sources referenciados (metadata[0][1])
-    n_src = 0
-    try:
-        nb = json.loads(src_nb.read_text(encoding="utf-8"))
-        meta = nb.get("metadata")
-        if meta and isinstance(meta, list) and meta and isinstance(meta[0], list):
-            src_list = meta[0][1] if len(meta[0]) > 1 else None
-            if isinstance(src_list, list):
-                for entry in src_list:
-                    if isinstance(entry, list) and entry and isinstance(entry[0], list) and entry[0]:
-                        suid = entry[0][0]
-                        if isinstance(suid, str):
-                            ssrc = prev_raw / "sources" / f"{suid}.json"
-                            sdst = target / "sources" / f"{suid}.json"
-                            if ssrc.exists() and not sdst.exists():
-                                sdst.parent.mkdir(parents=True, exist_ok=True)
-                                shutil.copy2(ssrc, sdst)
-                                n_src += 1
-    except Exception:
-        pass
-    return (True, n_src)
+
+def _check_discovery_drop(current: int, baseline: int) -> tuple[bool, str | None]:
+    """Aborta se discovery atual cair >threshold vs baseline historico."""
+    if baseline == 0:
+        return (False, None)  # primeira run
+    drop = (baseline - current) / baseline
+    if drop > DISCOVERY_DROP_ABORT_THRESHOLD:
+        return (
+            True,
+            f"Discovery caiu {drop:.0%} (atual={current}, baseline={baseline}). "
+            f"Threshold={DISCOVERY_DROP_ABORT_THRESHOLD:.0%}. ABORTANDO antes de salvar."
+        )
+    return (False, None)
+
+
+def _write_last_capture_md(output_dir: Path, log_entry: dict) -> None:
+    """Snapshot human-readable da ultima run."""
+    totals = log_entry["totals"]
+    md = (
+        f"# Last Capture — NotebookLM (account {log_entry['account']})\n\n"
+        f"**Run:** {log_entry['started_at']} → {log_entry['finished_at']}\n\n"
+        f"## Totals\n\n"
+        f"- Notebooks descobertos: {totals.get('notebooks_discovered', 0)}\n"
+        f"- Notebooks fetched: {totals.get('notebooks_fetched', 0)}\n"
+        f"- Sources fetched: {totals.get('sources_fetched_total', 0)}\n"
+        f"- RPCs OK: {totals.get('rpcs_ok_total', 0)}\n"
+        f"- RPCs empty: {totals.get('rpcs_empty_total', 0)}\n"
+        f"- Notebooks com erros: {totals.get('notebooks_with_errors', 0)}\n"
+        f"- Artifacts individuais fetched: {totals.get('artifacts_individual_total', 0)}\n"
+        f"- Mind maps fetched: {totals.get('mind_maps_total', 0)}\n"
+    )
+    (output_dir / "LAST_CAPTURE.md").write_text(md, encoding="utf-8")
 
 
 async def run_export(
@@ -105,8 +104,7 @@ async def run_export(
     only_notebooks: set[str] | None = None,
 ) -> Path:
     started_at = datetime.now(timezone.utc)
-    output_dir = _make_output_dir(account)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = _resolve_output_dir(account)
     print(f"Account: {account} ({ACCOUNT_LANG[account]})")
     print(f"Raw output: {output_dir}")
 
@@ -115,8 +113,19 @@ async def run_export(
         session = await load_session(context)
         client = NotebookLMClient(context, session, hl=ACCOUNT_LANG[account])
 
-        # Discovery
-        nbs = await discover(client, output_dir)
+        # Discovery LAZY — nao persiste ainda
+        nbs_all = await discover(client)
+        n_discovered = len(nbs_all)
+
+        # Fail-fast contra discovery flakey
+        baseline = _get_max_known_discovery(output_dir)
+        aborted, reason = _check_discovery_drop(n_discovered, baseline)
+        if aborted:
+            print(f"\nFAIL-FAST: {reason}")
+            raise RuntimeError(reason)
+
+        # Aplica filtros (smoke / only_notebooks) APOS fail-fast
+        nbs = nbs_all
         if smoke_limit is not None:
             nbs = nbs[:smoke_limit]
             print(f"SMOKE: limitado a {smoke_limit} notebooks")
@@ -128,31 +137,29 @@ async def run_export(
             if missing:
                 print(f"  UUIDs nao encontrados na discovery: {missing}")
 
-        # Detecta raw anterior pra incremental via lite-fetch
-        prev_raw = None
-        if not full and not only_notebooks:
-            raws = _list_raws(account)
-            cands = [r for r in raws if r != output_dir]
-            if cands:
-                prev_raw = cands[-1]
+        # Persist discovery agora — apos fail-fast (bug preventivo #2)
+        persist_discovery(nbs_all, output_dir)
 
-        if prev_raw:
-            print(f"\nLite-fetch: comparando 3 RPCs (rLM1Ne+cFji9+gArtLc) por notebook vs {prev_raw.name}")
+        # Detecta raw anterior pra incremental via lite-fetch
+        prev_existed = (output_dir / "notebooks").exists() and any(
+            (output_dir / "notebooks").glob("*.json")
+        )
+
+        if prev_existed and not full and not only_notebooks:
+            print(f"\nLite-fetch: comparando 3 RPCs (rLM1Ne+cFji9+gArtLc) por notebook vs estado anterior")
             from src.reconcilers.notebooklm import _eq_lenient
             sem_lite = asyncio.Semaphore(8)
 
             async def _classify(nb):
                 async with sem_lite:
                     lite = await lite_fetch_notebook(client, nb["uuid"])
-                # Compara com raw anterior se existe
-                prev_path = prev_raw / "notebooks" / f"{nb['uuid']}.json"
+                prev_path = output_dir / "notebooks" / f"{nb['uuid']}.json"
                 if not prev_path.exists():
                     return ("fetch", nb)
                 try:
                     prev = json.loads(prev_path.read_text(encoding="utf-8"))
                 except Exception:
                     return ("fetch", nb)
-                # Se 3 campos baterem (lenient), copy. Senão, fetch
                 same_meta = _eq_lenient(lite["metadata"], prev.get("metadata"))
                 same_notes = _eq_lenient(lite["notes"], prev.get("notes"))
                 same_audios = _eq_lenient(lite["audios"], prev.get("audios"))
@@ -163,11 +170,7 @@ async def run_export(
             classifications = await asyncio.gather(*(_classify(nb) for nb in nbs))
             to_fetch = [nb for action, nb in classifications if action == "fetch"]
             to_copy_nbs = [nb for action, nb in classifications if action == "copy"]
-            print(f"  resultado: {len(to_fetch)} fetch, {len(to_copy_nbs)} copy do anterior")
-
-            # Copy notebooks unchanged + sources do raw anterior
-            for nb in to_copy_nbs:
-                _copy_notebook_and_sources(prev_raw, output_dir, nb["uuid"])
+            print(f"  resultado: {len(to_fetch)} fetch, {len(to_copy_nbs)} copy in-place (sem alteracao)")
         else:
             to_fetch = list(nbs)
 
@@ -182,32 +185,36 @@ async def run_export(
                 f"— {marker}, sources={s['sources_fetched']}/{s['n_source_uuids']}"
             )
 
-        # Log resumo
-        log = {
+        # Log resumo (append-only jsonl)
+        log_entry = {
             "started_at": started_at.isoformat(),
             "finished_at": datetime.now(timezone.utc).isoformat(),
             "account": account,
             "hl": ACCOUNT_LANG[account],
             "smoke_limit": smoke_limit,
             "totals": {
-                "notebooks_discovered": len(nbs),
+                "notebooks_discovered": n_discovered,
                 "notebooks_fetched": len(all_stats),
                 "sources_fetched_total": sum(s["sources_fetched"] for s in all_stats),
                 "source_uuids_seen": sum(s["n_source_uuids"] for s in all_stats),
                 "rpcs_ok_total": sum(s["rpcs_ok"] for s in all_stats),
                 "rpcs_empty_total": sum(s["rpcs_empty"] for s in all_stats),
                 "notebooks_with_errors": sum(1 for s in all_stats if s["rpcs_errors"]),
+                "artifacts_individual_total": sum(s.get("artifacts_fetched_individual", 0) for s in all_stats),
+                "mind_maps_total": sum(1 for s in all_stats if s.get("mind_map_fetched")),
             },
             "errors_sample": [s for s in all_stats if s["rpcs_errors"] or s["sources_errors"]][:10],
         }
-        with open(output_dir / "capture_log.json", "w", encoding="utf-8") as f:
-            json.dump(log, f, ensure_ascii=False, indent=2)
+        log_path = output_dir / "capture_log.jsonl"
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry, ensure_ascii=False, default=str) + "\n")
+
+        _write_last_capture_md(output_dir, log_entry)
 
         print()
         print("=== SUMMARY ===")
-        print(json.dumps(log["totals"], indent=2))
+        print(json.dumps(log_entry["totals"], indent=2))
         print(f"\nRaw em: {output_dir}")
-        print(f"Proximo passo: python scripts/notebooklm-download-assets.py --account {account}")
         return output_dir
     finally:
         await context.close()

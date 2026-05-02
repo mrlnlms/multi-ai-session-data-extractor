@@ -1,11 +1,11 @@
 """Reconciler NotebookLM — merge raw atual com merged anterior.
 
-Uso:
-    python scripts/notebooklm-reconcile.py --account hello [raw_dir]
-    python scripts/notebooklm-reconcile.py --account hello --full
-    python scripts/notebooklm-reconcile.py --account hello --refetch-features rLM1Ne_metadata
+Pasta unica per-account. Sem timestamps.
 
-Default: auto-detecta raw mais recente do account + merged anterior.
+Uso:
+    python scripts/notebooklm-reconcile.py --account 1
+    python scripts/notebooklm-reconcile.py --account 2 --full
+    python scripts/notebooklm-reconcile.py --account 1 --refetch-features rLM1Ne_metadata
 """
 
 import argparse
@@ -13,25 +13,18 @@ import sys
 from pathlib import Path
 
 from src.extractors.notebooklm.auth import VALID_ACCOUNTS
-from src.extractors.notebooklm.orchestrator import ACCOUNT_DIR_MAP
+from src.extractors.notebooklm.orchestrator import BASE_DIR as RAW_BASE
 from src.reconcilers.notebooklm import run_reconciliation, FEATURE_FLAGS
 
 
-def _find_latest_raw(account: str) -> Path | None:
-    base = Path("data/raw/NotebookLM Data") / ACCOUNT_DIR_MAP[account]
-    if not base.exists():
-        return None
-    cands = sorted(
-        [p for p in base.iterdir() if p.is_dir() and len(p.name) == 16 and "T" in p.name],
-        key=lambda p: p.stat().st_mtime,
-    )
-    return cands[-1] if cands else None
+MERGED_BASE = Path("data/merged/NotebookLM")
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--account", required=True, choices=list(VALID_ACCOUNTS))
-    parser.add_argument("raw_dir", nargs="?", default=None)
+    parser.add_argument("raw_dir", nargs="?", default=None,
+                        help="Override do raw dir (default: data/raw/NotebookLM/account-{N}/)")
     parser.add_argument("--full", action="store_true",
                         help="Forca to_use em tudo (refetch completo)")
     parser.add_argument("--refetch-features", default=None,
@@ -40,16 +33,13 @@ def main():
                         help="Override do merged anterior (default: auto-detect)")
     args = parser.parse_args()
 
-    if args.raw_dir:
-        raw = Path(args.raw_dir)
-    else:
-        raw = _find_latest_raw(args.account)
-        if not raw:
-            print(f"ERRO: nenhum raw em data/raw/NotebookLM Data/{ACCOUNT_DIR_MAP[args.account]}/")
-            sys.exit(1)
-        print(f"Raw: {raw}")
+    raw = Path(args.raw_dir) if args.raw_dir else RAW_BASE / f"account-{args.account}"
+    if not raw.exists():
+        print(f"ERRO: raw nao existe: {raw}")
+        sys.exit(1)
+    print(f"Raw: {raw}")
 
-    merged_base = Path("data/merged/NotebookLM") / ACCOUNT_DIR_MAP[args.account]
+    merged_base = MERGED_BASE / f"account-{args.account}"
     prev_merged = Path(args.previous_merged) if args.previous_merged else None
 
     force_feats = None
