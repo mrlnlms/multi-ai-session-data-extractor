@@ -1,279 +1,318 @@
-"""Parser para metadados de notebooks do NotebookLM (scrapeados em markdown).
+"""Parser canonico v3 pra NotebookLM.
 
-Suporta duas fontes:
-- Inventarios markdown (parse): titulo, datas, sources, UUID
-- Downloads Playwright (parse_downloads): chat, notes, guide, audio metadata
-- Metadados notebook.json (parse_downloads): guide_summary, sources
+Le merged em data/merged/NotebookLM/account-{N}/ e gera 8 parquets em
+data/processed/NotebookLM/:
+- 4 canonicos (conversations, messages, tool_events, branches)
+- 4 auxiliares (sources, notes, outputs, guide_questions)
+
+Schema canonico em src/schema/models.py.
+
+Decisoes de design (ver docs/superpowers/specs/2026-05-02-notebooklm-schema-design.md):
+- guide.summary vira system message (sequence=0) em todo notebook — garante
+  message_count >= 1 mesmo quando chat=None (76% dos notebooks no legacy
+  do projeto pai tem chat=None).
+- 1 conversation por notebook
+- 1 branch (main) por conversation — NotebookLM nao tem fork
+- output_type=10 reservado pra mind_map
 """
 
 import json
-import logging
-import re
 from pathlib import Path
-from dataclasses import dataclass, asdict, fields
+from typing import Optional
 
 import pandas as pd
 
-from src.parsers.base import BaseParser
-from src.schema.models import Conversation, Message
-
-logger = logging.getLogger(__name__)
-
-
-@dataclass
-class NotebookGuide:
-    conversation_id: str
-    guide_summary: str
-    source_count: int
-    source_names: str  # JSON array of source names
-
-    def to_dict(self) -> dict:
-        return asdict(self)
+from src.schema.models import (
+    Conversation, Message, ToolEvent, Branch, ProjectDoc,
+    NotebookLMNote, NotebookLMOutput, NotebookLMGuideQuestion,
+    VALID_OUTPUT_TYPES,
+    conversations_to_df, messages_to_df, tool_events_to_df, branches_to_df,
+    project_docs_to_df,
+    notebooklm_notes_to_df, notebooklm_outputs_to_df, notebooklm_guide_questions_to_df,
+)
+from src.parsers._notebooklm_helpers import (
+    extract_sources_from_metadata, extract_guide, extract_chat_turns,
+    extract_notes, extract_artifacts_list, extract_artifact_content,
+    extract_mind_map_tree, parse_source_content, parse_timestamp,
+)
 
 
-@dataclass
-class NotebookSource:
-    conversation_id: str
-    source_uuid: str
-    source_name: str
-
-    def to_dict(self) -> dict:
-        return asdict(self)
-
-# Meses em portugues abreviado
-_PT_MONTHS = {
-    "jan.": 1, "fev.": 2, "mar.": 3, "abr.": 4,
-    "mai.": 5, "jun.": 6, "jul.": 7, "ago.": 8,
-    "set.": 9, "out.": 10, "nov.": 11, "dez.": 12,
-}
-
-_UUID_RE = re.compile(r"/notebook/([0-9a-f-]{36})")
+SOURCE = "notebooklm"
 
 
-class NotebookLMParser(BaseParser):
-    source_name = "notebooklm"
+class NotebookLMParser:
+    """Parser merged → 8 parquets canonicos+auxiliares."""
 
-    def __init__(self, account: str | None = None):
-        super().__init__(account)
-        self.guides: list[NotebookGuide] = []
-        self.sources: list[NotebookSource] = []
+    source_name = SOURCE
 
-    def reset(self):
-        super().reset()
-        self.guides = []
-        self.sources = []
+    def parse(self, merged: dict, output_dir: Path) -> dict:
+        """Parse merged dict, escreve 8 parquets em output_dir.
 
-    def parse(self, input_path: Path) -> None:
-        text = input_path.read_text(encoding="utf-8")
+        merged dict format:
+            {
+                "notebooks": [
+                    {
+                        "uuid": str, "title": str, "account": str,
+                        "metadata": <rLM1Ne raw>, "guide": <VfAZjd raw>,
+                        "chat": <khqZz raw>, "notes": <cFji9 raw>,
+                        "audios": <gArtLc raw>, "mind_map": <hPTbtc raw>,
+                        "_artifacts_individual": {art_uuid: {raw}, ...},
+                        "_mind_map_tree": {raw} or None,
+                        "_preserved_missing": bool,
+                        "_last_seen_in_server": str (date)
+                    },
+                    ...
+                ],
+                "sources": {
+                    src_uuid: {"raw": <hizoJc raw>, ...},
+                    ...
+                }
+            }
 
-        for line in text.splitlines():
-            line = line.strip()
-            if not line.startswith("|"):
+        Retorna stats {table_name: row_count}.
+        """
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        convs: list[Conversation] = []
+        msgs: list[Message] = []
+        events: list[ToolEvent] = []
+        branches: list[Branch] = []
+        sources: list[ProjectDoc] = []
+        notes: list[NotebookLMNote] = []
+        outputs: list[NotebookLMOutput] = []
+        questions: list[NotebookLMGuideQuestion] = []
+
+        sources_raw = merged.get("sources", {})
+
+        for nb in merged.get("notebooks", []):
+            self._parse_notebook(
+                nb, sources_raw,
+                convs, msgs, events, branches,
+                sources, notes, outputs, questions,
+            )
+
+        # Write parquets (idempotente — overwrite)
+        conversations_to_df(convs).to_parquet(
+            output_dir / "notebooklm_conversations.parquet", index=False)
+        messages_to_df(msgs).to_parquet(
+            output_dir / "notebooklm_messages.parquet", index=False)
+        tool_events_to_df(events).to_parquet(
+            output_dir / "notebooklm_tool_events.parquet", index=False)
+        branches_to_df(branches).to_parquet(
+            output_dir / "notebooklm_branches.parquet", index=False)
+        project_docs_to_df(sources).to_parquet(
+            output_dir / "notebooklm_sources.parquet", index=False)
+        notebooklm_notes_to_df(notes).to_parquet(
+            output_dir / "notebooklm_notes.parquet", index=False)
+        notebooklm_outputs_to_df(outputs).to_parquet(
+            output_dir / "notebooklm_outputs.parquet", index=False)
+        notebooklm_guide_questions_to_df(questions).to_parquet(
+            output_dir / "notebooklm_guide_questions.parquet", index=False)
+
+        return {
+            "conversations": len(convs),
+            "messages": len(msgs),
+            "tool_events": len(events),
+            "branches": len(branches),
+            "sources": len(sources),
+            "notes": len(notes),
+            "outputs": len(outputs),
+            "guide_questions": len(questions),
+        }
+
+    def _parse_notebook(
+        self, nb: dict, sources_raw: dict,
+        convs: list, msgs: list, events: list, branches: list,
+        sources: list, notes: list, outputs: list, questions: list,
+    ):
+        account = str(nb.get("account", "1"))
+        nb_uuid = nb["uuid"]
+        conv_id = f"account-{account}_{nb_uuid}"
+
+        # Timestamps from discovery (preferable) or metadata
+        created_at = parse_timestamp(nb.get("create_time"))
+        updated_at = parse_timestamp(nb.get("update_time"))
+        if created_at is None:
+            created_at = pd.Timestamp.now(tz="UTC")
+        if updated_at is None:
+            updated_at = created_at
+
+        is_preserved = bool(nb.get("_preserved_missing", False))
+        last_seen = nb.get("_last_seen_in_server")
+        last_seen_ts = parse_timestamp(last_seen) if last_seen else None
+
+        # Guide → summary + questions
+        guide = extract_guide(nb.get("guide"))
+        summary = guide.get("summary")
+
+        # === Sources ===
+        source_entries = extract_sources_from_metadata(nb.get("metadata"))
+        for s in source_entries:
+            src_raw_payload = sources_raw.get(s["uuid"])
+            if src_raw_payload is None:
                 continue
-            cells = [c.strip() for c in line.split("|")]
-            # Remove empty strings from split
-            cells = [c for c in cells if c]
+            content = parse_source_content(src_raw_payload.get("raw"))
+            sources.append(ProjectDoc(
+                doc_id=s["uuid"],
+                project_id=conv_id,
+                source=SOURCE,
+                file_name=s.get("filename") or "",
+                content=content or "",
+                content_size=len(content or ""),
+                estimated_token_count=(len(content or "") // 4) if content else 0,
+                created_at=created_at,
+            ))
 
-            # Skip header and separator rows
-            if not cells or cells[0] == "#" or cells[0].startswith("-"):
-                continue
+        # === Messages: system summary + chat turns ===
+        chat_turns = extract_chat_turns(nb.get("chat")) or []
+        sequence = 0
+        first_msg_id: Optional[str] = None
 
-            # First cell should be a number
+        if summary:
+            msg_id = f"{conv_id}_guide_summary"
+            msgs.append(Message(
+                message_id=msg_id,
+                conversation_id=conv_id,
+                source=SOURCE,
+                sequence=sequence,
+                role="system",
+                content=summary,
+                model="gemini",
+                created_at=created_at,
+                account=account,
+                branch_id=f"{conv_id}_main",
+            ))
+            first_msg_id = msg_id
+            sequence += 1
+
+        last_msg_id = first_msg_id
+        for turn in chat_turns:
+            tid = turn.get("id") or f"{conv_id}_turn_{sequence}"
+            msgs.append(Message(
+                message_id=tid,
+                conversation_id=conv_id,
+                source=SOURCE,
+                sequence=sequence,
+                role=turn.get("role", "user"),
+                content=turn.get("content", ""),
+                model="gemini",
+                created_at=parse_timestamp(turn.get("created_at")) or created_at,
+                account=account,
+                branch_id=f"{conv_id}_main",
+            ))
+            if first_msg_id is None:
+                first_msg_id = tid
+            last_msg_id = tid
+            sequence += 1
+
+        # === Branch ===
+        branches.append(Branch(
+            branch_id=f"{conv_id}_main",
+            conversation_id=conv_id,
+            source=SOURCE,
+            root_message_id=first_msg_id or "",
+            leaf_message_id=last_msg_id or first_msg_id or "",
+            is_active=True,
+            created_at=created_at,
+        ))
+
+        # === Notes ===
+        for n in extract_notes(nb.get("notes")):
             try:
-                int(cells[0])
+                notes.append(NotebookLMNote(
+                    note_id=n["uuid"],
+                    conversation_id=conv_id,
+                    source=SOURCE,
+                    account=account,
+                    title=n.get("title"),
+                    content=n.get("content", ""),
+                    kind=n.get("kind", "note"),
+                    source_refs_json=json.dumps(n.get("source_refs", [])) if n.get("source_refs") else None,
+                    created_at=parse_timestamp(n.get("created_at")),
+                ))
             except ValueError:
+                # kind invalido — skip silently (pra evitar quebra em edge cases)
                 continue
 
-            uuid = self._extract_uuid(cells)
-            if not uuid:
+        # === Outputs (artifacts + mind_map) ===
+        artifacts_list = extract_artifacts_list(nb.get("audios"))
+        individual = nb.get("_artifacts_individual", {})
+        for art in artifacts_list:
+            t = art["type"]
+            if t not in VALID_OUTPUT_TYPES:
                 continue
+            content = None
+            if t in {2, 4, 7, 9} and art["uuid"] in individual:
+                content = extract_artifact_content(individual[art["uuid"]].get("raw"), t)
+            outputs.append(NotebookLMOutput(
+                output_id=art["uuid"],
+                conversation_id=conv_id,
+                source=SOURCE,
+                account=account,
+                output_type=t,
+                output_type_name=VALID_OUTPUT_TYPES[t],
+                title=art.get("title"),
+                status=art.get("status"),
+                asset_path=art.get("asset_paths"),
+                content=content,
+                source_refs_json=json.dumps(art.get("source_refs", [])) if art.get("source_refs") else None,
+                created_at=parse_timestamp(art.get("created_at")),
+            ))
 
-            if len(cells) >= 7:
-                conv = self._parse_7col(cells, uuid)
-            elif len(cells) >= 5:
-                conv = self._parse_5col(cells, uuid)
-            else:
-                continue
+        # Mind map (output type=10)
+        mm_payload = nb.get("_mind_map_tree")
+        if mm_payload:
+            mm_uuid = mm_payload.get("mind_map_uuid", f"{nb_uuid}_mm")
+            tree_json = extract_mind_map_tree(mm_payload.get("raw"))
+            outputs.append(NotebookLMOutput(
+                output_id=mm_uuid,
+                conversation_id=conv_id,
+                source=SOURCE,
+                account=account,
+                output_type=10,
+                output_type_name="mind_map",
+                title=None,
+                status=None,
+                asset_path=None,
+                content=tree_json or None,
+                source_refs_json=None,
+                created_at=created_at,
+            ))
 
-            if conv:
-                self.conversations.append(conv)
+        # === Guide questions ===
+        for q in guide.get("questions", []):
+            i = q["order"]
+            questions.append(NotebookLMGuideQuestion(
+                question_id=f"{conv_id}_q{i}",
+                conversation_id=conv_id,
+                source=SOURCE,
+                account=account,
+                question_text=q["text"],
+                full_prompt=q.get("prompt", ""),
+                order=i,
+            ))
 
-    def _extract_uuid(self, cells: list[str]) -> str | None:
-        for cell in cells:
-            m = _UUID_RE.search(cell)
-            if m:
-                return m.group(1)
-        return None
+        # === Conversation ===
+        message_count = sum(1 for m in msgs if m.conversation_id == conv_id)
+        title = nb.get("title")
+        # rLM1Ne pode ter title atualizado em metadata[0][0]
+        meta = nb.get("metadata")
+        if meta and isinstance(meta, list) and meta and isinstance(meta[0], list):
+            if meta[0] and isinstance(meta[0][0], str):
+                title = meta[0][0]
 
-    def _parse_7col(self, cells: list[str], uuid: str) -> Conversation:
-        """Parse: # | Titulo | Criado | Atualizado | Sources | Fontes | Link"""
-        title = cells[1]
-        created_at = self._ts(cells[2])
-        updated_at = self._ts(cells[3])
-
-        return Conversation(
-            conversation_id=uuid,
-            source=self.source_name,
+        convs.append(Conversation(
+            conversation_id=conv_id,
+            source=SOURCE,
             title=title,
             created_at=created_at,
             updated_at=updated_at,
-            message_count=0,
-            model=None,
-            account=self.account,
-            url=f"https://notebooklm.google.com/notebook/{uuid}",
-        )
-
-    def _parse_5col(self, cells: list[str], uuid: str) -> Conversation:
-        """Parse: # | Titulo | Data | Sources | Link"""
-        title = cells[1]
-        created_at = self._parse_pt_date(cells[2])
-
-        return Conversation(
-            conversation_id=uuid,
-            source=self.source_name,
-            title=title,
-            created_at=created_at,
-            updated_at=created_at,
-            message_count=0,
-            model=None,
-            account=self.account,
-            url=f"https://notebooklm.google.com/notebook/{uuid}",
-        )
-
-    def parse_downloads(self, downloads_dir: Path) -> None:
-        """Le chat.json e notebook.json dos notebooks baixados.
-
-        - chat.json → Messages + atualiza message_count
-        - notebook.json → guides (guide_summary) + sources
-        downloads_dir deve ser a pasta da conta (ex: data/raw/NotebookLM Data/more.design/).
-        """
-        existing_convs = {c.conversation_id: c for c in self.conversations}
-
-        for chat_file in downloads_dir.glob("*/chat.json"):
-            uuid = chat_file.parent.name
-            if uuid not in existing_convs:
-                continue  # Skip orphan: chat sem conversa no inventario
-            chat = json.loads(chat_file.read_text(encoding="utf-8"))
-            if not chat:
-                continue
-
-            messages = []
-
-            # Briefs como contexto (sequence=0, role=system)
-            brief_content = self._read_briefs(chat_file.parent)
-            if brief_content:
-                first_ts = pd.NaT
-                if chat and chat[0].get("timestamp"):
-                    first_ts = self._ts(chat[0]["timestamp"])
-                messages.append(Message(
-                    message_id=f"{uuid}_brief",
-                    conversation_id=uuid,
-                    source=self.source_name,
-                    sequence=0,
-                    role="system",
-                    content=brief_content,
-                    model=None,
-                    created_at=first_ts,
-                    account=self.account,
-                    content_types="brief",
-                ))
-
-            for seq, msg in enumerate(chat, 1):
-                ts = self._ts(msg["timestamp"]) if msg.get("timestamp") else pd.NaT
-                messages.append(Message(
-                    message_id=msg.get("id", f"{uuid}_{seq}"),
-                    conversation_id=uuid,
-                    source=self.source_name,
-                    sequence=seq,
-                    role=msg["role"],
-                    content=msg.get("content", ""),
-                    model=None,
-                    created_at=ts,
-                    account=self.account,
-                    content_types="text",
-                ))
-
-            self.messages.extend(messages)
-
-            # Atualizar message_count se a conversa ja existe
-            if uuid in existing_convs:
-                existing_convs[uuid].message_count = len(messages)
-
-        # notebook.json → guides + sources
-        for nb_file in downloads_dir.glob("*/notebook.json"):
-            uuid = nb_file.parent.name
-            if uuid not in existing_convs:
-                continue  # Skip orphan: notebook sem conversa no inventario
-            nb = json.loads(nb_file.read_text(encoding="utf-8"))
-
-            # Guide summary
-            guide = nb.get("guide") or {}
-            summary = guide.get("summary", "")
-
-            # Sources
-            nb_sources = nb.get("sources") or []
-            source_names = [s.get("name", "") for s in nb_sources]
-
-            if summary or nb_sources:
-                self.guides.append(NotebookGuide(
-                    conversation_id=uuid,
-                    guide_summary=summary,
-                    source_count=len(nb_sources),
-                    source_names=json.dumps(source_names, ensure_ascii=False),
-                ))
-
-            for s in nb_sources:
-                self.sources.append(NotebookSource(
-                    conversation_id=uuid,
-                    source_uuid=s.get("uuid", ""),
-                    source_name=s.get("name", ""),
-                ))
-
-    def guides_df(self) -> pd.DataFrame:
-        cols = [f.name for f in fields(NotebookGuide)]
-        if not self.guides:
-            return pd.DataFrame(columns=cols)
-        return pd.DataFrame([g.to_dict() for g in self.guides], columns=cols)
-
-    def sources_df(self) -> pd.DataFrame:
-        cols = [f.name for f in fields(NotebookSource)]
-        if not self.sources:
-            return pd.DataFrame(columns=cols)
-        return pd.DataFrame([s.to_dict() for s in self.sources], columns=cols)
-
-    def save(self, output_dir: Path) -> None:
-        super().save(output_dir)
-
-        guides = self.guides_df()
-        if not guides.empty:
-            guides.to_parquet(output_dir / f"{self.source_name}_guides.parquet")
-
-        sources = self.sources_df()
-        if not sources.empty:
-            sources.to_parquet(output_dir / f"{self.source_name}_sources.parquet")
-
-    @staticmethod
-    def _read_briefs(notebook_dir: Path) -> str:
-        """Concatena todos os *_brief.md de um notebook em um unico texto."""
-        briefs = sorted(notebook_dir.glob("audio/*_brief.md"))
-        if not briefs:
-            return ""
-        parts = []
-        for b in briefs:
-            content = b.read_text(encoding="utf-8").strip()
-            if content:
-                parts.append(content)
-        return "\n\n---\n\n".join(parts)
-
-    def _parse_pt_date(self, text: str) -> pd.Timestamp:
-        """Parse '25 de mai. de 2025' → Timestamp BRT naive."""
-        parts = text.strip().split()
-        # Expected: ['25', 'de', 'mai.', 'de', '2025']
-        if len(parts) >= 5:
-            day = int(parts[0])
-            month = _PT_MONTHS.get(parts[2], 1)
-            year = int(parts[4])
-            # Data local (sem hora) — interpretada como BRT, sem conversao
-            return pd.Timestamp(year=year, month=month, day=day)
-        # Fallback: parse string via _ts (assume UTC se sem TZ)
-        return self._ts(text)
+            message_count=message_count,
+            model="gemini",
+            account=account,
+            mode="chat",
+            url=f"https://notebooklm.google.com/notebook/{nb_uuid}",
+            summary=summary,
+            is_preserved_missing=is_preserved,
+            last_seen_in_server=last_seen_ts,
+        ))
