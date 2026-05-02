@@ -12,7 +12,7 @@ from pathlib import Path
 
 from src.extractors.perplexity.auth import load_context
 from src.extractors.perplexity.api_client import PerplexityAPIClient
-from src.extractors.perplexity.discovery import discover
+from src.extractors.perplexity.discovery import discover, persist_discovery
 from src.extractors.perplexity.fetcher import fetch_threads
 from src.extractors.perplexity.spaces import discover_spaces, fetch_spaces
 from src.extractors.perplexity.artifact_downloader import download_artifacts
@@ -20,6 +20,29 @@ from src.extractors.perplexity.asset_downloader import download_assets as downlo
 
 
 BASE_DIR = Path("data/raw/Perplexity")
+
+# Aborta captura se discovery cair mais que isso vs maior valor historico.
+DISCOVERY_DROP_ABORT_THRESHOLD = 0.20
+
+
+def _get_max_known_discovery(raw_root: Path) -> int:
+    """Maior threads_discovered ja visto em qualquer capture_log."""
+    if not raw_root.exists():
+        return 0
+    max_count = 0
+    for log_path in raw_root.rglob("capture_log.jsonl"):
+        try:
+            with open(log_path) as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    data = json.loads(line)
+                    count = (data.get("totals") or {}).get("threads_discovered", 0)
+                    if count > max_count:
+                        max_count = count
+        except Exception:
+            continue
+    return max_count
 
 
 def _tag_map(raw_dir: Path) -> dict[str, str]:
@@ -102,6 +125,25 @@ async def run_export(
             print(f"  warn user metadata: {str(e)[:100]}")
 
         threads = await discover(client, output_dir)
+
+        # Fail-fast: queda drastica vs baseline historico. Persistencia da
+        # discovery acontece SO depois do clear — escrever antes corrompe
+        # baseline incremental se abortar (mesmo bug 2 corrigido em qwen/
+        # deepseek/gemini/claude_ai).
+        baseline = _get_max_known_discovery(output_dir)
+        curr = len(threads)
+        if baseline > 0:
+            drop = (baseline - curr) / baseline
+            if drop > DISCOVERY_DROP_ABORT_THRESHOLD:
+                raise RuntimeError(
+                    f"Discovery suspeita: {curr} threads vs {baseline} no historico "
+                    f"(queda {drop:.0%}, limite {DISCOVERY_DROP_ABORT_THRESHOLD:.0%}). "
+                    f"Possivel Cloudflare challenge / sessao expirada / endpoint flakey. "
+                    f"Tente novamente."
+                )
+            print(f"Discovery OK: {curr} threads (baseline historico: {baseline})")
+
+        persist_discovery(threads, output_dir)
 
         # Plano incremental: thread JA existe no disco com mesmo last_query_datetime?
         # Mantem (skip fetch). Mudou ou nova → fetch.

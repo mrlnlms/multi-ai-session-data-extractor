@@ -521,8 +521,8 @@ captura. Lista crescente conforme aprendemos:
 **O que NAO precisa ser feito (proposto e descartado em 27/abr):**
 - Re-mergear "do zero" varrendo `_backup-gpt/merged-*` — reconciler ja faz
   preservation naturalmente, merged atual ja tem tudo
-- Refatorar `asset_downloader.py` pra "pool cumulativo" — hardlink no sync
-  resolve sem mexer no script
+- Refatorar `asset_downloader.py` pra "pool cumulativo" — pasta unica
+  cumulativa + `skip_existing` resolve sem mexer no script
 - Criar `chatgpt-reconcile-from-zero.py` ou similar — sync ja orquestra
 
 **Antes de criar QUALQUER script novo:** conferir se sync, scripts standalone
@@ -534,9 +534,11 @@ codigo + memory antes de propor.
 ### 1. Capturar uma vez, nunca rebaixar
 - Binarios (assets, project_sources) sao precious — alguns nao podem ser
   refetched (asset removed do servidor)
-- `chatgpt-sync.py` etapa 2 hardlinka binarios antigos pro raw novo ANTES
-  de chamar download. Download script ve hardlinks como existing e pula
-- Mover essa estrutura para outras plataformas
+- Pasta unica cumulativa (`data/raw/<Source>/` mesma a cada run, sem timestamp)
+  + `skip_existing` nos downloaders garante que binarios ja capturados nao
+  sao re-baixados nem perdidos
+- Mesmo padrao replicado nas outras plataformas (claude_ai/perplexity/qwen/
+  deepseek/gemini)
 
 ### 2. Preservation acima de tudo
 - Convs deletadas no servidor: `preserved_missing` no merged (reconciler)
@@ -609,8 +611,11 @@ data/
 - `DISCOVERY_DROP_ABORT_THRESHOLD = 0.20`
 
 ### `scripts/chatgpt-sync.py`
-- `hardlink_existing_binaries(target)`: rglob recursivo, mais recente por
-  mtime, hardlink (cross-fs vira copia automatica), pula existing no target.
+- Orquestra capture + assets + project_sources + reconcile em sequencia.
+  Como a pasta `data/raw/ChatGPT/` eh cumulativa (mesma pasta a cada run,
+  sem timestamp), os downloaders pulam binarios ja existentes via
+  `skip_existing` — nao precisa mais de hardlink entre runs como na
+  arquitetura legada de subpastas datadas.
 
 ### `src/extractors/chatgpt/project_sources.py`
 - `_merge_with_preserved(current, index_path)`: merge cumulativo do indice

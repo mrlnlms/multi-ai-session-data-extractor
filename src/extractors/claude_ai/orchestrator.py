@@ -17,7 +17,7 @@ from pathlib import Path
 
 from src.extractors.claude_ai.auth import load_context
 from src.extractors.claude_ai.api_client import ClaudeAPIClient
-from src.extractors.claude_ai.discovery import discover
+from src.extractors.claude_ai.discovery import discover, persist_discovery
 from src.extractors.claude_ai.fetcher import fetch_conversations, fetch_projects
 
 
@@ -141,7 +141,9 @@ async def run_export(
         # Discovery
         disc = await discover(client, output_dir)
 
-        # Fail-fast: queda drastica vs baseline historico
+        # Fail-fast: queda drastica vs baseline historico. Persistencia da
+        # discovery acontece SO depois do clear — escrever antes corrompe
+        # baseline incremental se abortar.
         baseline = _get_max_known_discovery(output_dir)
         curr = len(disc["conversations"])
         if baseline > 0:
@@ -153,6 +155,8 @@ async def run_export(
                     f"Possivel sessao expirada / endpoint flakey. Tente novamente."
                 )
             print(f"Discovery OK: {curr} convs (baseline historico: {baseline})")
+
+        persist_discovery(disc, output_dir)
 
         today = started_at.strftime("%Y-%m-%d")
 
