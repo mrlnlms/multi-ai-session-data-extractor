@@ -1,15 +1,25 @@
-"""Reconciler do Gemini — merge raws de datas diferentes preservando historico.
+"""Reconciler Gemini — pasta unica cumulativa per-account.
 
-Layout: data/raw/Gemini Data/account-{N}/<YYYY-MM-DDTHH-MM>/
-  - conversations/<uuid>.json
-  - discovery_ids.json: [{uuid, title, created_at_secs}]
-  - assets/
+Layout:
+    data/raw/Gemini/account-{N}/        (input)
+        conversations/<uuid>.json
+        discovery_ids.json
+        capture_log.jsonl
 
-Saida: data/merged/Gemini/account-{N}/<YYYY-MM-DD>/
+    data/merged/Gemini/account-{N}/     (output)
+        conversations/<uuid>.json       (cumulativo)
+        assets/                         (cumulativo)
+        discovery_ids.json              (com _deleted_from_server flag)
+        gemini_merged_summary.json
+        LAST_RECONCILE.md
+        reconcile_log.jsonl
 
-Gemini nao expoe updated_at no discovery — usa created_at_secs como proxy.
-Como conv pode mudar (novas msgs) sem bumpar created_at, o reconciler tambem
-considera diff em arquivos/tamanho como sinal de mudanca.
+Multi-conta: reconciler cobre 1 conta por chamada. Sync orchestrator
+(`scripts/gemini-sync.py`) itera ambas e gera summary agregado.
+
+Limitacao: Gemini nao expoe updated_at (so created_at_secs). Novas msgs
+numa conv existente NAO bumpam created_at — pra forcar refetch nesses
+casos use --full.
 """
 
 import json
@@ -21,8 +31,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-FEATURES_VERSION = 1
-FEATURE_FLAGS = {"hNvQHb_conversation"}
+FEATURES_VERSION = 2  # bumpado pra layout pasta unica
 DROP_THRESHOLD = 0.5
 
 
@@ -39,6 +48,7 @@ class GeminiReconcileReport:
     updated: int = 0
     copied: int = 0
     preserved_missing: int = 0
+    asset_binaries_total: int = 0
     features_refetched: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     aborted: bool = False
@@ -46,9 +56,10 @@ class GeminiReconcileReport:
 
     def summary(self) -> str:
         return (
-            f"Reconciliacao Gemini: added={self.added}, updated={self.updated}, "
-            f"copied={self.copied}, preserved_missing={self.preserved_missing}, "
-            f"warnings={len(self.warnings)}"
+            f"Reconciliacao Gemini: convs={self.added}+/{self.updated}~/"
+            f"{self.copied}={self.preserved_missing}preserved "
+            f"(total={self.added + self.updated + self.copied + self.preserved_missing}), "
+            f"assets={self.asset_binaries_total}bin"
         )
 
 
@@ -66,22 +77,24 @@ def build_plan(
     force_refetch_features: set[str] | None = None,
     full: bool = False,
 ) -> GeminiPlan:
-    """Compara discovery por created_at_secs (Gemini nao expoe updated_at).
-
-    Limitacao: novas msgs numa conv existente nao bumpam created_at — pra forcar
-    refetch nesses casos use --full ou --refetch-features.
-    """
     curr = _load_discovery(current_raw)
     prev = _load_discovery(previous_merged) if previous_merged else {}
 
     version_bumped = False
     if previous_merged:
-        log = previous_merged / "reconcile_log.json"
-        if log.exists():
+        log_path = previous_merged / "reconcile_log.jsonl"
+        if log_path.exists():
             try:
-                d = json.loads(log.read_text(encoding="utf-8"))
-                if d.get("features_version", FEATURES_VERSION) < FEATURES_VERSION:
-                    version_bumped = True
+                with open(log_path, encoding="utf-8") as f:
+                    last_line = None
+                    for line in f:
+                        if line.strip():
+                            last_line = line
+                if last_line:
+                    prev_log = json.loads(last_line)
+                    prev_v = prev_log.get("features_version")
+                    if prev_v is not None and prev_v < FEATURES_VERSION:
+                        version_bumped = True
             except Exception:
                 pass
 
@@ -93,7 +106,9 @@ def build_plan(
             continue
         c_ts = curr[uuid].get("created_at_secs") or 0
         p_ts = prev[uuid].get("created_at_secs") or 0
-        if c_ts > p_ts:
+        title_changed = (curr[uuid].get("title") or "") != (prev[uuid].get("title") or "")
+        pinned_changed = bool(curr[uuid].get("pinned")) != bool(prev[uuid].get("pinned"))
+        if c_ts > p_ts or title_changed or pinned_changed:
             plan.to_use.append(uuid)
         else:
             plan.to_copy.append(uuid)
@@ -105,15 +120,13 @@ def build_plan(
 
 def run_reconciliation(
     raw_dir: Path,
-    merged_output_base: Path,
+    merged_output: Path,
     previous_merged: Path | None = None,
     force_refetch_features: set[str] | None = None,
     full: bool = False,
 ) -> GeminiReconcileReport:
     if previous_merged is None:
-        previous_merged = _find_latest_merged(merged_output_base)
-    if previous_merged and not previous_merged.exists():
-        previous_merged = None
+        previous_merged = merged_output if merged_output.exists() else None
 
     plan = build_plan(raw_dir, previous_merged, force_refetch_features, full)
     curr = _load_discovery(raw_dir)
@@ -126,55 +139,85 @@ def run_reconciliation(
         )
 
     today = datetime.now().strftime("%Y-%m-%d")
-    out = merged_output_base / today
-    (out / "conversations").mkdir(parents=True, exist_ok=True)
-    (out / "assets").mkdir(parents=True, exist_ok=True)
-
+    reconciled_at = datetime.now().isoformat()
     report = GeminiReconcileReport()
 
-    def _write_with_seen(src_path: Path, dst_path: Path):
-        try:
-            obj = json.loads(src_path.read_text(encoding="utf-8"))
-            obj["_last_seen_in_server"] = today
-            dst_path.write_text(json.dumps(obj, ensure_ascii=False, indent=2))
-        except Exception as e:
-            report.warnings.append(f"{dst_path.name}: {str(e)[:100]}")
+    merged_output.mkdir(parents=True, exist_ok=True)
+    (merged_output / "conversations").mkdir(exist_ok=True)
+    (merged_output / "assets").mkdir(exist_ok=True)
 
+    # ============================================================
+    # CONVERSATIONS
+    # ============================================================
     for uuid in plan.to_use:
-        s = raw_dir / "conversations" / f"{uuid}.json"
-        d = out / "conversations" / f"{uuid}.json"
-        if s.exists():
-            _write_with_seen(s, d)
+        src = raw_dir / "conversations" / f"{uuid}.json"
+        dst = merged_output / "conversations" / f"{uuid}.json"
+        if src.exists():
+            try:
+                obj = json.loads(src.read_text(encoding="utf-8"))
+                obj["_last_seen_in_server"] = today
+                obj.pop("_preserved_missing", None)
+                dst.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception as e:
+                report.warnings.append(f"to_use {uuid}: {str(e)[:100]}")
         else:
             report.warnings.append(f"to_use {uuid}: missing in raw")
 
+    # to_copy: do merged anterior (mantem _last_seen antigo), fallback pro raw
     for uuid in plan.to_copy:
-        if not previous_merged:
+        dst = merged_output / "conversations" / f"{uuid}.json"
+        prev_src = (previous_merged / "conversations" / f"{uuid}.json") if previous_merged else None
+        raw_src = raw_dir / "conversations" / f"{uuid}.json"
+        src = prev_src if (prev_src and prev_src.exists()) else raw_src
+        if not src.exists():
+            report.warnings.append(f"to_copy {uuid}: nem merged anterior nem raw tem arquivo")
             continue
-        s = previous_merged / "conversations" / f"{uuid}.json"
-        d = out / "conversations" / f"{uuid}.json"
-        if s.exists():
-            _write_with_seen(s, d)
+        try:
+            obj = json.loads(src.read_text(encoding="utf-8"))
+            obj["_last_seen_in_server"] = today
+            obj.pop("_preserved_missing", None)
+            dst.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception as e:
+            report.warnings.append(f"to_copy {uuid}: erro {str(e)[:100]}")
 
+    # preserved_missing: marca flag, NAO atualiza _last_seen
     for uuid in plan.preserved_missing:
         if not previous_merged:
             continue
-        s = previous_merged / "conversations" / f"{uuid}.json"
-        d = out / "conversations" / f"{uuid}.json"
-        if s.exists():
-            shutil.copy2(s, d)
+        src = previous_merged / "conversations" / f"{uuid}.json"
+        dst = merged_output / "conversations" / f"{uuid}.json"
+        if src.exists():
+            try:
+                obj = json.loads(src.read_text(encoding="utf-8"))
+                obj["_preserved_missing"] = True
+                dst.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception:
+                shutil.copy2(src, dst)
 
-    _merge_dir(raw_dir / "assets", out / "assets")
+    # ============================================================
+    # ASSETS (cumulativos)
+    # ============================================================
+    _merge_dir(raw_dir / "assets", merged_output / "assets")
     if previous_merged:
-        _merge_dir(previous_merged / "assets", out / "assets")
+        _merge_dir(previous_merged / "assets", merged_output / "assets")
 
+    # ============================================================
+    # DISCOVERY merged (com _deleted_from_server)
+    # ============================================================
     merged_disc = list(curr.values())
     for uuid in plan.preserved_missing:
         if uuid in prev:
-            e = dict(prev[uuid]); e["_deleted_from_server"] = True
-            merged_disc.append(e)
-    (out / "discovery_ids.json").write_text(json.dumps(merged_disc, ensure_ascii=False, indent=2))
+            entry = dict(prev[uuid])
+            entry["_deleted_from_server"] = True
+            merged_disc.append(entry)
+    (merged_output / "discovery_ids.json").write_text(
+        json.dumps(merged_disc, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
+    # ============================================================
+    # COUNTERS + LOGS
+    # ============================================================
     new_ids = set(plan.to_use) - set(prev.keys())
     report.added = len(new_ids)
     report.updated = len(plan.to_use) - report.added
@@ -183,8 +226,32 @@ def run_reconciliation(
     if force_refetch_features:
         report.features_refetched = sorted(force_refetch_features)
 
-    log = {
-        "reconciled_at": datetime.now().isoformat(),
+    asset_dir = merged_output / "assets"
+    if asset_dir.exists():
+        report.asset_binaries_total = sum(1 for _ in asset_dir.rglob("*") if _.is_file())
+
+    # gemini_merged_summary.json
+    summary = {
+        "reconciled_at": reconciled_at,
+        "features_version": FEATURES_VERSION,
+        "convs": {
+            "added": report.added,
+            "updated": report.updated,
+            "copied": report.copied,
+            "preserved_missing": report.preserved_missing,
+            "total": report.added + report.updated + report.copied + report.preserved_missing,
+        },
+        "asset_binaries_total": report.asset_binaries_total,
+        "features_refetched": report.features_refetched,
+    }
+    (merged_output / "gemini_merged_summary.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    # reconcile_log.jsonl (append)
+    log_entry = {
+        "reconciled_at": reconciled_at,
         "raw_source": str(raw_dir),
         "previous_merged": str(previous_merged) if previous_merged else None,
         "features_version": FEATURES_VERSION,
@@ -195,7 +262,13 @@ def run_reconciliation(
         "features_refetched": report.features_refetched,
         "warnings": report.warnings,
     }
-    (out / "reconcile_log.json").write_text(json.dumps(log, ensure_ascii=False, indent=2))
+    with open(merged_output / "reconcile_log.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+
+    # LAST_RECONCILE.md
+    _write_last_reconcile_md(merged_output, summary)
+
+    print(report.summary())
     return report
 
 
@@ -213,8 +286,17 @@ def _merge_dir(src: Path, dst: Path) -> None:
         shutil.copy2(item, tgt)
 
 
-def _find_latest_merged(merged_base: Path) -> Path | None:
-    if not merged_base.exists():
-        return None
-    cs = sorted([d for d in merged_base.iterdir() if d.is_dir()])
-    return cs[-1] if cs else None
+def _write_last_reconcile_md(merged_output: Path, summary: dict) -> None:
+    convs = summary["convs"]
+    md = (
+        "# Last reconcile\n\n"
+        f"- **Quando:** {summary['reconciled_at']}\n"
+        f"- **Features version:** {summary['features_version']}\n"
+        f"- **Conversations:** "
+        f"{convs['added']} added, {convs['updated']} updated, "
+        f"{convs['copied']} copied, {convs['preserved_missing']} preserved_missing "
+        f"(total={convs['total']})\n"
+        f"- **Assets binaries:** {summary['asset_binaries_total']}\n\n"
+        "Ver `reconcile_log.jsonl` pro historico completo.\n"
+    )
+    (merged_output / "LAST_RECONCILE.md").write_text(md, encoding="utf-8")

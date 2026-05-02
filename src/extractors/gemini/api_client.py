@@ -45,16 +45,21 @@ class GeminiAPIClient:
         )
         if not data or not isinstance(data, list):
             return []
-        # Schema observado: data = [null, cursor, [[conv_id, title, ..., [secs, nanos], ...]], ...]
+        # Schema observado (10 fields por conv):
+        #   [0]=conv_id, [1]=title, [2]=pinned (True ou None),
+        #   [5]=[secs, nanos], [9]=int (sempre 2 nos casos vistos)
+        # Confirmado empirico em 2026-05-02 via probe pin-share.
         convs_raw = data[2] if len(data) > 2 and isinstance(data[2], list) else []
         parsed = []
         for c in convs_raw:
             if not isinstance(c, list) or len(c) < 2:
                 continue
             ts = c[5] if len(c) > 5 and isinstance(c[5], list) else [None, None]
+            pinned = bool(c[2]) if len(c) > 2 else False
             parsed.append({
                 "uuid": c[0],
                 "title": c[1] or "",
+                "pinned": pinned,
                 "created_at_secs": ts[0] if len(ts) > 0 else None,
                 "created_at_nanos": ts[1] if len(ts) > 1 else None,
                 "raw": c,

@@ -92,9 +92,17 @@ class PlatformState:
     @property
     def conversations_parquet_path(self) -> Optional[Path]:
         """Parquet canonico (cross-platform). Preferir sobre merged_json_path
-        quando disponivel — schema uniforme entre plataformas."""
+        quando disponivel — schema uniforme entre plataformas.
+
+        Aceita 2 convencoes de naming:
+        - `conversations.parquet` (estilo legacy ChatGPT)
+        - `<source>_conversations.parquet` (parser v3 — Claude.ai, Qwen,
+          DeepSeek, Gemini, Perplexity)"""
         if self.processed_dir is None:
             return None
+        # Tenta primeiro o estilo v3
+        for cand in self.processed_dir.glob("*_conversations.parquet"):
+            return cand
         cand = self.processed_dir / "conversations.parquet"
         return cand if cand.exists() else None
 
@@ -232,6 +240,24 @@ def _load_reconcile_log(path: Path) -> list[ReconcileRun]:
     return runs
 
 
+def _collect_logs(base: Optional[Path], filename: str) -> list[Path]:
+    """Coleta logs do nome filename. Suporta layout flat (`base/filename`) E
+    multi-account (`base/account-*/filename`). Multi-account vira agregado."""
+    if base is None or not base.exists():
+        return []
+    direct = base / filename
+    if direct.exists():
+        return [direct]
+    # Multi-account: rglob limitado a 1 nivel (subpastas direto)
+    paths = []
+    for sub in base.iterdir():
+        if sub.is_dir():
+            cand = sub / filename
+            if cand.exists():
+                paths.append(cand)
+    return sorted(paths)
+
+
 def load_platform_state(name: str) -> PlatformState:
     raw_dir = DATA_RAW / name
     merged_dir = DATA_MERGED / name
@@ -240,8 +266,15 @@ def load_platform_state(name: str) -> PlatformState:
     merged_dir = merged_dir if merged_dir.exists() else None
     processed_dir = processed_dir if processed_dir.exists() else None
 
-    capture_runs = _load_capture_log(raw_dir / "capture_log.jsonl") if raw_dir else []
-    reconcile_runs = _load_reconcile_log(merged_dir / "reconcile_log.jsonl") if merged_dir else []
+    capture_runs: list[CaptureRun] = []
+    for p in _collect_logs(raw_dir, "capture_log.jsonl"):
+        capture_runs.extend(_load_capture_log(p))
+    capture_runs.sort(key=lambda r: r.started_at or datetime.min.replace(tzinfo=timezone.utc))
+
+    reconcile_runs: list[ReconcileRun] = []
+    for p in _collect_logs(merged_dir, "reconcile_log.jsonl"):
+        reconcile_runs.extend(_load_reconcile_log(p))
+    reconcile_runs.sort(key=lambda r: r.reconciled_at or datetime.min.replace(tzinfo=timezone.utc))
 
     return PlatformState(
         name=name,
