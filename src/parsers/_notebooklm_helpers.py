@@ -250,6 +250,37 @@ def extract_artifact_content(artifact_raw, artifact_type: int) -> Optional[str]:
     return json.dumps(artifact_raw, ensure_ascii=False)
 
 
+# === Source guide (tr032e) ===
+
+def extract_source_guide(guide_raw) -> dict:
+    """Extrai summary + tags + suggested questions do tr032e.
+
+    Schema empirico: [[[null, [summary_str], [[tags_list]], [[questions_list]]]]]
+
+    Retorna {summary: str|None, tags: list[str], questions: list[str]}.
+    """
+    out = {"summary": None, "tags": [], "questions": []}
+    if not isinstance(guide_raw, list) or not guide_raw:
+        return out
+    try:
+        # response[0][0] = [null, [summary], [[tags]], [[questions]]]
+        inner = guide_raw[0][0] if isinstance(guide_raw[0], list) else None
+        if not inner or len(inner) < 2:
+            return out
+        # summary em [1][0]
+        if isinstance(inner[1], list) and inner[1] and isinstance(inner[1][0], str):
+            out["summary"] = inner[1][0]
+        # tags em [2][0]
+        if len(inner) > 2 and isinstance(inner[2], list) and inner[2] and isinstance(inner[2][0], list):
+            out["tags"] = [t for t in inner[2][0] if isinstance(t, str)]
+        # questions em [3][0]
+        if len(inner) > 3 and isinstance(inner[3], list) and inner[3] and isinstance(inner[3][0], list):
+            out["questions"] = [q for q in inner[3][0] if isinstance(q, str)]
+    except (IndexError, TypeError):
+        pass
+    return out
+
+
 # === Mind map ===
 
 def extract_mind_map_tree(tree_raw) -> str:

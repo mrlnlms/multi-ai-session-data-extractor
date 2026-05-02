@@ -23,12 +23,13 @@ def _load_account(account_dir: Path, account: str) -> dict:
     """
     notebooks = []
     sources = {}
+    source_guides = {}
 
     nb_dir = account_dir / "notebooks"
     sources_dir = account_dir / "sources"
 
     if not nb_dir.exists():
-        return {"notebooks": notebooks, "sources": sources}
+        return {"notebooks": notebooks, "sources": sources, "source_guides": source_guides}
 
     # Discovery do merged: pra timestamps create_time/update_time atualizados
     discovery = {}
@@ -91,22 +92,26 @@ def _load_account(account_dir: Path, account: str) -> dict:
 
         notebooks.append(nb)
 
-    # Sources
+    # Sources + source guides (tr032e)
     if sources_dir.exists():
         for src_path in sources_dir.glob("*.json"):
             try:
                 s = json.loads(src_path.read_text(encoding="utf-8"))
-                if "source_uuid" in s:
+                if "source_uuid" not in s:
+                    continue
+                if src_path.stem.endswith("_guide"):
+                    source_guides[s["source_uuid"]] = s
+                else:
                     sources[s["source_uuid"]] = s
             except Exception:
                 continue
 
-    return {"notebooks": notebooks, "sources": sources}
+    return {"notebooks": notebooks, "sources": sources, "source_guides": source_guides}
 
 
 def main():
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-    merged_combined = {"notebooks": [], "sources": {}}
+    merged_combined = {"notebooks": [], "sources": {}, "source_guides": {}}
 
     if not MERGED_BASE.exists():
         print(f"ERRO: merged base nao existe: {MERGED_BASE}")
@@ -117,7 +122,9 @@ def main():
         data = _load_account(account_dir, account)
         merged_combined["notebooks"].extend(data["notebooks"])
         merged_combined["sources"].update(data["sources"])
-        print(f"  {account_dir.name}: {len(data['notebooks'])} notebooks, {len(data['sources'])} sources")
+        merged_combined["source_guides"].update(data.get("source_guides", {}))
+        print(f"  {account_dir.name}: {len(data['notebooks'])} notebooks, "
+              f"{len(data['sources'])} sources, {len(data.get('source_guides', {}))} source guides")
 
     parser = NotebookLMParser()
     stats = parser.parse(merged_combined, output_dir=PROCESSED_DIR)

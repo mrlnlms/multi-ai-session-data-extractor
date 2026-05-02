@@ -254,6 +254,29 @@ class NotebookLMOutput:
 
 
 @dataclass
+class NotebookLMSourceGuide:
+    """Guide gerado pelo modelo por source: summary + tags + suggested questions.
+
+    Vem do RPC tr032e (descoberto via probe 2026-05-02). Tabela auxiliar
+    separada de notebooklm_sources.parquet (que reusa ProjectDoc).
+    """
+    source_id: str           # source_uuid
+    conversation_id: str
+    source: str              # 'notebooklm'
+    account: str
+    summary: Optional[str]
+    tags_json: Optional[str]       # JSON list de tags
+    questions_json: Optional[str]  # JSON list de suggested questions
+
+    def __post_init__(self):
+        if self.source not in VALID_SOURCES:
+            raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
 class NotebookLMGuideQuestion:
     question_id: str
     conversation_id: str
@@ -322,3 +345,8 @@ def notebooklm_outputs_to_df(outputs: list[NotebookLMOutput]) -> pd.DataFrame:
 def notebooklm_guide_questions_to_df(qs: list[NotebookLMGuideQuestion]) -> pd.DataFrame:
     cols = [f.name for f in fields(NotebookLMGuideQuestion)]
     return _models_to_df(qs, cols)
+
+
+def notebooklm_source_guides_to_df(guides: list[NotebookLMSourceGuide]) -> pd.DataFrame:
+    cols = [f.name for f in fields(NotebookLMSourceGuide)]
+    return _models_to_df(guides, cols)

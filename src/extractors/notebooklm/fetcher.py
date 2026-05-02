@@ -210,17 +210,31 @@ async def fetch_notebook(
     async def _fetch_source(suid: str):
         async with sem:
             out = sources_dir / f"{suid}.json"
-            if out.exists():
-                return  # skip-existing
-            try:
-                sc = await client.fetch_source_content(nb_uuid, suid)
-                if sc is not None:
-                    payload = {"source_uuid": suid, "notebook_uuid": nb_uuid, "raw": sc}
-                    with open(out, "w", encoding="utf-8") as f:
-                        json.dump(payload, f, ensure_ascii=False)
-                    stats["sources_fetched"] += 1
-            except Exception as e:
-                stats["sources_errors"].append((suid, str(e)[:200]))
+            guide_out = sources_dir / f"{suid}_guide.json"
+
+            # Source content (hizoJc)
+            if not out.exists():
+                try:
+                    sc = await client.fetch_source_content(nb_uuid, suid)
+                    if sc is not None:
+                        payload = {"source_uuid": suid, "notebook_uuid": nb_uuid, "raw": sc}
+                        with open(out, "w", encoding="utf-8") as f:
+                            json.dump(payload, f, ensure_ascii=False)
+                        stats["sources_fetched"] += 1
+                except Exception as e:
+                    stats["sources_errors"].append((suid, str(e)[:200]))
+
+            # Source guide (tr032e — summary + tags + questions)
+            if not guide_out.exists():
+                try:
+                    sg = await client.fetch_source_guide(nb_uuid, suid)
+                    if sg is not None:
+                        payload = {"source_uuid": suid, "notebook_uuid": nb_uuid, "raw": sg}
+                        with open(guide_out, "w", encoding="utf-8") as f:
+                            json.dump(payload, f, ensure_ascii=False)
+                        stats["source_guides_fetched"] = stats.get("source_guides_fetched", 0) + 1
+                except Exception as e:
+                    stats["sources_errors"].append((f"guide:{suid[:8]}", str(e)[:200]))
 
     await asyncio.gather(*(_fetch_source(s) for s in source_uuids))
     stats["n_source_uuids"] = len(source_uuids)

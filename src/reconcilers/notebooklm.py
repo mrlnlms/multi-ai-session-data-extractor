@@ -229,6 +229,12 @@ def _copy_sources_for_notebook(uuid: str, src_root: Path, dst_root: Path) -> Non
         if src_path.exists() and not dst_path.exists():
             dst_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src_path, dst_path)
+        # Source guide (tr032e — summary + tags + questions)
+        src_guide = src_root / "sources" / f"{suid}_guide.json"
+        dst_guide = dst_root / "sources" / f"{suid}_guide.json"
+        if src_guide.exists() and not dst_guide.exists():
+            dst_guide.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_guide, dst_guide)
 
 
 def _copy_artifacts_and_mindmap(uuid: str, src_root: Path, dst_root: Path) -> None:

@@ -19,6 +19,7 @@ RPC_ARTIFACTS = "gArtLc"             # lista TODOS os artifacts (audio, video, s
 RPC_ARTIFACT_FETCH = "v9rmvd"        # fetch individual de artifact (flashcards, quiz, blog, data table, etc) por UUID
 RPC_MIND_MAP_FETCH = "CYK0Xb"        # fetch mind map estrutura (arvore JSON)
 RPC_SOURCE_CONTENT = "hizoJc"        # source content extraido
+RPC_SOURCE_GUIDE = "tr032e"          # source-level guide: summary + tags + suggested questions (descoberto via probe 2026-05-02)
 RPC_MIND_MAP_UUID = "hPTbtc"         # mind map UUID (legacy — hoje tambem em cFji9)
 
 # Alias retrocompat
@@ -179,6 +180,22 @@ class NotebookLMClient:
         """
         return await self._call(
             RPC_SOURCE_CONTENT, [[source_uuid], [2], [2]],
+            source_path=f"/notebook/{notebook_uuid}",
+        )
+
+    async def fetch_source_guide(self, notebook_uuid: str, source_uuid: str) -> dict | None:
+        """tr032e — source-level guide gerado pelo modelo: summary + tags + suggested questions.
+
+        Descoberto via probe 2026-05-02 (clicando num source na UI). Disparado quando
+        user abre painel do source na sidebar direita.
+
+        Schema empirico:
+            payload: [[[[source_uuid]]]]   — 4 wrappers
+            response: [[[null, [summary_str], [[tags_list]], [[questions_list]]]]]
+        """
+        payload = [[[[source_uuid]]]]
+        return await self._call(
+            RPC_SOURCE_GUIDE, payload,
             source_path=f"/notebook/{notebook_uuid}",
         )
 

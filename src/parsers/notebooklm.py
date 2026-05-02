@@ -24,16 +24,17 @@ import pandas as pd
 
 from src.schema.models import (
     Conversation, Message, ToolEvent, Branch, ProjectDoc,
-    NotebookLMNote, NotebookLMOutput, NotebookLMGuideQuestion,
+    NotebookLMNote, NotebookLMOutput, NotebookLMGuideQuestion, NotebookLMSourceGuide,
     VALID_OUTPUT_TYPES,
     conversations_to_df, messages_to_df, tool_events_to_df, branches_to_df,
     project_docs_to_df,
     notebooklm_notes_to_df, notebooklm_outputs_to_df, notebooklm_guide_questions_to_df,
+    notebooklm_source_guides_to_df,
 )
 from src.parsers._notebooklm_helpers import (
     extract_sources_from_metadata, extract_guide, extract_chat_turns,
     extract_notes, extract_artifacts_list, extract_artifact_content,
-    extract_mind_map_tree, parse_source_content, parse_timestamp,
+    extract_mind_map_tree, extract_source_guide, parse_source_content, parse_timestamp,
 )
 
 
@@ -81,14 +82,16 @@ class NotebookLMParser:
         notes: list[NotebookLMNote] = []
         outputs: list[NotebookLMOutput] = []
         questions: list[NotebookLMGuideQuestion] = []
+        source_guides: list[NotebookLMSourceGuide] = []
 
         sources_raw = merged.get("sources", {})
+        source_guides_raw = merged.get("source_guides", {})
 
         for nb in merged.get("notebooks", []):
             self._parse_notebook(
-                nb, sources_raw,
+                nb, sources_raw, source_guides_raw,
                 convs, msgs, events, branches,
-                sources, notes, outputs, questions,
+                sources, notes, outputs, questions, source_guides,
             )
 
         # Write parquets (idempotente — overwrite)
@@ -108,6 +111,8 @@ class NotebookLMParser:
             output_dir / "notebooklm_outputs.parquet", index=False)
         notebooklm_guide_questions_to_df(questions).to_parquet(
             output_dir / "notebooklm_guide_questions.parquet", index=False)
+        notebooklm_source_guides_to_df(source_guides).to_parquet(
+            output_dir / "notebooklm_source_guides.parquet", index=False)
 
         return {
             "conversations": len(convs),
@@ -118,12 +123,14 @@ class NotebookLMParser:
             "notes": len(notes),
             "outputs": len(outputs),
             "guide_questions": len(questions),
+            "source_guides": len(source_guides),
         }
 
     def _parse_notebook(
-        self, nb: dict, sources_raw: dict,
+        self, nb: dict, sources_raw: dict, source_guides_raw: dict,
         convs: list, msgs: list, events: list, branches: list,
         sources: list, notes: list, outputs: list, questions: list,
+        source_guides: list,
     ):
         account = str(nb.get("account", "1"))
         nb_uuid = nb["uuid"]
@@ -162,6 +169,21 @@ class NotebookLMParser:
                 estimated_token_count=(len(content or "") // 4) if content else 0,
                 created_at=created_at,
             ))
+
+            # Source guide (tr032e — summary + tags + questions)
+            guide_payload = source_guides_raw.get(s["uuid"])
+            if guide_payload is not None:
+                g = extract_source_guide(guide_payload.get("raw"))
+                if g.get("summary") or g.get("tags") or g.get("questions"):
+                    source_guides.append(NotebookLMSourceGuide(
+                        source_id=s["uuid"],
+                        conversation_id=conv_id,
+                        source=SOURCE,
+                        account=account,
+                        summary=g.get("summary"),
+                        tags_json=json.dumps(g.get("tags", [])) if g.get("tags") else None,
+                        questions_json=json.dumps(g.get("questions", [])) if g.get("questions") else None,
+                    ))
 
         # === Messages: system summary + chat turns ===
         chat_turns = extract_chat_turns(nb.get("chat")) or []
