@@ -1,6 +1,8 @@
 # Operações — comandos comuns no terminal
 
-Pra rodar o pipeline ChatGPT sozinho, sem depender de mim.
+Pra rodar o pipeline das 7 plataformas sozinho, sem depender de mim. ChatGPT
+serve de referência viva — as outras seguem o mesmo padrão com pequenas
+adaptações por plataforma.
 
 ---
 
@@ -14,13 +16,67 @@ Os exemplos abaixo usam `.venv/bin/python` por clareza.
 
 ---
 
-## Sync completo (recomendado pro dia-a-dia)
+## Sync por plataforma
 
-Captura tudo + reconcilia, em uma rodada. Incremental por padrão (rápido a partir da segunda run).
+Cada plataforma tem seu próprio orquestrador (`<plat>-sync.py`). Captura +
+reconcile + (assets, quando aplicável) em uma rodada. Incremental por padrão.
+
+### ChatGPT
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --no-voice-pass
 ```
+
+### Claude.ai
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/claude-sync.py
+# Se sync deixou gaps por timeout transiente:
+PYTHONPATH=. .venv/bin/python scripts/claude-refetch-known.py
+```
+
+### Perplexity
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/perplexity-sync.py
+```
+
+### Qwen
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/qwen-sync.py
+```
+
+### DeepSeek
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/deepseek-sync.py
+```
+
+### Gemini (multi-conta)
+
+```bash
+# Default: roda ambas contas (account-1 + account-2) em sequencia
+PYTHONPATH=. .venv/bin/python scripts/gemini-sync.py
+
+# Ou apenas uma conta
+PYTHONPATH=. .venv/bin/python scripts/gemini-sync.py --account 1
+```
+
+### NotebookLM
+
+Sem orquestrador ainda (backlog). Use export standalone:
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/notebooklm-export.py
+```
+
+---
+
+## Detalhes do ChatGPT (referência)
+
+ChatGPT tem mais flags porque é a plataforma mais madura. Outras seguem
+um subconjunto destas.
 
 **Flags úteis:**
 
@@ -120,13 +176,41 @@ cp /tmp/merged-backup-YYYYMMDD-HHMM.json data/merged/ChatGPT/chatgpt_merged.json
 cd /caminho/do/projeto
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
+.venv/bin/playwright install chromium
 
-# Login (1x por conta)
+# Login (1x por conta, por plataforma)
 PYTHONPATH=. .venv/bin/python scripts/chatgpt-login.py
+PYTHONPATH=. .venv/bin/python scripts/claude-login.py
+PYTHONPATH=. .venv/bin/python scripts/perplexity-login.py
+PYTHONPATH=. .venv/bin/python scripts/qwen-login.py
+PYTHONPATH=. .venv/bin/python scripts/deepseek-login.py
+PYTHONPATH=. .venv/bin/python scripts/gemini-login.py --account 1
+PYTHONPATH=. .venv/bin/python scripts/gemini-login.py --account 2
 
-# Primeira captura (vai ser cheia, demora)
+# Primeira captura por plataforma (cheia, demora)
 PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --no-voice-pass
+PYTHONPATH=. .venv/bin/python scripts/claude-sync.py
+# ... idem outras
 ```
+
+## Render Quarto descritivo (HTML self-contained)
+
+Após `<plat>-parse.py`, gerar HTML descritivo:
+
+```bash
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/chatgpt.qmd
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/claude-ai.qmd
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/perplexity.qmd
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/qwen.qmd
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/deepseek.qmd
+
+# Gemini tem 3 documentos: consolidado + 1 per-account
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/gemini.qmd
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/gemini-acc-1.qmd
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/gemini-acc-2.qmd
+```
+
+Output em `notebooks/_output/<plat>.html` (gitignored, ~50MB self-contained).
 
 ---
 

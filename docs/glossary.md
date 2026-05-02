@@ -82,6 +82,21 @@ Modo de captura que **refetcha tudo**. Usa quando tem suspeita de raw corrompido
 
 Etapa opcional que escaneia convs procurando mensagens de áudio (Voice Mode) cujo texto não veio pela API. Pra cada candidata, abre a conv no DOM e raspa o transcript. Lento — pode-se pular com `--no-voice-pass`.
 
+### Multi-account
+
+Plataformas onde o user tem **mais de uma conta** e queremos capturar todas
+juntas. Hoje só **Gemini** é multi-conta no projeto (2 contas Google em
+`.storage/gemini-profile-{1,2}/`).
+
+Implicações arquiteturais:
+- Pasta única por conta: `data/raw/Gemini/account-{N}/` e `data/merged/Gemini/account-{N}/`
+- Sync orquestrador (`gemini-sync.py`) itera ambas as contas em sequência por padrão; aceita `--account N` pra rodar só uma
+- `Conversation.account` ('1' ou '2') no schema canônico; `conversation_id` recebe namespace `account-{N}_{uuid}` pra prevenir colisão entre contas
+- Dashboard (`_collect_logs()`) agrega capture/reconcile logs across `account-*/` subpastas
+- Quarto: 3 documentos (`gemini.qmd` consolidado com stacked bars por conta + `gemini-acc-1.qmd` e `gemini-acc-2.qmd` no template canônico filtrado)
+
+NotebookLM provavelmente também será multi-conta quando for implementado.
+
 ---
 
 ## Os 4 estados de uma conv no reconcile

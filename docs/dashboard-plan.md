@@ -289,7 +289,12 @@ dashboard inicial.**
 
 ## 7. Fases de implementação
 
-### Fase 1: MVP Streamlit (sem parser)
+> **Estado atual (2026-05-02):** Fases 1, 2 e 3 entregues. Fase 4 entregue
+> pra 5 das 6 plataformas restantes (Claude.ai, Perplexity, Qwen, DeepSeek,
+> Gemini); só NotebookLM falta. Este documento permanece como histórico das
+> decisões — implementação está cristalizada no código.
+
+### Fase 1: MVP Streamlit (sem parser) — ✅ ENTREGUE
 
 **Entrega:** dashboard rodando com Overview + Drill-down + tabela básica de
 convs (apenas metadata, sem mensagens).
@@ -319,7 +324,7 @@ convs (apenas metadata, sem mensagens).
 
 ---
 
-### Fase 2: Parser ChatGPT (raw → parquet)
+### Fase 2: Parser ChatGPT (raw → parquet) — ✅ ENTREGUE
 
 **Entrega:** parser Python que transforma `chatgpt_merged.json` em 4 parquets
 no schema canônico de `src/schema/models.py`.
@@ -353,7 +358,7 @@ no schema canônico de `src/schema/models.py`.
 
 ---
 
-### Fase 3: Quarto descritivo + integração com Streamlit
+### Fase 3: Quarto descritivo + integração com Streamlit — ✅ ENTREGUE
 
 **Entrega:** notebook QMD do ChatGPT renderizando dashboard descritivo, com
 trigger e link a partir do Streamlit.
@@ -447,7 +452,7 @@ else:
 
 ---
 
-### Fase 4: Replicar parser + QMD pras outras 6 plataformas
+### Fase 4: Replicar parser + QMD pras outras 6 plataformas — ⚠️ 5/6 ENTREGUES (falta NotebookLM)
 
 Pra cada plataforma (Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity):
 

@@ -1,8 +1,7 @@
-# Dashboard — manual de funcionalidades (Fase 1)
+# Dashboard — manual de funcionalidades + operação
 
-Documento vivo do que ja existe no dashboard. Pareado com `dashboard-plan.md`
-(plan formal das 4 fases) e `dashboard-operations.md` (como subir, parar,
-acessar de outras sessoes).
+Documento vivo do que existe no dashboard (manual de funcionalidades +
+operação). Pareado com `dashboard-plan.md` (plan histórico das 4 fases).
 
 Roda com:
 
@@ -286,6 +285,121 @@ dashboard/
     └── platform.py
 ```
 
-`docs/dashboard-plan.md` — plan formal das 4 fases (este doc cobre so a 1).
+`docs/dashboard-plan.md` — plan formal das 4 fases (histórico de decisões).
 
 `README.md` — secao "Dashboard (Fase 1)" com instalacao e comandos basicos.
+
+---
+
+## 10. Operação
+
+### 10.1. Subir
+
+Pré-requisito: venv com deps do `requirements.txt` instaladas.
+
+Comando padrao (foreground, prende o terminal):
+
+```bash
+PYTHONPATH=. .venv/bin/streamlit run dashboard.py
+```
+
+Roda em <http://localhost:8501> por default. `Ctrl+C` no terminal pra parar.
+
+Em background (libera o shell, log em arquivo):
+
+```bash
+PYTHONPATH=. .venv/bin/streamlit run dashboard.py \
+  --server.headless true \
+  --browser.gatherUsageStats false \
+  > /tmp/dashboard.log 2>&1 &
+```
+
+Porta diferente (se 8501 ocupada):
+
+```bash
+PYTHONPATH=. .venv/bin/streamlit run dashboard.py --server.port 8512
+```
+
+### 10.2. Healthcheck
+
+```bash
+curl -sf http://localhost:8501/_stcore/health && echo OK
+```
+
+Listar processo:
+
+```bash
+lsof -nP -iTCP:8501 -sTCP:LISTEN
+```
+
+### 10.3. Parar
+
+Foreground: `Ctrl+C`. Background:
+
+```bash
+lsof -nP -iTCP:8501 -sTCP:LISTEN | awk 'NR>1 {print $2}' | xargs kill
+```
+
+### 10.4. Acessar
+
+| Quem | URL |
+|---|---|
+| Você, browser nesta máquina | <http://localhost:8501> |
+| Outro device na mesma LAN | `http://<ip-da-maquina-na-lan>:8501` (Streamlit imprime no boot como "Network URL") |
+| Outra sessão Claude com MCP browser | <http://localhost:8501> via `mcp__claude-in-chrome__tabs_create_mcp` |
+| Outra sessão Claude sem browser | API `streamlit.testing.v1.AppTest` (programático) |
+
+**Não use a "External URL"** que o Streamlit imprime no boot — é seu IP
+público, expõe o dashboard pra internet sem nenhuma autenticação. Auth ficou
+explicitamente fora de escopo (ver `dashboard-plan.md` seção 9).
+
+### 10.5. Acesso programático (sem browser)
+
+Outra sessão Claude pode rodar o app sem subir servidor, pra ler estado
+ou rodar smoke test:
+
+```python
+from streamlit.testing.v1 import AppTest
+
+# overview
+at = AppTest.from_file('dashboard.py').run(timeout=30)
+print('title:', at.title[0].value)
+print('errors:', [str(e) for e in at.error])
+print('metrics:', [(m.label, m.value) for m in at.metric])
+
+# drill-down de uma plataforma
+at = AppTest.from_file('dashboard.py')
+at.session_state['view'] = 'platform'
+at.session_state['selected_platform'] = 'ChatGPT'
+at.run(timeout=30)
+print('metrics:', [(m.label, m.value) for m in at.metric])
+print('dataframes:', len(at.dataframe))
+```
+
+Útil pra: smoke test, outra sessão verificar estado sem browser, CI futura.
+
+Warning `missing ScriptRunContext` é inócuo (esperado fora do runtime do
+Streamlit).
+
+### 10.6. Acesso via Claude-in-Chrome (outra sessão)
+
+Se a outra sessão tem MCP browser:
+
+1. Garante que o Streamlit está no ar (10.1 ou healthcheck 10.2)
+2. `mcp__claude-in-chrome__tabs_create_mcp(url="http://localhost:8501")`
+3. Espera renderizar (Streamlit usa WebSocket — uns 2-3s pra UI montar)
+4. `mcp__claude-in-chrome__read_page` pra extrair texto
+5. `mcp__claude-in-chrome__computer` pra clicar em botões
+
+Mire em elementos com `data-testid="stMetricLabel"`,
+`data-testid="stDataFrame"`, etc — Streamlit gera IDs estáveis.
+
+### 10.7. Gotchas comuns
+
+| Sintoma | Causa / Fix |
+|---|---|
+| `ModuleNotFoundError: dashboard` | Faltou `PYTHONPATH=.` antes do `streamlit run` |
+| Porta 8501 ocupada | `--server.port <outra>` ou matar processo (10.3) |
+| Mudei dado fora do dashboard, UI não atualiza | Clica "🔁 Recarregar dados" no sidebar |
+| Sync trava com browser do Playwright aberto | Esperado pra ChatGPT (Cloudflare detecta headless). Espera o subprocess terminar — UI exibe spinner |
+| Tabela de plataformas não mostra alguma | Discovery automática varre `data/raw/<plat>/` e `data/merged/<plat>/`. Se vazia, fica `⚫ nunca rodou`. Se nem isso, conferir nome em `KNOWN_PLATFORMS` (`dashboard/data.py`) |

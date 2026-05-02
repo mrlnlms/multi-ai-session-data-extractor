@@ -7,7 +7,7 @@ adaptar gotchas.
 
 ---
 
-## 1. Estado atual (atualizado 2026-05-01)
+## 1. Estado atual (atualizado 2026-05-02)
 
 | Plataforma | Extractor | Reconciler | Sync orquestr. | Pasta única | Parser canônico | Script parse | QMD |
 |---|---|---|---|---|---|---|---|
@@ -16,14 +16,18 @@ adaptar gotchas.
 | **Claude.ai** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Qwen** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **DeepSeek** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Gemini | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
+| **Gemini** | ✅ | ✅ | ✅ (multi-conta) | ✅ (per-account) | ✅ | ✅ | ✅ (3 docs: consolidado + per-account) |
 | NotebookLM | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
-| Qwen | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
-| DeepSeek | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
 
-**⚠️ legacy:** existe `src/parsers/<source>.py` mas é o MVP do projeto-mãe
-(não no schema v3 — sem branches table, sem campos preservation, sem
-ToolEvents estruturados). Precisa rewrite seguindo padrão do ChatGPT v3.
+**⚠️ legacy (NotebookLM):** existe `src/parsers/notebooklm.py` mas é o MVP do
+projeto-mãe (não no schema v3). Precisa rewrite — porém NotebookLM tem 9 tipos
+de outputs (audio, video, slide deck, blog, flashcards, quiz, etc) e pode
+exigir extensão do schema canônico antes do rewrite. Última plataforma do
+backlog.
+
+**6/7 plataformas shipped.** Bateria CRUD UI completa em todas (rename + pin
++ delete + features especificas). Bugs descobertos durante batterias estão
+documentados em `docs/<plat>-server-behavior.md`.
 
 ---
 

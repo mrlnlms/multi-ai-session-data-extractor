@@ -16,21 +16,23 @@ chats deletados no servidor, e mantem tudo em schema canonico (parquet).
 Output desenhado pra ser **fonte autoritativa**: depois de capturado, voce
 pode deletar do servidor e continuar usando a plataforma sem perder nada.
 
-## Status (2026-04-28)
+## Status (2026-05-02)
 
-**ChatGPT — ciclo completo validado end-to-end:**
-- ✅ Sync 4 etapas (capture + assets + project_sources + reconcile)
-- ✅ Pasta única cumulativa (`data/raw/ChatGPT/` + `data/merged/ChatGPT/`)
-- ✅ Os 6 cenários CRUD validados empiricamente:
-  conv deletada → preserved | conv atualizada → updated | conv nova → added |
-  conv renomeada → updated | project criado → captured |
-  project deletado inteiro → todas sources preservadas, binários intactos
-- ✅ Fail-fast contra discovery flakey (aborta antes de salvar dado corrompido)
-- ✅ 100 testes unitários passando
+**6 de 7 plataformas shipped** — pipeline completo (capture + reconcile +
+sync orquestrador + parser v3 + Quarto descritivo) com bateria CRUD UI
+validada empiricamente.
 
-**Outras 6 plataformas** (Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity):
-extractors individuais migrados, falta sync orquestrador equivalente ao ChatGPT.
-Backlog principal do projeto.
+| Plataforma | Status | Cobertura distintiva |
+|---|---|---|
+| **ChatGPT** | shipped (2026-04-28) | 6 cenários CRUD validados, fail-fast, branches via `mapping`, voice, DALL-E, projects, custom GPT |
+| **Claude.ai** | shipped (2026-05-01) | thinking, tool_use/result+MCP, branches via parent_uuid, project_docs com content inline |
+| **Perplexity** | shipped (2026-05-01) | 81 conversations (threads + pages), spaces, 9 artifacts, search results |
+| **Qwen** | shipped (2026-05-01) | 8 chat_types (chat/search/research/dalle), projects com custom_instruction, archive eh upstream no-op em Pro/free |
+| **DeepSeek** | shipped (2026-05-01) | R1 reasoning em 31% das msgs, accumulated_token_usage, ~2.4 branches/conv (regenerate intenso) |
+| **Gemini** | shipped (2026-05-02) | **Multi-conta** (2 contas Google), schema raw posicional, 8 modelos (Nano Banana, 3 Flash Thinking, etc), 41% das msgs assistant com thinking |
+| NotebookLM | backlog | 9 tipos de outputs (audio, video, slide deck, blog, flashcards, quiz, data table, infographic, mind map) |
+
+320 testes passando. Detalhes empíricos em `docs/<plataforma>-server-behavior.md`.
 
 ## Glossário
 
@@ -164,9 +166,9 @@ funcionalidades de cada tela, ver [docs/dashboard.md](docs/dashboard.md).
 
 Sem captura nenhuma, todas as plataformas aparecem como ⚫ "nunca rodou".
 Use o botao "Sync esta plataforma" no drill-down — abre browser pro login
-inicial. ChatGPT tem orquestrador completo (`chatgpt-sync.py`); as outras
-6 ainda usam o `<plat>-export.py` standalone (sync orquestrador esta no
-backlog).
+inicial. 6 das 7 plataformas tem orquestrador completo
+(`<plat>-sync.py`); so NotebookLM ainda usa `notebooklm-export.py`
+standalone (sync orquestrador esta no backlog).
 
 ### O que **NAO** faz
 

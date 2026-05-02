@@ -62,15 +62,13 @@ Lista de imports pendentes em `memory/project_pending_imports_from_old.md`.
 |---|---|---|---|---|---|---|
 | ChatGPT | ✅ | ✅ | ✅ (4 etapas, pasta unica) | ✅ (Fase 2 done) | ✅ (Fase 3.1 done) | Preservation completa, rename detection, fail-fast, parser cobrindo branches + ToolEvents, data-profile renderizando |
 | Claude.ai | ✅ | ✅ | ✅ (3 etapas, pasta unica) | ✅ v3 | ✅ | thinking, tool_use/result+MCP, branches via parent_uuid, is_pinned/is_temporary mapeados, 24k msgs / 16k events |
-| Qwen | ✅ | ✅ | ✅ (3 etapas, pasta unica) | ✅ v3 | ✅ | **NAO shipped — pendente bateria CRUD UI** (rename/delete/pin/archive). Pipeline funciona, parser cobre 8 chat_types + reasoning + projects + asset_paths via manifest, mas caminhos de delete/pin/archive nunca rodaram em dado real |
-| DeepSeek | ✅ | ✅ | ✅ (2 etapas, pasta unica) | ✅ v3 | ✅ | **NAO shipped — pendente bateria CRUD UI** (rename/delete/pin). Pipeline funciona, parser cobre R1 reasoning + token_count + 220 msgs com metadata, mas delete/pin nunca rodaram em dado real |
-| Gemini | ✅ | ✅ | ❌ | ❌ | ❌ | Idem |
+| Qwen | ✅ | ✅ | ✅ (3 etapas, pasta unica) | ✅ v3 | ✅ | shipped (3/4 CRUD validados em 2026-05-01; archive eh no-op upstream Pro/free, nao gap) |
+| DeepSeek | ✅ | ✅ | ✅ (2 etapas, pasta unica) | ✅ v3 | ✅ | shipped (3/3 CRUD validados em 2026-05-01) |
+| Gemini | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ v3 | ✅ | shipped (4/4 CRUD validados em 2026-05-02; share eh URL upstream-only, nao gap). 47+33=80 convs / 560 msgs / 889 tool_events / 215 imgs / ~18 Deep Research. 8 modelos. Pin descoberto via probe em `c[2]` do listing MaZiqc |
 | NotebookLM | ✅ | ✅ | ❌ | ❌ | ❌ | 9 tipos de outputs (audio, video, slide deck PDF+PPTX, blog, flashcards, quiz, data table, infographic, mind map) |
 | Perplexity | ✅ | ✅ | ✅ | ✅ | ✅ | Auditoria + reconciler + parser v3 + Quarto. 81 conversations (77 threads + 4 pages), 9 artifacts c/ binarios, 1 orphan, 4 spaces |
-| Qwen / DeepSeek | ✅ | ❌ | ❌ | ❌ | ❌ | Reconcilers + sync pendentes |
 
-Backlog principal: replicar o padrao do ChatGPT-sync nas outras 6 plataformas
-+ parsers canonicos por plataforma (espelhar `src/parsers/chatgpt.py`).
+Backlog principal: NotebookLM (sync + parser v3 + Quarto).
 
 ## Estado validado em 2026-04-28 — NAO refazer
 
@@ -286,11 +284,29 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
   326 URLs detectadas em msgs/projects, 321 baixadas com sucesso,
   196MB local. Parser resolve `asset_paths` via `assets_manifest.json`:
   171 msgs com `asset_paths` populados.
-- **STATUS: NAO shipped.** Pipeline tecnico completo, mas pendente bateria
-  CRUD UI (rename/delete/pin/archive) — caminhos de codigo nunca rodaram
-  em dado real. Snapshots historicos so cobrem add (+6 chats em 7 dias).
-  Pra fechar: usuario precisa clicar nos 4 cenarios em UI (~5 min). Ate
-  la, NAO chamar de shipped.
+- **STATUS: SHIPPED em 2026-05-01.** Bateria CRUD validada:
+  - ✅ **Rename** (chat 8c97d9ab → "Codemarker V2 from mqda"): title bate em
+    parquet, `updated_at` bumpa pra 2026-05-02
+  - ✅ **Pin** (chat 240ac30f "Meta-Analytics Explained"): `is_pinned=True`,
+    `updated_at` bumpa
+  - ⚠️ **Archive** (chat 75924b8e "Empathy Map Analysis"): no-op observavel
+    upstream — servidor aceita request (`updated_at` bumpa) mas flag `archived`
+    nunca persiste, endpoint `/v2/chats/archived` retorna `len=0`, todos os
+    listings ainda incluem o chat. Mesmo padrao do Perplexity Enterprise-only.
+    **NAO eh gap do extractor** — schema canonico tem `is_archived`, so nunca
+    True em Pro/free. Probe: `scripts/qwen-probe-archived.py`
+  - ✅ **Delete** (chat 2d7e6a81 "Future Tech Innovations"):
+    `is_preserved_missing=True`, `last_seen_in_server` preserva 2026-04-30
+- **3 bugs descobertos+fixados durante bateria** (`docs/qwen-server-behavior.md`):
+  1. `_get_max_known_discovery(output_dir.parent)` vazava entre plataformas
+     (1171 ChatGPT, 835 Claude.ai sendo usados como baseline do Qwen) — fix
+     em qwen/deepseek/claude_ai/chatgpt orchestrators
+  2. `discover()` persistia `discovery_ids.json` antes do fail-fast — proxima
+     run perdia janela de refetch — fix: separar `discover()` de
+     `persist_discovery()` em qwen + deepseek
+  3. `--full` nos sync scripts nao propagava pro reconciler (extractor
+     refetchava bodies novos, reconciler usava cache stale) — fix em
+     qwen-sync.py + deepseek-sync.py + claude-sync.py
 
 **DeepSeek — ciclo completo end-to-end validado em 2026-05-01:**
 - **Pasta unica cumulativa:** `data/raw/DeepSeek/` e `data/merged/DeepSeek/`
@@ -327,10 +343,87 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
 - **`status` enum descoberto:** `FINISHED`/`INCOMPLETE`/`WIP` (716/5/1 msgs)
 - **`feedback`/`tips`/`ban_edit`/`ban_regenerate`/`thinking_elapsed_secs`**
   preservados em `Message.attachments_json` (220 msgs com metadata)
-- **STATUS: NAO shipped.** Pipeline tecnico completo, mas pendente bateria
-  CRUD UI (rename/delete/pin) — caminhos nunca rodaram em dado real.
-  Snapshots historicos so cobrem add (+1 chat). Pra fechar: usuario
-  precisa clicar nos 3 cenarios em UI (~3 min).
+- **STATUS: SHIPPED em 2026-05-01.** Bateria CRUD 3/3 validada:
+  - ✅ **Rename** (chat 1d4823f1 "Meta Analytics Explained" → "Meta Analytics
+    Explicado"): title bate em parquet, `updated_at` bumpa pra 2026-05-02
+  - ✅ **Pin** (chat 37ca105e "Data Governance vs Research Operations:
+    Qualidade de Dados"): `is_pinned=True`, `updated_at` bumpa
+  - ✅ **Delete** (chat a7087bd3 "Olá, eu tenho uma planilha no go"):
+    `is_preserved_missing=True`, `last_seen_in_server` preserva 2026-04-30,
+    title preservado
+- DeepSeek tambem se beneficiou dos bugs descobertos durante bateria do Qwen
+  (mesma cadeia de orchestrators). Bug 2 fix preventivo aplicado antes da
+  bateria — sync rodou limpo na primeira tentativa: discovered=78, fetched=2
+  (rename+pin), reused=76, preserved=1 (delete).
+
+**Gemini — ciclo completo end-to-end validado em 2026-05-02:**
+- **Multi-conta** — primeira plataforma com 2 contas Google (`hello.marlonlemes@gmail.com`
+  e `marloonlemes@gmail.com`). Profiles em `.storage/gemini-profile-{1,2}/`.
+- **Pasta unica cumulativa per-account:**
+  `data/raw/Gemini/account-{N}/` e `data/merged/Gemini/account-{N}/`
+- **Sync orquestrador 3 etapas multi-conta** (`scripts/gemini-sync.py`):
+  capture per-account + assets + reconcile per-account. Itera ambas contas em
+  sequencia (default) ou `--account N` pra rodar so uma.
+- **Cobertura:** 47 + 33 = 80 convs / 560 msgs / 889 tool_events / 215 imagens
+  baixadas (lh3.googleusercontent.com) + 18 Deep Research markdown reports
+  extraidos
+- **Reconciler v3** (`FEATURES_VERSION=2`): preservation per-account,
+  idempotente, output em pasta unica cumulativa
+- **Parser canonico v3** (`src/parsers/gemini.py` + `_gemini_helpers.py`):
+  schema raw eh **posicional** (Google batchexecute, sem keys) — caminhos
+  descobertos via probe (`scripts/gemini-probe-schema.py`):
+  - `turn[2][0][0]` → user text
+  - `turn[3][0][0][1]` → assistant text (chunks)
+  - `turn[3][21]` → model name (e.g. '2.5 Flash', '3 Pro', 'Nano Banana')
+  - `turn[3][0][0][37+]` → thinking blocks (heuristica >=200 chars excl. main response)
+  - `turn[4][0]` → timestamp epoch secs
+  - 8 modelos detectados (2.5 Flash 118 msgs, 3 Pro 81, Nano Banana 33,
+    3 Flash Thinking 21, etc)
+  - **41% das assistant msgs com thinking** (116/280)
+  - Image generation via regex sobre JSON do turn → ToolEvent +
+    `Message.asset_paths` resolvidos via `assets_manifest.json` per-account
+  - Multi-conta com namespace `account-{N}_{uuid}` em `conversation_id`
+- **Bateria CRUD UI 4/4 validada:**
+  - ✅ **Rename** (chat dc5c683537a19cd1 → "Benchmarks Smiles Gol Pesqusias"):
+    title bate em parquet
+  - ✅ **Pin** (chat 98c60a18de056385 "Análise de Dados da Cota Parlamentar"):
+    `is_pinned=True`. **Pin descoberto via probe** — campo `c[2]` do listing
+    MaZiqc retorna `True` quando pinado, `None` senao
+  - ✅ **Delete** (chat b17426c13c5e1bc3): `is_preserved_missing=True`,
+    title + last_seen preservados
+  - ✅ **Share URL** (`gemini.google.com/share/c2a6a6436942`): confirmado
+    upstream-only — servidor gera URL publica isolada, NAO modifica body do
+    chat nem campos do listing. Nao eh gap do extractor
+- **Quarto descritivo:** 3 documentos
+  - `notebooks/gemini-acc-1.qmd` (template canonico, account-1 only)
+  - `notebooks/gemini-acc-2.qmd` (template canonico, account-2 only)
+  - `notebooks/gemini.qmd` (consolidado, com stacked bars por conta nas
+    secoes-chave: timeline, top models, msgs assistant, distribuicao de tamanho)
+  - Cor: azul Google `#4285F4` (acc-1), azul mais escuro `#1A73E8` (acc-2)
+- **Bugs descobertos+fixados durante migracao+bateria** (todos preventivos
+  aplicados em qwen/deepseek/claude_ai/chatgpt orchestrators):
+  1. `_get_max_known_discovery(output_dir)` (nao `parent`)
+  2. `discover()` lazy persist (separado de `persist_discovery()`)
+  3. `--full` propagado pro reconcile
+  4. `fetch_conversations(skip_existing=False)` quando orchestrator ja filtrou
+  5. Discovery captura `pinned` do `c[2]` do MaZiqc + reconciler detecta
+     `pinned_changed` como signal de update
+- **Dashboard adaptado:** `_collect_logs()` agora suporta multi-account
+  (`base/account-*/<log>.jsonl`); `conversations_parquet_path` aceita
+  ambas convencoes (`<source>_conversations.parquet` ou `conversations.parquet`)
+- **Findings empiricos:** `docs/gemini-server-behavior.md`
+- **Probes:** `scripts/gemini-probe-schema.py`, `scripts/gemini-probe-pin-share.py`
+- **Auth:** profiles copiados de `~/Desktop/AI Interaction Analysis/.storage/gemini-profile-{1,2}/`
+- **Captura HEADLESS** (sem Cloudflare em runtime)
+- **Comandos:**
+  ```bash
+  PYTHONPATH=. .venv/bin/python scripts/gemini-sync.py             # ambas contas
+  PYTHONPATH=. .venv/bin/python scripts/gemini-sync.py --account 1 # so conta 1
+  PYTHONPATH=. .venv/bin/python scripts/gemini-parse.py
+  for f in gemini gemini-acc-1 gemini-acc-2; do
+    QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd
+  done
+  ```
 
 **Estado atual `data/merged/ChatGPT/chatgpt_merged.json`:**
 - 1171 convs cumulativas (1168 active + 3 preserved_missing)
