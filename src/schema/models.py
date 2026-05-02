@@ -181,6 +181,96 @@ class Branch:
         return asdict(self)
 
 
+# === NotebookLM-specific dataclasses ===
+
+VALID_NOTE_KINDS = ("note", "brief")
+
+VALID_OUTPUT_TYPES = {
+    1: "audio_overview",
+    2: "blog_post",
+    3: "video_overview",
+    4: "flashcards_quiz",
+    7: "data_table",
+    8: "slide_deck",
+    9: "infographic",
+    10: "mind_map",
+}
+
+
+@dataclass
+class NotebookLMNote:
+    note_id: str
+    conversation_id: str
+    source: str
+    account: str
+    title: Optional[str]
+    content: str
+    kind: str  # 'note' | 'brief'
+    source_refs_json: Optional[str]
+    created_at: Optional[pd.Timestamp]
+
+    def __post_init__(self):
+        if self.source not in VALID_SOURCES:
+            raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
+        if self.kind not in VALID_NOTE_KINDS:
+            raise ValueError(f"kind '{self.kind}' invalido. Validos: {VALID_NOTE_KINDS}")
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class NotebookLMOutput:
+    output_id: str
+    conversation_id: str
+    source: str
+    account: str
+    output_type: int
+    output_type_name: str
+    title: Optional[str]
+    status: Optional[str]
+    asset_path: Optional[list[str]]
+    content: Optional[str]
+    source_refs_json: Optional[str]
+    created_at: Optional[pd.Timestamp]
+
+    def __post_init__(self):
+        if self.source not in VALID_SOURCES:
+            raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
+        if self.output_type not in VALID_OUTPUT_TYPES:
+            raise ValueError(
+                f"output_type {self.output_type} invalido. "
+                f"Validos: {sorted(VALID_OUTPUT_TYPES.keys())}"
+            )
+        expected_name = VALID_OUTPUT_TYPES[self.output_type]
+        if self.output_type_name != expected_name:
+            raise ValueError(
+                f"output_type_name '{self.output_type_name}' nao bate com "
+                f"type {self.output_type} (esperado '{expected_name}')"
+            )
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class NotebookLMGuideQuestion:
+    question_id: str
+    conversation_id: str
+    source: str
+    account: str
+    question_text: str
+    full_prompt: str
+    order: int
+
+    def __post_init__(self):
+        if self.source not in VALID_SOURCES:
+            raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
 def _models_to_df(items: list, column_order: list[str]) -> pd.DataFrame:
     """Converte lista de dataclasses em DataFrame com colunas ordenadas."""
     if not items:
@@ -217,3 +307,18 @@ def branches_to_df(branches: list[Branch]) -> pd.DataFrame:
 def project_docs_to_df(docs: list[ProjectDoc]) -> pd.DataFrame:
     cols = [f.name for f in fields(ProjectDoc)]
     return _models_to_df(docs, cols)
+
+
+def notebooklm_notes_to_df(notes: list[NotebookLMNote]) -> pd.DataFrame:
+    cols = [f.name for f in fields(NotebookLMNote)]
+    return _models_to_df(notes, cols)
+
+
+def notebooklm_outputs_to_df(outputs: list[NotebookLMOutput]) -> pd.DataFrame:
+    cols = [f.name for f in fields(NotebookLMOutput)]
+    return _models_to_df(outputs, cols)
+
+
+def notebooklm_guide_questions_to_df(qs: list[NotebookLMGuideQuestion]) -> pd.DataFrame:
+    cols = [f.name for f in fields(NotebookLMGuideQuestion)]
+    return _models_to_df(qs, cols)
