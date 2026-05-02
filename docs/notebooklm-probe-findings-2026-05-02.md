@@ -3,18 +3,31 @@
 Empirical findings descobertos durante a migração + smoke + full sync de
 NotebookLM. Esquema posicional Google batchexecute.
 
-## Volumes (smoke=5 conta 1, em validação para full)
+## Volumes (full sync 2026-05-02 — ambas contas)
 
-| Tabela | Smoke 5nb conta 1 | Full target (a confirmar) |
-|---|---|---|
-| conversations | 5 | ~95 (acc1) + ~? (acc2) |
-| messages | 5 (system summaries) | ~190 + chat extras |
-| sources | 21 | ~1500-2000 |
-| outputs | 30 (audio+blog+video+data table+slide+mind_map) | maior |
-| notes | 8 | proporcional |
-| guide_questions | 15 (~3/notebook) | ~570 |
-| branches | 5 (sempre `<conv>_main`) | ~190 |
-| tool_events | 0 | depende de chat populado |
+| Tabela | acc-1 (en) | acc-2 (pt-BR) | Total |
+|---|---|---|---|
+| conversations | 95 | 48 | **143** |
+| messages | ~80 (system summaries) | ~41 | **121** |
+| sources | 974 | 199 | **1173** |
+| outputs | ~270 (audio+blog+video+data table+slide+mind_map) | ~119 | **389** |
+| notes | ~190 | ~87 | **277** |
+| guide_questions | ~225 | ~138 | **363** |
+| branches | 95 | 48 | **143** |
+| tool_events | 0 | 0 | 0 (chat populado raro) |
+
+**Storage total:** ~2.5 GB (962M + 263M raw + 977M + 310M merged).
+
+**Assets baixados conta 1:** 1484 (4 audios + 12 videos + 30 slide decks +
+1344 page images + 54 text artifacts + 76 notes + 45 mind_maps).
+**Assets baixados conta 2:** 38 (11 audios + 4 videos + 4 slide decks +
+21 text artifacts + 96 notes + 53 mind_maps).
+
+**Empírico:** 22 dos 143 notebooks (15%) **não** tem `guide.summary` —
+sao notebooks vazios (sem sources), Untitled, ou recém-criados. Comportamento
+correto: sem system message pra eles, mas branch/conversation continuam.
+
+**Tempos sync:** conta 1 = 79min (95 nb, 1.2GB raw), conta 2 = 26min (48 nb).
 
 ## Schema posicional descoberto
 
@@ -182,20 +195,11 @@ fetcher legacy capturava ambos mas extraction misturou.
 Decidido durante full sync 2026-05-02 — não bloqueia "shipped" mas vale
 documentar pra refinar depois.
 
-### 1. Page images dos sources falham silenciosamente
+### ~~1. Page images dos sources~~ — FUNCIONOU (resolvido 2026-05-02)
 
-`_extract_page_images` no `asset_downloader.py` extrai URLs lh3
-de 363/974 sources (37%) mas downloads estão falhando — `source_pages/`
-tem 20 dirs vazias. Possíveis causas:
-- Timeout 60s muito curto pras imagens lh3
-- URLs requerem auth diferente
-- URLs expiram rápido
-
-**Impacto baixo:** texto extraído dos sources (`sources/<uuid>.json`) é o
-que importa — page images são thumbnails visuais "nice to have".
-
-**Fix:** aumentar timeout, investigar response, ou capturar URL e
-re-tentar quando expirado. Tarefa: ~30min de probe.
+Achado anterior baseado em observação parcial (sync ainda na fase 1
+quando inspecionei). **Full sync conta 1 baixou 1344 page images com
+sucesso (48MB).** Falso alarme — fica como nota histórica.
 
 ### 2. Source-level summary + tags não capturados
 

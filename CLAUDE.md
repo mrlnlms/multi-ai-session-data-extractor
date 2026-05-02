@@ -65,10 +65,10 @@ Lista de imports pendentes em `memory/project_pending_imports_from_old.md`.
 | Qwen | ✅ | ✅ | ✅ (3 etapas, pasta unica) | ✅ v3 | ✅ | shipped (3/4 CRUD validados em 2026-05-01; archive eh no-op upstream Pro/free, nao gap) |
 | DeepSeek | ✅ | ✅ | ✅ (2 etapas, pasta unica) | ✅ v3 | ✅ | shipped (3/3 CRUD validados em 2026-05-01) |
 | Gemini | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ v3 | ✅ | shipped (4/4 CRUD validados em 2026-05-02; share eh URL upstream-only, nao gap). 47+33=80 convs / 560 msgs / 889 tool_events / 215 imgs / ~18 Deep Research. 8 modelos. Pin descoberto via probe em `c[2]` do listing MaZiqc |
-| NotebookLM | ✅ | ✅ | ❌ | ❌ | ❌ | 9 tipos de outputs (audio, video, slide deck PDF+PPTX, blog, flashcards, quiz, data table, infographic, mind map) |
+| NotebookLM | ✅ | ✅ | ✅ | ✅ | ✅ | shipped 2026-05-02 (multi-conta acc-1+acc-2; 143 conversations / 121 messages / 1173 sources / 389 outputs cobrindo 9 tipos; CRUD UI pendente bateria final) |
 | Perplexity | ✅ | ✅ | ✅ | ✅ | ✅ | Auditoria + reconciler + parser v3 + Quarto. 82 conversations (78 threads + 4 pages), 9 artifacts c/ binarios, 1 orphan, 4 spaces |
 
-Backlog principal: NotebookLM (sync + parser v3 + Quarto).
+Backlog principal: bateria CRUD UI final pra NotebookLM. Pos-shipping: 7/7 plataformas verdes desbloqueia cross-plataforma overview + DVC pra dados grandes.
 
 ## Estado validado em 2026-04-28 — NAO refazer
 
@@ -421,6 +421,81 @@ listado aqui **ja foi feito, testado e validado** — duplicar e desperdicio.
   PYTHONPATH=. .venv/bin/python scripts/gemini-sync.py --account 1 # so conta 1
   PYTHONPATH=. .venv/bin/python scripts/gemini-parse.py
   for f in gemini gemini-acc-1 gemini-acc-2; do
+    QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd
+  done
+  ```
+
+**NotebookLM — ciclo completo end-to-end validado em 2026-05-02:**
+- **Multi-conta** — segunda plataforma com 2 contas (acc-1 = en, acc-2 = pt-BR).
+  Profiles em `.storage/notebooklm-profile-{1,2}/`. NotebookLM nao eh chat
+  puro: cada notebook gera ate 9 tipos de outputs (audio, blog, video,
+  flashcards, quiz, data table, slide deck PDF+PPTX, infographic, mind map).
+- **Pasta unica cumulativa per-account:** `data/raw/NotebookLM/account-{N}/`
+  e `data/merged/NotebookLM/account-{N}/`
+- **Sync orquestrador 3 etapas multi-conta** (`scripts/notebooklm-sync.py`):
+  capture per-account + assets + reconcile per-account. Itera ambas contas
+  em sequencia (default) ou `--account N` pra rodar so uma. Tempos: acc-1
+  = 79min (95 nb, 1.2GB raw + 1484 assets); acc-2 = 26min (48 nb).
+- **Cobertura full sync:**
+  - acc-1: 95 notebooks / 974 sources / 1484 assets (4 audios + 12 videos
+    + 30 slide decks + 1344 page images + 54 text artifacts + 76 notes
+    + 45 mind_maps)
+  - acc-2: 48 notebooks / 199 sources / 38 assets + 96 notes + 53 mind_maps
+  - Total: 962M+263M raw + 977M+310M merged ≈ 2.5GB
+- **RPCs mapeados** (api_client + fetcher):
+  - `wXbhsf` list, `rLM1Ne` metadata, `VfAZjd` guide,
+    `khqZz` chat (None na maioria), `cFji9` notes,
+    `gArtLc` artifacts (9 tipos), `v9rmvd` artifact content individual
+    (types 2/4/7/9 — gap-fill descoberto), `CYK0Xb` mind_map tree
+    (payload `[nb_uuid, mm_uuid]` descoberto via probe — bug fixado),
+    `hPTbtc` mind_map UUID, `hizoJc` source content
+- **Reconciler v3** (FEATURES_VERSION=2): preservation completa per-account,
+  pasta unica cumulativa (sem subpastas dated), `LAST_RECONCILE.md` +
+  `reconcile_log.jsonl` per-account
+- **Parser canonico v3** (`src/parsers/notebooklm.py` + `_notebooklm_helpers.py`):
+  rewrite total. **8 parquets** (4 canonicos + 4 auxiliares):
+  - canonicos: 143 conversations / 121 messages / 0 tool_events / 143 branches
+  - auxiliares: 1173 sources (com content extraido, reusa `ProjectDoc`) /
+    277 notes (kind ∈ {note, brief}) / 389 outputs (cobre 8 dos 9 tipos +
+    mind_map=10) / 363 guide_questions
+  - **Decisao chave:** `guide.summary` vira system message (sequence=0) em
+    notebooks que tem guide — garante `message_count >= 1`. 22/143 (15%)
+    notebooks nao tem guide (vazios/Untitled/recem-criados) — sem system
+    msg, mas branch/conversation continuam
+  - 12 tests parser-specific cobrindo 8 parquets + idempotencia + system msg
+- **Quarto descritivo** (3 docs, cor laranja Google `#F4B400`):
+  - `notebooks/notebooklm.qmd` (consolidado, stacked bars per-account)
+  - `notebooks/notebooklm-acc-1.qmd` (template canonico, account-1 only)
+  - `notebooks/notebooklm-acc-2.qmd` (template canonico, account-2 only)
+  - 12MB acc-1, 12MB acc-2, 7.6MB consolidado. Render < 30s cada
+- **Findings empiricos:** `docs/notebooklm-probe-findings-2026-05-02.md`
+- **Spec design:** `docs/superpowers/specs/2026-05-02-notebooklm-schema-design.md`
+- **Plan implementacao:** `docs/superpowers/plans/2026-05-02-notebooklm-implementation.md`
+- **Bugs fixados durante migracao:**
+  1. CYK0Xb payload errado — retornava None silenciosamente. Probe revelou
+     `[nb_uuid, mm_uuid]` ao invés de `[mm_uuid]`. Mind map tree agora capturado.
+  2. `_extract_mind_map_uuid` lendo do RPC errado (cFji9 ao invés de hPTbtc).
+- **5 bugs preventivos aplicados desde primeiro commit** (das 5 plataformas
+  anteriores): _get_max_known_discovery(output_dir) nao parent, discover()
+  lazy persist, --full propagado, fetch_conversations skip_existing=False,
+  pasta unica per-account com namespace `account-{N}_{uuid}`
+- **Dashboard:** suporte pros qmds per-account adicionado em
+  `dashboard/quarto.py` + `dashboard/pages/platform.py`. Multi-conta agora
+  mostra 3 links por plataforma (consolidado + per-account)
+- **TODOs validacao manual** (cenarios CRUD pendentes — bateria UI):
+  - rename → title bate em parquet?
+  - delete → preserved_missing?
+  - pin/star → NotebookLM tem feature? (provavel: nao)
+  - add/remove source → reflete em sources.parquet?
+- **Gaps conhecidos** (proxima iteracao, nao bloqueia):
+  - Source-level summary + tags (NotebookLM gera resumo + tags por source
+    na sidebar — requer RPC adicional nao mapeado)
+- **Comandos:**
+  ```bash
+  PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py             # ambas contas
+  PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py --account 1 # so conta 1
+  PYTHONPATH=. .venv/bin/python scripts/notebooklm-parse.py
+  for f in notebooklm notebooklm-acc-1 notebooklm-acc-2; do
     QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd
   done
   ```
