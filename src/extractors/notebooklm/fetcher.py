@@ -1,10 +1,12 @@
-"""Fetcher: pega todos os RPCs per notebook + source content.
+"""Fetcher: pega todos os RPCs per notebook + source content + artifact content + mind map tree.
 
 Salva raw responses em:
-  notebooks/{uuid}.json    — dict com metadata, guide, chat, notes, audios, mind_map, list_data
-  sources/{source_uuid}.json  — hizoJc response com texto extraido + image URLs
+  notebooks/{uuid}.json                          — dict com metadata, guide, chat, notes, audios, mind_map
+  notebooks/{uuid}_artifacts/{artifact_uuid}.json — conteudo individual de artifact types 2/4/7/9 (v9rmvd)
+  notebooks/{uuid}_mind_map_tree.json            — arvore completa do mind map (CYK0Xb)
+  sources/{source_uuid}.json                     — hizoJc response com texto extraido + image URLs
 
-Parse em schema normalizado fica pro parser (futuro).
+Parse em schema normalizado fica pro parser (Fase 8 do plan).
 """
 
 import asyncio
@@ -12,6 +14,12 @@ import json
 from pathlib import Path
 
 from src.extractors.notebooklm.api_client import NotebookLMClient
+
+
+# Tipos de artifact que precisam de fetch individual via v9rmvd:
+# 2=Blog/Report, 4=Flashcards/Quiz, 7=Data Table, 9=Infographic.
+# Tipos 1=Audio, 3=Video, 8=Slide Deck tem URL direta no listing — baixados via download_asset.
+ARTIFACT_TYPES_NEEDING_INDIVIDUAL_FETCH = {2, 4, 7, 9}
 
 
 def _extract_source_uuids(metadata_raw) -> list[str]:
@@ -32,6 +40,40 @@ def _extract_source_uuids(metadata_raw) -> list[str]:
             if isinstance(uid, str):
                 uuids.append(uid)
     return uuids
+
+
+def _extract_artifact_entries(artifacts_raw) -> list[dict]:
+    """Do gArtLc response extrai entries com {uuid, type}.
+
+    Schema empirico: artifacts_raw[0] = list de items
+    Cada item: [uuid, title, type_int, source_refs, ...]
+    """
+    if not isinstance(artifacts_raw, list) or not artifacts_raw:
+        return []
+    items = artifacts_raw[0] if isinstance(artifacts_raw[0], list) else []
+    out = []
+    for it in items:
+        if not isinstance(it, list) or len(it) < 3:
+            continue
+        uid = it[0] if isinstance(it[0], str) else None
+        ttype = it[2] if isinstance(it[2], int) else None
+        if uid and ttype is not None:
+            out.append({"uuid": uid, "type": ttype})
+    return out
+
+
+def _extract_mind_map_uuid(mind_map_raw) -> str | None:
+    """Do hPTbtc response extrai UUID do mind map. Schema empirico: [[[uuid]]]."""
+    if not isinstance(mind_map_raw, list) or not mind_map_raw:
+        return None
+    try:
+        if (isinstance(mind_map_raw[0], list) and mind_map_raw[0]
+                and isinstance(mind_map_raw[0][0], list) and mind_map_raw[0][0]
+                and isinstance(mind_map_raw[0][0][0], str)):
+            return mind_map_raw[0][0][0]
+    except (IndexError, TypeError):
+        pass
+    return None
 
 
 async def lite_fetch_notebook(
@@ -63,7 +105,10 @@ async def fetch_notebook(
     output_dir: Path,
     source_concurrency: int = 2,
 ) -> dict:
-    """Fetcha todos os RPCs do notebook + sources. Retorna stats."""
+    """Fetcha todos os RPCs do notebook + sources + artifact content + mind map tree.
+
+    Retorna stats.
+    """
     nb_dir = output_dir / "notebooks"
     nb_dir.mkdir(parents=True, exist_ok=True)
     sources_dir = output_dir / "sources"
@@ -77,9 +122,11 @@ async def fetch_notebook(
         "rpcs_errors": [],
         "sources_fetched": 0,
         "sources_errors": [],
+        "artifacts_fetched_individual": 0,
+        "mind_map_fetched": False,
     }
 
-    # Colleta RPCs em paralelo (mesma session, reqids distintos)
+    # Coleta RPCs em paralelo (mesma session, reqids distintos)
     async def _try(name, coro):
         try:
             data = await coro
@@ -97,7 +144,7 @@ async def fetch_notebook(
         _try("guide", client.fetch_guide(nb_uuid)),
         _try("chat", client.fetch_chat(nb_uuid)),
         _try("notes", client.fetch_notes(nb_uuid)),
-        _try("audios", client.fetch_audios(nb_uuid)),
+        _try("audios", client.fetch_artifacts(nb_uuid)),
         _try("mind_map", client.fetch_mind_map(nb_uuid)),
     )
     nb_data = {name: data for name, data in results}
@@ -107,6 +154,52 @@ async def fetch_notebook(
     # Salva notebook raw
     with open(nb_dir / f"{nb_uuid}.json", "w", encoding="utf-8") as f:
         json.dump(nb_data, f, ensure_ascii=False)
+
+    # Fetch individual de artifacts dos tipos 2/4/7/9 (gap-fill v9rmvd)
+    artifact_entries = _extract_artifact_entries(nb_data.get("audios"))
+    artifacts_dir = nb_dir / f"{nb_uuid}_artifacts"
+    for entry in artifact_entries:
+        if entry["type"] not in ARTIFACT_TYPES_NEEDING_INDIVIDUAL_FETCH:
+            continue
+        out = artifacts_dir / f"{entry['uuid']}.json"
+        if out.exists():
+            continue  # skip-existing
+        try:
+            content = await client.fetch_artifact(nb_uuid, entry["uuid"])
+            if content is not None:
+                artifacts_dir.mkdir(parents=True, exist_ok=True)
+                payload = {
+                    "artifact_uuid": entry["uuid"],
+                    "notebook_uuid": nb_uuid,
+                    "type": entry["type"],
+                    "raw": content,
+                }
+                with open(out, "w", encoding="utf-8") as f:
+                    json.dump(payload, f, ensure_ascii=False)
+                stats["artifacts_fetched_individual"] += 1
+        except Exception as e:
+            stats["rpcs_errors"].append((f"artifact:{entry['uuid'][:8]}", str(e)[:200]))
+
+    # Fetch mind_map tree (gap-fill CYK0Xb)
+    mm_uuid = _extract_mind_map_uuid(nb_data.get("mind_map"))
+    if mm_uuid:
+        mm_out = nb_dir / f"{nb_uuid}_mind_map_tree.json"
+        if not mm_out.exists():
+            try:
+                tree = await client.fetch_mind_map_tree(nb_uuid, mm_uuid)
+                if tree is not None:
+                    payload = {
+                        "mind_map_uuid": mm_uuid,
+                        "notebook_uuid": nb_uuid,
+                        "raw": tree,
+                    }
+                    with open(mm_out, "w", encoding="utf-8") as f:
+                        json.dump(payload, f, ensure_ascii=False)
+                    stats["mind_map_fetched"] = True
+            except Exception as e:
+                stats["rpcs_errors"].append((f"mind_map:{mm_uuid[:8]}", str(e)[:200]))
+        else:
+            stats["mind_map_fetched"] = True  # ja existia
 
     # Extrai source UUIDs do metadata
     source_uuids = _extract_source_uuids(nb_data.get("metadata"))

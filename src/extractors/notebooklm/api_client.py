@@ -152,8 +152,12 @@ class NotebookLMClient:
         )
 
     async def fetch_mind_map_tree(self, notebook_uuid: str, mind_map_uuid: str) -> dict | None:
-        """CYK0Xb — fetch a arvore JSON do mind map (nodes + children)."""
-        payload = [mind_map_uuid]
+        """CYK0Xb — fetch a arvore JSON do mind map (nodes + children).
+
+        Payload empirico: [notebook_uuid, mind_map_uuid] — descoberto 2026-05-02
+        via probe Chrome MCP (variations testadas em scripts).
+        """
+        payload = [notebook_uuid, mind_map_uuid]
         return await self._call(
             RPC_MIND_MAP_FETCH, payload,
             source_path=f"/notebook/{notebook_uuid}",
