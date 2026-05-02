@@ -1,41 +1,40 @@
-"""Reconciler do NotebookLM — merge entre raws de datas diferentes preservando historico.
+"""Reconciler do NotebookLM — pasta unica cumulativa per-account.
 
-Diferente do ChatGPT (1 arquivo chatgpt_raw.json com todas as convs), NotebookLM tem
-layout por arquivo:
-  - notebooks/<uuid>.json   — metadata, guide, chat, notes, audios, mind_map
-  - sources/<suid>.json     — source content chunked
-  - assets/                 — m4a/png/webp baixados
-  - discovery_ids.json      — lista [uuid, title, emoji, update_time, create_time]
+Layout (in-place na pasta unica):
+  - notebooks/<uuid>.json                          — metadata, guide, chat, notes, audios, mind_map
+  - notebooks/<uuid>_artifacts/<art_uuid>.json     — conteudo individual de tipos 2/4/7/9
+  - notebooks/<uuid>_mind_map_tree.json            — arvore CYK0Xb
+  - sources/<suid>.json                            — source content chunked
+  - assets/                                        — m4a/mp4/pdf/pptx baixados
+  - discovery_ids.json                             — lista [uuid, title, ...] cumulativa
 
-Saida em data/merged/NotebookLM/<account>/<date>/ com mesma estrutura.
+Padrao build_plan:
+  - to_use: UUIDs do raw atual com mudanca semantica (refetch da API ja feito)
+  - to_copy: UUIDs inalterados — no-op (ja estao no merged in-place)
+  - preserved_missing: UUIDs no merged anterior mas nao no atual
 
-Padrao build_plan (conforme CLAUDE.md):
-  - to_use: UUIDs do raw atual (novos ou update_time > anterior)
-  - to_copy: UUIDs inalterados — copia arquivos do merged anterior, nao refaz API
-  - preserved_missing: UUIDs no anterior mas nao no atual — deletados no servidor
+Pasta unica: NAO cria subpasta dated. Sobrescreve in-place.
 
-Features futuras (novos rpcids como Mind Map nodes, Notes content) usam
-FEATURES_VERSION no metadata pra forcar refetch seletivo.
+Features futuras (novos rpcids) usam FEATURES_VERSION pra forcar refetch seletivo.
 """
 
 import json
 import logging
 import shutil
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
-# Versao do schema fetchado. Bumpa quando adicionamos novo rpcid (Mind Map nodes,
-# Notes content, etc). Raws com version antiga sao refetchados, mesmo se servidor
-# nao mudou.
+# Versao do schema fetchado. Bumpa quando adicionamos novo rpcid.
 #
 # Histórico:
 #   v1: initial (rLM1Ne, VfAZjd, khqZz, cFji9, gArtLc, hPTbtc, hizoJc)
 #   v2: mapeia types 2/3/4/7/8/9 em gArtLc (antes tratava so types 1 e 8); adiciona
-#       v9rmvd (text artifacts) + CYK0Xb (mind map tree fetch)
+#       v9rmvd (text artifacts) + CYK0Xb (mind map tree fetch). Pasta unica
+#       cumulativa per-account (sem subpastas dated).
 FEATURES_VERSION = 2
 
 FEATURE_FLAGS = {
@@ -50,14 +49,14 @@ FEATURE_FLAGS = {
     "hizoJc_source_content",
 }
 
-DROP_THRESHOLD = 0.5  # previous > current/previous → aborta
+DROP_THRESHOLD = 0.5  # current/previous → aborta se < threshold
 
 
 @dataclass
 class NotebookPlan:
     """Plano por notebook_uuid."""
-    to_use: list[str] = field(default_factory=list)          # refetch da API ja feito, copia raw atual
-    to_copy: list[str] = field(default_factory=list)         # inalterado, copia do anterior
+    to_use: list[str] = field(default_factory=list)             # refetch da API ja feito, copia raw atual
+    to_copy: list[str] = field(default_factory=list)            # inalterado, ja esta no merged in-place
     preserved_missing: list[str] = field(default_factory=list)  # deletado no servidor
 
 
@@ -94,14 +93,9 @@ def _load_discovery(raw_dir: Path) -> dict[str, dict]:
 def _strip_timestamps(x):
     """Walk recursivo: substitui pares [epoch_secs, nanos] por placeholder.
 
-    NotebookLM bumpa esses pares periodicamente em vários campos do raw
-    (metadata.update_time, notes wrapper, etc). Removemos pra hash semantico.
-
-    Heurística: lista de 2 ints onde primeiro esta em range epoch seconds
-    (1.5e9 < N < 2.5e9, cobre 2017-2049) e segundo e nanos (<1e9).
+    NotebookLM bumpa esses pares periodicamente — removemos pra hash semantico.
     """
     if isinstance(x, list):
-        # Heuristica de timestamp [secs, nanos]
         if (len(x) == 2 and isinstance(x[0], int) and isinstance(x[1], int)
                 and 1_500_000_000 < x[0] < 2_500_000_000 and 0 <= x[1] < 1_000_000_000):
             return "_ts"
@@ -112,14 +106,9 @@ def _strip_timestamps(x):
 
 
 def _eq_lenient(a, b) -> bool:
-    """Comparacao recursiva tolerante a:
-    - timestamps voláteis (pares [epoch, nanos] tratados como iguais)
-    - None vs valor (RPC pode retornar None vs dado entre captures por flutuacao)
-    """
-    # None compativel com qualquer
+    """Comparacao recursiva tolerante a timestamps + None."""
     if a is None or b is None:
         return True
-    # Timestamps [secs, nanos]
     if (isinstance(a, list) and isinstance(b, list)
             and len(a) == 2 and len(b) == 2
             and all(isinstance(x, int) for x in a)
@@ -127,7 +116,7 @@ def _eq_lenient(a, b) -> bool:
             and 1_500_000_000 < a[0] < 2_500_000_000
             and 1_500_000_000 < b[0] < 2_500_000_000):
         return True
-    if type(a) != type(b):
+    if type(a) is not type(b):
         return False
     if isinstance(a, list):
         if len(a) != len(b):
@@ -140,7 +129,7 @@ def _eq_lenient(a, b) -> bool:
 
 
 def _content_eq(raw_a: Path, raw_b: Path, uuid: str) -> bool:
-    """True se notebook.json for semanticamente igual entre 2 raws."""
+    """True se notebook.json for semanticamente igual entre 2 dirs."""
     pa = raw_a / "notebooks" / f"{uuid}.json"
     pb = raw_b / "notebooks" / f"{uuid}.json"
     if not (pa.exists() and pb.exists()):
@@ -161,17 +150,7 @@ def build_plan(
     force_refetch_features: set[str] | None = None,
     full: bool = False,
 ) -> NotebookPlan:
-    """Decide to_use/to_copy/preserved_missing comparando HASH DO CONTEUDO.
-
-    NotebookLM bumpa update_time periodicamente — usar hash do JSON (excluindo
-    campos volateis) e mais confiavel pra detectar mudancas semanticas.
-
-    Args:
-        current_raw: raw dir novo (com discovery_ids.json + notebooks/ + sources/)
-        previous_merged: merged dir anterior, ou None (primeiro run)
-        force_refetch_features: rpcids a forcar refetch
-        full: True = tudo vira to_use
-    """
+    """Decide to_use/to_copy/preserved_missing comparando hash do conteudo."""
     current_disc = _load_discovery(current_raw)
     previous_disc = _load_discovery(previous_merged) if previous_merged else {}
 
@@ -183,11 +162,14 @@ def build_plan(
 
     prev_version = None
     if previous_merged:
-        meta_path = previous_merged / "reconcile_log.json"
-        if meta_path.exists():
+        log_path = previous_merged / "reconcile_log.jsonl"
+        if log_path.exists():
             try:
-                prev_log = json.loads(meta_path.read_text(encoding="utf-8"))
-                prev_version = prev_log.get("features_version")
+                # Le ultima entrada (jsonl)
+                lines = log_path.read_text(encoding="utf-8").strip().split("\n")
+                if lines:
+                    last = json.loads(lines[-1])
+                    prev_version = last.get("features_version")
             except Exception:
                 pass
 
@@ -195,8 +177,6 @@ def build_plan(
     has_forced_features = bool(force_feats)
 
     for uuid in current_ids:
-        # Suporta export parcial (--notebook UUID): se notebook.json NAO esta no
-        # raw atual mas existe no merged, copia do merged
         raw_has = (current_raw / "notebooks" / f"{uuid}.json").exists()
         merged_has = bool(previous_merged) and (previous_merged / "notebooks" / f"{uuid}.json").exists()
 
@@ -204,7 +184,6 @@ def build_plan(
             plan.to_copy.append(uuid)
             continue
         if not raw_has and not merged_has:
-            # Discovery lista mas ningum tem o notebook — skip
             continue
 
         if full or version_bumped or has_forced_features:
@@ -219,10 +198,88 @@ def build_plan(
             plan.to_use.append(uuid)
 
     plan.preserved_missing = sorted(previous_ids - current_ids)
-
     plan.to_use = sorted(plan.to_use)
     plan.to_copy = sorted(plan.to_copy)
     return plan
+
+
+def _copy_sources_for_notebook(uuid: str, src_root: Path, dst_root: Path) -> None:
+    """Copia sources/<suid>.json do notebook uuid a partir do seu metadata."""
+    nb_path = src_root / "notebooks" / f"{uuid}.json"
+    if not nb_path.exists():
+        return
+    try:
+        nb = json.loads(nb_path.read_text(encoding="utf-8"))
+    except Exception:
+        return
+    meta = nb.get("metadata")
+    if not (meta and isinstance(meta, list) and meta and isinstance(meta[0], list)):
+        return
+    src_list = meta[0][1] if len(meta[0]) > 1 else None
+    if not isinstance(src_list, list):
+        return
+    for src_entry in src_list:
+        if not (isinstance(src_entry, list) and src_entry and isinstance(src_entry[0], list) and src_entry[0]):
+            continue
+        suid = src_entry[0][0] if isinstance(src_entry[0][0], str) else None
+        if not suid:
+            continue
+        src_path = src_root / "sources" / f"{suid}.json"
+        dst_path = dst_root / "sources" / f"{suid}.json"
+        if src_path.exists() and not dst_path.exists():
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_path, dst_path)
+
+
+def _copy_artifacts_and_mindmap(uuid: str, src_root: Path, dst_root: Path) -> None:
+    """Copia notebooks/<uuid>_artifacts/* e <uuid>_mind_map_tree.json."""
+    src_art = src_root / "notebooks" / f"{uuid}_artifacts"
+    dst_art = dst_root / "notebooks" / f"{uuid}_artifacts"
+    if src_art.exists():
+        dst_art.mkdir(parents=True, exist_ok=True)
+        for f in src_art.glob("*.json"):
+            tgt = dst_art / f.name
+            if not tgt.exists():
+                shutil.copy2(f, tgt)
+    src_mm = src_root / "notebooks" / f"{uuid}_mind_map_tree.json"
+    dst_mm = dst_root / "notebooks" / f"{uuid}_mind_map_tree.json"
+    if src_mm.exists() and not dst_mm.exists():
+        shutil.copy2(src_mm, dst_mm)
+
+
+def _merge_assets(raw_dir: Path, output_dir: Path) -> None:
+    """Copia assets do raw atual pro merged. Skip-existing."""
+    src = raw_dir / "assets"
+    dst = output_dir / "assets"
+    if not src.exists():
+        return
+    for item in src.rglob("*"):
+        if not item.is_file():
+            continue
+        rel = item.relative_to(src)
+        tgt = dst / rel
+        if tgt.exists():
+            continue
+        tgt.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(item, tgt)
+
+
+def _write_last_reconcile_md(merged_dir: Path, log_entry: dict) -> None:
+    """Snapshot human-readable da ultima reconciliacao."""
+    md = (
+        f"# Last Reconcile — NotebookLM (account {log_entry.get('account', '?')})\n\n"
+        f"**Run:** {log_entry['reconciled_at']}\n"
+        f"**Features version:** {log_entry['features_version']}\n\n"
+        f"## Totals\n\n"
+        f"- Added: {log_entry['added']}\n"
+        f"- Updated: {log_entry['updated']}\n"
+        f"- Copied: {log_entry['copied']}\n"
+        f"- Preserved missing: {log_entry['preserved_missing']}\n"
+        f"- Warnings: {len(log_entry.get('warnings', []))}\n"
+    )
+    if log_entry.get("features_refetched"):
+        md += f"\n**Forced refetch:** {', '.join(log_entry['features_refetched'])}\n"
+    (merged_dir / "LAST_RECONCILE.md").write_text(md, encoding="utf-8")
 
 
 def run_reconciliation(
@@ -232,21 +289,27 @@ def run_reconciliation(
     force_refetch_features: set[str] | None = None,
     full: bool = False,
 ) -> ReconcileReport:
-    """Executa reconciliacao: raw + previous merged → novo merged.
+    """Executa reconciliacao in-place na pasta unica per-account.
 
     Args:
-        raw_dir: raw recem capturado (com notebooks/, sources/, assets/, discovery_ids.json)
-        merged_output_base: data/merged/NotebookLM/<account>/ (cria subdir datado)
-        previous_merged: override auto-detect; None = pega mais recente
+        raw_dir: raw recem capturado (data/raw/NotebookLM/account-{N}/)
+        merged_output_base: data/merged/NotebookLM/account-{N}/ (cumulativa)
+        previous_merged: override default (default: merged_output_base mesmo — in-place)
         force_refetch_features: rpcids a forcar refetch
         full: True = ignora previous, usa tudo atual
-
-    Preserva estrutura: notebooks/, sources/, assets/.
     """
+    started_at = datetime.now(timezone.utc)
+    today = started_at.strftime("%Y-%m-%d")
+
+    merged_output_base.mkdir(parents=True, exist_ok=True)
+    output_dir = merged_output_base
+    (output_dir / "notebooks").mkdir(exist_ok=True)
+    (output_dir / "sources").mkdir(exist_ok=True)
+    (output_dir / "assets").mkdir(exist_ok=True)
+
+    # Pasta unica: previous = merged_output_base mesmo (a menos que override)
     if previous_merged is None:
-        previous_merged = _find_latest_merged(merged_output_base)
-    if previous_merged and not previous_merged.exists():
-        previous_merged = None
+        previous_merged = merged_output_base if (merged_output_base / "discovery_ids.json").exists() else None
 
     plan = build_plan(raw_dir, previous_merged, force_refetch_features, full)
 
@@ -265,59 +328,53 @@ def run_reconciliation(
                 ),
             )
 
-    today = datetime.now().strftime("%Y-%m-%d")
-    output_dir = merged_output_base / today
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "notebooks").mkdir(exist_ok=True)
-    (output_dir / "sources").mkdir(exist_ok=True)
-    (output_dir / "assets").mkdir(exist_ok=True)
-
     report = ReconcileReport()
 
-    # to_use: copia do raw atual
+    # to_use: copia do raw atual (sobrescreve in-place)
     for uuid in plan.to_use:
         src_nb = raw_dir / "notebooks" / f"{uuid}.json"
         dst_nb = output_dir / "notebooks" / f"{uuid}.json"
         if src_nb.exists():
-            # Injeta _last_seen_in_server
             nb = json.loads(src_nb.read_text(encoding="utf-8"))
             nb["_last_seen_in_server"] = today
-            dst_nb.write_text(json.dumps(nb, ensure_ascii=False, indent=2))
+            dst_nb.write_text(json.dumps(nb, ensure_ascii=False, indent=2), encoding="utf-8")
         else:
             report.warnings.append(f"to_use {uuid}: notebook.json faltando em raw")
 
-        # Copia sources desse notebook (descobre via metadata)
         _copy_sources_for_notebook(uuid, raw_dir, output_dir)
+        _copy_artifacts_and_mindmap(uuid, raw_dir, output_dir)
 
-    # to_copy: copia do merged anterior
+    # to_copy: ja esta in-place. Atualizar so _last_seen_in_server.
     for uuid in plan.to_copy:
-        if not previous_merged:
-            report.warnings.append(f"to_copy {uuid} mas sem previous_merged")
-            continue
-        src_nb = previous_merged / "notebooks" / f"{uuid}.json"
         dst_nb = output_dir / "notebooks" / f"{uuid}.json"
-        if src_nb.exists():
-            nb = json.loads(src_nb.read_text(encoding="utf-8"))
-            nb["_last_seen_in_server"] = today
-            dst_nb.write_text(json.dumps(nb, ensure_ascii=False, indent=2))
+        if not dst_nb.exists() and previous_merged and previous_merged != output_dir:
+            # Se previous_merged for diferente do output (override), copia
+            src_nb = previous_merged / "notebooks" / f"{uuid}.json"
+            if src_nb.exists():
+                shutil.copy2(src_nb, dst_nb)
+        if dst_nb.exists():
+            try:
+                nb = json.loads(dst_nb.read_text(encoding="utf-8"))
+                nb["_last_seen_in_server"] = today
+                dst_nb.write_text(json.dumps(nb, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception:
+                report.warnings.append(f"to_copy {uuid}: falha ao atualizar _last_seen_in_server")
         else:
-            report.warnings.append(f"to_copy {uuid}: merged anterior nao tem notebook")
-        _copy_sources_for_notebook(uuid, previous_merged, output_dir)
+            report.warnings.append(f"to_copy {uuid}: notebook.json faltando em merged")
 
-    # preserved_missing: copia do anterior, NAO atualiza _last_seen_in_server
+    # preserved_missing: ja esta in-place. Marcar mas NAO atualizar _last_seen_in_server.
+    # Se previous_merged for override e diferente, copia o anterior.
     for uuid in plan.preserved_missing:
-        if not previous_merged:
-            continue
-        src_nb = previous_merged / "notebooks" / f"{uuid}.json"
         dst_nb = output_dir / "notebooks" / f"{uuid}.json"
-        if src_nb.exists():
-            shutil.copy2(src_nb, dst_nb)
-        _copy_sources_for_notebook(uuid, previous_merged, output_dir)
+        if not dst_nb.exists() and previous_merged and previous_merged != output_dir:
+            src_nb = previous_merged / "notebooks" / f"{uuid}.json"
+            if src_nb.exists():
+                shutil.copy2(src_nb, dst_nb)
 
-    # Assets: link/copy (skip-existing) do raw atual + do merged anterior
-    _merge_assets(raw_dir, previous_merged, output_dir)
+    # Assets do raw atual
+    _merge_assets(raw_dir, output_dir)
 
-    # Discovery do merged = discovery atual (tag preserved_missing marca quem foi deletado)
+    # Discovery do merged: discovery atual + tag preserved_missing pros deletados
     merged_disc = list(current_disc.values())
     if previous_disc:
         for uuid in plan.preserved_missing:
@@ -326,7 +383,7 @@ def run_reconciliation(
                 d["_deleted_from_server"] = True
                 merged_disc.append(d)
     (output_dir / "discovery_ids.json").write_text(
-        json.dumps(merged_disc, ensure_ascii=False, indent=2)
+        json.dumps(merged_disc, ensure_ascii=False, indent=2), encoding="utf-8",
     )
 
     # Contagens
@@ -339,9 +396,13 @@ def run_reconciliation(
     if force_refetch_features:
         report.features_refetched = sorted(force_refetch_features)
 
-    # reconcile_log.json
-    log = {
-        "reconciled_at": datetime.now().isoformat(),
+    # Determina account a partir do path (data/merged/NotebookLM/account-{N}/)
+    account = output_dir.name.replace("account-", "") if output_dir.name.startswith("account-") else "?"
+
+    # reconcile_log.jsonl (append-only)
+    log_entry = {
+        "reconciled_at": started_at.isoformat(),
+        "account": account,
         "raw_source": str(raw_dir),
         "previous_merged": str(previous_merged) if previous_merged else None,
         "features_version": FEATURES_VERSION,
@@ -350,67 +411,12 @@ def run_reconciliation(
         "copied": report.copied,
         "preserved_missing": report.preserved_missing,
         "features_refetched": report.features_refetched,
-        "warnings": report.warnings,
+        "warnings": report.warnings[:10],  # primeiros 10
     }
-    (output_dir / "reconcile_log.json").write_text(
-        json.dumps(log, ensure_ascii=False, indent=2)
-    )
+    log_path = output_dir / "reconcile_log.jsonl"
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry, ensure_ascii=False, default=str) + "\n")
+
+    _write_last_reconcile_md(output_dir, log_entry)
 
     return report
-
-
-def _copy_sources_for_notebook(uuid: str, src_root: Path, dst_root: Path) -> None:
-    """Copia sources/<suid>.json do notebook uuid a partir do seu metadata."""
-    nb_path = src_root / "notebooks" / f"{uuid}.json"
-    if not nb_path.exists():
-        return
-    try:
-        nb = json.loads(nb_path.read_text(encoding="utf-8"))
-    except Exception:
-        return
-    # source UUIDs em metadata[0][1] — lista de [[suid], name, ...]
-    meta = nb.get("metadata")
-    if not (meta and isinstance(meta, list) and meta and isinstance(meta[0], list)):
-        return
-    src_list = meta[0][1] if len(meta[0]) > 1 else None
-    if not isinstance(src_list, list):
-        return
-    for src_entry in src_list:
-        if not (isinstance(src_entry, list) and src_entry and isinstance(src_entry[0], list) and src_entry[0]):
-            continue
-        suid = src_entry[0][0] if isinstance(src_entry[0][0], str) else None
-        if not suid:
-            continue
-        src_path = src_root / "sources" / f"{suid}.json"
-        dst_path = dst_root / "sources" / f"{suid}.json"
-        if src_path.exists() and not dst_path.exists():
-            shutil.copy2(src_path, dst_path)
-
-
-def _merge_assets(raw_dir: Path, previous_merged: Path | None, output_dir: Path) -> None:
-    """Copia assets de raw atual e merged anterior pro output. Skip-existing."""
-    def _copy_tree(src: Path, dst: Path) -> None:
-        if not src.exists():
-            return
-        for item in src.rglob("*"):
-            if not item.is_file():
-                continue
-            rel = item.relative_to(src)
-            tgt = dst / rel
-            if tgt.exists():
-                continue
-            tgt.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(item, tgt)
-
-    assets_out = output_dir / "assets"
-    _copy_tree(raw_dir / "assets", assets_out)
-    if previous_merged:
-        _copy_tree(previous_merged / "assets", assets_out)
-
-
-def _find_latest_merged(merged_base: Path) -> Path | None:
-    """Pega o merged dir mais recente em merged_base/<YYYY-MM-DD>/."""
-    if not merged_base.exists():
-        return None
-    candidates = sorted([d for d in merged_base.iterdir() if d.is_dir()])
-    return candidates[-1] if candidates else None
