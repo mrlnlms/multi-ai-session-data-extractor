@@ -6,6 +6,7 @@ jupyter: python3
 
 ```{python}
 #| label: setup
+#| code-summary: "Setup — paths, conexao DuckDB, helpers"
 
 import sys
 from pathlib import Path
@@ -18,6 +19,7 @@ import json
 import pandas as pd
 import duckdb
 import plotly.graph_objects as go
+import plotly.express as px
 from itables import init_notebook_mode, show
 
 init_notebook_mode(all_interactive=False)
@@ -30,8 +32,9 @@ for table in ("conversations", "messages", "tool_events", "branches"):
         con.execute(f"CREATE VIEW {table} AS SELECT * FROM read_parquet('{p}')")
 
 # DeepSeek brand: blue royal
-SOURCE_COLOR = "#4D6BFE"
-ACCENT = "#1E2856"
+SOURCE_COLOR = "#3B82F6"
+SECONDARY = "#1E3A8A"
+ACCENT = "#0F172A"
 MUTED = "#D1D5DB"
 
 
@@ -46,11 +49,14 @@ def show_df(df, **kwargs):
 
 
 def plotly_bar(x, y, title, color=SOURCE_COLOR, height=350, orientation="v"):
-    fig = (go.Figure(go.Bar(y=x, x=y, marker_color=color, orientation="h"))
-           if orientation == "h" else
-           go.Figure(go.Bar(x=x, y=y, marker_color=color)))
-    fig.update_layout(title=title, height=height, template="plotly_white",
-                      margin=dict(t=50, b=40, l=40, r=20))
+    if orientation == "h":
+        fig = go.Figure(go.Bar(y=x, x=y, marker_color=color, orientation="h"))
+    else:
+        fig = go.Figure(go.Bar(x=x, y=y, marker_color=color))
+    fig.update_layout(
+        title=title, height=height, template="plotly_white",
+        margin=dict(t=50, b=40, l=40, r=20),
+    )
     return fig
 ```
 
@@ -67,24 +73,43 @@ totals = con.execute("""
         (SELECT COUNT(*) FROM branches) AS branches
 """).df()
 
-range_dt = con.execute("SELECT MIN(created_at) AS oldest, MAX(created_at) AS newest FROM conversations").df()
+range_dt = con.execute("""
+    SELECT
+        MIN(created_at) AS oldest,
+        MAX(created_at) AS newest_created,
+        MAX(updated_at) AS newest_updated
+    FROM conversations
+""").df()
 
 show_df(pd.DataFrame([
-    {"Tabela": "conversations.parquet", "Rows": f"{totals['conversations'].iloc[0]:,}", "Periodo": f"{range_dt['oldest'].iloc[0]:%Y-%m-%d} → {range_dt['newest'].iloc[0]:%Y-%m-%d}"},
+    {"Tabela": "conversations.parquet", "Rows": f"{totals['conversations'].iloc[0]:,}", "Periodo": f"{range_dt['oldest'].iloc[0]:%Y-%m-%d} → {range_dt['newest_created'].iloc[0]:%Y-%m-%d}"},
     {"Tabela": "messages.parquet", "Rows": f"{totals['messages'].iloc[0]:,}", "Periodo": "—"},
     {"Tabela": "tool_events.parquet", "Rows": f"{totals['tool_events'].iloc[0]:,}", "Periodo": "—"},
     {"Tabela": "branches.parquet", "Rows": f"{totals['branches'].iloc[0]:,}", "Periodo": "—"},
 ]))
 ```
 
-> **Sobre.** Catalogo descritivo do DeepSeek. Highlights: R1 reasoning chain
-> (`thinking_content`), latency (`thinking_elapsed_secs`), token usage
-> cumulativo, search_results estruturados, branches via parent_id (DAG plano).
+> **Sobre este documento.** Catalogo descritivo dos parquets gerados pelo
+> parser canonico do DeepSeek (`src/parsers/deepseek.py`). Apresenta o que
+> esta nos dados — schema, cobertura, distribuicoes, preservation. **Nao
+> interpreta** conteudo. Pra analise qualitativa, ver projeto
+> `~/Desktop/AI Interaction Analysis/`.
+>
+> Fonte: pasta unica cumulativa `data/merged/DeepSeek/`. Schema canonico
+> v3 cobre: R1 reasoning (`thinking`) com cobertura significativa,
+> `accumulated_token_usage` per msg, `pinned`/`is_archived` cross-platform,
+> branches via `parent_id` (forks de regenerate).
 
-# 1. Conversations
+# 1. Dados disponiveis
+
+## 1.1 Conversations
+
+Cada linha eh uma chat session do DeepSeek. `mode` mapeia de `agent` +
+`model_type`: `chat` (default), `research` (`expert`/R1 reasoner). DeepSeek
+nao tem projects/spaces.
 
 ```{python}
-#| label: conv-stats
+#| label: conv-schema
 
 cov = con.execute("""
     SELECT
@@ -92,164 +117,527 @@ cov = con.execute("""
         COUNT(title) AS title,
         COUNT(model) AS model,
         SUM(is_pinned::INT) AS pinned,
-        SUM(is_preserved_missing::INT) AS preserved
+        SUM(is_archived::INT) AS archived,
+        SUM(is_preserved_missing::INT) AS preserved,
+        COUNT(last_seen_in_server) AS last_seen,
+        COUNT(settings_json) AS with_settings
     FROM conversations
 """).df()
 total = cov["total"].iloc[0]
-def cv(f): return fmt_pct(int(cov[f].iloc[0]), int(total))
 
-show_df(pd.DataFrame([
-    {"Campo": "title", "Cobertura": cv("title")},
-    {"Campo": "model", "Cobertura": cv("model")},
-    {"Campo": "is_pinned", "Cobertura": f"{int(cov['pinned'].iloc[0])} flagged"},
-    {"Campo": "is_preserved_missing", "Cobertura": f"{int(cov['preserved'].iloc[0])} flagged"},
-]))
+def conv_cov(field):
+    return fmt_pct(int(cov[field].iloc[0]), int(total))
+
+schema_conv = pd.DataFrame([
+    {"Campo": "conversation_id", "Tipo": "str", "Descricao": "UUID do session", "Cobertura": "100%"},
+    {"Campo": "source", "Tipo": "str", "Descricao": "Sempre 'deepseek'", "Cobertura": "100%"},
+    {"Campo": "title", "Tipo": "str?", "Descricao": "Nome da session (servidor preenche)", "Cobertura": conv_cov("title")},
+    {"Campo": "created_at", "Tipo": "timestamp", "Descricao": "Quando criada (epoch float)", "Cobertura": "100%"},
+    {"Campo": "updated_at", "Tipo": "timestamp", "Descricao": "Servidor bumpa em rename + pin (validado empirico)", "Cobertura": "100%"},
+    {"Campo": "message_count", "Tipo": "int", "Descricao": "user + assistant messages", "Cobertura": "100%"},
+    {"Campo": "model", "Tipo": "str?", "Descricao": "DeepSeek nao expoe `model` no schema (sempre NULL)", "Cobertura": conv_cov("model")},
+    {"Campo": "mode", "Tipo": "str", "Descricao": "chat / research (R1 reasoner em sessions de model_type='expert')", "Cobertura": "100%"},
+    {"Campo": "is_pinned", "Tipo": "bool", "Descricao": "Pin na sidebar (cross-platform)", "Cobertura": f"{int(cov['pinned'].iloc[0])} flagged"},
+    {"Campo": "is_archived", "Tipo": "bool", "Descricao": "Schema canonico — DeepSeek nao expoe archive na UI atual", "Cobertura": f"{int(cov['archived'].iloc[0])} flagged"},
+    {"Campo": "is_preserved_missing", "Tipo": "bool", "Descricao": "True se conv sumiu do servidor (preservada local)", "Cobertura": f"{int(cov['preserved'].iloc[0])} flagged"},
+    {"Campo": "last_seen_in_server", "Tipo": "timestamp", "Descricao": "Data da ultima run em que servidor retornou", "Cobertura": conv_cov("last_seen")},
+    {"Campo": "settings_json", "Tipo": "str?", "Descricao": "JSON com `thinking_elapsed_total_secs` agregado de R1 sessions", "Cobertura": conv_cov("with_settings")},
+])
+show_df(schema_conv)
 ```
 
-## 1.1 Mode (chat / agent / R1 thinking)
+```{python}
+#| label: conv-sample
+#| column: page
+
+sample_conv = con.execute("""
+    WITH
+    pinned_one AS (
+        SELECT * FROM conversations WHERE is_pinned LIMIT 1
+    ),
+    research_mode AS (
+        SELECT * FROM conversations WHERE mode = 'research' LIMIT 1
+    ),
+    chat_mode AS (
+        SELECT * FROM conversations WHERE mode = 'chat' ORDER BY message_count DESC LIMIT 1
+    ),
+    preserved AS (
+        SELECT * FROM conversations WHERE is_preserved_missing LIMIT 1
+    ),
+    longest AS (
+        SELECT * FROM conversations ORDER BY message_count DESC LIMIT 1
+    ),
+    shortest AS (
+        SELECT * FROM conversations WHERE message_count > 0 ORDER BY message_count ASC LIMIT 1
+    )
+    SELECT DISTINCT ON (conversation_id)
+        substr(conversation_id, 1, 8) AS conv_id,
+        substr(title, 1, 50) AS title,
+        mode, message_count AS msgs,
+        is_pinned, is_preserved_missing AS preserved,
+        strftime(created_at, '%Y-%m-%d') AS created
+    FROM (
+        SELECT * FROM pinned_one
+        UNION ALL SELECT * FROM research_mode
+        UNION ALL SELECT * FROM chat_mode
+        UNION ALL SELECT * FROM preserved
+        UNION ALL SELECT * FROM longest
+        UNION ALL SELECT * FROM shortest
+    )
+    ORDER BY conversation_id
+""").df()
+show_df(sample_conv)
+```
+
+## 1.2 Messages
+
+R1 reasoner expoe `thinking_content` em msgs assistant — captado em
+`thinking`. Token usage acumulado per-msg (`accumulated_token_usage`)
+populado em quase 100% das msgs.
+
+```{python}
+#| label: msg-schema
+
+mcov = con.execute("""
+    SELECT
+        COUNT(*) AS total,
+        COUNT(model) AS model,
+        COUNT(thinking) AS thinking,
+        COUNT(token_count) AS token_count,
+        COUNT(citations_json) AS citations_json,
+        COUNT(attachments_json) AS attachments_json,
+        COUNT(attachment_names) AS attachment_names,
+        COUNT(finish_reason) AS finish_reason
+    FROM messages
+""").df()
+mtotal = mcov["total"].iloc[0]
+
+def msg_cov(field):
+    return fmt_pct(int(mcov[field].iloc[0]), int(mtotal))
+
+schema_msg = pd.DataFrame([
+    {"Campo": "message_id", "Tipo": "str", "Descricao": "UUID da msg (ou int id no schema legacy)", "Cobertura": "100%"},
+    {"Campo": "conversation_id", "Tipo": "str", "Descricao": "FK pra conversations", "Cobertura": "100%"},
+    {"Campo": "branch_id", "Tipo": "str", "Descricao": "FK pra branches", "Cobertura": "100%"},
+    {"Campo": "sequence", "Tipo": "int", "Descricao": "Ordem cronologica", "Cobertura": "100%"},
+    {"Campo": "role", "Tipo": "str", "Descricao": "'user' ou 'assistant' (mapeado de USER/ASSISTANT)", "Cobertura": "100%"},
+    {"Campo": "content", "Tipo": "str", "Descricao": "Texto da msg (sem reasoning)", "Cobertura": "100%"},
+    {"Campo": "thinking", "Tipo": "str?", "Descricao": "R1 `thinking_content` — feature distintiva DeepSeek (~31% das msgs)", "Cobertura": msg_cov("thinking")},
+    {"Campo": "token_count", "Tipo": "int?", "Descricao": "`accumulated_token_usage` per-msg", "Cobertura": msg_cov("token_count")},
+    {"Campo": "citations_json", "Tipo": "str?", "Descricao": "JSON de search_results citados (estrutura rica)", "Cobertura": msg_cov("citations_json")},
+    {"Campo": "attachments_json", "Tipo": "str?", "Descricao": "JSON de feedback / tips / ban_edit / thinking_elapsed_secs", "Cobertura": msg_cov("attachments_json")},
+    {"Campo": "attachment_names", "Tipo": "str?", "Descricao": "Files anexados", "Cobertura": msg_cov("attachment_names")},
+    {"Campo": "finish_reason", "Tipo": "str?", "Descricao": "Mapeado de `status`: stop / incomplete / wip", "Cobertura": msg_cov("finish_reason")},
+])
+show_df(schema_msg)
+```
+
+```{python}
+#| label: msg-sample
+#| column: page
+
+sample_msg = con.execute("""
+    WITH
+    user_msg AS (
+        SELECT * FROM messages WHERE role='user' ORDER BY created_at DESC LIMIT 1
+    ),
+    asst_no_think AS (
+        SELECT * FROM messages WHERE role='assistant' AND thinking IS NULL ORDER BY created_at DESC LIMIT 1
+    ),
+    asst_thinking AS (
+        SELECT * FROM messages WHERE thinking IS NOT NULL ORDER BY length(thinking) DESC LIMIT 1
+    ),
+    with_citations AS (
+        SELECT * FROM messages WHERE citations_json IS NOT NULL LIMIT 1
+    ),
+    incomplete AS (
+        SELECT * FROM messages WHERE finish_reason = 'incomplete' LIMIT 1
+    )
+    SELECT
+        substr(message_id, 1, 12) AS msg_id,
+        role,
+        substr(content, 1, 50) AS content_preview,
+        word_count AS wc,
+        token_count AS tokens,
+        thinking IS NOT NULL AS has_thinking,
+        citations_json IS NOT NULL AS has_citations,
+        finish_reason
+    FROM (
+        SELECT * FROM user_msg
+        UNION ALL SELECT * FROM asst_no_think
+        UNION ALL SELECT * FROM asst_thinking
+        UNION ALL SELECT * FROM with_citations
+        UNION ALL SELECT * FROM incomplete
+    )
+""").df()
+show_df(sample_msg)
+```
+
+## 1.3 Tool Events
+
+DeepSeek expoe `search_results` per-msg em chats com search habilitado.
+O parser emite `search_call` + `search_result` events. **Nao tem code
+execution / artifacts / image gen** no schema atual.
+
+```{python}
+#| label: evt-schema
+
+ecov = con.execute("""
+    SELECT
+        COUNT(*) AS total,
+        COUNT(tool_name) AS tool_name,
+        COUNT(metadata_json) AS metadata_json,
+        COUNT(result) AS result
+    FROM tool_events
+""").df()
+etotal = ecov["total"].iloc[0]
+
+def evt_cov(field):
+    return fmt_pct(int(ecov[field].iloc[0]), int(etotal))
+
+schema_evt = pd.DataFrame([
+    {"Campo": "event_id", "Tipo": "str", "Descricao": "`<msg_id>_search_call` ou `_result`", "Cobertura": "100%"},
+    {"Campo": "conversation_id", "Tipo": "str", "Descricao": "FK pra conversations", "Cobertura": "100%"},
+    {"Campo": "message_id", "Tipo": "str", "Descricao": "ID da msg origem", "Cobertura": "100%"},
+    {"Campo": "event_type", "Tipo": "str", "Descricao": "search_call / search_result", "Cobertura": "100%"},
+    {"Campo": "tool_name", "Tipo": "str?", "Descricao": "'web_search'", "Cobertura": evt_cov("tool_name")},
+    {"Campo": "metadata_json", "Tipo": "str", "Descricao": "JSON com result_count + agent + model_type", "Cobertura": evt_cov("metadata_json")},
+    {"Campo": "result", "Tipo": "str?", "Descricao": "JSON dos results em events `_result`", "Cobertura": evt_cov("result")},
+])
+show_df(schema_evt)
+```
+
+```{python}
+#| label: evt-sample
+
+sample_evt = con.execute("""
+    SELECT DISTINCT ON (event_type)
+        event_type, tool_name,
+        substr(metadata_json, 1, 80) AS metadata_preview
+    FROM tool_events ORDER BY event_type
+""").df()
+show_df(sample_evt)
+```
+
+## 1.4 Branches
+
+Branches DeepSeek vem de regenerate da resposta (`parent_id` per msg gera
+fork). 271 branches em 79 sessions = **~2.4 branches/conv** — muito acima
+de outras plataformas. DeepSeek tem MUITO regenerate.
+
+```{python}
+#| label: br-schema
+
+bcov = con.execute("""
+    SELECT
+        COUNT(*) AS total,
+        SUM(is_active::INT) AS active,
+        SUM((parent_branch_id IS NULL)::INT) AS main,
+        SUM((parent_branch_id IS NOT NULL)::INT) AS forks
+    FROM branches
+""").df()
+
+schema_br = pd.DataFrame([
+    {"Campo": "branch_id", "Tipo": "str", "Descricao": "`<conv>_main` ou `<conv>_<root_msg_id>`", "Cobertura": "100%"},
+    {"Campo": "conversation_id", "Tipo": "str", "Descricao": "FK pra conversations", "Cobertura": "100%"},
+    {"Campo": "root_message_id", "Tipo": "str", "Descricao": "Primeira msg da branch", "Cobertura": "100%"},
+    {"Campo": "leaf_message_id", "Tipo": "str", "Descricao": "Ultima msg da branch", "Cobertura": "100%"},
+    {"Campo": "is_active", "Tipo": "bool", "Descricao": "Branch contem `current_message_id` da session", "Cobertura": f"{int(bcov['active'].iloc[0]):,} (1 por session)"},
+    {"Campo": "parent_branch_id", "Tipo": "str?", "Descricao": "NULL pra main; aponta pra main em forks", "Cobertura": f"{int(bcov['forks'].iloc[0])} forks / {int(bcov['main'].iloc[0])} main"},
+])
+show_df(schema_br)
+```
+
+# 2. Cobertura e gaps
+
+## 2.1 Convs sem `model`
+
+DeepSeek **nao expoe model na API** — sempre NULL no schema. Schema
+canonico mantem o campo pra consistencia cross-platform.
+
+```{python}
+#| label: model-gap
+
+print("DeepSeek nao expoe model name na API — campo Conversation.model "
+      "fica NULL pra todas. Pra distinguir entre R1 reasoner e chat regular, "
+      "usar `mode` ('research' vs 'chat').")
+```
+
+## 2.2 Cobertura de R1 reasoning (`thinking`)
+
+R1 thinking eh **a feature distintiva do DeepSeek**. Cobertura alta
+indica uso intensivo de R1 reasoner.
+
+```{python}
+#| label: thinking-coverage
+
+think_cov = con.execute("""
+    SELECT
+        role,
+        COUNT(*) AS total,
+        COUNT(thinking) AS com_thinking,
+        ROUND(COUNT(thinking) * 100.0 / COUNT(*), 1) AS pct
+    FROM messages
+    GROUP BY role ORDER BY role
+""").df()
+show_df(think_cov)
+```
+
+```{python}
+#| label: thinking-by-mode
+
+think_by_mode = con.execute("""
+    SELECT
+        c.mode,
+        COUNT(m.message_id) AS total_msgs,
+        COUNT(m.thinking) AS com_thinking,
+        ROUND(COUNT(m.thinking) * 100.0 / COUNT(m.message_id), 1) AS pct
+    FROM messages m
+    JOIN conversations c USING(conversation_id)
+    WHERE m.role='assistant'
+    GROUP BY c.mode ORDER BY c.mode
+""").df()
+show_df(think_by_mode)
+```
+
+## 2.3 Token count coverage
+
+`accumulated_token_usage` populado per-msg.
+
+```{python}
+#| label: token-coverage
+
+tok_cov = con.execute("""
+    SELECT
+        role,
+        COUNT(*) AS total,
+        COUNT(token_count) AS com_token,
+        ROUND(COUNT(token_count) * 100.0 / COUNT(*), 1) AS pct,
+        ROUND(AVG(token_count), 0) AS avg_tokens,
+        MAX(token_count) AS max_tokens
+    FROM messages
+    GROUP BY role ORDER BY role
+""").df()
+show_df(tok_cov)
+```
+
+## 2.4 finish_reason — incomplete vs stop
+
+```{python}
+#| label: finish-reason
+
+fr = con.execute("""
+    SELECT finish_reason, COUNT(*) AS n
+    FROM messages WHERE finish_reason IS NOT NULL
+    GROUP BY finish_reason ORDER BY n DESC
+""").df()
+show_df(fr)
+```
+
+# 3. Volumes e distribuicoes
+
+## 3.1 Conversas criadas por mes
+
+```{python}
+#| label: conv-timeline
+
+timeline = con.execute("""
+    SELECT strftime(created_at, '%Y-%m') AS mes, COUNT(*) AS n
+    FROM conversations GROUP BY mes ORDER BY mes
+""").df()
+
+fig = plotly_bar(x=timeline["mes"], y=timeline["n"],
+                 title="Conversations criadas por mes", height=350)
+fig.update_xaxes(type="category")
+fig.show()
+```
+
+## 3.2 Mensagens por role
+
+```{python}
+#| label: roles
+
+roles = con.execute("""
+    SELECT role, COUNT(*) AS n FROM messages GROUP BY role ORDER BY n DESC
+""").df()
+
+fig = plotly_bar(x=roles["role"], y=roles["n"], title="Messages por role", height=300)
+fig.show()
+```
+
+## 3.3 Mode (chat vs research)
 
 ```{python}
 #| label: modes
 
 modes = con.execute("""
-    SELECT mode, COUNT(*) AS n FROM conversations GROUP BY mode ORDER BY n DESC
+    SELECT mode, COUNT(*) AS n FROM conversations
+    GROUP BY mode ORDER BY n DESC
 """).df()
-show_df(modes)
-fig = plotly_bar(x=modes["mode"], y=modes["n"], title="Sessions por mode", height=300)
+
+fig = px.pie(modes, values="n", names="mode",
+             title="Conversations por mode",
+             color_discrete_sequence=[SOURCE_COLOR, SECONDARY],
+             height=350)
+fig.update_layout(template="plotly_white", margin=dict(t=50, b=40, l=40, r=20))
 fig.show()
+show_df(modes)
 ```
 
-## 1.2 Top models
-
-```{python}
-#| label: top-models
-
-top = con.execute("""
-    SELECT model, COUNT(*) AS n FROM conversations
-    WHERE model IS NOT NULL GROUP BY model ORDER BY n DESC LIMIT 10
-""").df()
-if not top.empty:
-    show_df(top)
-```
-
-# 2. Messages
-
-```{python}
-#| label: msg-stats
-
-mc = con.execute("""
-    SELECT
-        COUNT(*) AS total,
-        COUNT(thinking) AS with_thinking,
-        COUNT(citations_json) AS with_citations,
-        COUNT(token_count) AS with_tokens,
-        COUNT(attachment_names) AS with_files,
-        COUNT(finish_reason) AS with_finish
-    FROM messages
-""").df()
-mtotal = mc["total"].iloc[0]
-def mv(f): return fmt_pct(int(mc[f].iloc[0]), int(mtotal))
-
-show_df(pd.DataFrame([
-    {"Campo": "thinking (R1 reasoning chain)", "Cobertura": mv("with_thinking")},
-    {"Campo": "citations_json (search_results inline)", "Cobertura": mv("with_citations")},
-    {"Campo": "token_count (accumulated_token_usage)", "Cobertura": mv("with_tokens")},
-    {"Campo": "attachment_names (files)", "Cobertura": mv("with_files")},
-    {"Campo": "finish_reason (status + incomplete_message)", "Cobertura": mv("with_finish")},
-]))
-```
-
-## 2.1 R1 reasoning — uso por modelo
-
-```{python}
-#| label: r1-by-model
-
-r1 = con.execute("""
-    SELECT
-        model,
-        COUNT(*) AS total,
-        COUNT(thinking) AS with_thinking,
-        ROUND(100.0 * COUNT(thinking) / COUNT(*), 1) AS pct
-    FROM messages
-    WHERE role = 'assistant'
-    GROUP BY model
-    ORDER BY total DESC
-""").df()
-show_df(r1)
-```
-
-## 2.2 Token usage (accumulated)
-
-```{python}
-#| label: tokens
-
-t = con.execute("""
-    SELECT
-        AVG(token_count) AS avg, MEDIAN(token_count)::INT AS median,
-        MAX(token_count) AS max,
-        SUM(token_count) AS total
-    FROM messages WHERE token_count IS NOT NULL
-""").df()
-show_df(t)
-```
-
-## 2.3 finish_reason distribution
-
-```{python}
-#| label: finish-reason
-
-f = con.execute("""
-    SELECT finish_reason, COUNT(*) AS n
-    FROM messages WHERE finish_reason IS NOT NULL
-    GROUP BY finish_reason ORDER BY n DESC
-""").df()
-show_df(f)
-```
-
-# 3. ToolEvents
+## 3.4 ToolEvents por event_type
 
 ```{python}
 #| label: tool-events
 
-ev = con.execute("""
-    SELECT event_type, COUNT(*) AS n FROM tool_events GROUP BY event_type ORDER BY n DESC
+evts = con.execute("""
+    SELECT event_type, tool_name, COUNT(*) AS n
+    FROM tool_events GROUP BY event_type, tool_name ORDER BY n DESC
 """).df()
-if not ev.empty:
-    show_df(ev)
+
+if not evts.empty:
+    fig = plotly_bar(x=evts["event_type"], y=evts["n"],
+                     title="ToolEvents por event_type", height=300)
+    fig.show()
+show_df(evts)
 ```
 
-# 4. Branches (forks via parent_id)
+## 3.5 Distribuicao de tamanho (msgs por conv)
 
 ```{python}
-#| label: branches
+#| label: conv-size
 
-br = con.execute("""
-    SELECT
-        SUM(is_active::INT) AS main,
-        SUM((NOT is_active)::INT) AS secondary,
-        COUNT(*) AS total
-    FROM branches
+sizes = con.execute("""
+    SELECT message_count FROM conversations WHERE message_count > 0
 """).df()
-show_df(br)
 
-# Distribuicao de N branches por session
-distrib = con.execute("""
-    WITH counts AS (SELECT conversation_id, COUNT(*) AS n_br FROM branches GROUP BY conversation_id)
-    SELECT n_br, COUNT(*) AS n_sessions FROM counts GROUP BY n_br ORDER BY n_br
-""").df()
-show_df(distrib)
+bins = [0, 1, 2, 5, 10, 20, 50, 100, 9999]
+labels = ["1", "2", "3-5", "6-10", "11-20", "21-50", "51-100", "100+"]
+sizes["bin"] = pd.cut(sizes["message_count"], bins=bins, labels=labels, include_lowest=True)
+hist = sizes["bin"].value_counts().reindex(labels).reset_index()
+hist.columns = ["bin", "n"]
+
+fig = plotly_bar(x=hist["bin"].astype(str), y=hist["n"],
+                 title=f"Distribuicao de msgs por conv (n={len(sizes):,})", height=300)
+fig.update_xaxes(title="Msgs por conv")
+fig.update_yaxes(title="N convs")
+fig.show()
 ```
 
-# 5. Preservation
+## 3.6 Branches: forks por session (regenerate)
 
 ```{python}
-#| label: preservation
+#| label: forks
 
-p = con.execute("""
-    SELECT
-        CASE WHEN is_preserved_missing THEN 'Preserved' ELSE 'Active' END AS status,
-        COUNT(*) AS n
-    FROM conversations GROUP BY is_preserved_missing
+forks = con.execute("""
+    SELECT n_branches, COUNT(*) AS n_convs FROM (
+        SELECT conversation_id, COUNT(*) AS n_branches
+        FROM branches GROUP BY conversation_id
+    ) GROUP BY n_branches ORDER BY n_branches
 """).df()
-show_df(p)
+
+fig = plotly_bar(x=forks["n_branches"].astype(str), y=forks["n_convs"],
+                 title="Branches por session (regenerate count)",
+                 color=SECONDARY, height=300)
+fig.update_xaxes(title="N branches")
+fig.update_yaxes(title="N sessions")
+fig.show()
 ```
+
+## 3.7 Token usage — distribuicao
+
+```{python}
+#| label: token-distrib
+
+tok_dist = con.execute("""
+    SELECT token_count
+    FROM messages
+    WHERE token_count IS NOT NULL AND token_count > 0
+""").df()
+
+if not tok_dist.empty:
+    fig = px.histogram(tok_dist, x="token_count",
+                       title=f"Distribuicao de token_count (n={len(tok_dist):,})",
+                       color_discrete_sequence=[SOURCE_COLOR],
+                       nbins=40, height=350)
+    fig.update_layout(template="plotly_white", margin=dict(t=50, b=40, l=40, r=20))
+    fig.show()
+```
+
+# 4. Preservation + features distintivas
+
+## 4.1 Pinned (cross-platform)
+
+```{python}
+#| label: pinned-detail
+
+pinned_table = con.execute("""
+    SELECT
+        substr(conversation_id, 1, 8) AS conv_id,
+        title,
+        mode,
+        message_count AS msgs,
+        strftime(created_at, '%Y-%m-%d') AS created
+    FROM conversations
+    WHERE is_pinned = TRUE
+    ORDER BY created_at DESC
+""").df()
+
+if not pinned_table.empty:
+    show_df(pinned_table)
+else:
+    print("Nenhuma conv pinada.")
+```
+
+## 4.2 Preservation — convs sumidas do servidor
+
+```{python}
+#| label: preserved-detail
+
+preserved_table = con.execute("""
+    SELECT
+        substr(conversation_id, 1, 8) AS conv_id,
+        title,
+        message_count AS msgs,
+        strftime(last_seen_in_server, '%Y-%m-%d') AS last_seen,
+        strftime(created_at, '%Y-%m-%d') AS created
+    FROM conversations
+    WHERE is_preserved_missing = TRUE
+    ORDER BY last_seen_in_server DESC
+""").df()
+
+if not preserved_table.empty:
+    show_df(preserved_table)
+else:
+    print("Nenhuma conv preservada.")
+```
+
+## 4.3 R1 reasoner — exemplos de thinking
+
+```{python}
+#| label: r1-samples
+#| column: page
+
+r1_samples = con.execute("""
+    SELECT
+        substr(conversation_id, 1, 8) AS conv_id,
+        substr(content, 1, 50) AS msg_preview,
+        substr(thinking, 1, 100) AS thinking_preview,
+        length(thinking) AS thinking_chars,
+        token_count
+    FROM messages
+    WHERE thinking IS NOT NULL
+    ORDER BY length(thinking) DESC
+    LIMIT 5
+""").df()
+show_df(r1_samples)
+```
+
+# 5. Limitacoes conhecidas
+
+| Item | Status |
+|---|---|
+| `model` field | DeepSeek nao expoe na API — sempre NULL. Distincao via `mode` (chat / research) |
+| Archive na UI | Nao existe atualmente; campo `is_archived` no schema canonico fica sempre False |
+| Files / multi-modal | Schema tem `attachment_names`, mas nao exercitado em produndidade |
+| Voice / TTS | Nao identificado |
+| Citations estrutura | Schema tem `citations_json` com title/url/metadata — formato proprio do DeepSeek |
