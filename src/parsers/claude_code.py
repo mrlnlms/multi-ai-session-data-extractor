@@ -1,37 +1,83 @@
-# src/parsers/claude_code.py
-"""Parser para sessoes do Claude Code."""
+"""Parser canonico v3 do Claude Code CLI.
+
+Le sessoes JSONL de `data/raw/Claude Code/<encoded-cwd>/*.jsonl` (e subagents
+em `<encoded-cwd>/<session-id>/subagents/*.jsonl`).
+
+Gotchas mapeados (do projeto pai — 14 tests, multiples bug fixes):
+
+1. **`content` pode ser str OU list** — fix recuperou 10.7k msgs (commit a391e5d).
+2. **Sessoes orfas** — JSONL raiz some mas subagents + ~/.claude/usage-data/
+   session-meta/<uuid>.json sobrevivem. Reconstroi stub parent (commit d2b2ffc:
+   resgatou 352 sessoes + 1723 subagents).
+3. **`isSidechain` filter** — sessoes principais filtram sidechain=True;
+   subagents processam tudo.
+4. **Subagent `conversation_id` usa filename** (nao sessionId — colidia com parent,
+   commit 66d5cbc).
+5. **`tool_results` em user msgs seguintes** — 2 passes pra correlacionar.
+6. **`interaction_type`** — 'human_ai' (raiz) vs 'ai_ai' (subagent) +
+   `parent_session_id` no subagent.
+
+Output: data/processed/Claude Code/{claude_code_conversations,messages,
+tool_events,branches}.parquet (4 parquets canonicos v3).
+
+Branches: 1 _main por Conversation (Claude Code nao tem fork — chat eh linear).
+"""
+
+from __future__ import annotations
 
 import json
 import logging
 from pathlib import Path
+from typing import Optional
 
 import pandas as pd
 
 from src.parsers.base import BaseParser
-from src.schema.models import Conversation, Message, ToolEvent
+from src.schema.models import (
+    Branch,
+    Conversation,
+    Message,
+    ToolEvent,
+    branches_to_df,
+    conversations_to_df,
+    messages_to_df,
+    tool_events_to_df,
+)
+
+
+logger = logging.getLogger(__name__)
+
 
 # Metadados de sessao ficam em ~/.claude/usage-data/session-meta/<uuid>.json
 # Mesmo quando o JSONL raiz some, o meta geralmente sobrevive (first_prompt, stats)
 _SESSION_META_DIR = Path.home() / ".claude" / "usage-data" / "session-meta"
 
-logger = logging.getLogger(__name__)
-
 
 class ClaudeCodeParser(BaseParser):
     source_name = "claude_code"
 
+    def __init__(self, account: Optional[str] = None):
+        super().__init__(account=account)
+        self.branches: list[Branch] = []
+
+    def reset(self):
+        super().reset()
+        self.branches = []
+
     def parse(self, input_path: Path) -> None:
         """Le sessoes JSONL de todos os projetos em input_path.
 
-        input_path deve conter subdiretorios por projeto (formato: -Users-xxx-Desktop-project/).
-        Cada diretorio contem:
+        input_path deve conter subdiretorios por projeto (formato encoded-cwd:
+        `-Users-xxx-Desktop-project/`). Cada diretorio contem:
           - *.jsonl (sessoes principais)
           - {session-uuid}/subagents/*.jsonl (subagents)
 
         Sessoes orfas (subagents sem JSONL raiz) sao processadas com stub parent
         reconstruido a partir de ~/.claude/usage-data/session-meta/<uuid>.json.
         """
+        input_path = Path(input_path)
         orphan_count = 0
+
         for project_dir in sorted(input_path.iterdir()):
             if not project_dir.is_dir():
                 continue
@@ -74,6 +120,8 @@ class ClaudeCodeParser(BaseParser):
         if orphan_count:
             logger.info(f"  Claude Code: {orphan_count} sessoes orfas (stub parent reconstruido)")
 
+        self._build_branches()
+
     def parse_files(self, files: list[Path]) -> None:
         """Processa lista especifica de arquivos (uso incremental).
 
@@ -84,7 +132,6 @@ class ClaudeCodeParser(BaseParser):
         for session_file in files:
             parts = session_file.parts
             if "subagents" in parts:
-                # .../<project>/<parent_uuid>/subagents/<sub_uuid>.jsonl
                 parent_id = session_file.parent.parent.name
                 self._parse_session(
                     session_file,
@@ -93,6 +140,37 @@ class ClaudeCodeParser(BaseParser):
                 )
             else:
                 self._parse_session(session_file, interaction_type="human_ai")
+        self._build_branches()
+
+    def _build_branches(self) -> None:
+        """Gera 1 Branch <conv>_main por Conversation. Claude Code nao tem fork."""
+        existing = {b.conversation_id for b in self.branches}
+        msgs_by_conv: dict[str, list[Message]] = {}
+        for m in self.messages:
+            msgs_by_conv.setdefault(m.conversation_id, []).append(m)
+
+        for conv in self.conversations:
+            if conv.conversation_id in existing:
+                continue
+            conv_msgs = sorted(
+                msgs_by_conv.get(conv.conversation_id, []),
+                key=lambda m: m.sequence,
+            )
+            if conv_msgs:
+                root_id = conv_msgs[0].message_id
+                leaf_id = conv_msgs[-1].message_id
+            else:
+                root_id = ""
+                leaf_id = ""
+            self.branches.append(Branch(
+                branch_id=f"{conv.conversation_id}_main",
+                conversation_id=conv.conversation_id,
+                source=self.source_name,
+                root_message_id=root_id,
+                leaf_message_id=leaf_id,
+                is_active=True,
+                created_at=conv.created_at if conv.created_at is not None else pd.Timestamp.now(tz="UTC"),
+            ))
 
     def _reconstruct_orphan_parent(self, parent_id: str, project_name: str) -> None:
         """Cria stub parent para sessao orfa a partir do session-meta.
@@ -133,8 +211,6 @@ class ClaudeCodeParser(BaseParser):
                 content_types="text",
             ))
 
-        # message_count preserva a contagem real (mesmo com mensagens perdidas)
-        # Documenta lacuna via title: sessao real tinha N msgs, aqui so o first_prompt
         total_msgs = user_count + assistant_count
         title = f"[orphan parent — {total_msgs} msgs originais, JSONL perdido]"
 
@@ -158,10 +234,22 @@ class ClaudeCodeParser(BaseParser):
         self,
         session_file: Path,
         interaction_type: str = "human_ai",
-        parent_session_id: str | None = None,
+        parent_session_id: Optional[str] = None,
     ) -> None:
-        lines = session_file.read_text(encoding="utf-8").strip().split("\n")
-        events = [json.loads(line) for line in lines if line.strip()]
+        try:
+            text = session_file.read_text(encoding="utf-8")
+        except Exception as e:
+            logger.warning(f"  {session_file}: falha ao ler: {e}")
+            return
+        lines = text.strip().split("\n")
+        events = []
+        for line in lines:
+            if not line.strip():
+                continue
+            try:
+                events.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue  # skip malformed lines
 
         # Subagents (ai_ai): processar todos os eventos (isSidechain=true e o esperado)
         # Sessoes principais (human_ai): filtrar sidechain
@@ -172,14 +260,14 @@ class ClaudeCodeParser(BaseParser):
 
         # Subagents usam filename como conversation_id (sessionId nos eventos e o do pai)
         if interaction_type == "ai_ai":
-            session_id = session_file.stem  # ex: agent-abc123
+            session_id: Optional[str] = session_file.stem  # ex: agent-abc123
         else:
             session_id = None
         cwd = None
         slug = None
-        messages = []
-        tool_events = []
-        tool_results = {}  # tool_use_id → result info
+        messages: list[Message] = []
+        tool_events: list[ToolEvent] = []
+        tool_results: dict[str, dict] = {}  # tool_use_id → result info
         seq = 0
 
         # Primeiro passo: coletar tool_results dos user messages
@@ -207,10 +295,10 @@ class ClaudeCodeParser(BaseParser):
                 slug = evt.get("slug")
 
             if etype == "user":
-                # Verificar se e user real (text) ou tool_result (continuacao)
                 content = evt.get("message", {}).get("content", [])
 
-                # content pode ser string direta ou lista de blocos
+                # GOTCHA: content pode ser string direta ou lista de blocos
+                # Bug pre-a391e5d descartava string content, perdendo 10.7k msgs
                 if isinstance(content, str):
                     text_parts = [content] if content.strip() else []
                 elif isinstance(content, list):
@@ -240,9 +328,9 @@ class ClaudeCodeParser(BaseParser):
                 msg_data = evt.get("message", {})
                 content_blocks = msg_data.get("content", [])
 
-                text_parts = []
-                thinking_parts = []
-                ct_types = set()
+                text_parts: list[str] = []
+                thinking_parts: list[str] = []
+                ct_types: set[str] = set()
 
                 for block in content_blocks:
                     btype = block.get("type", "")
@@ -256,8 +344,8 @@ class ClaudeCodeParser(BaseParser):
                         ct_types.add("tool_use")
                         tool_idx = len(tool_events)
                         tool_id = block.get("id")
-                        tool_input = block.get("input", {})
-                        result_info = tool_results.get(tool_id, {})
+                        tool_input = block.get("input", {}) or {}
+                        result_info = tool_results.get(tool_id, {}) if tool_id else {}
 
                         tool_events.append(ToolEvent(
                             event_id=tool_id or f"{session_id}_tool_{tool_idx}",
@@ -268,11 +356,12 @@ class ClaudeCodeParser(BaseParser):
                             tool_name=block.get("name", ""),
                             file_path=tool_input.get("file_path"),
                             command=tool_input.get("command"),
-                            success=not result_info.get("is_error", False) if result_info else None,
+                            success=(not result_info.get("is_error", False))
+                            if result_info else None,
                         ))
 
                 seq += 1
-                usage = msg_data.get("usage", {})
+                usage = msg_data.get("usage", {}) or {}
                 token_count = (usage.get("input_tokens", 0) + usage.get("output_tokens", 0)) or None
 
                 messages.append(Message(
@@ -311,3 +400,25 @@ class ClaudeCodeParser(BaseParser):
         ))
         self.messages.extend(messages)
         self.events.extend(tool_events)
+
+    def branches_df(self) -> pd.DataFrame:
+        return branches_to_df(self.branches)
+
+    def write_parquets(self, output_dir: Path) -> dict[str, int]:
+        """Escreve 4 parquets canonicos em output_dir. Idempotente."""
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        conversations_to_df(self.conversations).to_parquet(
+            output_dir / "claude_code_conversations.parquet", index=False)
+        messages_to_df(self.messages).to_parquet(
+            output_dir / "claude_code_messages.parquet", index=False)
+        tool_events_to_df(self.events).to_parquet(
+            output_dir / "claude_code_tool_events.parquet", index=False)
+        branches_to_df(self.branches).to_parquet(
+            output_dir / "claude_code_branches.parquet", index=False)
+        return {
+            "conversations": len(self.conversations),
+            "messages": len(self.messages),
+            "tool_events": len(self.events),
+            "branches": len(self.branches),
+        }

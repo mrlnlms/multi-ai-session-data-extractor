@@ -68,6 +68,14 @@ Lista de imports pendentes em `memory/project_pending_imports_from_old.md`.
 | NotebookLM | ✅ | ✅ | ✅ | ✅ | ✅ | **shipped 2026-05-02** (multi-conta acc-1+acc-2; 143 conversations / 138 messages / 1174 sources / 1174 source_guides / 389 outputs / 9 parquets total; bateria CRUD validada — pin nao existe upstream) |
 | Perplexity | ✅ | ✅ | ✅ | ✅ | ✅ | Auditoria + reconciler + parser v3 + Quarto. 82 conversations (78 threads + 4 pages), 9 artifacts c/ binarios, 1 orphan, 4 spaces |
 
+**CLI (3 fontes adicionais — dado local em vez de captura web):**
+
+| CLI | Source | Copy script | Parser v3 | Status |
+|---|---|---|---|---|
+| Claude Code | claude_code | ✅ `cli-copy.py --source claude_code` | ✅ shipped 2026-05-03 | 3742 convs / 136k msgs / 78k tool_events / 3742 branches (snapshot atual `~/.claude/projects/`); cross-validacao 1:1 vs pai = v3 ⊇ pai estritamente (+271 msgs, +6k tool_events) |
+| Codex | codex | ✅ `cli-copy.py --source codex` | ⏳ pendente | dados em `data/raw/Codex/` |
+| Gemini CLI | gemini_cli | ✅ `cli-copy.py --source gemini_cli` | ⏳ pendente | dados em `data/raw/Gemini CLI/` |
+
 Backlog principal: bateria CRUD UI final pra NotebookLM. Pos-shipping: 7/7 plataformas verdes desbloqueia cross-plataforma overview + DVC pra dados grandes.
 
 ## Estado validado em 2026-04-28 — NAO refazer
