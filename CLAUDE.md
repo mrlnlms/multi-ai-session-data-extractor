@@ -56,7 +56,7 @@ profile/dados; o projeto pai e atalho de dev pra mim, nao parte do produto.
 
 Lista de imports pendentes em `memory/project_pending_imports_from_old.md`.
 
-## Status (2026-05-01)
+## Status (2026-05-03)
 
 | Plataforma | Capture | Reconcile | Sync orquestrador | Parser canonico | Quarto descritivo | Notas |
 |---|---|---|---|---|---|---|
@@ -76,7 +76,37 @@ Lista de imports pendentes em `memory/project_pending_imports_from_old.md`.
 | Codex | codex | ✅ `cli-copy.py --source codex` | ✅ shipped 2026-05-03 | 112 convs / 2.6k msgs / 6.1k tool_events / 112 branches; cross-val 1:1 = EXATO match com pai |
 | Gemini CLI | gemini_cli | ✅ `cli-copy.py --source gemini_cli` | ✅ shipped 2026-05-03 | 12 convs / 181 msgs / 84 tool_events / 12 branches; cross-val 1:1 = +2 convs vs pai (v3 capta extras) |
 
-Backlog principal: bateria CRUD UI final pra NotebookLM. Pos-shipping: 7/7 plataformas verdes desbloqueia cross-plataforma overview + DVC pra dados grandes.
+**Manual saves (parser via `scripts/manual-saves-sync.py` — re-mapeiam source pra plataforma original):**
+
+| Parser | source destino | capture_method | Convs |
+|---|---|---|---|
+| `clippings_obsidian` | chatgpt (20), claude_ai (1) | `manual_clipping_obsidian` | 21 |
+| `copypaste_web` | chatgpt (1), claude_ai (1), gemini (2), qwen (1) | `manual_copypaste` | 5 |
+| `terminal_claude_code` | claude_code (3) | `manual_terminal_cc` | 3 |
+
+Total: 29 convs / 403 msgs / 70 tool_events. Output em `<source>_manual_<table>.parquet`
+em cada `data/processed/<Plataforma>/`. Quartos fazem UNION via
+`setup_views_with_manual()` em `src/parsers/quarto_helpers.py`.
+
+**Schema v3.2 (2026-05-03):** `Conversation.capture_method` (default `'extractor'`,
+manuais sobrescrevem). Permite distinguir extractor vs manual-saves vs futuras
+fontes externas no mesmo parquet via UNION.
+
+**External preservado (`data/external/`, ~1.4GB total — sem parser):**
+
+| Categoria | Tamanho | Conteudo |
+|---|---|---|
+| `manual-saves/` | 1.8MB | Inputs ativos pros 3 parsers manuais (parsavel) |
+| `openai-gdpr-export/{2026-03-27,2026-04-27}/` + `_archive/2026-04-27.zip` | 1.0GB | Exports GDPR oficiais OpenAI |
+| `chatgpt-extension-snapshot/2026-03-27/` | 51MB | conversations.json + memories.md + instructions.json |
+| `claude-ai-snapshots/{2026-03-26,2026-03-30,2026-04-18}/` | 360MB | snapshots brutos pre-extractor |
+| `deep-research-md/` | 208KB | 2 .md exportados manualmente (nao parsado — design adiado) |
+
+Todos preservados como blob. README em `data/external/README.md`.
+
+Backlog principal: **cross-plataforma overview** (`notebooks/00-overview.qmd`)
+agregando 10 sources via DuckDB UNION ALL. Pos-shipping: DVC pra dados grandes,
+publicacao opensource.
 
 ## Estado validado em 2026-04-28 — NAO refazer
 
