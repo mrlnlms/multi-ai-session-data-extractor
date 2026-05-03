@@ -8,13 +8,20 @@ NotebookLM. Esquema posicional Google batchexecute.
 | Tabela | acc-1 (en) | acc-2 (pt-BR) | Total |
 |---|---|---|---|
 | conversations | 95 | 48 | **143** |
-| messages | ~80 (system summaries) | ~41 | **121** |
-| sources | 974 | 199 | **1173** |
+| messages | ~95 (system summaries + chats) | ~43 | **138** |
+| sources | 975 | 199 | **1174** |
+| **source_guides** | 975 | 199 | **1174** ⭐ NOVO (RPC tr032e) |
 | outputs | ~270 (audio+blog+video+data table+slide+mind_map) | ~119 | **389** |
 | notes | ~190 | ~87 | **277** |
-| guide_questions | ~225 | ~138 | **363** |
+| guide_questions | ~270 | ~144 | **414** |
 | branches | 95 | 48 | **143** |
 | tool_events | 0 | 0 | 0 (chat populado raro) |
+
+**Pós CRUD UI bateria 2026-05-02:** delete preservou 1 notebook ("Westward
+Mushrooms"), rename atualizou title ("Heatmap Studies" → "Heatmap estudos"),
+add source incrementou sources acc-1 974→975. Pin **não existe upstream**.
+
+**Total parquets:** 9 (4 canônicos + 5 auxiliares).
 
 **Storage total:** ~2.5 GB (962M + 263M raw + 977M + 310M merged).
 

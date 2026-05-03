@@ -35,7 +35,8 @@ logger = logging.getLogger(__name__)
 #   v2: mapeia types 2/3/4/7/8/9 em gArtLc (antes tratava so types 1 e 8); adiciona
 #       v9rmvd (text artifacts) + CYK0Xb (mind map tree fetch). Pasta unica
 #       cumulativa per-account (sem subpastas dated).
-FEATURES_VERSION = 2
+#   v3: adiciona tr032e (source-level summary + tags + suggested questions).
+FEATURES_VERSION = 3
 
 FEATURE_FLAGS = {
     "rLM1Ne_metadata",
@@ -47,6 +48,7 @@ FEATURE_FLAGS = {
     "CYK0Xb_mind_map_tree",
     "hPTbtc_mind_map_uuid",
     "hizoJc_source_content",
+    "tr032e_source_guide",
 }
 
 DROP_THRESHOLD = 0.5  # current/previous → aborta se < threshold

@@ -83,7 +83,7 @@ def _build_minimal_merged():
     }
 
 
-def test_parser_generates_8_parquets(tmp_path):
+def test_parser_generates_9_parquets(tmp_path):
     parser = NotebookLMParser()
     parser.parse(_build_minimal_merged(), output_dir=tmp_path)
     expected = {
@@ -95,9 +95,34 @@ def test_parser_generates_8_parquets(tmp_path):
         "notebooklm_notes.parquet",
         "notebooklm_outputs.parquet",
         "notebooklm_guide_questions.parquet",
+        "notebooklm_source_guides.parquet",
     }
     files = {p.name for p in tmp_path.glob("*.parquet")}
     assert expected.issubset(files)
+
+
+def test_source_guides_parsed_when_present(tmp_path):
+    """Quando merged tem source_guides, parser popula notebooklm_source_guides.parquet."""
+    merged = _build_minimal_merged()
+    merged["source_guides"] = {
+        "src-uuid-1": {
+            "source_uuid": "src-uuid-1",
+            "raw": [[
+                [None,
+                 ["Resumo do PDF de teste."],
+                 [["TagA", "TagB"]],
+                 [["Pergunta 1?", "Pergunta 2?"]]],
+            ]],
+        }
+    }
+    parser = NotebookLMParser()
+    parser.parse(merged, output_dir=tmp_path)
+    df = pd.read_parquet(tmp_path / "notebooklm_source_guides.parquet")
+    assert len(df) == 1
+    assert df.iloc[0]["source_id"] == "src-uuid-1"
+    assert "Resumo" in df.iloc[0]["summary"]
+    assert "TagA" in df.iloc[0]["tags_json"]
+    assert "Pergunta" in df.iloc[0]["questions_json"]
 
 
 def test_conversation_per_notebook(tmp_path):

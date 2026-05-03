@@ -17,7 +17,7 @@ adaptar gotchas.
 | **Qwen** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **DeepSeek** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Gemini** | ✅ | ✅ | ✅ (multi-conta) | ✅ (per-account) | ✅ | ✅ | ✅ (3 docs: consolidado + per-account) |
-| NotebookLM | ✅ | ✅ | ❌ | ❌ | ⚠️ legacy | ❌ | ❌ |
+| NotebookLM | ✅ | ✅ | ✅ (multi-conta) | ✅ (per-account) | ✅ | ✅ | ✅ (3 docs: consolidado + per-account, 9 parquets) |
 
 **⚠️ legacy (NotebookLM):** existe `src/parsers/notebooklm.py` mas é o MVP do
 projeto-mãe (não no schema v3). Precisa rewrite — porém NotebookLM tem 9 tipos
@@ -292,7 +292,7 @@ tipos de output testam a robustez do schema.
 |---|---|---|---|---|
 | Perplexity | 1 dia | 0.5 dia | 1.5 dias | ✅ shipped 2026-05-01 |
 | Claude.ai | 3-5 dias | 0.5 dia | 3.5-5.5 dias | pendente |
-| NotebookLM | 3-4 dias | 0.5 dia | 3.5-4.5 dias | pendente |
+| NotebookLM | 3-4 dias | 0.5 dia | 3.5-4.5 dias | ✅ shipped 2026-05-02 |
 | Gemini | 1-2 dias | 0.5 dia | 1.5-2.5 dias | pendente |
 | Qwen | 1 dia | 0.5 dia | 1.5 dias | pendente |
 | DeepSeek | 1 dia | 0.5 dia | 1.5 dias | pendente |

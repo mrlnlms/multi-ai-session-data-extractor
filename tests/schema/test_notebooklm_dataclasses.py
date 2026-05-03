@@ -7,6 +7,7 @@ from src.schema.models import (
     NotebookLMNote, notebooklm_notes_to_df,
     NotebookLMOutput, notebooklm_outputs_to_df,
     NotebookLMGuideQuestion, notebooklm_guide_questions_to_df,
+    NotebookLMSourceGuide, notebooklm_source_guides_to_df,
     VALID_OUTPUT_TYPES,
 )
 
@@ -109,3 +110,42 @@ def test_guide_question_validates_source():
             question_id="q1", conversation_id="c1", source="invalid",
             account="1", question_text="?", full_prompt="?", order=0,
         )
+
+
+def test_notebooklm_source_guide_validates_source():
+    with pytest.raises(ValueError, match="source"):
+        NotebookLMSourceGuide(
+            source_id="s1", conversation_id="c1", source="invalid",
+            account="1", summary="x", tags_json=None, questions_json=None,
+        )
+
+
+def test_notebooklm_source_guide_valid():
+    g = NotebookLMSourceGuide(
+        source_id="src-1", conversation_id="account-1_nb1", source="notebooklm",
+        account="1",
+        summary="O documento detalha...",
+        tags_json='["Onboarding","NPS"]',
+        questions_json='["Q1?","Q2?"]',
+    )
+    assert g.summary.startswith("O documento")
+
+
+def test_source_guides_to_df_empty():
+    df = notebooklm_source_guides_to_df([])
+    assert "source_id" in df.columns
+    assert "summary" in df.columns
+    assert "tags_json" in df.columns
+    assert "questions_json" in df.columns
+
+
+def test_source_guides_to_df_with_rows():
+    g = NotebookLMSourceGuide(
+        source_id="src-1", conversation_id="account-1_nb1", source="notebooklm",
+        account="1", summary="Summary text",
+        tags_json='["a","b"]', questions_json='["q1"]',
+    )
+    df = notebooklm_source_guides_to_df([g])
+    assert len(df) == 1
+    assert df.iloc[0]["source_id"] == "src-1"
+    assert df.iloc[0]["summary"] == "Summary text"

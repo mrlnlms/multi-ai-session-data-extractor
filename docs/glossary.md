@@ -85,8 +85,8 @@ Etapa opcional que escaneia convs procurando mensagens de áudio (Voice Mode) cu
 ### Multi-account
 
 Plataformas onde o user tem **mais de uma conta** e queremos capturar todas
-juntas. Hoje só **Gemini** é multi-conta no projeto (2 contas Google em
-`.storage/gemini-profile-{1,2}/`).
+juntas. Hoje **Gemini** e **NotebookLM** são multi-conta no projeto (2 contas
+Google em `.storage/gemini-profile-{1,2}/` e `.storage/notebooklm-profile-{1,2}/`).
 
 Implicações arquiteturais:
 - Pasta única por conta: `data/raw/Gemini/account-{N}/` e `data/merged/Gemini/account-{N}/`
@@ -95,7 +95,28 @@ Implicações arquiteturais:
 - Dashboard (`_collect_logs()`) agrega capture/reconcile logs across `account-*/` subpastas
 - Quarto: 3 documentos (`gemini.qmd` consolidado com stacked bars por conta + `gemini-acc-1.qmd` e `gemini-acc-2.qmd` no template canônico filtrado)
 
-NotebookLM provavelmente também será multi-conta quando for implementado.
+## NotebookLM-specifics
+
+NotebookLM é a única plataforma que **não é chat puro** — cada notebook
+é um workspace que gera ate **9 tipos de outputs distintos**:
+
+1. **Audio overview** (.m4a) — type=1
+2. **Blog post** (markdown) — type=2
+3. **Video overview** (.mp4) — type=3
+4. **Flashcards/Quiz** (JSON) — type=4
+5. **Data table** (JSON) — type=7
+6. **Slide deck** (PDF + PPTX) — type=8
+7. **Infographic** (JSON) — type=9
+8. **Mind map** (tree JSON) — type=10 (custom)
+
+**Tabelas auxiliares NotebookLM-specific** no parquet:
+- `notebooklm_sources.parquet` — PDFs/links uploaded com texto extraído
+- `notebooklm_source_guides.parquet` — summary + tags + questions por source (RPC tr032e)
+- `notebooklm_notes.parquet` — notes/briefs gerados pela IA
+- `notebooklm_outputs.parquet` — os 9 tipos acima
+- `notebooklm_guide_questions.parquet` — perguntas sugeridas pelo guide
+
+Total: 9 parquets (4 canônicos + 5 auxiliares) — único caso no projeto.
 
 ---
 

@@ -89,9 +89,14 @@ trata com tabelas especificas, sem crise" (user, 2026-05-02).
 
 - **4 parquets canonicos** (Conversation, Message, ToolEvent, Branch) —
   garantem link com queries cross-plataforma do dashboard
-- **4 parquets auxiliares NotebookLM-specific** (sources, notes, outputs,
-  guide_questions) — semantica dedicada sem hack
-- **Total: 8 parquets**
+- **5 parquets auxiliares NotebookLM-specific** (sources, notes, outputs,
+  guide_questions, source_guides) — semantica dedicada sem hack
+- **Total: 9 parquets**
+
+**Update 2026-05-02 (pos-shipping):** RPC `tr032e` descoberto via probe
+Chrome MCP — retorna source-level summary + tags + suggested questions
+gerados pelo modelo. Adicionada 5a tabela auxiliar `notebooklm_source_guides.parquet`
++ dataclass `NotebookLMSourceGuide`. Total subiu de 8 pra 9 parquets.
 
 ### 4.2. Multi-conta — normalizar pra `account-{1,2}` (igual Gemini)
 
@@ -361,7 +366,7 @@ Flags:
 - `_parse_mind_map(uuid_raw, tree_raw)` — extrai estrutura tree de CYK0Xb
 - `_parse_source_content(raw)` — extrai texto de hizoJc
 
-Saida: 8 parquets em `data/processed/NotebookLM/`. Idempotente.
+Saida: 9 parquets em `data/processed/NotebookLM/`. Idempotente.
 
 Backup do legacy em `_backup-temp/parser-notebooklm-promocao-2026-05-02/`.
 
@@ -375,7 +380,7 @@ Backup do legacy em `_backup-temp/parser-notebooklm-promocao-2026-05-02/`.
 Cor primaria: **laranja Google `#F4B400`** (distinta das 6 ja usadas)
 
 Secoes:
-1. Dados disponiveis (counts dos 8 parquets)
+1. Dados disponiveis (counts dos 9 parquets)
 2. Cobertura (% notebooks com cada tipo de artifact)
 3. Volumes (top notebooks por tamanho/atividade)
 4. **9 tipos de outputs** (distribuicao + amostras)
@@ -424,7 +429,7 @@ Aplicar **desde o primeiro commit** — nao esperar review pegar:
 - [ ] CLAUDE.md atualizado (tabela §1 + bloco "Estado validado")
 - [ ] Empirical findings doc (`docs/notebooklm-probe-findings-2026-05-XX.md`)
 - [ ] Server behavior doc (`docs/notebooklm-server-behavior.md`)
-- [ ] Tests parser-specific cobrindo 8 parquets
+- [ ] Tests parser-specific cobrindo 9 parquets
 - [ ] Review cruzado (`project-hardening` fase 5+6): zero achados
 - [ ] Suite total >= 320 + N parser tests
 
@@ -462,7 +467,7 @@ Aplicar **desde o primeiro commit** — nao esperar review pegar:
 | 7 | Build `scripts/notebooklm-sync.py` | 0.25 dia |
 | 8 | Run full sync (2 contas) — pode demorar com binarios | 0.5 dia |
 | 9 | Empirical findings + server behavior docs | 0.5 dia |
-| 10 | Parser v3 (8 parquets) + helpers + tests | 1.5 dias |
+| 10 | Parser v3 (9 parquets) + helpers + tests | 1.5 dias |
 | 11 | Quarto descritivo (3 docs) | 0.5 dia |
 | 12 | Bateria CRUD UI + ajustes | 0.25 dia |
 | 13 | Review cruzado + CLAUDE.md update | 0.25 dia |
