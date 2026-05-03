@@ -30,9 +30,24 @@ def test_eq_lenient_timestamps_treated_equal():
     assert _eq_lenient(a, b) is True
 
 
-def test_eq_lenient_none_compatible_with_anything():
-    assert _eq_lenient(None, "x") is True
-    assert _eq_lenient([], None) is True
+def test_eq_lenient_both_none_equal():
+    """Ambos None: equivalentes."""
+    assert _eq_lenient(None, None) is True
+
+
+def test_eq_lenient_none_vs_populated_differs():
+    """None vs populado: diferente — força refetch (regressão fix 2026-05-03).
+
+    Bug histórico: retornava True pra QUALQUER lado None, fazendo notebook
+    que ganhou chat/guide/mind_map novo virar to_copy ao invés de to_use.
+    """
+    assert _eq_lenient(None, "x") is False
+    assert _eq_lenient([], None) is False
+    assert _eq_lenient(None, [["chat turn"]]) is False
+    # Caso real: notebook com chat=None que ganhou turns
+    prev = {"metadata": [["x"]], "chat": None}
+    curr = {"metadata": [["x"]], "chat": [["new turn"]]}
+    assert _eq_lenient(prev, curr) is False
 
 
 def test_eq_lenient_real_diff_detected():

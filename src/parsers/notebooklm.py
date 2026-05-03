@@ -1,9 +1,9 @@
 """Parser canonico v3 pra NotebookLM.
 
-Le merged em data/merged/NotebookLM/account-{N}/ e gera 8 parquets em
+Le merged em data/merged/NotebookLM/account-{N}/ e gera 9 parquets em
 data/processed/NotebookLM/:
 - 4 canonicos (conversations, messages, tool_events, branches)
-- 4 auxiliares (sources, notes, outputs, guide_questions)
+- 5 auxiliares (sources, notes, outputs, guide_questions, source_guides)
 
 Schema canonico em src/schema/models.py.
 

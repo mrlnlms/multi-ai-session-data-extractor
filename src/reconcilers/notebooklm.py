@@ -108,9 +108,21 @@ def _strip_timestamps(x):
 
 
 def _eq_lenient(a, b) -> bool:
-    """Comparacao recursiva tolerante a timestamps + None."""
-    if a is None or b is None:
+    """Comparacao recursiva tolerante a timestamps voláteis.
+
+    Semântica de None:
+    - `None == None`: True (ambos vazios)
+    - `None vs populado`: False (conteúdo divergente — força refetch)
+
+    Bug histórico (corrigido 2026-05-03 via cross-review): versão anterior
+    retornava True pra QUALQUER lado None, fazendo notebook que ganhou
+    chat/guide/mind_map novo virar `to_copy` em vez de `to_use` — perda
+    silenciosa de dados novos no merged.
+    """
+    if a is None and b is None:
         return True
+    if a is None or b is None:
+        return False
     if (isinstance(a, list) and isinstance(b, list)
             and len(a) == 2 and len(b) == 2
             and all(isinstance(x, int) for x in a)
