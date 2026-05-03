@@ -72,9 +72,9 @@ Lista de imports pendentes em `memory/project_pending_imports_from_old.md`.
 
 | CLI | Source | Copy script | Parser v3 | Status |
 |---|---|---|---|---|
-| Claude Code | claude_code | ✅ `cli-copy.py --source claude_code` | ✅ shipped 2026-05-03 | 3742 convs / 136k msgs / 78k tool_events / 3742 branches (snapshot atual `~/.claude/projects/`); cross-validacao 1:1 vs pai = v3 ⊇ pai estritamente (+271 msgs, +6k tool_events) |
-| Codex | codex | ✅ `cli-copy.py --source codex` | ⏳ pendente | dados em `data/raw/Codex/` |
-| Gemini CLI | gemini_cli | ✅ `cli-copy.py --source gemini_cli` | ⏳ pendente | dados em `data/raw/Gemini CLI/` |
+| Claude Code | claude_code | ✅ `cli-copy.py --source claude_code` | ✅ shipped 2026-05-03 | 3742 convs / 136k msgs / 78k tool_events / 3742 branches; cross-val 1:1 vs pai = v3 ⊇ pai (+271 msgs, +6k tool_events) |
+| Codex | codex | ✅ `cli-copy.py --source codex` | ✅ shipped 2026-05-03 | 112 convs / 2.6k msgs / 6.1k tool_events / 112 branches; cross-val 1:1 = EXATO match com pai |
+| Gemini CLI | gemini_cli | ✅ `cli-copy.py --source gemini_cli` | ✅ shipped 2026-05-03 | 12 convs / 181 msgs / 84 tool_events / 12 branches; cross-val 1:1 = +2 convs vs pai (v3 capta extras) |
 
 Backlog principal: bateria CRUD UI final pra NotebookLM. Pos-shipping: 7/7 plataformas verdes desbloqueia cross-plataforma overview + DVC pra dados grandes.
 
