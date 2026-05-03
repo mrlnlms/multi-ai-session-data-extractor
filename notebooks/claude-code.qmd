@@ -24,13 +24,13 @@ from itables import init_notebook_mode, show
 
 init_notebook_mode(all_interactive=False)
 
+from src.parsers.quarto_helpers import setup_views_with_manual
 PROCESSED = _project_root / "data" / "processed" / "Claude Code"
 con = duckdb.connect()
-
-for table in ("conversations", "messages", "tool_events", "branches"):
-    p = PROCESSED / f"claude_code_{table}.parquet"
-    if p.exists():
-        con.execute(f"CREATE VIEW {table} AS SELECT * FROM read_parquet('{p}')")
+_views = setup_views_with_manual(
+    con, "claude_code", PROCESSED,
+    ["conversations", "messages", "tool_events", "branches"],
+)
 
 # Anthropic dev palette: roxo escuro
 SOURCE_COLOR = "#7C3AED"

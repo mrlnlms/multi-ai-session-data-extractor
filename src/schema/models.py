@@ -40,6 +40,13 @@ class Conversation:
     # parser v3.1 (Claude.ai gap-fill)
     summary: Optional[str] = None
     settings_json: Optional[str] = None
+    # provenance: como esse dado foi capturado.
+    # 'extractor' (default): captura automatica via Playwright/CLI/API
+    # 'manual_clipping_obsidian': clip do Obsidian Web Clipper
+    # 'manual_copypaste': copy-paste manual de webpage
+    # 'manual_terminal_cc': output renderizado do terminal Claude Code
+    # 'external_gdpr': export GDPR oficial (futuro)
+    capture_method: str = "extractor"
 
     def __post_init__(self):
         if self.source not in VALID_SOURCES:

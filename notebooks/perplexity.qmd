@@ -25,12 +25,13 @@ from itables import init_notebook_mode, show
 init_notebook_mode(all_interactive=False)
 
 # --- DuckDB sobre os parquets ---
+from src.parsers.quarto_helpers import setup_views_with_manual
 PROCESSED = _project_root / "data" / "processed" / "Perplexity"
 con = duckdb.connect()
-for table in ("conversations", "messages", "tool_events", "branches"):
-    con.execute(
-        f"CREATE VIEW {table} AS SELECT * FROM read_parquet('{PROCESSED}/perplexity_{table}.parquet')"
-    )
+_views = setup_views_with_manual(
+    con, "perplexity", PROCESSED,
+    ["conversations", "messages", "tool_events", "branches"],
+)
 
 # --- Constantes visuais ---
 SOURCE_COLOR = "#20808D"  # Perplexity teal
