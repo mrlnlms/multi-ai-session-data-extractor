@@ -32,21 +32,31 @@ def quarto_installed() -> bool:
     return shutil.which("quarto") is not None
 
 
+def _slug(platform: str) -> str:
+    """Normaliza nome da plataforma pra filename: lowercase + `.`/space → `-`.
+
+    'ChatGPT' → 'chatgpt'
+    'Claude.ai' → 'claude-ai'
+    'Claude Code' → 'claude-code'
+    'Gemini CLI' → 'gemini-cli'
+    """
+    return platform.lower().replace(".", "-").replace(" ", "-")
+
+
 def qmd_path(platform: str) -> Path:
-    """Path do .qmd consolidado da plataforma. Convencao: notebooks/<lowercase>.qmd."""
-    return NOTEBOOKS_DIR / f"{platform.lower()}.qmd"
+    """Path do .qmd consolidado da plataforma. Convencao: notebooks/<slug>.qmd."""
+    return NOTEBOOKS_DIR / f"{_slug(platform)}.qmd"
 
 
 def qmd_paths_per_account(platform: str) -> list[tuple[str, Path]]:
     """Lista de (account_label, qmd_path) pros .qmd per-account existentes.
 
-    Convencao: notebooks/<lowercase>-acc-{N}.qmd. Retorna so os que existem.
+    Convencao: notebooks/<slug>-acc-{N}.qmd. Retorna so os que existem.
     Plataformas multi-account hoje: Gemini (acc-1, acc-2), NotebookLM (acc-1, acc-2).
     """
-    base = platform.lower()
+    base = _slug(platform)
     out = []
     for cand in sorted(NOTEBOOKS_DIR.glob(f"{base}-acc-*.qmd")):
-        # extrai label apos `<base>-`
         label = cand.stem[len(base) + 1:]  # ex: 'acc-1'
         out.append((label, cand))
     return out
@@ -54,7 +64,7 @@ def qmd_paths_per_account(platform: str) -> list[tuple[str, Path]]:
 
 def html_output_path(platform: str) -> Path:
     """Path do HTML rendirizado pelo Quarto."""
-    return QUARTO_OUTPUT_DIR / f"{platform.lower()}.html"
+    return QUARTO_OUTPUT_DIR / f"{_slug(platform)}.html"
 
 
 def html_output_path_for_qmd(qmd: Path) -> Path:
@@ -64,7 +74,7 @@ def html_output_path_for_qmd(qmd: Path) -> Path:
 
 def html_static_path(platform: str) -> Path:
     """Path do HTML servido pelo Streamlit (em static/)."""
-    return STATIC_DIR / QUARTO_STATIC_SUBDIR / f"{platform.lower()}.html"
+    return STATIC_DIR / QUARTO_STATIC_SUBDIR / f"{_slug(platform)}.html"
 
 
 def html_static_path_for_qmd(qmd: Path) -> Path:
@@ -78,7 +88,7 @@ def streamlit_static_url(platform: str) -> str:
     Streamlit serve PROJECT_ROOT/static/ via /app/static/. Link relativo
     funciona dentro do dashboard.
     """
-    return f"/app/static/{QUARTO_STATIC_SUBDIR}/{platform.lower()}.html"
+    return f"/app/static/{QUARTO_STATIC_SUBDIR}/{_slug(platform)}.html"
 
 
 def streamlit_static_url_for_qmd(qmd: Path) -> str:

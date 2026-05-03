@@ -1,0 +1,343 @@
+---
+title: "Claude Code — Data Profile"
+subtitle: "Catalogo descritivo dos 4 parquets do parser canonico v3 (CLI local)"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+
+import sys
+from pathlib import Path
+
+_this = Path.cwd()
+_project_root = _this if (_this / "src").exists() else _this.parent
+sys.path.insert(0, str(_project_root))
+
+import json
+import pandas as pd
+import duckdb
+import plotly.graph_objects as go
+import plotly.express as px
+from itables import init_notebook_mode, show
+
+init_notebook_mode(all_interactive=False)
+
+PROCESSED = _project_root / "data" / "processed" / "Claude Code"
+con = duckdb.connect()
+
+for table in ("conversations", "messages", "tool_events", "branches"):
+    p = PROCESSED / f"claude_code_{table}.parquet"
+    if p.exists():
+        con.execute(f"CREATE VIEW {table} AS SELECT * FROM read_parquet('{p}')")
+
+# Anthropic dev palette: roxo escuro
+SOURCE_COLOR = "#7C3AED"
+SECONDARY = "#5B21B6"
+ACCENT = "#A78BFA"
+MUTED = "#DDD6FE"
+
+
+def fmt_pct(n, total):
+    pct = n / total * 100 if total else 0
+    return f"{n:,}/{total:,} ({pct:.0f}%)"
+
+
+def show_df(df, **kwargs):
+    from IPython.display import display
+    display(df.style.hide(axis="index"))
+
+
+def plotly_bar(x, y, title, color=SOURCE_COLOR, height=350, orientation="v"):
+    if orientation == "h":
+        fig = go.Figure(go.Bar(y=x, x=y, marker_color=color, orientation="h"))
+    else:
+        fig = go.Figure(go.Bar(x=x, y=y, marker_color=color))
+    fig.update_layout(
+        title=title, height=height, template="plotly_white",
+        margin=dict(t=50, b=40, l=40, r=20),
+    )
+    return fig
+```
+
+# Visao geral
+
+```{python}
+#| label: overview
+
+totals = con.execute("""
+    SELECT
+        (SELECT COUNT(*) FROM conversations) AS conversations,
+        (SELECT COUNT(*) FROM messages) AS messages,
+        (SELECT COUNT(*) FROM tool_events) AS tool_events,
+        (SELECT COUNT(*) FROM branches) AS branches
+""").df()
+
+range_dt = con.execute("""
+    SELECT
+        MIN(created_at) AS oldest,
+        MAX(created_at) AS newest_created,
+        MAX(updated_at) AS newest_updated
+    FROM conversations
+""").df()
+
+show_df(pd.DataFrame([
+    {"Tabela": "conversations.parquet", "Rows": f"{totals['conversations'].iloc[0]:,}",
+     "Periodo": f"{range_dt['oldest'].iloc[0]:%Y-%m-%d} → {range_dt['newest_created'].iloc[0]:%Y-%m-%d}"},
+    {"Tabela": "messages.parquet", "Rows": f"{totals['messages'].iloc[0]:,}", "Periodo": "—"},
+    {"Tabela": "tool_events.parquet", "Rows": f"{totals['tool_events'].iloc[0]:,}", "Periodo": "—"},
+    {"Tabela": "branches.parquet", "Rows": f"{totals['branches'].iloc[0]:,}", "Periodo": "—"},
+]))
+```
+
+> **Sobre este documento.** Catalogo descritivo dos 4 parquets do Claude Code,
+> capturados via cópia incremental de `~/.claude/projects/`. Diferente das 7
+> plataformas web, CLI eh dado **local** — sem captura via Playwright.
+>
+> Source: `claude_code`. Mode: `cli`. Schema canonico v3 (Conversation +
+> Message + ToolEvent + Branch).
+>
+> Cada notebook do Claude Code eh uma sessao JSONL. Sessoes com `isSidechain=
+> True` sao filtradas. Subagents (sidechains) viram `interaction_type='ai_ai'`
+> com `parent_session_id` apontando pro main. 6 gotchas mapeados na
+> implementacao (content str|list, sessoes orfas via session-meta, etc).
+
+# 1. Cobertura
+
+## 1.1 Sessions: main vs subagent
+
+```{python}
+#| label: interaction-type
+
+it_dist = con.execute("""
+    SELECT interaction_type, COUNT(*) AS count
+    FROM conversations
+    GROUP BY interaction_type
+    ORDER BY count DESC
+""").df()
+
+show_df(it_dist)
+total = it_dist["count"].sum()
+fig = plotly_bar(
+    it_dist["interaction_type"].tolist(),
+    it_dist["count"].tolist(),
+    f"Sessions por tipo (de {total:,} totais)",
+    color=SOURCE_COLOR,
+)
+fig.show()
+```
+
+## 1.2 Stub parents (sessoes orfas)
+
+```{python}
+#| label: stub-parents
+
+stub_count = con.execute("""
+    SELECT COUNT(*) AS stubs
+    FROM conversations
+    WHERE title LIKE '[orphan parent%'
+""").df().iloc[0]["stubs"]
+total_convs = con.execute("SELECT COUNT(*) FROM conversations").df().iloc[0, 0]
+print(f"Sessoes orfas reconstruidas via session-meta: {fmt_pct(int(stub_count), int(total_convs))}")
+print()
+print("Sao sessoes onde o JSONL principal sumiu mas o session-meta sobreviveu —")
+print("recuperam first_prompt + stats reais.")
+```
+
+## 1.3 Cobertura de tools
+
+```{python}
+#| label: tools-coverage
+
+cov = con.execute("""
+    SELECT
+        COUNT(DISTINCT conversation_id) AS sessions_with_tools,
+        (SELECT COUNT(*) FROM conversations) AS total_sessions
+    FROM tool_events
+""").df()
+sw = int(cov["sessions_with_tools"].iloc[0])
+ts = int(cov["total_sessions"].iloc[0])
+print(f"Sessions com tool calls: {fmt_pct(sw, ts)}")
+
+cov_thinking = con.execute("""
+    SELECT COUNT(*) AS with_thinking
+    FROM messages
+    WHERE thinking IS NOT NULL AND role = 'assistant'
+""").df().iloc[0]["with_thinking"]
+total_asst = con.execute("SELECT COUNT(*) FROM messages WHERE role = 'assistant'").df().iloc[0, 0]
+print(f"Assistant msgs com thinking: {fmt_pct(int(cov_thinking), int(total_asst))}")
+```
+
+# 2. Volumes
+
+## 2.1 Timeline de criacao
+
+```{python}
+#| label: timeline
+
+months = con.execute("""
+    SELECT date_trunc('month', created_at) AS month, COUNT(*) AS count
+    FROM conversations
+    WHERE created_at IS NOT NULL
+    GROUP BY month
+    ORDER BY month
+""").df()
+
+if len(months):
+    fig = go.Figure(go.Bar(
+        x=months["month"], y=months["count"],
+        marker_color=SOURCE_COLOR,
+    ))
+    fig.update_layout(
+        title="Sessions Claude Code criadas por mes",
+        height=350, template="plotly_white",
+        margin=dict(t=50, b=40, l=40, r=20),
+        xaxis_title=None, yaxis_title="Sessions",
+    )
+    fig.show()
+```
+
+## 2.2 Top 10 sessions por mensagens
+
+```{python}
+#| label: top-sessions
+
+top = con.execute("""
+    SELECT conversation_id, title, message_count, project, model
+    FROM conversations
+    WHERE interaction_type = 'human_ai'
+    ORDER BY message_count DESC
+    LIMIT 10
+""").df()
+
+show_df(top)
+```
+
+# 3. Tool events (deep dive)
+
+## 3.1 Top tools usados
+
+```{python}
+#| label: top-tools
+
+top_tools = con.execute("""
+    SELECT tool_name, COUNT(*) AS calls,
+           SUM(CASE WHEN success THEN 1 ELSE 0 END) AS success_count,
+           SUM(CASE WHEN success = false THEN 1 ELSE 0 END) AS error_count
+    FROM tool_events
+    WHERE tool_name IS NOT NULL AND tool_name != ''
+    GROUP BY tool_name
+    ORDER BY calls DESC
+    LIMIT 15
+""").df()
+
+show_df(top_tools)
+
+if len(top_tools) > 0:
+    fig = plotly_bar(
+        top_tools["tool_name"].tolist()[::-1],
+        top_tools["calls"].tolist()[::-1],
+        f"Top {len(top_tools)} tools por chamadas",
+        color=SOURCE_COLOR, orientation="h", height=450,
+    )
+    fig.show()
+```
+
+## 3.2 Success rate global
+
+```{python}
+#| label: success-rate
+
+stats = con.execute("""
+    SELECT
+        SUM(CASE WHEN success THEN 1 ELSE 0 END) AS success_count,
+        SUM(CASE WHEN success = false THEN 1 ELSE 0 END) AS error_count,
+        SUM(CASE WHEN success IS NULL THEN 1 ELSE 0 END) AS unknown_count,
+        COUNT(*) AS total
+    FROM tool_events
+""").df().iloc[0]
+
+print(f"Success: {fmt_pct(int(stats['success_count']), int(stats['total']))}")
+print(f"Error:   {fmt_pct(int(stats['error_count']), int(stats['total']))}")
+print(f"Unknown: {fmt_pct(int(stats['unknown_count']), int(stats['total']))}")
+```
+
+# 4. Projects (cwd)
+
+```{python}
+#| label: projects
+
+projects = con.execute("""
+    SELECT project, COUNT(*) AS sessions,
+           SUM(message_count) AS total_msgs
+    FROM conversations
+    WHERE project IS NOT NULL AND interaction_type = 'human_ai'
+    GROUP BY project
+    ORDER BY sessions DESC
+    LIMIT 20
+""").df()
+
+show_df(projects)
+```
+
+# 5. Modelos usados
+
+```{python}
+#| label: models
+
+models = con.execute("""
+    SELECT model, COUNT(*) AS msg_count,
+           COUNT(DISTINCT conversation_id) AS sessions
+    FROM messages
+    WHERE model IS NOT NULL
+    GROUP BY model
+    ORDER BY msg_count DESC
+""").df()
+
+show_df(models)
+
+if len(models):
+    fig = plotly_bar(
+        models["model"].tolist(),
+        models["msg_count"].tolist(),
+        f"Mensagens por modelo (Claude Code mistura modelos na mesma sessao)",
+        color=SOURCE_COLOR, height=350,
+    )
+    fig.show()
+```
+
+# 6. Subagents (parent-child)
+
+```{python}
+#| label: subagents
+
+# Top 10 main sessions com mais subagents
+subs_per_parent = con.execute("""
+    SELECT parent_session_id, COUNT(*) AS num_subagents
+    FROM conversations
+    WHERE interaction_type = 'ai_ai' AND parent_session_id IS NOT NULL
+    GROUP BY parent_session_id
+    ORDER BY num_subagents DESC
+    LIMIT 10
+""").df()
+
+show_df(subs_per_parent)
+
+# Modelos mais usados em subagents
+sub_models = con.execute("""
+    SELECT m.model, COUNT(*) AS msg_count
+    FROM messages m
+    JOIN conversations c ON m.conversation_id = c.conversation_id
+    WHERE c.interaction_type = 'ai_ai' AND m.model IS NOT NULL
+    GROUP BY m.model
+    ORDER BY msg_count DESC
+""").df()
+
+print(f"\nModelos mais usados em subagents:")
+show_df(sub_models)
+```
+
+---
+
+**Render:** `QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/claude-code.qmd`
