@@ -25,6 +25,9 @@ KNOWN_PLATFORMS: list[str] = [
     "Qwen",
     "DeepSeek",
     "Perplexity",
+    "Claude Code",
+    "Codex",
+    "Gemini CLI",
 ]
 
 SCRIPT_PREFIX: dict[str, str] = {
@@ -35,6 +38,9 @@ SCRIPT_PREFIX: dict[str, str] = {
     "Qwen": "qwen",
     "DeepSeek": "deepseek",
     "Perplexity": "perplexity",
+    "Claude Code": "claude-code",
+    "Codex": "codex",
+    "Gemini CLI": "gemini-cli",
 }
 
 
