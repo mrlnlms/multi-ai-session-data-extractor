@@ -1,71 +1,72 @@
-# Perplexity — cobertura técnica
+# Perplexity — technical coverage
 
 ## Pipeline
 
-- **Pasta única cumulativa:** `data/raw/Perplexity/` e `data/merged/Perplexity/`.
-- **Sync orquestrador (2 etapas):** `scripts/perplexity-sync.py`
-  (capture + reconcile). Captura tudo num shot (sem etapa separada de
-  assets).
-- **Captura:** **headed** (Cloudflare 403 em headless — documentado por
-  design em `perplexity/api_client.py:12-13`).
-- **Auth:** profile persistente em `.storage/perplexity-profile-<conta>/`
-  (gerado via `scripts/perplexity-login.py`).
+- **Single cumulative folder:** `data/raw/Perplexity/` and `data/merged/Perplexity/`.
+- **Sync orchestrator (2 steps):** `scripts/perplexity-sync.py`
+  (capture + reconcile). Captures everything in one shot (no separate
+  asset step).
+- **Capture:** **headed** (Cloudflare 403 in headless — documented by
+  design in `perplexity/api_client.py:12-13`).
+- **Auth:** persistent profile in `.storage/perplexity-profile-<account>/`
+  (generated via `scripts/perplexity-login.py`).
 
-## Cobertura
+## Coverage
 
-Threads + spaces + pages (dentro de Bookmarks) + threads em spaces +
-files de space + assets/artifacts metadata + assets binários + thread
-attachments (com manifest `failed_upstream_deleted` para S3 cleanup
-upstream) + user metadata (info, settings, ai_profile).
+Threads + spaces + pages (inside Bookmarks) + threads in spaces +
+space files + assets/artifacts metadata + binary assets + thread
+attachments (with `failed_upstream_deleted` manifest for upstream S3
+cleanup) + user metadata (info, settings, ai_profile).
 
-Reconciler: preservation completa (orphans + ENTRY_DELETED), idempotente.
-Saída em `data/merged/Perplexity/perplexity_merged_summary.json` +
+Reconciler: full preservation (orphans + ENTRY_DELETED), idempotent.
+Output in `data/merged/Perplexity/perplexity_merged_summary.json` +
 `LAST_RECONCILE.md` + `reconcile_log.jsonl`.
 
-### Volume de referência
+### Reference volume
 
 - 82 conversations (~41 copilot + ~37 concise + 4 research/pages).
 - 374 messages.
 - 2312 tool_events (2134 search_result + 168 media_reference + 9 asset_generation).
 - 81 branches.
 
-## Parser canônico
+## Canonical parser
 
 `src/parsers/perplexity.py`:
 
-- Pages tem `conversation_id='page:<slug>'`.
-- Search results extraídos de `blocks[*].web_result_block.web_results`.
-- Idempotente (~1s pra rodar).
+- Pages have `conversation_id='page:<slug>'`.
+- Search results extracted from `blocks[*].web_result_block.web_results`.
+- Idempotent (~1s to run).
 
-## Quarto descritivo
+## Descriptive Quarto
 
-`notebooks/perplexity.qmd`: 22MB HTML self-contained.
+`notebooks/perplexity.qmd`: 22MB self-contained HTML.
 
-## Bateria UI + probe Chrome MCP — gaps fechados
+## UI battery + Chrome MCP probe — gaps closed
 
-- **Pin de thread em library:** bug em `list_all_threads` (`seen` como
-  `set` em vez de `dict`) descartava `is_pinned: true` quando thread já
-  aparecia em `list_ask_threads`. Fix: merge dict-based propaga flag.
-- **Skills em spaces:** endpoint
-  `/rest/skills?scope=collection&scope_id=<UUID>` descoberto via probe
+- **Thread pin in library:** bug in `list_all_threads` (`seen` as a
+  `set` instead of `dict`) discarded `is_pinned: true` when the thread
+  already appeared in `list_ask_threads`. Fix: dict-based merge
+  propagates the flag.
+- **Skills in spaces:** endpoint
+  `/rest/skills?scope=collection&scope_id=<UUID>` discovered via probe
   (scope enum: `global`/`organization`/`collection`/`individual`).
-  Implementado `list_collection_skills` + `list_user_skills`.
-- **Archive de thread: Enterprise-only** (ver
+  Implemented `list_collection_skills` + `list_user_skills`.
+- **Thread archive: Enterprise-only** (see
   [LIMITATIONS.md](../../LIMITATIONS.md#perplexity)).
-- **Voice em Perplexity:** comportamento upstream (servidor transcreve
-  e descarta áudio).
+- **Voice in Perplexity:** upstream behavior (server transcribes and
+  discards audio).
 
-## Comportamento do servidor
+## Server behavior
 
-- Rename bumpa `last_query_datetime` (igual ChatGPT).
-- Delete via menu = ENTRY_DELETED some de tudo.
-- Threads antigas em space podem virar orphan se deletadas.
+- Rename bumps `last_query_datetime` (same as ChatGPT).
+- Delete via menu = ENTRY_DELETED disappears from everywhere.
+- Old threads in a space can become orphans if deleted.
 
-## Documentos relacionados
+## Related documents
 
-- Probes: 7 scripts em `scripts/perplexity-probe-*.py`.
+- Probes: 7 scripts in `scripts/perplexity-probe-*.py`.
 
-## Comandos
+## Commands
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/perplexity-sync.py

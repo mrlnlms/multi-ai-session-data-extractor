@@ -1,207 +1,207 @@
-# Limitações conhecidas
+# Known limitations
 
-Lista honesta do que **não funciona** ou **não foi validado**. Atualizada
-em 2026-05-04.
+Honest list of what **does not work** or **has not been validated**. Updated
+on 2026-05-04.
 
-Limitações se dividem em 3 categorias:
+Limitations fall into 3 categories:
 
-- **Upstream** — a plataforma não expõe a feature; sem o que fazer no
-  nosso lado.
-- **Cobertura adicional pendente** — a feature existe, mas precisa de
-  trabalho de mapeamento (probe ao vivo na plataforma).
-- **Cobertura de testes** — o código funciona empiricamente mas há gaps
-  de teste automatizado.
+- **Upstream** — the platform doesn't expose the feature; nothing we
+  can do on our side.
+- **Additional pending coverage** — the feature exists but needs
+  mapping work (live probe on the platform).
+- **Test coverage** — the code works empirically but there are gaps
+  in automated testing.
 
-## Por plataforma
+## Per platform
 
 ### ChatGPT
 
-- **Voice — 97% das transcrições já capturadas via Pass 1.** 127 de 131
-  voice messages têm texto da transcrição populado (via raw heuristic
-  detectando `audio_transcription` em parts). 4 messages voice ficam
-  com texto vazio (edge cases — transcrição falhou upstream). O Pass 2
-  via DOM scraping (`src/extractors/chatgpt/dom_voice.py`) existe mas
-  não é necessário pra essa cobertura — over-engineering pros 4 casos
-  remanescentes.
-- **8 assets irrecuperáveis:** alguns assets antigos não estão mais
-  disponíveis no servidor (parents foram apagados). Documentado como
-  "failed=8" no download — não é bug.
+- **Voice — 97% of transcripts already captured via Pass 1.** 127 of 131
+  voice messages have transcript text populated (via raw heuristic
+  detecting `audio_transcription` in parts). 4 voice messages end up
+  with empty text (edge cases — transcription failed upstream). The Pass 2
+  via DOM scraping (`src/extractors/chatgpt/dom_voice.py`) exists but
+  is not necessary for this coverage — over-engineering for the 4
+  remaining cases.
+- **8 unrecoverable assets:** some old assets are no longer
+  available on the server (parents were deleted). Documented as
+  "failed=8" in the download — not a bug.
 
 ### Claude.ai
 
-- **`is_archived` — sempre None:** Claude.ai não expõe esse campo em
-  nenhum endpoint visível. Pra distinguir "não está arquivado" de
-  "informação não disponível", o parser usa `None` em vez de `False`.
+- **`is_archived` — always None:** Claude.ai does not expose this field on
+  any visible endpoint. To distinguish "not archived" from
+  "information not available", the parser uses `None` instead of `False`.
 
 ### Perplexity
 
-- **Archive — Enterprise-only:** o backend aceita os requests
-  `archive_thread`/`unarchive_thread` em contas Pro (200 success), mas
-  o estado archived **não é exposto** em nenhum listing visível em
-  Pro/free. Listar threads arquivadas só funciona em conta Enterprise
-  (gated por Cloudflare Access). Pra contas Pro, archive é no-op
-  observável — não é gap do extractor.
-- **Voice em Perplexity** — o servidor transcreve e descarta o áudio,
-  sem `is_voice` no schema. Não há como saber retroativamente se uma
-  mensagem foi originalmente de voz.
-- **Attachments antigos no S3 expiram.** Perplexity faz cleanup
-  automático de uploads antigos no S3. Manifest preserva os entries
-  como `failed_upstream_deleted` pra idempotência (skip em re-runs).
-  Equivalente aos 8 assets ChatGPT antigos com parents deletados.
-- **Slugs de Page não estão no DOM inicial.** Perplexity é SPA Vite com
-  router programático (`router.push` no onClick). Pages exigem DOM-click
-  programático com `expect_navigation` pra extrair slugs. Custo: ~10s
-  por page. Aceitável pra volumes baixos.
-- **1 thread orphan em GAS:** a thread `d344c501` é referenciada num
-  space mas foi deletada do servidor. Preservada localmente como
+- **Archive — Enterprise-only:** the backend accepts the
+  `archive_thread`/`unarchive_thread` requests on Pro accounts (200 success), but
+  the archived state **is not exposed** on any listing visible on
+  Pro/free. Listing archived threads only works on Enterprise accounts
+  (gated by Cloudflare Access). For Pro accounts, archive is an observable
+  no-op — not an extractor gap.
+- **Voice on Perplexity** — the server transcribes and discards the audio,
+  with no `is_voice` in the schema. There's no way to tell retroactively whether a
+  message was originally voice.
+- **Old attachments on S3 expire.** Perplexity does automatic cleanup
+  of old uploads on S3. The manifest preserves the entries
+  as `failed_upstream_deleted` for idempotency (skip on re-runs).
+  Equivalent to the 8 old ChatGPT assets with deleted parents.
+- **Page slugs are not in the initial DOM.** Perplexity is a Vite SPA with
+  programmatic router (`router.push` on onClick). Pages require a
+  programmatic DOM-click with `expect_navigation` to extract slugs. Cost: ~10s
+  per page. Acceptable for low volumes.
+- **1 orphan thread on GAS:** thread `d344c501` is referenced in a
+  space but was deleted from the server. Preserved locally as
   `is_preserved_missing=True`.
 
-#### Pro/Max features não cobertas (TODO público pra contributors)
+#### Pro/Max features not covered (public TODO for contributors)
 
-Estas validações exigem conta Pro Max e ficam em aberto até alguém testar:
+These validations require a Pro Max account and remain open until someone tests:
 
 - **Computer mode (`mode=asi`)** — endpoint `/rest/spaces/{uuid}/tasks`
-  retorna `{tasks: []}` em conta Pro. Em Max: criar tarefa Computer e
-  capturar threads geradas + tasks armazenadas + possíveis novos
+  returns `{tasks: []}` on a Pro account. On Max: create a Computer task and
+  capture generated threads + stored tasks + possible new
   endpoints `/rest/computer/*`.
-- **Scheduled tasks** — botão "Scheduled" na home. Em Max: criar
-  agendamento e descobrir endpoint.
-- **Model council (Max tier)** — feature Max consulta múltiplos modelos
-  simultaneamente. Schema desconhecido. Captura cada modelo como
-  ToolEvent separado? Aggregação numa só assistant message?
-- **Modelos AI alternativos no listing** — Sonar / GPT / Gemini / Claude
-  / Kimi etc. Lockados em Pro. Em Max: trocar modelo na thread e validar
-  `display_model` na entry.
-- **Pages — criar uma própria.** Hoje capturamos pages bookmarkadas. Em
-  Pro: publicar thread COMO Page e descobrir slug + schema do article
-  gerado + diferenças vs pages bookmarkadas.
-- **Deep Research moderno.** Mode lockado em Pro. Em Max: validar se
-  mode na entry vem como `COPILOT` (legacy) ou tem novo nome
-  (`DEEP_RESEARCH`); se entry tem campos extras (multi-step, citations
-  expandidas).
+- **Scheduled tasks** — "Scheduled" button on the home. On Max: create
+  a schedule and discover the endpoint.
+- **Model council (Max tier)** — Max feature consults multiple models
+  simultaneously. Schema unknown. Capture each model as
+  a separate ToolEvent? Aggregate into a single assistant message?
+- **Alternative AI models in the listing** — Sonar / GPT / Gemini / Claude
+  / Kimi etc. Locked on Pro. On Max: switch model in the thread and validate
+  `display_model` in the entry.
+- **Pages — create one of your own.** Today we capture bookmarked pages. On
+  Pro: publish a thread AS a Page and discover the slug + schema of the
+  generated article + differences vs. bookmarked pages.
+- **Modern Deep Research.** Mode locked on Pro. On Max: validate whether
+  mode in the entry comes as `COPILOT` (legacy) or has a new name
+  (`DEEP_RESEARCH`); whether the entry has extra fields (multi-step, expanded
+  citations).
 
 ### Qwen
 
-- **Archive — no-op upstream:** o servidor aceita o request mas a flag
-  `archived` nunca persiste; `archived=True` nunca aparece em listings.
-  Mesmo padrão do Perplexity — não é gap do extractor.
-- **Temporary chats:** Qwen não tem essa feature. Campo `is_temporary`
-  fica `None`.
-- **`/v2/chats/archived` retorna sempre vazio** mesmo após archive
-  request. Documentado.
+- **Archive — upstream no-op:** the server accepts the request but the
+  `archived` flag never persists; `archived=True` never appears in listings.
+  Same pattern as Perplexity — not an extractor gap.
+- **Temporary chats:** Qwen does not have this feature. The `is_temporary`
+  field stays `None`.
+- **`/v2/chats/archived` always returns empty** even after archive
+  request. Documented.
 
 ### DeepSeek
 
-- **`is_archived` e `is_temporary` — sempre None:** DeepSeek não expõe
-  essas features. Padrão None (não False) pra deixar claro.
-- **`message_id` é INT local-por-conv (1-98):** não é UUID global. Pra
-  consolidação cross-platform, o `unify-parquets.py` usa PK composta
+- **`is_archived` and `is_temporary` — always None:** DeepSeek does not expose
+  these features. None pattern (not False) to make it clear.
+- **`message_id` is local-per-conv INT (1-98):** not a global UUID. For
+  cross-platform consolidation, `unify-parquets.py` uses composite PK
   `[source, conversation_id, message_id]`.
 
 ### Gemini
 
-- **Drafts/regenerate alternativos:** quando você regera uma resposta,
-  o estado anterior fica em `turn[1]` mas o parser v3 não captura — só
-  o estado ativo. (Backlog: implementar quando aparecer caso real
-  representativo.)
-- ~~**Search/grounding citations**~~ **FECHADO 2026-05-04**: tool events
-  tipo `search_result` são criados (1 por citation com URL, título,
-  snippet, favicon, deduplicados por URL). Também populam
-  `Message.citations_json` no parquet de mensagens. Base atual: 416
-  search results em 9 messages que usaram Deep Research.
-- **Share URL:** Gemini permite compartilhar uma conversa por URL
-  pública. Esse estado não é gravado no body da conv (o servidor gera a
-  URL e mantém isolada). Não é gap do extractor — não é capturável.
-- **Multi-conta:** suporte para 2 contas Google é hardcoded (acc-1, acc-2).
-  Para mais contas, seria necessário ajustar `gemini-sync.py` e o
-  template Quarto.
+- **Drafts/alternative regenerate:** when you regenerate a response,
+  the previous state stays in `turn[1]` but parser v3 does not capture it — only
+  the active state. (Backlog: implement when a representative real
+  case appears.)
+- ~~**Search/grounding citations**~~ **CLOSED 2026-05-04**: tool events
+  of type `search_result` are created (1 per citation with URL, title,
+  snippet, favicon, deduplicated by URL). They also populate
+  `Message.citations_json` in the messages parquet. Current base: 416
+  search results across 9 messages that used Deep Research.
+- **Share URL:** Gemini allows sharing a conversation via public URL.
+  This state is not recorded in the conversation body (the server generates the
+  URL and keeps it isolated). Not an extractor gap — not capturable.
+- **Multi-account:** support for 2 Google accounts is hardcoded (acc-1, acc-2).
+  For more accounts, you would need to adjust `gemini-sync.py` and the
+  Quarto template.
 
 ### NotebookLM
 
-- **Não tem feature de pin** upstream — campo `is_pinned` fica `None`.
-- **`update_time` no listing é volátil** — o servidor reindexa
-  periodicamente e bumpa o timestamp sem mudança real de conteúdo. O
-  reconciler usa hash semântico (não timestamp) pra decidir refetch —
-  comportamento já mitigado por design.
-- **Mind map — 75 de 141 com tree completa.** A tree hierárquica
-  (root + children recursivo) é baixada pelo extractor em
-  `data/raw/NotebookLM/account-{N}/assets/mind_maps/<nb>_<mm>.json` e
-  populada em `notebooklm_outputs.parquet` campo `content` (até 75KB
-  de hierarquia). Os 66 mind maps restantes ficam com só metadata
-  porque o asset não foi baixado (regenerate upstream ou falha de
-  download — não bloqueante).
-- **Chat real — não é bug, é estado dos dados.** Dos 143 notebooks
-  atuais, 0 têm chat populado upstream (user não fez chats reais nos
-  notebooks). As 138 messages capturadas são `role=system`
-  (`guide.summary` virando seq=0). Quando você fizer chats reais no
-  futuro, parser tem placeholder em `_extract_chat_turns()` — pode
-  precisar mapear o schema posicional.
+- **No pin feature** upstream — `is_pinned` field stays `None`.
+- **`update_time` in the listing is volatile** — the server reindexes
+  periodically and bumps the timestamp without an actual content change. The
+  reconciler uses semantic hash (not timestamp) to decide refetch —
+  behavior already mitigated by design.
+- **Mind map — 75 of 141 with full tree.** The hierarchical tree
+  (root + recursive children) is downloaded by the extractor at
+  `data/raw/NotebookLM/account-{N}/assets/mind_maps/<nb>_<mm>.json` and
+  populated in `notebooklm_outputs.parquet` `content` field (up to 75KB
+  of hierarchy). The remaining 66 mind maps end up with metadata only
+  because the asset wasn't downloaded (upstream regenerate or download
+  failure — not blocking).
+- **Real chat — not a bug, it's the state of the data.** Of the 143 current
+  notebooks, 0 have chat populated upstream (the user did not have real
+  chats in the notebooks). The 138 captured messages are `role=system`
+  (`guide.summary` becoming seq=0). When you have real chats in the
+  future, the parser has a placeholder in `_extract_chat_turns()` — it may
+  need to map the positional schema.
 
 ### Claude Code (CLI)
 
-- **Não há features de pin/archive/temporary** — são CLI, sem servidor
-  com essas semânticas. Os campos ficam `None`.
-- **Sem reconciler dedicado:** preservation de arquivos é feita pelo
-  `cli-copy.py` (nunca deleta destino). O parser detecta
-  `is_preserved_missing=True` comparando `data/raw/Claude Code/` com
-  `~/.claude/projects/` atual.
-- **Sessões compactadas (`/compact`):** quando você usa `/compact`, a
-  thread continua num JSONL novo. O parser identifica e consolida via
-  `sessionId` interno (todos os JSONLs viram 1 Conversation com
-  `conv_id` = raiz da cadeia).
+- **No pin/archive/temporary features** — these are CLIs, no server
+  with those semantics. The fields stay `None`.
+- **No dedicated reconciler:** file preservation is done by
+  `cli-copy.py` (never deletes destination). The parser detects
+  `is_preserved_missing=True` by comparing `data/raw/Claude Code/` with
+  current `~/.claude/projects/`.
+- **Compacted sessions (`/compact`):** when you use `/compact`, the
+  thread continues in a new JSONL. The parser identifies and consolidates via
+  internal `sessionId` (all JSONLs become 1 Conversation with
+  `conv_id` = root of the chain).
 
 ### Codex (CLI)
 
-- Mesmas observações dos CLIs acima.
+- Same observations as the CLIs above.
 
 ### Gemini CLI
 
-- Mesmas observações dos CLIs acima.
-- **Snapshots periódicos:** o Gemini CLI grava múltiplos arquivos
-  `session-<timestamp>-<sid>.json` para a mesma sessão. O parser
-  consolida via `sessionId` com dedup por `message_id`.
+- Same observations as the CLIs above.
+- **Periodic snapshots:** Gemini CLI writes multiple
+  `session-<timestamp>-<sid>.json` files for the same session. The parser
+  consolidates via `sessionId` with dedup by `message_id`.
 
-## Cobertura de testes
+## Test coverage
 
-- **514 testes passando.** Cobre parsers (todos os 10), schema canônico,
-  helpers de notebook, unify, **reconcilers de todas as 7 plataformas
-  web** (smoke tests com fixtures: build_plan + run_reconciliation +
-  preservation + idempotência), **funções puras dos 6 extractors web**
-  (parsing, dedup, baseline de discovery, target_path, ext_from_url).
-- **CI roda em Ubuntu + macOS x Python 3.12/3.13** (4 combinações de
-  unit) + integration smoke (Quarto render + Playwright import + Streamlit
-  healthcheck + 10 imports de plataforma).
-- **HTTP/auth/Playwright dos extractors sem teste de unidade.** A lógica
-  é validada empiricamente nos syncs reais. Mockar Playwright/httpx é
-  caro (~20h de setup + frágil quando a plataforma muda). Caso valha,
-  ficar em backlog pra v1.0.
+- **514 tests passing.** Covers parsers (all 10), the canonical schema,
+  notebook helpers, unify, **reconcilers for all 7 web platforms**
+  (smoke tests with fixtures: build_plan + run_reconciliation +
+  preservation + idempotency), **pure functions of the 6 web extractors**
+  (parsing, dedup, discovery baseline, target_path, ext_from_url).
+- **CI runs on Ubuntu + macOS x Python 3.12/3.13** (4 unit
+  combinations) + integration smoke (Quarto render + Playwright import + Streamlit
+  healthcheck + 10 platform imports).
+- **Extractors' HTTP/auth/Playwright without unit tests.** The logic
+  is validated empirically in real syncs. Mocking Playwright/httpx is
+  expensive (~20h of setup + fragile when the platform changes). If worth it,
+  on the v1.0 backlog.
 
-## Cobertura de ambiente
+## Environment coverage
 
-- **Línguas testadas:** en + pt-BR (NotebookLM acc-1/acc-2,
-  Gemini acc-1/acc-2). Outras línguas podem ter strings UI hardcoded em
-  probes (ex: "Deep Dive" / "Aprofundar" no NotebookLM) que não foram
-  exercitadas. Quando aparecer, é fix pontual.
-- **Account tiers testados:** Free / Pro. Enterprise / Team / Max não
-  validados (ver Perplexity Pro/Max acima como exemplo concreto). Schemas
-  canônicos têm os campos genéricos; ajustes finos quando contributor
-  com tier maior testar.
-- **Volume validado:** confirmado até ~140k mensagens (Claude Code) /
-  ~1.2GB raw (NotebookLM acc-1). Acima de ~500k mensagens, parsers que
-  carregam tudo em memória podem precisar de streaming chunked
-  (`pyarrow.ParquetWriter` em loop em vez de `to_parquet` direto). Não
-  é caso atual; refator quando alguém reportar.
+- **Languages tested:** en + pt-BR (NotebookLM acc-1/acc-2,
+  Gemini acc-1/acc-2). Other languages may have UI strings hardcoded in
+  probes (e.g. "Deep Dive" / "Aprofundar" in NotebookLM) that haven't been
+  exercised. When that comes up, it's a targeted fix.
+- **Account tiers tested:** Free / Pro. Enterprise / Team / Max not
+  validated (see Perplexity Pro/Max above as a concrete example). The canonical
+  schemas have the generic fields; fine-tuning when a contributor
+  with a higher tier tests.
+- **Volume validated:** confirmed up to ~140k messages (Claude Code) /
+  ~1.2GB raw (NotebookLM acc-1). Above ~500k messages, parsers that
+  load everything in memory may need chunked streaming
+  (`pyarrow.ParquetWriter` in a loop instead of `to_parquet` directly). Not
+  the current case; refactor when someone reports it.
 
-## Limitações operacionais
+## Operational limitations
 
-- **Windows não testado.** macOS e Linux funcionam.
-- **Python ≥3.12 requerido** (testado em 3.12 e 3.14).
-- **Captura headless (sem janela)** funciona em Claude.ai, Gemini,
-  NotebookLM, Qwen, DeepSeek. ChatGPT e Perplexity exigem janela
-  visível porque Cloudflare detecta clientes headless e bloqueia com
+- **Windows not tested.** macOS and Linux work.
+- **Python ≥3.12 required** (tested on 3.12 and 3.14).
+- **Headless capture (no window)** works on Claude.ai, Gemini,
+  NotebookLM, Qwen, DeepSeek. ChatGPT and Perplexity require a visible
+  window because Cloudflare detects headless clients and blocks them with
   HTTP 403.
-- **Profile/cookies** ficam em `.storage/<plat>-profile-<conta>/`. Esse
-  diretório é gitignored — nunca commitado. Se você apagar, precisa
-  refazer o login.
-- **Multi-conta:** apenas Gemini (2 contas) e NotebookLM (até 3 contas)
-  têm suporte explícito. Outras plataformas: 1 conta por instalação.
+- **Profile/cookies** live at `.storage/<plat>-profile-<account>/`. This
+  directory is gitignored — never committed. If you delete it, you need to
+  redo the login.
+- **Multi-account:** only Gemini (2 accounts) and NotebookLM (up to 3 accounts)
+  have explicit support. Other platforms: 1 account per installation.

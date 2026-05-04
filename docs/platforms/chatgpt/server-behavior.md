@@ -1,32 +1,34 @@
-# ChatGPT — comportamento do servidor (validado empiricamente)
+# ChatGPT — server behavior (empirically validated)
 
-## `update_time` em rename
+## `update_time` on rename
 
-Servidor BUMPA `update_time` pra hora atual quando renomeias conv pela
-sidebar. Validado em 2026-04-28 com 2 chats antigos (out/2025 e mai/2025) —
-ambos saltaram pra 2026-04-28 ao renomear. Implicacao: caminho incremental
-normal (`update_time > cutoff`) ja pega rename. Guardrail no
-`_filter_incremental_targets` (compara title da discovery vs prev_raw) eh
-defesa em profundidade caso comportamento mude.
+The server BUMPS `update_time` to the current time when you rename a conv
+from the sidebar. Validated on 2026-04-28 with 2 old chats (Oct/2025 and
+May/2025) — both jumped to 2026-04-28 on rename. Implication: the normal
+incremental path (`update_time > cutoff`) already catches renames. The
+guardrail in `_filter_incremental_targets` (compares discovery title vs
+prev_raw) is defense in depth in case the behavior changes.
 
-## Rename de project (nome do project_id, nao IDs)
+## Project rename (project_id name, not IDs)
 
-Sempre detectado via `project_names` re-fetched a cada run. Independente
-de `update_time`.
+Always detected via `project_names` re-fetched on every run. Independent
+of `update_time`.
 
-## `/projects` 404 intermitente
+## `/projects` intermittent 404
 
-Caller tem fallback automatico para `/gizmos/discovery/mine` -> DOM scrape.
-Fail-fast cobre quando todos os fallbacks falham juntos (raro).
+Caller has automatic fallback to `/gizmos/discovery/mine` -> DOM scrape.
+Fail-fast covers the case when all fallbacks fail together (rare).
 
-## O que NAO precisa ser feito (proposto e descartado em 27/abr)
+## What does NOT need to be done (proposed and discarded on Apr/27)
 
-- Re-mergear "do zero" varrendo `_backup-gpt/merged-*` — reconciler ja faz
-  preservation naturalmente, merged atual ja tem tudo.
-- Refatorar `asset_downloader.py` pra "pool cumulativo" — pasta unica
-  cumulativa + `skip_existing` resolve sem mexer no script.
-- Criar `chatgpt-reconcile-from-zero.py` ou similar — sync ja orquestra.
+- Re-merge "from scratch" by sweeping `_backup-gpt/merged-*` — the reconciler
+  already does preservation naturally, and the current merged already has
+  everything.
+- Refactor `asset_downloader.py` to a "cumulative pool" — the single
+  cumulative folder + `skip_existing` solves it without touching the script.
+- Create `chatgpt-reconcile-from-zero.py` or similar — sync already
+  orchestrates this.
 
-**Antes de criar QUALQUER script novo:** conferir se sync, scripts standalone
-existentes ou os helpers em `src/` ja resolvem. Se nao tiver certeza, ler
-codigo + memory antes de propor.
+**Before creating ANY new script:** check whether sync, existing standalone
+scripts, or the helpers in `src/` already solve it. If unsure, read code +
+memory before proposing.

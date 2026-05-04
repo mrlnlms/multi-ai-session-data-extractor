@@ -1,30 +1,30 @@
 ---
 name: Feature request
-about: Sugerir melhoria ou cobertura nova
+about: Suggest an improvement or new coverage
 title: "[feature] "
 labels: enhancement
 ---
 
-## O que
+## What
 
-<!-- Descrição curta. Plataforma, feature, escopo. -->
+<!-- Short description. Platform, feature, scope. -->
 
-## Por quê
+## Why
 
-<!-- O que isso resolve? Caso de uso real. -->
+<!-- What does this solve? Real use case. -->
 
-## Como
+## How
 
-<!-- Se já tem ideia da abordagem, descreve. Se não, ok deixar em aberto. -->
+<!-- If you already have an approach in mind, describe it. If not, it's fine to leave open. -->
 
-## Tipo
+## Type
 
-- [ ] Nova plataforma (ver [CONTRIBUTING.md](../../docs/CONTRIBUTING.md#adicionando-uma-plataforma-nova) — 8 fases)
-- [ ] Cobertura adicional em plataforma existente
-- [ ] Mudança no schema canônico (`src/schema/models.py` — breaking change)
-- [ ] Melhoria de doc / DX
-- [ ] Outro
+- [ ] New platform (see [CONTRIBUTING.md](../../docs/CONTRIBUTING.md#adding-a-new-platform) — 8 phases)
+- [ ] Additional coverage on an existing platform
+- [ ] Change to the canonical schema (`src/schema/models.py` — breaking change)
+- [ ] Doc / DX improvement
+- [ ] Other
 
-## Considerações
+## Considerations
 
-<!-- Já tentou algo? Conhece limitação upstream? Cita aqui. -->
+<!-- Already tried something? Know of an upstream limitation? Mention it here. -->

@@ -1,69 +1,69 @@
-# Qwen — cobertura técnica
+# Qwen — technical coverage
 
 ## Pipeline
 
-- **Pasta única cumulativa:** `data/raw/Qwen/` e `data/merged/Qwen/`.
-- **Sync orquestrador (2 etapas):** `scripts/qwen-sync.py` (capture +
+- **Single cumulative folder:** `data/raw/Qwen/` and `data/merged/Qwen/`.
+- **Sync orchestrator (2 steps):** `scripts/qwen-sync.py` (capture +
   reconcile).
-- **Captura headless.**
-- **Auth:** profile persistente em `.storage/qwen-profile-<conta>/`
-  (gerado via `scripts/qwen-login.py`).
+- **Headless capture.**
+- **Auth:** persistent profile in `.storage/qwen-profile-<account>/`
+  (generated via `scripts/qwen-login.py`).
 
-## Cobertura
+## Coverage
 
-Chats + projects + project files capturados. Reconciler v3
-(FEATURES_VERSION=2): preservation completa convs + projects.
+Chats + projects + project files captured. Reconciler v3
+(FEATURES_VERSION=2): full preservation for convs + projects.
 
-### Volume de referência
+### Reference volume
 
 - 115 chats / 3 projects / 4 project files.
-- 1.799 messages / 9 tool_events / 133 branches.
+- 1,799 messages / 9 tool_events / 133 branches.
 
-## Parser canônico
+## Canonical parser
 
 `src/parsers/qwen.py` + `_qwen_helpers.py`.
 
-### Cobertura
+### Coverage
 
-- **8 chat_types mapeados pra modes:** chat / search / research
+- **8 chat_types mapped to modes:** chat / search / research
   (deep_research) / dalle (t2i+t2v).
-- **Branches via DAG plano** (`parentId`/`childrenIds` + `currentId`).
-- **`reasoning_content` → `Message.thinking`** (raro — feature de
-  modelos QwQ-style, condicional).
-- **`search_results`** (de blocks `info.search_results`) → ToolEvent.
-- **t2i/t2v/artifacts** sempre emitem ToolEvent
+- **Branches via flat DAG** (`parentId`/`childrenIds` + `currentId`).
+- **`reasoning_content` → `Message.thinking`** (rare — feature of
+  QwQ-style models, conditional).
+- **`search_results`** (from `info.search_results` blocks) → ToolEvent.
+- **t2i/t2v/artifacts** always emit ToolEvent
   (`image/video_generation`, `artifact`).
 - **`pinned` → `is_pinned`** (cross-platform).
-- **`archived` → `is_archived`** (mas sempre False — ver
+- **`archived` → `is_archived`** (but always False — see
   [LIMITATIONS.md](../../LIMITATIONS.md#qwen)).
-- **`meta.tags` + `feature_config`** preservados em `settings_json`.
+- **`meta.tags` + `feature_config`** preserved in `settings_json`.
 - **`content_list[*].timestamp`** → `Message.start_timestamp`/`stop_timestamp`.
-- **Project com `custom_instruction`** + `_files` (presigned S3 URLs,
-  expiram 6h) → `project_metadata` + `project_docs` parquets.
+- **Project with `custom_instruction`** + `_files` (presigned S3 URLs,
+  expire in 6h) → `project_metadata` + `project_docs` parquets.
 
-## Asset download integrado
+## Integrated asset download
 
-`scripts/qwen-download-assets.py`. URLs em msgs/projects baixadas via
-manifest. Parser resolve `asset_paths` via `assets_manifest.json`.
+`scripts/qwen-download-assets.py`. URLs in msgs/projects downloaded via
+manifest. Parser resolves `asset_paths` via `assets_manifest.json`.
 
-## Quarto descritivo
+## Descriptive Quarto
 
-`notebooks/qwen.qmd`: 17MB HTML, render < 30s, cor primária roxo `#615CED`.
+`notebooks/qwen.qmd`: 17MB HTML, render < 30s, primary color purple `#615CED`.
 
-## Cenários CRUD validados
+## Validated CRUD scenarios
 
-| Cenário | Resultado |
+| Scenario | Result |
 |---|---|
-| Rename | title bate em parquet, `updated_at` bumpa |
-| Pin | `is_pinned=True`, `updated_at` bumpa |
-| Archive | no-op upstream em Pro/free (ver [LIMITATIONS.md](../../LIMITATIONS.md#qwen)) |
-| Delete | `is_preserved_missing=True`, `last_seen_in_server` preservado |
+| Rename | title matches in parquet, `updated_at` bumps |
+| Pin | `is_pinned=True`, `updated_at` bumps |
+| Archive | upstream no-op on Pro/free (see [LIMITATIONS.md](../../LIMITATIONS.md#qwen)) |
+| Delete | `is_preserved_missing=True`, `last_seen_in_server` preserved |
 
-## Documentos relacionados
+## Related documents
 
-- `docs/platforms/qwen/server-behavior.md` — comportamento upstream.
+- `docs/platforms/qwen/server-behavior.md` — upstream behavior.
 
-## Comandos
+## Commands
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/qwen-sync.py

@@ -4,60 +4,62 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Captura e arquivamento das suas próprias sessões em plataformas de AI
+Capture and archive your own sessions across AI platforms
 (ChatGPT, Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity)
-mais ferramentas de linha de comando (Claude Code, Codex, Gemini CLI).
-Os dados ficam preservados localmente em formato canônico (parquet),
-mesmo se você apagar do servidor.
+plus command-line tools (Claude Code, Codex, Gemini CLI).
+Data is preserved locally in canonical format (parquet),
+even if you delete it from the server.
 
-> **Esta ferramenta é para uso pessoal, com as suas próprias contas.**
-> Ela usa as APIs internas das plataformas autenticadas com cookies do
-> seu próprio login (acesso que você já tem). Não é uma ferramenta de
-> scraping de dados de outros usuários nem de bypass de termos de uso —
-> e não deve ser usada assim.
+> **This tool is for personal use, with your own accounts.**
+> It uses the platforms' internal APIs authenticated with cookies from
+> your own login (access you already have). It is not a tool for
+> scraping data from other users or for bypassing terms of use —
+> and should not be used that way.
 
-## O problema
+![Streamlit dashboard showing all 10 sources with green status, total counts, and cross-platform views](docs/img/quickstart-01-hero.png)
 
-Plataformas de AI têm exports oficiais limitados, frequentemente
-quebrados, sem garantia de retenção. Você não tem como saber se uma
-conversa antiga vai estar acessível daqui a 6 meses, ou se uma feature
-nova vai sumir levando dados junto.
+## The problem
 
-Este projeto resolve isso capturando tudo localmente:
+AI platforms have limited official exports, often broken, with no
+guarantee of retention. You have no way of knowing whether an old
+conversation will be accessible 6 months from now, or whether a new
+feature will disappear taking data with it.
 
-- Conversas, projects, knowledge files, artifacts (canvas, deep research
+This project solves that by capturing everything locally:
+
+- Conversations, projects, knowledge files, artifacts (canvas, deep research
   reports, slide decks)
-- Imagens geradas (DALL-E, Nano Banana), uploads do usuário, mind maps
-- Mensagens de voz (transcrições), thinking blocks (reasoning), tool calls
-- Chats deletados no servidor — preservados localmente para sempre
+- Generated images (DALL-E, Nano Banana), user uploads, mind maps
+- Voice messages (transcripts), thinking blocks (reasoning), tool calls
+- Chats deleted on the server — preserved locally forever
 
-Output em **parquet** (schema unificado entre todas as 10 fontes), pronto
-para análise em pandas/DuckDB/Quarto/o-que-você-preferir.
+Output in **parquet** (unified schema across all 10 sources), ready
+for analysis in pandas/DuckDB/Quarto/whatever you prefer.
 
-## Estado atual
+## Current status
 
-Todas as 10 fontes funcionam end-to-end — captura, consolidação,
-parsing canônico e visualização descritiva (Quarto):
+All 10 sources work end-to-end — capture, consolidation,
+canonical parsing, and descriptive visualization (Quarto):
 
-| Fonte | Tipo | Cobertura |
+| Source | Type | Coverage |
 |---|---|---|
 | **ChatGPT** | web | branches, voice, DALL-E, projects, custom GPT |
-| **Claude.ai** | web | thinking, tool use+MCP, project_docs com content inline |
-| **Perplexity** | web | threads + pages + spaces + 9 tipos de artifacts |
-| **Qwen** | web | 8 tipos de chat (search, research, dalle, etc), projects |
-| **DeepSeek** | web | R1 reasoning (thinking em ~31% das msgs), token usage |
-| **Gemini** | web | multi-conta (2 contas Google), 8 modelos |
-| **NotebookLM** | web | multi-conta (3), 9 tipos de outputs (audio, video, slide deck, etc) |
-| **Claude Code** | CLI | sessões locais (`~/.claude/projects/`), subagents |
-| **Codex** | CLI | sessões locais (`~/.codex/sessions/`), latência exata por tool call |
-| **Gemini CLI** | CLI | sessões locais (`~/.gemini/tmp/`) |
+| **Claude.ai** | web | thinking, tool use+MCP, project_docs with inline content |
+| **Perplexity** | web | threads + pages + spaces + 9 artifact types |
+| **Qwen** | web | 8 chat types (search, research, dalle, etc.), projects |
+| **DeepSeek** | web | R1 reasoning (thinking in ~31% of msgs), token usage |
+| **Gemini** | web | multi-account (2 Google accounts), 8 models |
+| **NotebookLM** | web | multi-account (3), 9 output types (audio, video, slide deck, etc.) |
+| **Claude Code** | CLI | local sessions (`~/.claude/projects/`), subagents |
+| **Codex** | CLI | local sessions (`~/.codex/sessions/`), exact latency per tool call |
+| **Gemini CLI** | CLI | local sessions (`~/.gemini/tmp/`) |
 
-**514 testes passando.** Limitações conhecidas e gaps documentados em
+**514 tests passing.** Known limitations and gaps documented in
 [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 
 ## Quickstart
 
-Pré-requisitos: Python ≥3.12, macOS ou Linux. Windows não testado.
+Prerequisites: Python ≥3.12, macOS or Linux. Windows not tested.
 
 ```bash
 git clone <repo>
@@ -68,151 +70,158 @@ pip install -e ".[dev]"
 playwright install chromium
 ```
 
-Login (1x por plataforma — abre navegador, você loga manualmente, fecha):
+Login (once per platform — opens a browser, you log in manually, close):
 
 ```bash
 python scripts/chatgpt-login.py
 ```
 
-Sync (captura + consolidação + parquet em 1 comando):
+Sync (capture + consolidation + parquet in 1 command):
 
 ```bash
 python scripts/chatgpt-sync.py
 ```
 
-Resultado:
+Result:
 
-- `data/raw/ChatGPT/` — captura crua (cumulativa, mantém binários)
-- `data/merged/ChatGPT/` — versão consolidada (mantém também conversas
-  apagadas do servidor)
-- `data/processed/ChatGPT/*.parquet` — formato canônico para análise
+- `data/raw/ChatGPT/` — raw capture (cumulative, keeps binaries)
+- `data/merged/ChatGPT/` — consolidated version (also keeps conversations
+  deleted from the server)
+- `data/processed/ChatGPT/*.parquet` — canonical format for analysis
 
-Repita os 2 comandos para outras plataformas (`claude-login.py`,
-`gemini-sync.py`, etc). Detalhes em [docs/SETUP.md](docs/SETUP.md).
+![ChatGPT platform drill-down — capture status, content metrics, monthly creation chart, models, projects, knowledge files, and reconcile history](docs/img/quickstart-02-platform.png)
 
-## Como funciona
+Repeat the 2 commands for other platforms (`claude-login.py`,
+`gemini-sync.py`, etc.). Details in [docs/SETUP.md](docs/SETUP.md).
+
+## How it works
 
 ```
 extractor → reconciler → parser → unify
    raw    →  merged    → processed (per-source) → unified (cross-source)
 ```
 
-1. **Extractor** baixa via API interna da plataforma (autenticada com seu
-   cookie).
-2. **Reconciler** consolida o que você capturou agora com o que já tinha
-   antes — preservando registros que sumiram do servidor.
-3. **Parser** converte o JSON cru em parquet com schema unificado:
-   `Conversation`, `Message`, `ToolEvent`, `Branch` (e algumas auxiliares
-   por plataforma — `ProjectDoc`, `NotebookLMOutput`, etc).
-4. **Unify** consolida os parquets das 10 fontes num único `data/unified/`
-   com 11 arquivos parquet (4 canônicos + 7 auxiliares), pronto para
-   análise cross-platform.
+1. **Extractor** downloads via the platform's internal API (authenticated
+   with your cookie).
+2. **Reconciler** consolidates what you just captured with what you
+   already had — preserving records that disappeared from the server.
+3. **Parser** converts the raw JSON into parquet with a unified schema:
+   `Conversation`, `Message`, `ToolEvent`, `Branch` (and a few auxiliaries
+   per platform — `ProjectDoc`, `NotebookLMOutput`, etc.).
+4. **Unify** consolidates the parquets from the 10 sources into a single
+   `data/unified/` with 11 parquet files (4 canonical + 7 auxiliaries),
+   ready for cross-platform analysis.
 
-Schema completo em `src/schema/models.py`. Glossário dos termos do
-projeto em [docs/glossary.md](docs/glossary.md).
+Full schema in `src/schema/models.py`. Glossary of project terms in
+[docs/glossary.md](docs/glossary.md).
 
-## Captura: navegador visível ou em segundo plano
+## Capture: visible browser or background
 
-Login é sempre com janela visível (1x por plataforma — você precisa logar
-manualmente). Captura depois disso varia:
+Login is always with a visible window (once per platform — you need to
+log in manually). Capture after that varies:
 
-| Plataforma | Captura |
+| Platform | Capture |
 |---|---|
-| Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek | Sem janela visível |
-| ChatGPT, Perplexity | Janela visível (Cloudflare detecta scraping sem janela) |
+| Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek | No visible window |
+| ChatGPT, Perplexity | Visible window (Cloudflare detects scraping without a window) |
 
-Se você rodar Claude.ai/Gemini/NotebookLM/Qwen/DeepSeek e ver janela
-abrir durante a captura: tem algo errado (provavelmente cookie expirou).
-Para ChatGPT/Perplexity: comportamento esperado.
+If you run Claude.ai/Gemini/NotebookLM/Qwen/DeepSeek and see a window
+open during capture: something is wrong (likely an expired cookie).
+For ChatGPT/Perplexity: expected behavior.
 
-## Comandos por plataforma
+## Commands per platform
 
-Cada plataforma tem 2-3 scripts em `scripts/`. Padrão:
+Each platform has 2-3 scripts in `scripts/`. Pattern:
 
 ```bash
-python scripts/<plat>-login.py    # 1x — login manual no navegador
-python scripts/<plat>-sync.py     # captura + consolidação
+python scripts/<plat>-login.py    # once — manual login in the browser
+python scripts/<plat>-sync.py     # capture + consolidation
 ```
 
-Flags consistentes em todos os syncs:
+Consistent flags across all syncs:
 
-- `--full` — força recaptura completa (pula o caminho incremental)
-- `--no-binaries` — pula download de assets (imagens, slide decks, etc)
-- `--no-reconcile` — pula a consolidação (só captura)
-- `--dry-run` — mostra o que faria sem executar
+- `--full` — force full recapture (skips the incremental path)
+- `--no-binaries` — skip asset downloads (images, slide decks, etc.)
+- `--no-reconcile` — skip consolidation (capture only)
+- `--dry-run` — show what would happen without executing
 
-Lista completa de comandos por plataforma:
+Full list of commands per platform:
 [docs/operations.md](docs/operations.md).
 
 ## Dashboard
 
-Visualização local em Streamlit — totais cross-platform, status por
-plataforma, links para os documentos descritivos:
+Local Streamlit visualization — cross-platform totals, per-platform
+status, links to the descriptive documents:
 
 ```bash
 PYTHONPATH=. streamlit run dashboard.py
 ```
 
-Abre em <http://localhost:8501>. Read-only sobre o que o sync produziu —
-não escreve nem edita.
+Opens at <http://localhost:8501>. Read-only over what sync produced —
+does not write or edit.
 
-Detalhes em [docs/dashboard/manual.md](docs/dashboard/manual.md).
+Details in [docs/dashboard/manual.md](docs/dashboard/manual.md).
 
-## Documentos descritivos (Quarto)
+## Descriptive documents (Quarto)
 
-14 documentos por plataforma + 4 visões cross-platform — schema dos
-dados, cobertura, distribuições, exemplos. Compartilham um template
-único para evitar duplicação.
+14 documents per platform + 4 cross-platform views — data schema,
+coverage, distributions, examples. They share a single template
+to avoid duplication.
 
 ```bash
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/chatgpt.qmd
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview.qmd
 ```
 
-Pra ver localmente os HTMLs gerados:
+![Cross-platform Quarto data profile — cumulative growth chart by platform and activity heatmap (hour × day) consolidating all 10 sources](docs/img/quickstart-03-quarto.png)
+
+To view the generated HTMLs locally:
 
 ```bash
 ./scripts/serve-qmds.sh open
 ```
 
-## Testes
+## Tests
 
 ```bash
-PYTHONPATH=. .venv/bin/pytest                    # tudo (514 testes, ~3s)
-PYTHONPATH=. .venv/bin/pytest tests/parsers/     # só parsers
+PYTHONPATH=. .venv/bin/pytest                    # everything (514 tests, ~3s)
+PYTHONPATH=. .venv/bin/pytest tests/parsers/     # parsers only
 ```
 
-## Documentação
+## Documentation
 
-- [docs/README.md](docs/README.md) — índice completo
-- [docs/SETUP.md](docs/SETUP.md) — setup detalhado, primeiro login,
-  troubleshooting
-- [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — gaps e limitações conhecidas
-- [docs/operations.md](docs/operations.md) — comandos comuns por plataforma
-- [docs/glossary.md](docs/glossary.md) — termos do projeto
-- [docs/platforms/](docs/platforms/) — comportamento empírico por plataforma
-- [docs/SECURITY.md](docs/SECURITY.md) — política de credenciais e ToS
-- [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — guia para contribuidores
+- [docs/README.md](docs/README.md) — full index
+- [docs/SETUP.md](docs/SETUP.md) — detailed setup, first login,
+  troubleshooting, optional DVC backup
+- [docs/dvc-runbook.md](docs/dvc-runbook.md) — DVC operational guide
+  (versioned vault for full recovery after deletion)
+- [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — known gaps and limitations
+- [docs/operations.md](docs/operations.md) — common commands per platform
+- [docs/glossary.md](docs/glossary.md) — project terms
+- [docs/platforms/](docs/platforms/) — empirical behavior per platform
+- [docs/SECURITY.md](docs/SECURITY.md) — credentials and ToS policy
+- [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — contributor guide
 
-## Princípios
+## Principles
 
-1. **Capturar uma vez, nunca rebaixar.** Quando algo é capturado,
-   permanece local. Reruns só baixam novidades.
-2. **Preservation acima de tudo.** Conversas/arquivos deletados no
-   servidor permanecem locais com flag `is_preserved_missing=True`.
-3. **Schema canônico é a fronteira.** Os parsers entregam parquet em
-   schema unificado; análise consome parquet. Não há vazamento de
-   particularidades de plataforma para a etapa de análise.
-4. **Aborto cedo em casos suspeitos.** Se a listagem inicial cair >20%
-   versus o histórico, o extractor aborta antes de gravar (proteção
-   contra capturas parciais que contaminariam a próxima rodada).
+1. **Capture once, never downgrade.** Once something is captured, it
+   stays local. Reruns only fetch new items.
+2. **Preservation above all.** Conversations/files deleted on the
+   server remain local with the `is_preserved_missing=True` flag.
+3. **The canonical schema is the boundary.** Parsers deliver parquet in
+   a unified schema; analysis consumes parquet. No platform
+   particularities leak into the analysis stage.
+4. **Abort early in suspicious cases.** If the initial listing drops
+   >20% versus history, the extractor aborts before writing
+   (protection against partial captures that would contaminate the
+   next run).
 
-## Licença
+## License
 
-MIT — ver [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
 
-## Contribuindo
+## Contributing
 
-Issues e PRs bem-vindos. Detalhes em
-[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md), incluindo o playbook de
-8 fases pra adicionar plataforma nova.
+Issues and PRs welcome. Details in
+[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md), including the 8-phase
+playbook for adding a new platform.

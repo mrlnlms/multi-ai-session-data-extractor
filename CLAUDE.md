@@ -115,8 +115,10 @@ todos resolvidos ou re-enquadrados apos validacao empirica:
    filho versiona pipeline completo (raw + merged + processed + unified +
    external) como cofre completo via gdrive. Pai consumira `processed/` e
    `unified/` via `dvc import-url`. Runbook em `docs/dvc-runbook.md`.
-3. **Pos-shipping:** publicacao opensource (sanitizar credenciais, README,
-   exemplos).
+3. ~~Pos-shipping: publicacao opensource~~ **SHIPPED 2026-05-04** — repo
+   publico no GitHub, README/SETUP/CONTRIBUTING/CI/badges/LICENSE,
+   secao DVC opcional documentada em `docs/SETUP.md` (contributors podem
+   usar proprio gdrive remote via `--local` overrides).
 
 ## Cross-feature checks (pin, archive, voice, share)
 
