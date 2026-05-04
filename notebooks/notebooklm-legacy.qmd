@@ -1,7 +1,7 @@
 ---
-title: "NotebookLM — account-1 — Data Profile"
-subtitle: "Catalogo descritivo dos parquets do parser v3 (so account-1, en)"
-source-title: "NotebookLM account-1"
+title: "NotebookLM — legacy more.design — Data Profile"
+subtitle: "Captura legacy de 2026-03-30 (conta extinta). Parquets _manual_ via parser legacy."
+source-title: "NotebookLM legacy more.design"
 jupyter: python3
 ---
 
@@ -27,22 +27,28 @@ from src.parsers.quarto_helpers import (
 )
 
 SOURCE_KEY     = "notebooklm"
-SOURCE_TITLE   = "NotebookLM (account-1)"
-SOURCE_COLOR   = "#F4B400"  # Google yellow/orange
+SOURCE_TITLE   = "NotebookLM (legacy more.design)"
+SOURCE_COLOR   = "#0F9D58"  # Google green (legacy)
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "NotebookLM"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
 AUX_TABLES     = ["sources", "notes", "outputs", "guide_questions", "source_guides"]
-ACCOUNT_FILTER = "1"
+ACCOUNT_FILTER = "3"  # account-3 = legacy more.design
 
 con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **NotebookLM account-1** (`hello.marlonlemes`, en). Vista filtrada da
-> pasta consolidada. Para visao das 3 contas: [`notebooklm.qmd`](notebooklm.html).
-> account-2: [`notebooklm-acc-2.qmd`](notebooklm-acc-2.html). legacy:
-> [`notebooklm-legacy.qmd`](notebooklm-legacy.html).
+> **NotebookLM legacy more.design.** Conta extinta (`more.design`, pt-BR),
+> capturada em 2026-03-30 pelo extractor antigo do projeto-mae. Snapshot
+> raw em `data/external/notebooklm-snapshots/more-design-2026-03-30/`,
+> parquets `notebooklm_manual_*.parquet` via parser legacy
+> (`capture_method = 'legacy_notebooklm_more_design'`). 11 notebooks /
+> 33 msgs / 27 outputs / 6 briefs.
+>
+> Para visao das 3 contas: [`notebooklm.qmd`](notebooklm.html).
+> account-1: [`notebooklm-acc-1.qmd`](notebooklm-acc-1.html). account-2:
+> [`notebooklm-acc-2.qmd`](notebooklm-acc-2.html).
 
 {{< include _template.qmd >}}
 

@@ -6,11 +6,17 @@ format:
   html:
     toc: true
     toc-depth: 3
+    toc-location: left
+    toc-title: "Conteudo"
     code-fold: true
     code-tools: true
     embed-resources: true
     css: _style.css
     theme: cosmo
+    grid:
+      sidebar-width: 240px
+      body-width: 900px
+      margin-width: 240px
 
 execute:
   echo: true

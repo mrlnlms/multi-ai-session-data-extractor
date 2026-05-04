@@ -1,0 +1,198 @@
+# 5. Tabelas auxiliares
+
+Algumas plataformas tem tabelas auxiliares alem das 4 canonicas
+(conversations / messages / tool_events / branches):
+
+- **NotebookLM**: sources, notes, outputs, guide_questions, source_guides
+- **Qwen / Claude.ai**: project_metadata, project_docs
+
+Esta secao itera sobre `AUX_TABLES` configurado no setup do notebook.
+
+```{python}
+#| label: aux-config
+
+# Config de schema/descricoes por aux table — fonte unica de verdade
+# Usado pra renderizar schema + sample padronizados.
+AUX_CONFIG = {
+    "sources": {
+        "title": "Sources (NotebookLM)",
+        "id_col": "doc_id",
+        "desc": "Sources de cada notebook NotebookLM (PDFs, URLs, texto). Reusa schema `ProjectDoc`.",
+        "fields": {
+            "doc_id": "ID unico do source",
+            "project_id": "Notebook que possui o source",
+            "file_name": "Nome do arquivo / titulo da URL",
+            "content": "Texto extraido do source",
+            "content_size": "Chars no content",
+            "estimated_token_count": "Tokens estimados",
+            "created_at": "Data de upload",
+        },
+    },
+    "notes": {
+        "title": "Notes (NotebookLM)",
+        "id_col": "note_id",
+        "desc": "Anotacoes do usuario no notebook. `kind` ∈ {note, brief}.",
+        "fields": {
+            "note_id": "ID unico",
+            "conversation_id": "Notebook que possui",
+            "account": "Conta",
+            "title": "Titulo da nota (raro)",
+            "content": "Texto da nota",
+            "kind": "note (manual) ou brief (gerado)",
+            "created_at": "Data de criacao",
+        },
+    },
+    "outputs": {
+        "title": "Outputs (NotebookLM)",
+        "id_col": "output_id",
+        "desc": "Artefatos gerados pelo notebook. 9 tipos: audio, blog, video, flashcards, quiz, data table, slide deck, infographic, mind map.",
+        "fields": {
+            "output_id": "ID unico",
+            "conversation_id": "Notebook que gerou",
+            "account": "Conta",
+            "output_type": "1=audio, 2=blog, 3=video, 4=flashcards, 7=table, 8=slides, 9=info, 10=mind",
+            "output_type_name": "Nome legivel do tipo",
+            "title": "Titulo do artefato",
+            "content": "Texto/markdown do output (quando aplicavel)",
+            "asset_path": "Path no disco do binario",
+            "created_at": "Data de geracao",
+        },
+    },
+    "guide_questions": {
+        "title": "Guide Questions (NotebookLM)",
+        "id_col": "question_id",
+        "desc": "Perguntas sugeridas pelo modelo no guide do notebook (3 por notebook).",
+        "fields": {
+            "question_id": "ID unico",
+            "conversation_id": "Notebook que possui",
+            "question_text": "Pergunta curta (label)",
+            "full_prompt": "Prompt completo enviado ao modelo",
+            "order": "Ordem (1, 2, 3)",
+        },
+    },
+    "source_guides": {
+        "title": "Source Guides (NotebookLM)",
+        "id_col": "source_id",
+        "desc": "Guide gerado pelo modelo POR SOURCE: summary + tags + suggested questions. Vem do RPC tr032e.",
+        "fields": {
+            "source_id": "ID do source",
+            "conversation_id": "Notebook do source",
+            "summary": "Resumo gerado (~800-1000 chars)",
+            "tags_json": "JSON list de tags",
+            "questions_json": "JSON list de perguntas sugeridas",
+        },
+    },
+    "project_metadata": {
+        "title": "Project Metadata (Qwen / Claude.ai)",
+        "id_col": "project_id",
+        "desc": "Metadados dos projetos (nome, instrucoes custom, contadores de docs/files).",
+        "fields": {
+            "project_id": "ID unico do projeto",
+            "name": "Nome do projeto",
+            "description": "Descricao (Claude.ai)",
+            "custom_instruction": "Instrucao custom (Qwen)",
+            "prompt_template": "System prompt (Claude.ai)",
+            "created_at": "Data de criacao",
+            "updated_at": "Ultima atualizacao",
+            "is_starred": "Pinada (Claude.ai)",
+            "docs_count": "N docs do projeto",
+            "files_count": "N files binarios",
+        },
+    },
+    "project_docs": {
+        "title": "Project Docs (Qwen / Claude.ai)",
+        "id_col": "doc_id",
+        "desc": "Knowledge files de cada projeto, com content extraido inline.",
+        "fields": {
+            "doc_id": "ID unico do doc",
+            "project_id": "Projeto que possui",
+            "file_name": "Nome do arquivo",
+            "content": "Content extraido (chars)",
+            "content_size": "Chars no content",
+            "estimated_token_count": "Tokens estimados",
+            "created_at": "Data de adicao",
+        },
+    },
+}
+```
+
+```{python}
+#| label: aux-render
+#| output: asis
+
+from IPython.display import Markdown, display
+
+for _aux in AUX_TABLES:
+    if not has_view(con, _aux):
+        continue
+    _conf = AUX_CONFIG.get(_aux, {"title": _aux, "id_col": "id", "desc": "", "fields": {}})
+    _t = table_count(con, _aux)
+    display(Markdown(f"## 5.{AUX_TABLES.index(_aux)+1} {_conf['title']}\n\n{_conf['desc']}\n\n_Rows: **{_t:,}**_"))
+
+    # Schema + cobertura
+    _cols_df = con.execute(f"DESCRIBE SELECT * FROM {_aux}").df()
+    _real_cols = _cols_df["column_name"].tolist()
+    _types = dict(zip(_cols_df["column_name"], _cols_df["column_type"]))
+    _rows_schema = []
+    for _col in _real_cols:
+        _desc = _conf["fields"].get(_col, "—")
+        if _t > 0:
+            _n = con.execute(f'SELECT COUNT("{_col}") FROM {_aux}').fetchone()[0]
+            _cov_str = fmt_pct(int(_n), _t) if _n != _t else f"{_t:,} (100%)"
+        else:
+            _cov_str = "—"
+        _rows_schema.append({
+            "Campo": _col,
+            "Tipo": _types[_col],
+            "Descricao": _desc,
+            "Cobertura": _cov_str,
+        })
+    show_df(pd.DataFrame(_rows_schema))
+
+    # Sample (3 rows recentes ou random se sem created_at)
+    if _t > 0:
+        _has_created = "created_at" in _real_cols
+        _order = "ORDER BY created_at DESC" if _has_created else ""
+        _sample = con.execute(f"SELECT * FROM {_aux} {_order} LIMIT 3").df()
+        # Truncar content longo pra display
+        for _c in _sample.columns:
+            if _sample[_c].dtype == "object":
+                _sample[_c] = _sample[_c].astype(str).str.slice(0, 80)
+        display(Markdown("**Amostra (3 rows mais recentes):**"))
+        show_df(_sample)
+
+    # Stats agregadas quando faz sentido
+    if _aux == "outputs" and "output_type_name" in _real_cols:
+        _stats = con.execute("""
+            SELECT output_type_name, COUNT(*) AS n,
+                ROUND(AVG(LENGTH(content)), 0)::INT AS avg_chars
+            FROM outputs GROUP BY output_type_name ORDER BY n DESC
+        """).df()
+        display(Markdown("**Counts por tipo:**"))
+        show_df(_stats)
+        fig = plotly_bar(
+            _stats["output_type_name"].tolist()[::-1], _stats["n"].tolist()[::-1],
+            title="Outputs por tipo",
+            color=SOURCE_COLOR, orientation="h", height=350,
+        )
+        fig.show()
+    elif _aux == "notes" and "kind" in _real_cols:
+        _stats = con.execute("""
+            SELECT kind, COUNT(*) AS n,
+                ROUND(AVG(LENGTH(content)), 0)::INT AS avg_chars
+            FROM notes GROUP BY kind
+        """).df()
+        display(Markdown("**Counts por kind:**"))
+        show_df(_stats)
+    elif _aux in ("sources", "project_docs") and "content_size" in _real_cols:
+        _stats = con.execute(f"""
+            SELECT
+                COUNT(*) AS n,
+                SUM(content_size) AS total_chars,
+                ROUND(AVG(content_size), 0)::INT AS avg_chars,
+                MAX(content_size) AS max_chars
+            FROM {_aux}
+        """).df()
+        display(Markdown(f"**Stats de conteudo ({_aux}):**"))
+        show_df(_stats.assign(total_chars=_stats["total_chars"].fillna(0).astype(int)))
+```
