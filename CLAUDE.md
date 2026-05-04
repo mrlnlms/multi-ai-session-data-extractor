@@ -121,7 +121,7 @@ Marcos arquiteturais 2026-05-04 — todos shipped:
    badges/LICENSE, secao DVC opcional pra contributors em `docs/SETUP.md`.
 
 Trabalho aberto pos-2026-05-04: ver [docs/ROADMAP.md](docs/ROADMAP.md)
-(1 item operacional: ChatGPT capture-delete cycle).
+(future platforms: Grok, Kimi; operacional: ChatGPT capture-delete cycle).
 
 ## Cross-feature checks (pin, archive, voice, share)
 

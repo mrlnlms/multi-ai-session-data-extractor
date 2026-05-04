@@ -4,6 +4,21 @@ Open work items. Closed via shipped releases are removed from this list
 (see `git log` for history). For broader context, see
 [README.md](../README.md) and [CLAUDE.md](../CLAUDE.md).
 
+## Future platforms
+
+### Grok (xAI / X)
+
+Web chat at `grok.com` (or via X). No native export. Authentication
+through X account cookies. Pattern likely similar to Gemini/NotebookLM:
+Playwright with persistent context, internal API discovery via DevTools,
+batchexecute or REST endpoints. Probe required to map endpoints.
+
+### Kimi (Moonshot AI)
+
+Web chat at `kimi.com`. No known native export for full conversation
+history. Same pattern as Grok — browser-based capture with persistent
+profile and reverse-engineered internal API.
+
 ## Operational
 
 ### ChatGPT capture-delete cycle
