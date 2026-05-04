@@ -8,7 +8,10 @@ Helpers pra:
 - expor HTML rendirizado via Streamlit static serving
 
 Streamlit serve arquivos em PROJECT_ROOT/static/ via path /app/static/<file>.
-Por isso copiamos o HTML pra static/quarto/<source>.html após render.
+Por isso linkamos o HTML pra static/quarto/<source>.html apos render
+(symlink — Streamlit segue links no filesystem local). Single source of
+truth: notebooks/_output/. Pra deploy hosted (Streamlit Cloud), trocar
+symlink_to por shutil.copy2.
 """
 from __future__ import annotations
 
@@ -145,26 +148,30 @@ def _render_qmd_path(qmd: Path) -> subprocess.CompletedProcess:
     )
 
 
-def copy_to_static(platform: str) -> Path:
-    """Copia HTML rendirizado (consolidado) pra static/quarto/."""
-    src = html_output_path(platform)
+def _link_to_static(src: Path, dst: Path) -> Path:
+    """Cria symlink dst → src (substitui se ja existe).
+
+    Streamlit serve PROJECT_ROOT/static/ via /app/static/<file> e segue
+    symlinks no filesystem local. Symlink evita duplicacao de disco e
+    mantem static/ sempre apontando pro ultimo render.
+    """
     if not src.exists():
         raise FileNotFoundError(f"HTML rendirizado nao existe: {src}")
-    dst = html_static_path(platform)
     dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dst)
+    if dst.is_symlink() or dst.exists():
+        dst.unlink()
+    dst.symlink_to(src.resolve())
     return dst
+
+
+def copy_to_static(platform: str) -> Path:
+    """Linka static/quarto/<plat>.html → notebooks/_output/<plat>.html."""
+    return _link_to_static(html_output_path(platform), html_static_path(platform))
 
 
 def copy_to_static_for_qmd(qmd: Path) -> Path:
-    """Copia HTML de um .qmd qualquer (consolidado ou per-account) pra static/."""
-    src = html_output_path_for_qmd(qmd)
-    if not src.exists():
-        raise FileNotFoundError(f"HTML rendirizado nao existe: {src}")
-    dst = html_static_path_for_qmd(qmd)
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dst)
-    return dst
+    """Linka static/quarto/<qmd>.html → notebooks/_output/<qmd>.html."""
+    return _link_to_static(html_output_path_for_qmd(qmd), html_static_path_for_qmd(qmd))
 
 
 def render_and_publish(platform: str) -> tuple[bool, Optional[str]]:
