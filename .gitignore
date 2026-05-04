@@ -1,9 +1,11 @@
 # Data — personal, never committed (versionado via DVC)
+# Subpastas grandes sao trackadas individualmente; DVC gera .gitignore proprio
+# em cada nivel pra ignorar so o conteudo trackado (README e similares ficam
+# no git). Ver docs/dvc-runbook.md.
 data/raw/
 data/merged/
 data/processed/
 data/unified/
-data/external/
 
 # Python
 __pycache__/

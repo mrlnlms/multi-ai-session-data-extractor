@@ -1,0 +1,6 @@
+outs:
+- md5: a497807a34bc0126ec495f371c7ae952.dir
+  size: 3213834
+  nfiles: 2
+  hash: md5
+  path: deepseek-snapshots

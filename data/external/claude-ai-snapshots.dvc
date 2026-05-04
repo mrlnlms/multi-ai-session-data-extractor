@@ -1,0 +1,6 @@
+outs:
+- md5: 7e370b3ea3a3826744500463fabdbb12.dir
+  size: 377775929
+  nfiles: 12
+  hash: md5
+  path: claude-ai-snapshots
