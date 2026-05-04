@@ -1,0 +1,46 @@
+---
+title: "Overview Web Chat — Data Profile"
+subtitle: "Subset: 6 plataformas web (ChatGPT, Claude.ai, Perplexity, Qwen, DeepSeek, Gemini)"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+
+import sys
+from pathlib import Path
+
+_this = Path.cwd()
+_project_root = _this if (_this / "src").exists() else _this.parent
+sys.path.insert(0, str(_project_root))
+
+import pandas as pd
+import duckdb
+from itables import init_notebook_mode
+init_notebook_mode(all_interactive=False)
+
+from src.parsers.quarto_helpers import (
+    fmt_pct, fmt_int, safe_int, show_df, show_md, plotly_bar,
+    has_col, has_view, table_count, setup_unified_views,
+)
+
+SUBSET_TITLE     = "Web Chat (6 plataformas)"
+SOURCES_FILTER   = ["chatgpt", "claude_ai", "perplexity", "qwen", "deepseek", "gemini"]
+UNIFIED_DIR      = _project_root / "data" / "unified"
+MUTED            = "#D1D5DB"
+
+SOURCE_COLORS = {
+    "chatgpt":    "#74AA9C",
+    "claude_ai":  "#CC785C",
+    "perplexity": "#20808D",
+    "qwen":       "#615CED",
+    "deepseek":   "#3B82F6",
+    "gemini":     "#4285F4",
+}
+
+con = duckdb.connect()
+_setup = setup_unified_views(con, UNIFIED_DIR, sources_filter=SOURCES_FILTER)
+```
+
+{{< include _template_overview.qmd >}}

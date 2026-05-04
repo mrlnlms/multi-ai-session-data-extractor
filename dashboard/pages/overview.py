@@ -176,8 +176,61 @@ def render(states: list[PlatformState]) -> None:
             st.rerun()
 
     st.divider()
+    _render_overview_qmds_section()
+
+    st.divider()
     st.subheader("Timeline de captura")
     st.plotly_chart(_timeline_figure(states), width="stretch")
+
+
+def _render_overview_qmds_section() -> None:
+    """Lista os qmds de overview cross-plataforma disponiveis (data/unified).
+
+    Renderizam HTML self-contained de `notebooks/_template_overview.qmd`
+    com filtros diferentes (todas / web / cli / rag).
+    """
+    from dashboard.quarto import (
+        copy_to_static_for_qmd,
+        html_output_path_for_qmd,
+        overview_qmds,
+        render_and_publish_qmd,
+        streamlit_static_url_for_qmd,
+    )
+
+    qmds = overview_qmds()
+    if not qmds:
+        return
+
+    st.subheader("Visões cross-plataforma")
+    st.caption(
+        "Comparativos consolidados de `data/unified/` — tabela pivot, "
+        "stacked bars por plataforma, distribuição temporal cruzada, "
+        "modelos cross, capture method, preservation."
+    )
+
+    cols = st.columns(min(len(qmds), 4))
+    for i, (label, qmd) in enumerate(qmds):
+        col = cols[i % len(cols)]
+        html_out = html_output_path_for_qmd(qmd)
+        if html_out.exists():
+            # Garante copia em static/ pra Streamlit servir
+            try:
+                copy_to_static_for_qmd(qmd)
+            except FileNotFoundError:
+                pass
+            url = f"/app/static/quarto/{qmd.stem}.html"
+            col.markdown(
+                f"📊 **{label}**  \n[Ver dados detalhados]({url}){{target=\"_blank\"}}"
+            )
+        else:
+            if col.button(f"🔄 Render {label}", key=f"render-overview-{qmd.stem}"):
+                with st.spinner(f"Render {label}..."):
+                    success, err = render_and_publish_qmd(qmd)
+                if success:
+                    st.success(f"✅ {label} rendirizado")
+                    st.rerun()
+                else:
+                    st.error(f"❌ {label}: {err}")
 
 
 def _run_update_all(states: list[PlatformState]) -> None:

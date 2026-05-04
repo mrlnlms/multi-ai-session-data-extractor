@@ -1,0 +1,42 @@
+---
+title: "Overview RAG — Data Profile"
+subtitle: "Subset: NotebookLM (workspace com sources/notes/outputs cross-account)"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+
+import sys
+from pathlib import Path
+
+_this = Path.cwd()
+_project_root = _this if (_this / "src").exists() else _this.parent
+sys.path.insert(0, str(_project_root))
+
+import pandas as pd
+import duckdb
+from itables import init_notebook_mode
+init_notebook_mode(all_interactive=False)
+
+from src.parsers.quarto_helpers import (
+    fmt_pct, fmt_int, safe_int, show_df, show_md, plotly_bar,
+    has_col, has_view, table_count, setup_unified_views,
+)
+
+SUBSET_TITLE     = "RAG (NotebookLM)"
+SOURCES_FILTER   = ["notebooklm"]
+UNIFIED_DIR      = _project_root / "data" / "unified"
+MUTED            = "#D1D5DB"
+
+# Cor por conta (NotebookLM tem 3: account-1 en, account-2 pt-BR, account-3 legacy)
+SOURCE_COLORS = {
+    "notebooklm": "#F4B400",
+}
+
+con = duckdb.connect()
+_setup = setup_unified_views(con, UNIFIED_DIR, sources_filter=SOURCES_FILTER)
+```
+
+{{< include _template_overview.qmd >}}

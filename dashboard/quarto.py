@@ -49,15 +49,21 @@ def qmd_path(platform: str) -> Path:
 
 
 def qmd_paths_per_account(platform: str) -> list[tuple[str, Path]]:
-    """Lista de (account_label, qmd_path) pros .qmd per-account existentes.
+    """Lista de (account_label, qmd_path) pros .qmd per-account/sufixados existentes.
 
-    Convencao: notebooks/<slug>-acc-{N}.qmd. Retorna so os que existem.
-    Plataformas multi-account hoje: Gemini (acc-1, acc-2), NotebookLM (acc-1, acc-2).
+    Convencoes:
+    - notebooks/<slug>-acc-{N}.qmd  (multi-account ativo)
+    - notebooks/<slug>-legacy.qmd   (snapshot legacy de conta extinta)
+
+    Retorna so os que existem.
     """
     base = _slug(platform)
     out = []
     for cand in sorted(NOTEBOOKS_DIR.glob(f"{base}-acc-*.qmd")):
         label = cand.stem[len(base) + 1:]  # ex: 'acc-1'
+        out.append((label, cand))
+    for cand in sorted(NOTEBOOKS_DIR.glob(f"{base}-legacy.qmd")):
+        label = cand.stem[len(base) + 1:]  # 'legacy'
         out.append((label, cand))
     return out
 
@@ -194,6 +200,27 @@ def render_and_publish_qmd(qmd: Path) -> tuple[bool, Optional[str]]:
     except Exception as e:
         return False, f"render OK mas copy_to_static falhou: {e}"
     return True, None
+
+
+def overview_qmds() -> list[tuple[str, Path]]:
+    """Retorna [(label, qmd_path)] dos overviews cross-plataforma existentes.
+
+    Convencao: notebooks/00-overview*.qmd. Filtra so os que tem .qmd no
+    disco (label = parte apos `00-overview` ou 'Geral' pro `00-overview.qmd`
+    sem sufixo).
+    """
+    out: list[tuple[str, Path]] = []
+    for qmd in sorted(NOTEBOOKS_DIR.glob("00-overview*.qmd")):
+        stem = qmd.stem
+        if stem == "00-overview":
+            label = "Geral (todas)"
+        else:
+            # 00-overview-web -> 'Web Chat', 00-overview-cli -> 'CLI', etc
+            tail = stem.replace("00-overview-", "")
+            mapping = {"web": "Web Chat", "cli": "CLI", "rag": "RAG (NotebookLM)"}
+            label = mapping.get(tail, tail.replace("-", " ").title())
+        out.append((label, qmd))
+    return out
 
 
 def is_html_stale_for_qmd(platform: str, qmd: Path) -> bool:

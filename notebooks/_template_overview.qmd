@@ -1,0 +1,484 @@
+## Sobre este documento
+
+Visao **cross-platform** dos parquets canonicos consolidados em
+`data/unified/`. Diferente dos qmds per-source (`<plat>.qmd`) que descrevem
+**uma** plataforma, aqui o foco eh **comparar** as plataformas — stacked
+bars por source, distribuicao temporal cruzada, modelos cross, capture_method,
+preservation global.
+
+Setup do per-subset qmd define `SOURCES_FILTER` (vazio = todas; lista pra
+subset tipo Web Chat / CLI / RAG).
+
+```{python}
+#| label: overview-totals
+
+_rows = []
+for table in ["conversations","messages","tool_events","branches",
+              "sources","notes","outputs","guide_questions","source_guides",
+              "project_metadata","project_docs"]:
+    n = table_count(con, table)
+    if n:
+        _rows.append({"Tabela": f"{table}.parquet", "Rows": fmt_int(n)})
+show_df(pd.DataFrame(_rows))
+```
+
+```{python}
+#| label: overview-period
+
+_period = con.execute("""
+    SELECT MIN(created_at) AS oldest, MAX(created_at) AS newest, MAX(updated_at) AS last_update
+    FROM conversations
+""").df()
+_oldest = _period["oldest"].iloc[0]
+_newest = _period["newest"].iloc[0]
+_last = _period["last_update"].iloc[0]
+
+_meta_rows = [
+    {"Campo": "Subset", "Valor": SUBSET_TITLE},
+    {"Campo": "Sources incluidas", "Valor": ", ".join(SOURCES_FILTER) if SOURCES_FILTER else "todas (10)"},
+    {"Campo": "Periodo de criacao", "Valor": f"{_oldest:%Y-%m-%d} → {_newest:%Y-%m-%d}" if pd.notna(_oldest) else "—"},
+    {"Campo": "Ultima atualizacao", "Valor": f"{_last:%Y-%m-%d %H:%M}" if pd.notna(_last) else "—"},
+]
+show_df(pd.DataFrame(_meta_rows))
+```
+
+# 1. Comparativo plataforma × métricas
+
+Tabela pivot: cada linha eh uma plataforma, cada coluna eh uma metrica.
+Vista de uma vez "quem tem o que".
+
+```{python}
+#| label: comparative-table
+
+_comp = con.execute("""
+    SELECT
+        source AS plataforma,
+        COUNT(*) AS convs,
+        SUM(message_count) AS msgs_total,
+        ROUND(AVG(message_count), 1) AS avg_msgs,
+        SUM(is_preserved_missing::INT) AS preserved,
+        SUM(is_pinned::INT) AS pinned,
+        MIN(created_at)::DATE AS oldest,
+        MAX(created_at)::DATE AS newest
+    FROM conversations
+    GROUP BY source
+    ORDER BY convs DESC
+""").df()
+show_df(_comp)
+```
+
+```{python}
+#| label: tools-by-source
+
+_tools = con.execute("""
+    SELECT source AS plataforma,
+        COUNT(*) AS tool_events,
+        COUNT(DISTINCT tool_name) AS unique_tools,
+        SUM(CASE WHEN success THEN 1 ELSE 0 END) AS sucesso,
+        SUM(CASE WHEN success = false THEN 1 ELSE 0 END) AS erro
+    FROM tool_events
+    GROUP BY source
+    ORDER BY tool_events DESC
+""").df()
+show_df(_tools)
+```
+
+# 2. Distribuição temporal
+
+## 2.1 Conversas criadas por mês (stacked por plataforma)
+
+```{python}
+#| label: timeline-stacked
+
+_tl = con.execute("""
+    SELECT strftime(created_at, '%Y-%m') AS mes,
+        source AS plataforma,
+        COUNT(*) AS n
+    FROM conversations
+    WHERE created_at IS NOT NULL
+    GROUP BY mes, source
+    ORDER BY mes, source
+""").df()
+
+if len(_tl):
+    import plotly.graph_objects as go
+    pivot = _tl.pivot(index="mes", columns="plataforma", values="n").fillna(0)
+    fig = go.Figure()
+    for col in pivot.columns:
+        fig.add_trace(go.Bar(x=pivot.index, y=pivot[col],
+                              name=col, marker_color=SOURCE_COLORS.get(col, MUTED)))
+    fig.update_layout(
+        barmode="stack", title="Conversas criadas por mes (stacked por plataforma)",
+        height=400, template="plotly_white",
+        xaxis=dict(type="category"),
+        margin=dict(t=50, b=80, l=40, r=20),
+        legend=dict(orientation="h", y=-0.25),
+    )
+    fig.show()
+```
+
+## 2.2 Crescimento acumulado por plataforma
+
+```{python}
+#| label: cumulative-by-source
+
+_cum = con.execute("""
+    SELECT strftime(created_at, '%Y-%m') AS mes,
+        source AS plataforma,
+        COUNT(*) AS n
+    FROM conversations
+    WHERE created_at IS NOT NULL
+    GROUP BY mes, source
+    ORDER BY mes, source
+""").df()
+
+if len(_cum):
+    import plotly.graph_objects as go
+    fig = go.Figure()
+    for src in _cum["plataforma"].unique():
+        sub = _cum[_cum["plataforma"] == src].sort_values("mes")
+        cum = sub["n"].cumsum()
+        fig.add_trace(go.Scatter(
+            x=sub["mes"], y=cum, mode="lines+markers", name=src,
+            line=dict(color=SOURCE_COLORS.get(src, MUTED), width=2),
+        ))
+    fig.update_layout(
+        title="Crescimento acumulado por plataforma",
+        height=400, template="plotly_white",
+        xaxis=dict(type="category", title="Mes"),
+        yaxis=dict(title="Convs acumuladas"),
+        margin=dict(t=50, b=40, l=40, r=20),
+    )
+    fig.show()
+```
+
+## 2.3 Activity heatmap (hora × dia, todas as fontes)
+
+```{python}
+#| label: heatmap-cross
+
+_hm = con.execute("""
+    SELECT EXTRACT(isodow FROM created_at) AS dow,
+        EXTRACT(hour FROM created_at) AS hour,
+        COUNT(*) AS n
+    FROM conversations WHERE created_at IS NOT NULL
+    GROUP BY dow, hour
+""").df()
+
+if len(_hm):
+    import plotly.graph_objects as go
+    pivot = _hm.pivot(index="dow", columns="hour", values="n").fillna(0)
+    pivot = pivot.reindex(range(1, 8))
+    days = ["Seg","Ter","Qua","Qui","Sex","Sab","Dom"]
+    fig = go.Figure(go.Heatmap(
+        z=pivot.values, x=list(pivot.columns), y=days,
+        colorscale=[[0, "#ffffff"], [1, "#1f2937"]],
+    ))
+    fig.update_layout(
+        title="Atividade — hora x dia (todas as plataformas)",
+        height=300, template="plotly_white",
+        xaxis=dict(title="Hora", dtick=2),
+        margin=dict(t=50, b=40, l=60, r=20),
+    )
+    fig.show()
+```
+
+# 3. Modelos cross-platform
+
+## 3.1 Top 20 modelos (com badge de source)
+
+```{python}
+#| label: top-models-cross
+
+_tm = con.execute("""
+    SELECT model, source AS plataforma, COUNT(*) AS n
+    FROM conversations WHERE model IS NOT NULL
+    GROUP BY model, source
+    ORDER BY n DESC LIMIT 20
+""").df()
+show_df(_tm)
+```
+
+## 3.2 Heatmap modelo × plataforma (top 30 modelos)
+
+```{python}
+#| label: model-platform-heat
+
+_mph = con.execute("""
+    WITH top_models AS (
+        SELECT model FROM conversations WHERE model IS NOT NULL
+        GROUP BY model ORDER BY COUNT(*) DESC LIMIT 30
+    )
+    SELECT model, source AS plataforma, COUNT(*) AS n
+    FROM conversations
+    WHERE model IN (SELECT model FROM top_models)
+    GROUP BY model, source
+""").df()
+
+if len(_mph):
+    import plotly.graph_objects as go
+    pivot = _mph.pivot(index="model", columns="plataforma", values="n").fillna(0)
+    fig = go.Figure(go.Heatmap(
+        z=pivot.values, x=list(pivot.columns), y=list(pivot.index),
+        colorscale=[[0, "#ffffff"], [1, "#1f2937"]],
+        text=pivot.values, texttemplate="%{text:.0f}",
+    ))
+    fig.update_layout(
+        title="Distribuicao de uso: modelo × plataforma",
+        height=600, template="plotly_white",
+        margin=dict(t=50, b=40, l=140, r=20),
+    )
+    fig.show()
+```
+
+# 4. Capture method (proveniência do dado)
+
+Distingue dado capturado pelo extractor automatico vs importado via parsers
+manuais (clippings_obsidian, copypaste_web, terminal_claude_code,
+legacy_notebooklm).
+
+```{python}
+#| label: capture-method-cross
+
+if has_col(con, "conversations", "capture_method"):
+    _cm = con.execute("""
+        SELECT
+            COALESCE(capture_method, 'extractor') AS method,
+            source AS plataforma,
+            COUNT(*) AS n
+        FROM conversations
+        GROUP BY method, source
+        ORDER BY method, n DESC
+    """).df()
+    show_df(_cm)
+
+    import plotly.graph_objects as go
+    pivot = _cm.pivot(index="method", columns="plataforma", values="n").fillna(0)
+    fig = go.Figure()
+    for col in pivot.columns:
+        fig.add_trace(go.Bar(x=pivot.index, y=pivot[col],
+                              name=col, marker_color=SOURCE_COLORS.get(col, MUTED)))
+    fig.update_layout(
+        barmode="stack", title="Conversas por capture_method (stacked por plataforma)",
+        height=400, template="plotly_white",
+        margin=dict(t=50, b=80, l=40, r=20),
+        legend=dict(orientation="h", y=-0.25),
+    )
+    fig.show()
+else:
+    show_md("> `capture_method` ausente nas views (todos extractor).")
+```
+
+# 5. Tool events cross-platform
+
+## 5.1 Top 20 tools usados
+
+```{python}
+#| label: top-tools-cross
+
+if table_count(con, "tool_events") > 0:
+    _tt = con.execute("""
+        SELECT tool_name, source AS plataforma, COUNT(*) AS calls
+        FROM tool_events
+        WHERE tool_name IS NOT NULL AND tool_name != ''
+        GROUP BY tool_name, source
+        ORDER BY calls DESC LIMIT 20
+    """).df()
+    show_df(_tt)
+```
+
+## 5.2 Tools por categoria (event_type) cross
+
+```{python}
+#| label: events-by-type-cross
+
+if table_count(con, "tool_events") > 0:
+    _et = con.execute("""
+        SELECT event_type, source AS plataforma, COUNT(*) AS n
+        FROM tool_events
+        GROUP BY event_type, source
+        ORDER BY n DESC
+    """).df()
+
+    import plotly.graph_objects as go
+    pivot = _et.pivot(index="event_type", columns="plataforma", values="n").fillna(0)
+    fig = go.Figure()
+    for col in pivot.columns:
+        fig.add_trace(go.Bar(x=pivot.index, y=pivot[col],
+                              name=col, marker_color=SOURCE_COLORS.get(col, MUTED)))
+    fig.update_layout(
+        barmode="stack", title="ToolEvents por event_type (stacked por plataforma)",
+        height=400, template="plotly_white",
+        margin=dict(t=50, b=80, l=40, r=20),
+        legend=dict(orientation="h", y=-0.25),
+    )
+    fig.show()
+```
+
+## 5.3 Success rate (CLIs)
+
+```{python}
+#| label: success-rate-cross
+
+if has_col(con, "tool_events", "success"):
+    _sr = con.execute("""
+        SELECT source AS plataforma,
+            SUM(CASE WHEN success THEN 1 ELSE 0 END) AS sucesso,
+            SUM(CASE WHEN success = false THEN 1 ELSE 0 END) AS erro,
+            SUM(CASE WHEN success IS NULL THEN 1 ELSE 0 END) AS desconhecido,
+            COUNT(*) AS total
+        FROM tool_events
+        GROUP BY source
+        HAVING SUM(CASE WHEN success IS NOT NULL THEN 1 ELSE 0 END) > 0
+        ORDER BY total DESC
+    """).df()
+    if len(_sr):
+        show_df(_sr)
+    else:
+        show_md("> Nenhuma plataforma neste subset registra success em tool_events.")
+```
+
+# 6. Word counts cross-platform
+
+```{python}
+#| label: words-cross
+
+_wc = con.execute("""
+    SELECT source AS plataforma, role,
+        ROUND(AVG(word_count), 0)::INT AS avg_words,
+        MEDIAN(word_count)::INT AS median_words,
+        MAX(word_count) AS max_words,
+        SUM(word_count) AS total_words
+    FROM messages
+    WHERE NOT is_hidden AND word_count > 0
+    GROUP BY source, role
+    ORDER BY source, role
+""").df()
+show_df(_wc)
+```
+
+# 7. Preservation e estados especiais
+
+## 7.1 Preserved missing global
+
+Convs ativas no servidor vs preservadas localmente (sumiram do servidor).
+
+```{python}
+#| label: preservation-cross
+
+_pres = con.execute("""
+    SELECT source AS plataforma,
+        SUM(is_preserved_missing::INT) AS preserved,
+        COUNT(*) AS total,
+        ROUND(SUM(is_preserved_missing::INT) * 100.0 / NULLIF(COUNT(*),0), 1) AS pct
+    FROM conversations
+    GROUP BY source
+    HAVING SUM(is_preserved_missing::INT) > 0
+    ORDER BY preserved DESC
+""").df()
+if len(_pres):
+    show_df(_pres)
+else:
+    show_md("> Zero convs preservadas (deletadas do servidor) neste subset.")
+```
+
+## 7.2 Pinned / Archived / Temporary
+
+```{python}
+#| label: states-cross
+
+_st = con.execute("""
+    SELECT source AS plataforma,
+        SUM(is_pinned::INT) AS pinned,
+        SUM(is_archived::INT) AS archived,
+        SUM(is_temporary::INT) AS temporary,
+        COUNT(*) AS total
+    FROM conversations
+    GROUP BY source
+    HAVING SUM(is_pinned::INT) + SUM(is_archived::INT) + SUM(is_temporary::INT) > 0
+    ORDER BY pinned DESC, archived DESC
+""").df()
+if len(_st):
+    show_df(_st)
+else:
+    show_md("> Nenhuma plataforma deste subset registra pin/archive/temporary.")
+```
+
+# 8. Lifetime das conversas
+
+`updated_at - created_at`. Distingue one-shot (< 1 dia) de threads que
+viraram projeto (> 7 dias).
+
+```{python}
+#| label: lifetime-cross
+
+_lf = con.execute("""
+    WITH lt AS (
+        SELECT source, EXTRACT(epoch FROM updated_at - created_at) / 86400 AS days
+        FROM conversations
+        WHERE updated_at IS NOT NULL AND created_at IS NOT NULL
+    )
+    SELECT source AS plataforma,
+        CASE
+            WHEN days < 0.04167 THEN '< 1h'
+            WHEN days < 1 THEN '1h-1dia'
+            WHEN days < 7 THEN '1-7 dias'
+            WHEN days < 30 THEN '7-30 dias'
+            WHEN days < 90 THEN '30-90 dias'
+            ELSE '> 90 dias'
+        END AS bin,
+        COUNT(*) AS n
+    FROM lt GROUP BY source, bin
+""").df()
+
+if len(_lf):
+    _order = ['< 1h','1h-1dia','1-7 dias','7-30 dias','30-90 dias','> 90 dias']
+    _lf['bin'] = pd.Categorical(_lf['bin'], categories=_order, ordered=True)
+    _lf = _lf.sort_values(['bin', 'plataforma'])
+
+    import plotly.graph_objects as go
+    pivot = _lf.pivot(index="bin", columns="plataforma", values="n").fillna(0)
+    pivot = pivot.reindex(_order)
+    fig = go.Figure()
+    for col in pivot.columns:
+        fig.add_trace(go.Bar(x=pivot.index.astype(str), y=pivot[col],
+                              name=col, marker_color=SOURCE_COLORS.get(col, MUTED)))
+    fig.update_layout(
+        barmode="stack", title="Lifetime das convs (stacked por plataforma)",
+        height=400, template="plotly_white",
+        margin=dict(t=50, b=80, l=40, r=20),
+        legend=dict(orientation="h", y=-0.25),
+    )
+    fig.show()
+```
+
+# 9. Tabela completa cross-platform filtrável
+
+```{python}
+#| label: full-table-cross
+#| column: page
+
+from itables import show as itable_show
+
+_full = con.execute("""
+    SELECT
+        source AS plataforma,
+        substr(conversation_id, 1, 8) AS conv_id,
+        title,
+        message_count AS msgs,
+        model,
+        project,
+        strftime(created_at, '%Y-%m-%d') AS created,
+        is_preserved_missing AS preserved,
+        is_pinned AS pinned
+    FROM conversations
+    ORDER BY created_at DESC
+""").df()
+
+itable_show(
+    _full,
+    paging=True, searching=True, ordering=True, info=True,
+    lengthMenu=[10, 25, 50, 100],
+    classes="display compact",
+)
+```

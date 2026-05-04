@@ -100,17 +100,25 @@ class PlatformState:
         """Parquet canonico (cross-platform). Preferir sobre merged_json_path
         quando disponivel — schema uniforme entre plataformas.
 
-        Aceita 2 convencoes de naming:
+        Aceita 3 convencoes de naming, em ordem de prioridade:
+        - `<source>_conversations.parquet` (parser v3 canonico)
         - `conversations.parquet` (estilo legacy ChatGPT)
-        - `<source>_conversations.parquet` (parser v3 — Claude.ai, Qwen,
-          DeepSeek, Gemini, Perplexity)"""
+        - `<source>_manual_conversations.parquet` (manual saves / legacy
+          accounts) — fallback so quando nao ha canonico"""
         if self.processed_dir is None:
             return None
-        # Tenta primeiro o estilo v3
-        for cand in self.processed_dir.glob("*_conversations.parquet"):
-            return cand
+        # Prioriza canonico v3 (exclui _manual_ — esses sao agregados via
+        # setup_views_with_manual nos quartos consolidados)
+        candidates = sorted(self.processed_dir.glob("*_conversations.parquet"))
+        for cand in candidates:
+            if "_manual_" not in cand.name:
+                return cand
+        # Fallback: legacy ChatGPT-style
         cand = self.processed_dir / "conversations.parquet"
-        return cand if cand.exists() else None
+        if cand.exists():
+            return cand
+        # Ultimo recurso: so ha _manual_
+        return candidates[0] if candidates else None
 
     def status(self, now: Optional[datetime] = None) -> str:
         """green | yellow | red | gray. Cadencia de sync e variavel por
