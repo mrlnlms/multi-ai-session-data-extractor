@@ -23,22 +23,6 @@ Code fields currently dropped: `message.usage` (token counts),
 `gitBranch`, `cwd`, `permissionMode`. Details in
 [docs/research/extractor-findings.md](research/extractor-findings.md).
 
-### Claude.ai memories
-
-Claude.ai exposes a "Memory" feature in the UI (preferences/instructions
-the assistant remembers across sessions). The current extractor does not
-capture it — `src/extractors/claude_ai/api_client.py` has zero references
-to memory/preferences endpoints. Compare with ChatGPT, which already
-saves `chatgpt_memories.md` as part of every capture.
-
-**Plan:**
-1. Probe the Claude.ai API to find the endpoint that returns memories
-   (likely under `/api/organizations/{org_id}/...`).
-2. Add it to `ClaudeAPIClient` and persist as `claude_ai_memories.md`
-   (or similar) in the raw output, mirroring ChatGPT's pattern.
-3. Decide whether memories enter the canonical schema as a new auxiliary
-   table or stay as a standalone artifact.
-
 ## Operational
 
 ### ChatGPT capture-delete cycle

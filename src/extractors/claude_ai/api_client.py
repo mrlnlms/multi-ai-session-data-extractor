@@ -118,6 +118,18 @@ class ClaudeAPIClient:
         path = self._org_path(f"projects/{project_uuid}/files")
         return await self._get_json(path)
 
+    # --- Memory (preferences/instructions remembered across sessions) ---
+
+    async def get_memory(self) -> str:
+        """Retorna texto da memory do org (campo unico em markdown).
+
+        Endpoint: GET /api/organizations/{org}/memory → {"memory": "<markdown>"}.
+        Vazio (memory desabilitada / sem conteudo): {"memory": ""}.
+        """
+        path = self._org_path("memory")
+        data = await self._get_json(path)
+        return data.get("memory", "") or ""
+
     # --- Assets ---
 
     async def download_file(self, file_uuid: str, variant: str = "preview") -> bytes:
