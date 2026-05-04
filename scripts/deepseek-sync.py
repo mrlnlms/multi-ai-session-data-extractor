@@ -73,6 +73,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--no-reconcile", action="store_true")
     ap.add_argument("--full", action="store_true")
+    ap.add_argument("--no-binaries", action="store_true",
+                    help="(no-op pra DeepSeek: nao tem assets/projects, so threads)")
     ap.add_argument("--smoke", type=int, default=None)
     ap.add_argument("--account", default="default")
     ap.add_argument("--dry-run", action="store_true")

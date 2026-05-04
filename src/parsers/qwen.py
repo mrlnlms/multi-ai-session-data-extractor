@@ -31,7 +31,7 @@ import pandas as pd
 from src.parsers._qwen_helpers import (
     CHAT_TYPE_TO_MODE,
     CHAT_TYPE_TO_TOOL_CATEGORY,
-    block_time_bounds,
+    block_time_bounds_epoch,
     build_branches_qwen,
     collect_file_names,
     collect_text_from_content_list,
@@ -254,7 +254,7 @@ class QwenParser(BaseParser):
             project_id=(data.get("project_id") or None),  # "" → None
             is_pinned=bool(data.get("pinned", False)),
             is_archived=is_archived,
-            is_temporary=False,  # Qwen nao tem feature de temporary chat
+            is_temporary=None,  # Qwen nao tem feature de temporary — None = nao existe upstream
             is_preserved_missing=is_preserved,
             last_seen_in_server=self._ts(last_seen) if last_seen else None,
             summary=None,  # Qwen nao gera summary auto
@@ -310,7 +310,7 @@ class QwenParser(BaseParser):
             block_types.append("search")
 
         # Block timestamps
-        start_ts, stop_ts = block_time_bounds(content_list)
+        start_ts, stop_ts = block_time_bounds_epoch(content_list)
 
         # Model on assistant
         model = msg.get("model") if role == "assistant" else None

@@ -211,8 +211,8 @@ class DeepSeekParser(BaseParser):
             url=f"https://chat.deepseek.com/a/chat/s/{conv_id}",
             project_id=None,  # DeepSeek nao tem projects
             is_pinned=bool(sess.get("pinned", False)),
-            is_archived=False,  # DeepSeek nao expoe is_archived
-            is_temporary=False,
+            is_archived=None,  # DeepSeek nao expoe is_archived — None = nao existe upstream
+            is_temporary=None,  # DeepSeek nao tem feature
             is_preserved_missing=is_preserved,
             last_seen_in_server=self._ts(last_seen) if last_seen else None,
             summary=None,  # DeepSeek nao tem summary auto-gerado

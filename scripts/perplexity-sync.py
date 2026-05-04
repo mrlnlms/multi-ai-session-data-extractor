@@ -85,6 +85,8 @@ async def main(args: argparse.Namespace) -> int:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--no-reconcile", action="store_true", help="Pula reconcile")
+    parser.add_argument("--no-binaries", action="store_true",
+                        help="(no-op pra Perplexity: extractor faz threads + assets num shot — nao ha etapa separada)")
     parser.add_argument("--full", action="store_true", help="Refetch todas as threads")
     parser.add_argument("--account", default="default", help="Conta Perplexity (default: 'default')")
     parser.add_argument("--dry-run", action="store_true", help="Reporta sem executar")

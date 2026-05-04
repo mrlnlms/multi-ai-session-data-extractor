@@ -31,7 +31,7 @@ from typing import Optional
 import pandas as pd
 
 from src.parsers._claude_ai_helpers import (
-    block_time_bounds,
+    block_time_bounds_iso,
     build_branches,
     classify_tool_event,
     collect_attachment_names,
@@ -245,7 +245,7 @@ class ClaudeAIParser(BaseParser):
                 proj_dict.get("uuid") if isinstance(proj_dict, dict) else None
             ),
             is_pinned=bool(conv.get("is_starred", False)),
-            is_archived=False,  # Claude.ai nao expoe is_archived (validado 2026-05-01)
+            is_archived=None,  # Claude.ai nao expoe is_archived — None = feature nao existe upstream
             is_temporary=bool(conv.get("is_temporary", False)),
             is_preserved_missing=is_preserved,
             last_seen_in_server=self._ts(last_seen) if last_seen else None,
@@ -302,7 +302,7 @@ class ClaudeAIParser(BaseParser):
         )
 
         # Timestamps de bloco (latencia: max(stop) - min(start))
-        start_ts_str, stop_ts_str = block_time_bounds(content_blocks)
+        start_ts_str, stop_ts_str = block_time_bounds_iso(content_blocks)
 
         model = conv.get("model") if role == "assistant" else None
         branch_id = msg_to_branch.get(msg_uuid, f"{conv_uuid}_main")

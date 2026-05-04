@@ -50,8 +50,11 @@ def collect_text_from_content_list(content_list: list) -> str:
     return "\n\n".join(parts)
 
 
-def block_time_bounds(content_list: list) -> tuple[Optional[float], Optional[float]]:
-    """Retorna (min_ts, max_ts) dos blocks. Qwen usa epoch int em `timestamp`."""
+def block_time_bounds_epoch(content_list: list) -> tuple[Optional[float], Optional[float]]:
+    """Retorna (min_ts, max_ts) dos blocks. Qwen usa epoch int em `timestamp`.
+
+    Diferente de `block_time_bounds_iso` (claude_ai) que trabalha com strings ISO.
+    """
     if not content_list or not isinstance(content_list, list):
         return None, None
     starts = []
