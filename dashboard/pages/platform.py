@@ -50,8 +50,8 @@ def _capture_log_df(state: PlatformState) -> pd.DataFrame:
     for r in reversed(state.capture_runs):
         rows.append(
             {
-                "Inicio": format_datetime(r.started_at),
-                "Duracao (s)": (
+                "Start": format_datetime(r.started_at),
+                "Duration (s)": (
                     f"{r.duration_seconds:.0f}" if r.duration_seconds is not None else "—"
                 ),
                 "Discovery": str(r.discovery_total) if r.discovery_total is not None else "—",
@@ -60,7 +60,7 @@ def _capture_log_df(state: PlatformState) -> pd.DataFrame:
                     if r.fetch_attempted is not None
                     else "—"
                 ),
-                "Erros": r.errors_count,
+                "Errors": r.errors_count,
             }
         )
     return pd.DataFrame(rows)
@@ -71,7 +71,7 @@ def _reconcile_log_df(state: PlatformState) -> pd.DataFrame:
     for r in reversed(state.reconcile_runs):
         rows.append(
             {
-                "Quando": format_datetime(r.reconciled_at),
+                "When": format_datetime(r.reconciled_at),
                 "Added": r.added,
                 "Updated": r.updated,
                 "Copied": r.copied,
@@ -88,7 +88,7 @@ def _creation_chart(merged_stats) -> go.Figure:
     ys = [c for _, c in months]
     fig = go.Figure(go.Bar(x=xs, y=ys))
     fig.update_layout(
-        title="Convs criadas por mes",
+        title="Convs created per month",
         height=320,
         margin=dict(l=10, r=10, t=40, b=10),
         xaxis_title=None,
@@ -98,7 +98,7 @@ def _creation_chart(merged_stats) -> go.Figure:
 
 
 def render(state: PlatformState) -> None:
-    if st.button("← Voltar"):
+    if st.button("← Back"):
         st.session_state["view"] = "overview"
         st.rerun()
 
@@ -108,8 +108,8 @@ def render(state: PlatformState) -> None:
 
     if not state.has_data:
         st.info(
-            f"Nenhuma captura encontrada para {state.name}. "
-            f"Use o botao abaixo para rodar a primeira sync."
+            f"No capture found for {state.name}. "
+            f"Use the button below to run the first sync."
         )
         _render_sync_button(state)
         return
@@ -117,7 +117,7 @@ def render(state: PlatformState) -> None:
     _render_status_panel(state)
 
     st.divider()
-    st.subheader("Acoes")
+    st.subheader("Actions")
     _render_sync_button(state)
     _render_quarto_section(state)
 
@@ -132,16 +132,16 @@ def _render_status_panel(state: PlatformState) -> None:
     cols = st.columns(3)
     if state.last_capture:
         lc = state.last_capture
-        cols[0].metric("Ultima captura", relative_time(lc.started_at))
+        cols[0].metric("Last capture", relative_time(lc.started_at))
         cols[0].caption(format_datetime(lc.started_at))
     else:
-        cols[0].metric("Ultima captura", "—")
+        cols[0].metric("Last capture", "—")
     if state.last_reconcile:
         lr = state.last_reconcile
-        cols[1].metric("Ultimo reconcile", relative_time(lr.reconciled_at))
+        cols[1].metric("Last reconcile", relative_time(lr.reconciled_at))
         cols[1].caption(format_datetime(lr.reconciled_at))
     else:
-        cols[1].metric("Ultimo reconcile", "—")
+        cols[1].metric("Last reconcile", "—")
 
     raw_size = _cached_dir_size(str(state.raw_dir), state.raw_dir.stat().st_mtime) if state.raw_dir else 0
     merged_size = (
@@ -149,13 +149,13 @@ def _render_status_panel(state: PlatformState) -> None:
         if state.merged_dir
         else 0
     )
-    cols[2].metric("Storage local", format_size(raw_size + merged_size))
+    cols[2].metric("Local storage", format_size(raw_size + merged_size))
     cols[2].caption(f"raw {format_size(raw_size)} · merged {format_size(merged_size)}")
 
     if discovery_drop_flag(state):
         st.error(
-            "🚨 Discovery drop detectado: ultima captura veio com menos de "
-            "80% do total historico. Investigar antes de confiar no merged."
+            "🚨 Discovery drop detected: last capture came with less than "
+            "80% of the historical total. Investigate before trusting the merged."
         )
 
 
@@ -163,28 +163,28 @@ def _render_sync_button(state: PlatformState) -> None:
     cmd = sync_command(state.name)
     if cmd is None:
         st.info(
-            f"Nenhum script de sync ou export para {state.name} ainda. "
-            f"Implementar `scripts/{state.name.lower()}-sync.py` libera o botao."
+            f"No sync or export script for {state.name} yet. "
+            f"Implementing `scripts/{state.name.lower()}-sync.py` enables the button."
         )
         return
 
     label = (
         f"🔄 Sync {state.name}" if has_sync_script(state.name)
-        else f"🔄 Export {state.name} (sem orquestrador ainda)"
+        else f"🔄 Export {state.name} (no orchestrator yet)"
     )
     if st.button(label, key=f"sync-{state.name}", type="primary"):
-        with st.spinner(f"Rodando {' '.join(cmd[-2:])}..."):
+        with st.spinner(f"Running {' '.join(cmd[-2:])}..."):
             try:
                 result = run_sync(state.name)
             except Exception as e:  # noqa: BLE001
                 st.error(f"❌ {e}")
                 return
         if result.returncode != 0:
-            st.error(f"❌ Falhou (exit {result.returncode}).")
+            st.error(f"❌ Failed (exit {result.returncode}).")
             with st.expander("stderr"):
-                st.code(result.stderr or "(vazio)")
+                st.code(result.stderr or "(empty)")
         else:
-            st.success("✅ Sync concluido")
+            st.success("✅ Sync complete")
             with st.expander("stdout"):
                 st.code((result.stdout or "")[-3000:])
             st.cache_data.clear()
@@ -200,8 +200,8 @@ def _render_quarto_section(state: PlatformState) -> None:
     """
     if not quarto.quarto_installed():
         st.caption(
-            "ℹ️ Quarto não instalado — `brew install quarto` habilita visão "
-            "descritiva detalhada (`notebooks/<plat>.qmd`)."
+            "ℹ️ Quarto not installed — `brew install quarto` enables detailed "
+            "descriptive view (`notebooks/<plat>.qmd`)."
         )
         return
 
@@ -210,15 +210,15 @@ def _render_quarto_section(state: PlatformState) -> None:
 
     if not consolidated.exists() and not per_account:
         st.caption(
-            f"📝 Notebook descritivo Quarto não existe pra {state.name} ainda. "
-            f"Implementar `notebooks/{state.name.lower()}.qmd` (modelo: "
+            f"📝 Quarto descriptive notebook does not exist for {state.name} yet. "
+            f"Implement `notebooks/{state.name.lower()}.qmd` (template: "
             f"`notebooks/chatgpt.qmd`)."
         )
         return
 
     # 1) Consolidado
     if consolidated.exists():
-        _render_qmd_row(state, consolidated, label_suffix="(consolidado)")
+        _render_qmd_row(state, consolidated, label_suffix="(consolidated)")
 
     # 2) Per-account
     for acc_label, qmd in per_account:
@@ -239,40 +239,40 @@ def _render_qmd_row(state: PlatformState, qmd, label_suffix: str) -> None:
                 quarto.copy_to_static_for_qmd(qmd)
             url = quarto.streamlit_static_url_for_qmd(qmd)
             st.markdown(
-                f'📊 **[Ver dados detalhados {label_suffix}]({url})** — '
-                f'HTML self-contained, abre em nova aba',
+                f'📊 **[View detailed data {label_suffix}]({url})** — '
+                f'self-contained HTML, opens in a new tab',
                 unsafe_allow_html=True,
             )
         elif html_src.exists() and stale:
             st.warning(
-                f"⚠️ Dados detalhados {label_suffix} desatualizados — parquet mais novo que último render."
+                f"⚠️ Detailed data {label_suffix} out of date — parquet newer than last render."
             )
         else:
-            st.caption(f"📊 Dados detalhados {label_suffix} ainda não rendirizados.")
+            st.caption(f"📊 Detailed data {label_suffix} not rendered yet.")
 
     with cols[1]:
-        label = "🔄 Re-render" if html_src.exists() else "📊 Renderizar"
+        label = "🔄 Re-render" if html_src.exists() else "📊 Render"
         if st.button(label, key=f"render-quarto-{qmd.stem}"):
-            with st.spinner(f"Renderizando {qmd.name}... (~20s)"):
+            with st.spinner(f"Rendering {qmd.name}... (~20s)"):
                 ok, err = quarto.render_and_publish_qmd(qmd)
             if ok:
-                st.success("✅ Rendirizado e disponível")
+                st.success("✅ Rendered and available")
                 st.rerun()
             else:
-                st.error("❌ Render falhou")
+                st.error("❌ Render failed")
                 with st.expander("stderr"):
-                    st.code(err or "(vazio)")
+                    st.code(err or "(empty)")
 
 
 def _render_metrics(state: PlatformState) -> None:
-    st.subheader("Conteudo capturado")
+    st.subheader("Captured content")
     parquet = state.conversations_parquet_path
     if parquet is not None:
         merged = _cached_processed_stats(str(parquet), parquet.stat().st_mtime)
     elif state.merged_json_path is not None:
         merged = _cached_merged_stats(str(state.merged_json_path), state.merged_json_path.stat().st_mtime)
     else:
-        st.caption("Nenhum parquet ou merged.json encontrado para esta plataforma.")
+        st.caption("No parquet or merged.json found for this platform.")
         return
 
     cols = st.columns(4)
@@ -282,26 +282,26 @@ def _render_metrics(state: PlatformState) -> None:
     cols[3].metric("Archived", f"{merged.archived:,}")
 
     cols = st.columns(3)
-    cols[0].metric("Em projects", f"{merged.in_projects:,}")
+    cols[0].metric("In projects", f"{merged.in_projects:,}")
     cols[1].metric("Standalone", f"{merged.standalone:,}")
     cols[2].metric("Distinct projects", f"{merged.distinct_projects:,}")
 
     cols = st.columns(2)
-    cols[0].metric("Conv mais antiga", format_datetime(merged.oldest_create_time))
-    cols[1].metric("Atividade mais recente", format_datetime(merged.newest_update_time))
+    cols[0].metric("Oldest conv", format_datetime(merged.oldest_create_time))
+    cols[1].metric("Most recent activity", format_datetime(merged.newest_update_time))
 
-    st.metric("Mensagens estimadas", f"{merged.total_messages_estimated:,}")
+    st.metric("Estimated messages", f"{merged.total_messages_estimated:,}")
 
     if merged.creation_by_month:
         st.plotly_chart(_creation_chart(merged), width="stretch")
 
     if merged.models:
-        with st.expander("Modelos usados (top 10)"):
-            df = pd.DataFrame(merged.models.most_common(10), columns=["Model", "Mensagens"])
+        with st.expander("Models used (top 10)"):
+            df = pd.DataFrame(merged.models.most_common(10), columns=["Model", "Messages"])
             st.dataframe(df, hide_index=True, width="stretch")
 
     if merged.convs_per_project:
-        with st.expander("Top projects por convs"):
+        with st.expander("Top projects by convs"):
             top = merged.convs_per_project.most_common(15)
             df = pd.DataFrame(
                 [
@@ -315,8 +315,8 @@ def _render_metrics(state: PlatformState) -> None:
             st.dataframe(df, hide_index=True, width="stretch")
 
     if merged.preserved_titles:
-        with st.expander(f"Convs preservadas (deletadas no servidor) — {len(merged.preserved_titles)}"):
-            df = pd.DataFrame(merged.preserved_titles, columns=["ID", "Titulo"])
+        with st.expander(f"Preserved convs (deleted on server) — {len(merged.preserved_titles)}"):
+            df = pd.DataFrame(merged.preserved_titles, columns=["ID", "Title"])
             st.dataframe(df, hide_index=True, width="stretch")
 
     if state.raw_dir is not None:
@@ -326,9 +326,9 @@ def _render_metrics(state: PlatformState) -> None:
             st.subheader("Project sources (knowledge files)")
             cols = st.columns(4)
             cols[0].metric("Projects", f"{ps.total_projects}")
-            cols[1].metric("Com files", f"{ps.projects_with_files}")
-            cols[2].metric("Vazios", f"{ps.projects_empty}")
-            cols[3].metric("Tamanho", format_size(ps.total_size_bytes))
+            cols[1].metric("With files", f"{ps.projects_with_files}")
+            cols[2].metric("Empty", f"{ps.projects_empty}")
+            cols[3].metric("Size", format_size(ps.total_size_bytes))
             cols = st.columns(3)
             cols[0].metric("Files active", f"{ps.total_files_active}")
             cols[1].metric("Files preserved", f"{ps.total_files_preserved}")
@@ -336,15 +336,15 @@ def _render_metrics(state: PlatformState) -> None:
 
 
 def _render_history(state: PlatformState) -> None:
-    st.subheader("Historico")
-    tab_capture, tab_reconcile = st.tabs(["Capturas", "Reconciles"])
+    st.subheader("History")
+    tab_capture, tab_reconcile = st.tabs(["Captures", "Reconciles"])
     with tab_capture:
         if state.capture_runs:
             st.dataframe(_capture_log_df(state), hide_index=True, width="stretch")
         else:
-            st.caption("Sem capturas registradas.")
+            st.caption("No captures recorded.")
     with tab_reconcile:
         if state.reconcile_runs:
             st.dataframe(_reconcile_log_df(state), hide_index=True, width="stretch")
         else:
-            st.caption("Sem reconciles registrados.")
+            st.caption("No reconciles recorded.")

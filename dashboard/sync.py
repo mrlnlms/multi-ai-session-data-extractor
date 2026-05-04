@@ -55,7 +55,7 @@ def run_sync(platform: str, capture_output: bool = True) -> subprocess.Completed
     """Executa sync da plataforma, bloqueante. Levanta se comando nao existe."""
     cmd = sync_command(platform)
     if cmd is None:
-        raise RuntimeError(f"Nenhum script de sync ou export encontrado para {platform}")
+        raise RuntimeError(f"No sync or export script found for {platform}")
     env_pythonpath = str(PROJECT_ROOT)
     return subprocess.run(
         cmd,

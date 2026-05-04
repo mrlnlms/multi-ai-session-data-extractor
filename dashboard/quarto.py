@@ -133,7 +133,7 @@ def render_qmd(platform: str) -> subprocess.CompletedProcess:
 
 def _render_qmd_path(qmd: Path) -> subprocess.CompletedProcess:
     if not qmd.exists():
-        raise FileNotFoundError(f"QMD nao existe: {qmd}")
+        raise FileNotFoundError(f"QMD does not exist: {qmd}")
     cmd = ["quarto", "render", str(qmd.relative_to(PROJECT_ROOT))]
     env = {
         **os.environ,
@@ -156,7 +156,7 @@ def _link_to_static(src: Path, dst: Path) -> Path:
     mantem static/ sempre apontando pro ultimo render.
     """
     if not src.exists():
-        raise FileNotFoundError(f"HTML rendirizado nao existe: {src}")
+        raise FileNotFoundError(f"Rendered HTML does not exist: {src}")
     dst.parent.mkdir(parents=True, exist_ok=True)
     if dst.is_symlink() or dst.exists():
         dst.unlink()
@@ -185,11 +185,11 @@ def render_and_publish(platform: str) -> tuple[bool, Optional[str]]:
         return False, str(e)
     if result.returncode != 0:
         tail = (result.stderr or "")[-500:]
-        return False, f"quarto render falhou (exit {result.returncode}):\n{tail}"
+        return False, f"quarto render failed (exit {result.returncode}):\n{tail}"
     try:
         copy_to_static(platform)
     except Exception as e:
-        return False, f"render OK mas copy_to_static falhou: {e}"
+        return False, f"render OK but copy_to_static failed: {e}"
     return True, None
 
 
@@ -201,11 +201,11 @@ def render_and_publish_qmd(qmd: Path) -> tuple[bool, Optional[str]]:
         return False, str(e)
     if result.returncode != 0:
         tail = (result.stderr or "")[-500:]
-        return False, f"quarto render falhou (exit {result.returncode}):\n{tail}"
+        return False, f"quarto render failed (exit {result.returncode}):\n{tail}"
     try:
         copy_to_static_for_qmd(qmd)
     except Exception as e:
-        return False, f"render OK mas copy_to_static falhou: {e}"
+        return False, f"render OK but copy_to_static failed: {e}"
     return True, None
 
 
@@ -220,7 +220,7 @@ def overview_qmds() -> list[tuple[str, Path]]:
     for qmd in sorted(NOTEBOOKS_DIR.glob("00-overview*.qmd")):
         stem = qmd.stem
         if stem == "00-overview":
-            label = "Geral (todas)"
+            label = "General (all)"
         else:
             # 00-overview-web -> 'Web Chat', 00-overview-cli -> 'CLI', etc
             tail = stem.replace("00-overview-", "")

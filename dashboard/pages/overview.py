@@ -81,11 +81,11 @@ def _platform_table(states: list[PlatformState]) -> pd.DataFrame:
         rows.append(
             {
                 " ": STATUS_BADGES.get(s.status(), "⚪"),
-                "Plataforma": s.name,
-                "Ultima captura": (
+                "Platform": s.name,
+                "Last capture": (
                     relative_time(s.last_capture.started_at) if s.last_capture else "—"
                 ),
-                "Ultima conv mexida (servidor)": (
+                "Last conv touched (server)": (
                     relative_time(newest_update) if newest_update else "—"
                 ),
                 "Total": f"{total:,}" if total else "—",
@@ -110,15 +110,15 @@ def _timeline_figure(states: list[PlatformState]) -> go.Figure:
         fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines+markers", name=s.name))
         has_data = True
     fig.update_layout(
-        title="Discovery total por captura",
-        xaxis_title="Data",
-        yaxis_title="Convs descobertas",
+        title="Discovery total per capture",
+        xaxis_title="Date",
+        yaxis_title="Convs discovered",
         height=320,
         margin=dict(l=10, r=10, t=40, b=10),
     )
     if not has_data:
         fig.add_annotation(
-            text="Sem capturas ainda — rode um sync para popular este grafico.",
+            text="No captures yet — run a sync to populate this chart.",
             showarrow=False,
             font=dict(size=14),
         )
@@ -128,45 +128,45 @@ def _timeline_figure(states: list[PlatformState]) -> go.Figure:
 def render(states: list[PlatformState]) -> None:
     st.title("AI Sessions Tracker")
     st.caption(
-        "Captura cumulativa de sessoes AI multi-plataforma. "
-        "Dashboard descritivo — counts e saude operacional."
+        "Cumulative capture of multi-platform AI sessions. "
+        "Descriptive dashboard — counts and operational health."
     )
 
     kpis = _global_kpis(states)
 
     cols = st.columns(4)
-    cols[0].metric("Total capturado", f"{kpis['total_convs']:,}")
+    cols[0].metric("Total captured", f"{kpis['total_convs']:,}")
     cols[1].metric("Active", f"{kpis['active']:,}")
     cols[2].metric("Preserved missing", f"{kpis['preserved']:,}")
     cols[3].metric(
-        "Plataformas com dados",
+        "Platforms with data",
         f"{sum(1 for s in states if s.has_data)}/{len(states)}",
     )
 
     if kpis["last_sync"]:
         ts, name = kpis["last_sync"]
-        st.markdown(f"**Ultima sync global:** {relative_time(ts)} ({name}, {format_datetime(ts)})")
+        st.markdown(f"**Last global sync:** {relative_time(ts)} ({name}, {format_datetime(ts)})")
 
     if kpis["overdue"]:
-        st.warning(f"⚠️ {len(kpis['overdue'])} plataformas atrasadas: {', '.join(kpis['overdue'])}")
+        st.warning(f"⚠️ {len(kpis['overdue'])} platforms overdue: {', '.join(kpis['overdue'])}")
 
     drops = [s.name for s in states if discovery_drop_flag(s)]
     if drops:
-        st.error(f"🚨 Discovery drop detectado em: {', '.join(drops)}")
+        st.error(f"🚨 Discovery drop detected in: {', '.join(drops)}")
 
     st.divider()
 
     sync_disabled = not any(sync_command(s.name) for s in states)
-    if st.button("🔄 Atualizar todas", disabled=sync_disabled, type="primary"):
+    if st.button("🔄 Update all", disabled=sync_disabled, type="primary"):
         _run_update_all(states)
 
     st.divider()
 
-    st.subheader("Plataformas")
+    st.subheader("Platforms")
     df = _platform_table(states)
     st.dataframe(df, hide_index=True, width="stretch")
 
-    st.caption("Para detalhes, escolha uma plataforma:")
+    st.caption("For details, pick a platform:")
     cols = st.columns(min(len(states), 4))
     for i, s in enumerate(states):
         col = cols[i % len(cols)]
@@ -179,7 +179,7 @@ def render(states: list[PlatformState]) -> None:
     _render_overview_qmds_section()
 
     st.divider()
-    st.subheader("Timeline de captura")
+    st.subheader("Capture timeline")
     st.plotly_chart(_timeline_figure(states), width="stretch")
 
 
@@ -201,11 +201,11 @@ def _render_overview_qmds_section() -> None:
     if not qmds:
         return
 
-    st.subheader("Visões cross-plataforma")
+    st.subheader("Cross-platform views")
     st.caption(
-        "Comparativos consolidados de `data/unified/` — tabela pivot, "
-        "stacked bars por plataforma, distribuição temporal cruzada, "
-        "modelos cross, capture method, preservation."
+        "Consolidated comparisons from `data/unified/` — pivot table, "
+        "stacked bars per platform, cross temporal distribution, "
+        "cross models, capture method, preservation."
     )
 
     cols = st.columns(min(len(qmds), 4))
@@ -220,14 +220,14 @@ def _render_overview_qmds_section() -> None:
                 pass
             url = f"/app/static/quarto/{qmd.stem}.html"
             col.markdown(
-                f"📊 **{label}**  \n[Ver dados detalhados]({url}){{target=\"_blank\"}}"
+                f"📊 **{label}**  \n[View detailed data]({url}){{target=\"_blank\"}}"
             )
         else:
             if col.button(f"🔄 Render {label}", key=f"render-overview-{qmd.stem}"):
                 with st.spinner(f"Render {label}..."):
                     success, err = render_and_publish_qmd(qmd)
                 if success:
-                    st.success(f"✅ {label} rendirizado")
+                    st.success(f"✅ {label} rendered")
                     st.rerun()
                 else:
                     st.error(f"❌ {label}: {err}")
@@ -236,9 +236,9 @@ def _render_overview_qmds_section() -> None:
 def _run_update_all(states: list[PlatformState]) -> None:
     targets = [s for s in states if sync_command(s.name)]
     if not targets:
-        st.error("Nenhum sync disponivel.")
+        st.error("No sync available.")
         return
-    st.warning("⚠️ Sync em andamento — nao feche esta aba.")
+    st.warning("⚠️ Sync in progress — don't close this tab.")
     progress = st.progress(0.0)
     for i, s in enumerate(targets):
         with st.spinner(f"Sync {s.name}..."):
@@ -249,7 +249,7 @@ def _run_update_all(states: list[PlatformState]) -> None:
                 continue
         if result.returncode != 0:
             st.error(
-                f"❌ {s.name} falhou (exit {result.returncode}). "
+                f"❌ {s.name} failed (exit {result.returncode}). "
                 f"stderr: {(result.stderr or '')[-500:]}"
             )
         else:
