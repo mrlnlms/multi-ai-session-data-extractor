@@ -185,6 +185,60 @@ que valida schema + NOT NULL + VALID_SOURCES + nao-encolhimento. Mudancas
 silenciosas quebram analises do pai. Detalhes + recover + troubleshooting:
 `docs/dvc-runbook.md`.
 
+## Rotina pos-captura (checklist end-to-end)
+
+Apos qualquer ciclo de captura/parse de uma plataforma, rodar **na ordem**.
+Sem isso o pai nao enxerga os dados novos via `dvc import`.
+
+**1. Capturar + parsear + unify (filho):**
+
+```bash
+# (a) Captura — varia por plataforma
+PYTHONPATH=. .venv/bin/python scripts/<plat>-sync.py
+# (b) Materializa o cross-platform
+PYTHONPATH=. .venv/bin/python scripts/unify-parquets.py
+```
+
+**2. Comparar schema de `data/unified/messages.parquet` antes/depois.** Se
+mudou coluna ou tipo, abrir PR em `docs/unified-schema.md` no projeto pai
+**antes** de pushar aqui — smoke test do pai quebra silenciosamente. Conferir
+com:
+
+```bash
+.venv/bin/python -c "import duckdb; con=duckdb.connect(); \
+  print(con.execute(\"DESCRIBE SELECT * FROM read_parquet('data/unified/messages.parquet')\").fetchdf())"
+```
+
+**3. DVC add + commit + dvc push + git push (filho):**
+
+```bash
+.venv/bin/dvc add data/raw data/merged data/processed data/unified \
+    data/external/manual-saves data/external/deep-research-md \
+    data/external/perplexity-orphan-threads data/external/deepseek-snapshots \
+    data/external/chatgpt-extension-snapshot data/external/claude-ai-snapshots \
+    data/external/notebooklm-snapshots data/external/openai-gdpr-export
+git add data/*.dvc data/external/*.dvc data/.gitignore data/external/.gitignore
+~/.claude/scripts/commit.sh "data: snapshot apos <plat> sync (<stats>)"
+.venv/bin/dvc push   # blobs pro source-dvc no gdrive
+git push             # rev_lock pro GitHub — sem isso, pai nao enxerga via dvc import
+```
+
+**Os dois pushs sao obrigatorios.** `dvc push` sobe os blobs (gdrive), `git push`
+sobe o `.dvc` atualizado (GitHub). `dvc import` no pai precisa dos dois.
+
+**4. No pai (`~/Desktop/AI Interaction Analysis/`): atualizar + smoke test:**
+
+```bash
+cd ~/Desktop/AI\ Interaction\ Analysis/
+dvc update data/processed.dvc data/unified.dvc
+python scripts/smoke_test_unified.py
+```
+
+Se o smoke falhar, **investigar** — drift de schema eh o caso comum (coluna
+nova ou tipo mudado no filho que o pai nao espera). Resolver editando
+`docs/unified-schema.md` no pai pra refletir a nova realidade, ou revertendo
+a mudanca no filho.
+
 ## Estrutura
 
 ```
