@@ -1,5 +1,9 @@
 # multi-ai-session-data-extractor
 
+[![tests](https://github.com/mrlnlms/multi-ai-session-data-extractor/actions/workflows/test.yml/badge.svg)](https://github.com/mrlnlms/multi-ai-session-data-extractor/actions/workflows/test.yml)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Captura e arquivamento das suas próprias sessões em plataformas de AI
 (ChatGPT, Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity)
 mais ferramentas de linha de comando (Claude Code, Codex, Gemini CLI).
