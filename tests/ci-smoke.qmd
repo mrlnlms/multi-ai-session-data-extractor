@@ -1,0 +1,32 @@
+---
+title: "CI Smoke"
+subtitle: "Smoke render — confirma stack DuckDB + Pandas + Plotly + Quarto"
+jupyter: python3
+format:
+  html:
+    embed-resources: true
+    output-file: ci-smoke.html
+---
+
+```{python}
+#| label: setup
+#| echo: false
+import duckdb
+import pandas as pd
+import plotly.express as px
+
+con = duckdb.connect()
+df = pd.DataFrame({"x": [1, 2, 3, 4, 5], "y": [10, 12, 9, 14, 11]})
+con.register("smoke", df)
+n = con.sql("SELECT COUNT(*) AS n FROM smoke").fetchone()[0]
+print(f"smoke rows: {n}")
+```
+
+```{python}
+#| label: plot
+#| echo: false
+fig = px.line(df, x="x", y="y", title="Smoke plot")
+fig.show()
+```
+
+CI smoke OK.

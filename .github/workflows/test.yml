@@ -7,10 +7,12 @@ on:
     branches: [main]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  unit:
+    name: unit (${{ matrix.os }} / py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest, macos-latest]
         python-version: ["3.12", "3.13"]
       fail-fast: false
 
@@ -30,4 +32,94 @@ jobs:
           pip install pytest
 
       - name: Run pytest
-        run: PYTHONPATH=. pytest tests/ -q
+        run: pytest tests/ -q
+
+  integration:
+    name: integration smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: unit
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Setup Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Smoke — Quarto render
+        env:
+          QUARTO_PYTHON: ${{ github.workspace }}/.venv-or-system/bin/python
+        run: |
+          # Quarto usa o python do sistema (PATH); deps ja instaladas acima
+          quarto render tests/ci-smoke.qmd
+          test -f tests/ci-smoke.html
+          echo "✓ Quarto render OK ($(wc -c < tests/ci-smoke.html) bytes)"
+
+      - name: Smoke — Playwright import
+        run: |
+          python -c "from playwright.async_api import async_playwright; print('✓ playwright import OK')"
+
+      - name: Smoke — Streamlit dashboard inicia
+        run: |
+          # Inicia em background, espera healthcheck, mata. Confirma que
+          # o dashboard.py importa toda a stack e sobe sem erro.
+          PYTHONPATH=. streamlit run dashboard.py \
+            --server.headless true \
+            --server.port 8765 \
+            > /tmp/streamlit.log 2>&1 &
+          STREAMLIT_PID=$!
+          # Aguarda ate 30s o servidor responder
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8765/_stcore/health > /dev/null 2>&1; then
+              echo "✓ Streamlit healthcheck OK em ${i}s"
+              kill $STREAMLIT_PID 2>/dev/null || true
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "✗ Streamlit nao respondeu em 30s"
+          cat /tmp/streamlit.log
+          kill $STREAMLIT_PID 2>/dev/null || true
+          exit 1
+
+      - name: Smoke — imports das 10 plataformas
+        run: |
+          PYTHONPATH=. python <<'EOF'
+          # Verifica que todos os parsers + extractors importam sem erro
+          # em runtime real (Linux/macOS), nao so via pytest.
+          from src.parsers.chatgpt import ChatGPTParser
+          from src.parsers.claude_ai import ClaudeAIParser
+          from src.parsers.perplexity import PerplexityParser
+          from src.parsers.qwen import QwenParser
+          from src.parsers.deepseek import DeepSeekParser
+          from src.parsers.gemini import GeminiParser
+          from src.parsers.notebooklm import NotebookLMParser
+          from src.parsers.claude_code import ClaudeCodeParser
+          from src.parsers.codex import CodexParser
+          from src.parsers.gemini_cli import GeminiCLIParser
+
+          # Extractors auth modules (validam imports Playwright)
+          from src.extractors.chatgpt import auth as cgt_auth
+          from src.extractors.claude_ai import auth as cla_auth
+          from src.extractors.perplexity import auth as ppx_auth
+          from src.extractors.qwen import auth as qwn_auth
+          from src.extractors.deepseek import auth as dsk_auth
+          from src.extractors.gemini import auth as gmn_auth
+          from src.extractors.notebooklm import auth as nbk_auth
+
+          print("✓ 10 parsers + 7 extractor auth modules import OK")
+          EOF
