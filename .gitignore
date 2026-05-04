@@ -57,3 +57,10 @@ docs/local/
 # Servidor HTTP local (scripts/serve-qmds.sh)
 .serve-qmds.pid
 .serve-qmds.log
+
+# Streamlit dashboard (background)
+.streamlit-dashboard.pid
+.streamlit-dashboard.log
+
+# Render batch helper
+.render-all.pid
