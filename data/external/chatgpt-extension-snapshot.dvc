@@ -1,0 +1,6 @@
+outs:
+- md5: f3a76dd606c97471e9c89a96f3b7d83f.dir
+  size: 53105157
+  nfiles: 3
+  hash: md5
+  path: chatgpt-extension-snapshot

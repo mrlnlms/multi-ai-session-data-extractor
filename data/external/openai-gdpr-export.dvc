@@ -1,0 +1,6 @@
+outs:
+- md5: f3cc8f07417f582eaa54be66512f9649.dir
+  size: 656253141
+  nfiles: 24
+  hash: md5
+  path: openai-gdpr-export

@@ -1,0 +1,6 @@
+outs:
+- md5: b9ed9f56028c67fa4e333eca022b721d.dir
+  size: 1818732
+  nfiles: 30
+  hash: md5
+  path: manual-saves
