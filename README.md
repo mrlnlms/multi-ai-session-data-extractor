@@ -210,6 +210,5 @@ MIT — ver [LICENSE](LICENSE).
 ## Contribuindo
 
 Issues e PRs bem-vindos. Detalhes em
-[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Para adicionar uma
-plataforma nova, ver o playbook em
-[docs/parser-v3/platform-replication-plan.md](docs/parser-v3/platform-replication-plan.md).
+[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md), incluindo o playbook de
+8 fases pra adicionar plataforma nova.

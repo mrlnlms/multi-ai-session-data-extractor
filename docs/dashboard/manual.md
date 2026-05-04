@@ -20,7 +20,7 @@ seção 10 deste arquivo.
 O dashboard apresenta dados, **nao interpreta**. Counts, distribuicoes,
 timelines, status. Sem analise de sentimento, clustering semantico, coding
 qualitativo, ranking de "qualidade" ou narrative discovery. Quem quer
-interpretacao pesada leva os parquets pra `~/Desktop/AI Interaction Analysis/`.
+interpretacao pesada leva os parquets pra um pipeline analitico proprio.
 
 Tambem **read-only**: o dashboard nunca edita os dados que o sync produziu.
 Os botoes disparam o sync original via subprocess; nao reescrevem JSONs nem
@@ -267,7 +267,7 @@ escopo do dashboard (por design):
   tem comparativo lado-a-lado (ex: distribuicao temporal das 7 simultaneas).
   Fica pro `notebooks/00-overview.qmd` (backlog).
 - **Analise interpretativa** — sentiment, clustering, topic detection. Por
-  design fica em `~/Desktop/AI Interaction Analysis/`.
+  design fica em pipelines externos (este projeto so produz parquets).
 
 ---
 
@@ -285,8 +285,6 @@ dashboard/
     ├── overview.py
     └── platform.py
 ```
-
-`docs/dashboard/plan.md` — plan formal das 4 fases (histórico de decisões — todas shipped).
 
 `README.md` — seção "Dashboard" com instalação e comandos básicos.
 

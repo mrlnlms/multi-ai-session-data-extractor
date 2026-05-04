@@ -49,6 +49,11 @@ _backup-temp/
 local/
 .tmp/
 
+# Local-only docs (planos internos, journeys, housekeeping, superpowers).
+# Conteudo util pra contributor externo foi extraido pros docs publicos
+# (CONTRIBUTING.md, LIMITATIONS.md, docs/probes/).
+docs/local/
+
 # Servidor HTTP local (scripts/serve-qmds.sh)
 .serve-qmds.pid
 .serve-qmds.log

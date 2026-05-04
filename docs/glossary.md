@@ -140,8 +140,8 @@ Cada run gera contadores desses 4 estados em `reconcile_log.jsonl`.
 Saída do parser em `data/processed/<Source>/`. 4 tabelas (ChatGPT):
 `conversations.parquet`, `messages.parquet`, `tool_events.parquet`,
 `branches.parquet`. Schema definido em `src/schema/models.py`. Interface
-universal consumida pelo dashboard descritivo (Quarto futuro) e pelo projeto
-de análise qualitativa (`~/Desktop/AI Interaction Analysis/`).
+universal consumida pelo dashboard descritivo (Quarto) e por pipelines
+externos de análise qualitativa.
 
 ### Branch
 
@@ -206,11 +206,10 @@ sources × extractor + manual saves em uma vista cross-platform:
 auxiliares de project), `keep='last'`. Defesa contra dups internas
 (parsers que emitem rows duplicadas) + propagacao de fix de parser.
 
-**Decisao:** filho materializa `data/unified/`, NAO o consumer
-(`~/Desktop/AI Interaction Analysis/`). Filho é a casa canonica de
-dados; consumer vai consumir via `dvc import-url` desses 11 parquets.
-Decorrente da decisao "filho eh casa canonica" em
-`memory/project_canonical_data_home.md`.
+**Decisao:** este projeto materializa `data/unified/` em casa; pipelines
+de consumo externos (analise qualitativa, etc) leem via `dvc import-url`
+desses 11 parquets. Este projeto e a casa canonica de dados; consumers
+sao read-only.
 
 **Idempotente:** rodar 1x ou 100x produz arquivos byte-a-byte identicos.
 Se apagar `data/unified/`, basta rodar `scripts/unify-parquets.py` de

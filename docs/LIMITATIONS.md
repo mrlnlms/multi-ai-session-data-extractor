@@ -44,9 +44,41 @@ Limitações se dividem em 3 categorias:
 - **Voice em Perplexity** — o servidor transcreve e descarta o áudio,
   sem `is_voice` no schema. Não há como saber retroativamente se uma
   mensagem foi originalmente de voz.
+- **Attachments antigos no S3 expiram.** Perplexity faz cleanup
+  automático de uploads antigos no S3. Manifest preserva os entries
+  como `failed_upstream_deleted` pra idempotência (skip em re-runs).
+  Equivalente aos 8 assets ChatGPT antigos com parents deletados.
+- **Slugs de Page não estão no DOM inicial.** Perplexity é SPA Vite com
+  router programático (`router.push` no onClick). Pages exigem DOM-click
+  programático com `expect_navigation` pra extrair slugs. Custo: ~10s
+  por page. Aceitável pra volumes baixos.
 - **1 thread orphan em GAS:** a thread `d344c501` é referenciada num
   space mas foi deletada do servidor. Preservada localmente como
   `is_preserved_missing=True`.
+
+#### Pro/Max features não cobertas (TODO público pra contributors)
+
+Estas validações exigem conta Pro Max e ficam em aberto até alguém testar:
+
+- **Computer mode (`mode=asi`)** — endpoint `/rest/spaces/{uuid}/tasks`
+  retorna `{tasks: []}` em conta Pro. Em Max: criar tarefa Computer e
+  capturar threads geradas + tasks armazenadas + possíveis novos
+  endpoints `/rest/computer/*`.
+- **Scheduled tasks** — botão "Scheduled" na home. Em Max: criar
+  agendamento e descobrir endpoint.
+- **Model council (Max tier)** — feature Max consulta múltiplos modelos
+  simultaneamente. Schema desconhecido. Captura cada modelo como
+  ToolEvent separado? Aggregação numa só assistant message?
+- **Modelos AI alternativos no listing** — Sonar / GPT / Gemini / Claude
+  / Kimi etc. Lockados em Pro. Em Max: trocar modelo na thread e validar
+  `display_model` na entry.
+- **Pages — criar uma própria.** Hoje capturamos pages bookmarkadas. Em
+  Pro: publicar thread COMO Page e descobrir slug + schema do article
+  gerado + diferenças vs pages bookmarkadas.
+- **Deep Research moderno.** Mode lockado em Pro. Em Max: validar se
+  mode na entry vem como `COPILOT` (legacy) ou tem novo nome
+  (`DEEP_RESEARCH`); se entry tem campos extras (multi-step, citations
+  expandidas).
 
 ### Qwen
 
