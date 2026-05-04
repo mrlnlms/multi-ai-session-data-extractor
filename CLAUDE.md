@@ -30,7 +30,7 @@ o dashboard. Furo: `notebooks/<source>.qmd` rendiriza, parquets estao em
 `data/processed/<Source>/`, mas a tabela do dashboard ainda mostra ❌.
 Resolver antes de fechar.
 
-## Status (2026-05-03)
+## Status
 
 Ciclo end-to-end por plataforma documentado em
 `docs/platforms/<plat>/state.md` — **conferir la antes de propor refatoracao
@@ -40,19 +40,19 @@ ou script novo**. Resumo:
 |---|---|---|---|---|---|---|---|
 | ChatGPT | ✅ | ✅ | ✅ (4 etapas) | ✅ | ✅ | [chatgpt/state.md](docs/platforms/chatgpt/state.md) | 1171 convs, 6 CRUD validados |
 | Claude.ai | ✅ | ✅ | ✅ (3 etapas) | ✅ | ✅ | [claude-ai/state.md](docs/platforms/claude-ai/state.md) | 24k msgs / 16k events, MCP, project_docs |
-| Qwen | ✅ | ✅ | ✅ (2 etapas) | ✅ | ✅ | [qwen/state.md](docs/platforms/qwen/state.md) | shipped 2026-05-01 (3/4 CRUD) |
-| DeepSeek | ✅ | ✅ | ✅ (2 etapas) | ✅ | ✅ | [deepseek/state.md](docs/platforms/deepseek/state.md) | shipped 2026-05-01 (3/3 CRUD), R1 thinking 31% |
-| Gemini | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ | ✅ | [gemini/state.md](docs/platforms/gemini/state.md) | shipped 2026-05-02, 2 contas, 4/4 CRUD |
-| NotebookLM | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ | ✅ | [notebooklm/state.md](docs/platforms/notebooklm/state.md) | shipped 2026-05-02, 9 parquets, account-3 legacy |
+| Qwen | ✅ | ✅ | ✅ (2 etapas) | ✅ | ✅ | [qwen/state.md](docs/platforms/qwen/state.md) | 3/4 CRUD validados (archive eh no-op upstream) |
+| DeepSeek | ✅ | ✅ | ✅ (2 etapas) | ✅ | ✅ | [deepseek/state.md](docs/platforms/deepseek/state.md) | 3/3 CRUD validados, R1 thinking 31% |
+| Gemini | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ | ✅ | [gemini/state.md](docs/platforms/gemini/state.md) | 2 contas, 4/4 CRUD validados |
+| NotebookLM | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ | ✅ | [notebooklm/state.md](docs/platforms/notebooklm/state.md) | multi-conta + account-3 legacy, 9 parquets |
 | Perplexity | ✅ | ✅ | ✅ (2 etapas) | ✅ | ✅ | [perplexity/state.md](docs/platforms/perplexity/state.md) | 82 convs, 4 spaces, 1 orphan |
 
 **CLI (3 fontes adicionais — dado local em vez de captura web):**
 
 | CLI | Source | Copy script | Parser v3 | Status |
 |---|---|---|---|---|
-| Claude Code | claude_code | `cli-copy.py --source claude_code` | ✅ shipped 2026-05-03 | 3742 convs / 136k msgs / 78k tool_events |
-| Codex | codex | `cli-copy.py --source codex` | ✅ shipped 2026-05-03 | 112 convs / 2.6k msgs / 6.1k tool_events |
-| Gemini CLI | gemini_cli | `cli-copy.py --source gemini_cli` | ✅ shipped 2026-05-03 | 12 convs / 181 msgs / 84 tool_events |
+| Claude Code | claude_code | `cli-copy.py --source claude_code` | ✅ | 3742 convs / 136k msgs / 78k tool_events (corpus de exemplo) |
+| Codex | codex | `cli-copy.py --source codex` | ✅ | 112 convs / 2.6k msgs / 6.1k tool_events (corpus de exemplo) |
+| Gemini CLI | gemini_cli | `cli-copy.py --source gemini_cli` | ✅ | 12 convs / 181 msgs / 84 tool_events (corpus de exemplo) |
 
 **Manual saves** (parser via `scripts/manual-saves-sync.py` — re-mapeiam
 source pra plataforma original):
@@ -186,7 +186,7 @@ data/
 ├── processed/                # (gitignored) saida dos parsers (per-source)
 ├── unified/                  # (gitignored) saida do unify-parquets.py (cross-platform)
 └── external/                 # (gitignored) blobs preservados (snapshots, GDPR exports, etc)
-.venv/                        # local — Python 3.14, criado em 2026-04-27
+.venv/                        # local — Python ≥3.12 (testado em 3.12 e 3.13 no CI)
                               # setup: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 
