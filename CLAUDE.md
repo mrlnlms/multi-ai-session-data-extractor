@@ -121,9 +121,8 @@ Marcos arquiteturais 2026-05-04 — todos shipped:
    badges/LICENSE, secao DVC opcional pra contributors em `docs/SETUP.md`.
 
 Trabalho aberto pos-2026-05-04: ver [docs/ROADMAP.md](docs/ROADMAP.md)
-(7 items: Claude Code image extraction, Claude.ai memories, ingestao por
-URL, automacao CLI capture, ChatGPT delete cycle, voice DOM pass decisao,
-versionamento avancado).
+(3 items: Claude Code image extraction, Claude.ai memories, ChatGPT
+capture-delete cycle).
 
 ## Cross-feature checks (pin, archive, voice, share)
 
