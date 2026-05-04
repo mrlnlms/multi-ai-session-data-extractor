@@ -2,6 +2,8 @@
 data/raw/
 data/merged/
 data/processed/
+data/unified/
+data/external/
 
 # Python
 __pycache__/
@@ -10,6 +12,8 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.coverage
+.pytest_cache/
 
 # IDE
 .vscode/
@@ -40,3 +44,7 @@ _backup-temp/
 # Local scratch
 local/
 .tmp/
+
+# Servidor HTTP local (scripts/serve-qmds.sh)
+.serve-qmds.pid
+.serve-qmds.log
