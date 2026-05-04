@@ -1,23 +1,23 @@
-## Visao geral
+## Overview
 
-Este documento eh um **catalogo descritivo** dos parquets do parser canonico
-de **{{< meta source-title >}}**. Apresenta o que esta nos dados — schema,
-cobertura, distribuicoes, preservation. **Nao interpreta** conteudo (sem
-sentiment, clustering, topic detection). Pra analise qualitativa, ver
-projeto `~/Desktop/AI Interaction Analysis/`.
+This document is a **descriptive catalog** of the canonical parser parquets
+for **{{< meta source-title >}}**. Shows what's in the data — schema,
+coverage, distributions, preservation. **Does not interpret** content (no
+sentiment, clustering, topic detection). For qualitative analysis, see
+project `~/AI Interaction Analysis/`.
 
 ```{python}
 #| label: overview-totals
-#| code-summary: "Totais por tabela"
+#| code-summary: "Totals per table"
 
 _rows = [
-    {"Tabela": f"{SOURCE_KEY}_conversations.parquet", "Rows": fmt_int(table_count(con, "conversations"))},
-    {"Tabela": f"{SOURCE_KEY}_messages.parquet",      "Rows": fmt_int(table_count(con, "messages"))},
-    {"Tabela": f"{SOURCE_KEY}_tool_events.parquet",   "Rows": fmt_int(table_count(con, "tool_events"))},
-    {"Tabela": f"{SOURCE_KEY}_branches.parquet",      "Rows": fmt_int(table_count(con, "branches"))},
+    {"Table": f"{SOURCE_KEY}_conversations.parquet", "Rows": fmt_int(table_count(con, "conversations"))},
+    {"Table": f"{SOURCE_KEY}_messages.parquet",      "Rows": fmt_int(table_count(con, "messages"))},
+    {"Table": f"{SOURCE_KEY}_tool_events.parquet",   "Rows": fmt_int(table_count(con, "tool_events"))},
+    {"Table": f"{SOURCE_KEY}_branches.parquet",      "Rows": fmt_int(table_count(con, "branches"))},
 ]
 for _aux in AUX_TABLES:
-    _rows.append({"Tabela": f"{SOURCE_KEY}_{_aux}.parquet", "Rows": fmt_int(table_count(con, _aux))})
+    _rows.append({"Table": f"{SOURCE_KEY}_{_aux}.parquet", "Rows": fmt_int(table_count(con, _aux))})
 show_df(pd.DataFrame(_rows))
 ```
 
@@ -33,35 +33,35 @@ _newest = _period["newest"].iloc[0]
 _last = _period["last_update"].iloc[0]
 
 _meta_rows = [
-    {"Campo": "Periodo de criacao", "Valor": f"{_oldest:%Y-%m-%d} → {_newest:%Y-%m-%d}" if pd.notna(_oldest) else "—"},
-    {"Campo": "Ultima atualizacao", "Valor": f"{_last:%Y-%m-%d %H:%M}" if pd.notna(_last) else "—"},
+    {"Field": "Creation period", "Value": f"{_oldest:%Y-%m-%d} → {_newest:%Y-%m-%d}" if pd.notna(_oldest) else "—"},
+    {"Field": "Last update", "Value": f"{_last:%Y-%m-%d %H:%M}" if pd.notna(_last) else "—"},
 ]
 if PROCESSED.exists():
     import datetime as _dt
     _mt = max((p.stat().st_mtime for p in PROCESSED.glob(f"{SOURCE_KEY}_*.parquet")), default=None)
     if _mt:
-        _meta_rows.append({"Campo": "Parquets gerados em", "Valor": _dt.datetime.fromtimestamp(_mt).strftime("%Y-%m-%d %H:%M")})
+        _meta_rows.append({"Field": "Parquets generated at", "Value": _dt.datetime.fromtimestamp(_mt).strftime("%Y-%m-%d %H:%M")})
     _size = sum(p.stat().st_size for p in PROCESSED.glob(f"{SOURCE_KEY}_*.parquet"))
-    _meta_rows.append({"Campo": "Tamanho em disco", "Valor": f"{_size/1024/1024:.1f} MB"})
+    _meta_rows.append({"Field": "Size on disk", "Value": f"{_size/1024/1024:.1f} MB"})
 show_df(pd.DataFrame(_meta_rows))
 ```
 
-# 1. Dados disponiveis
+# 1. Available data
 
-Cada uma das tabelas canonicas tem schema proprio. Aqui mostramos os campos,
-sua cobertura nesta base (quantas linhas tem o campo preenchido) e amostras
-diversificadas.
+Each canonical table has its own schema. Here we show the fields, their
+coverage in this base (how many rows have the field populated) and
+diversified samples.
 
 ## 1.1 Conversations
 
-A tabela de conversas eh a unidade central. Cada linha representa um chat,
-sessao ou notebook — com metadados (titulo, modelo, projeto, datas) e
-campos de preservation criados pelo parser (`is_preserved_missing`,
+The conversations table is the central unit. Each row represents a chat,
+session or notebook — with metadata (title, model, project, dates) and
+preservation fields created by the parser (`is_preserved_missing`,
 `last_seen_in_server`).
 
 ```{python}
 #| label: conv-schema
-#| code-summary: "Cobertura por campo — conversations"
+#| code-summary: "Coverage per field — conversations"
 
 _t = table_count(con, "conversations")
 _cov = con.execute(f"""
@@ -84,48 +84,48 @@ def _conv_cov(field):
     if field in _cov.columns:
         n = _cov[field].iloc[0]
     else:
-        # Coluna conditional (summary, settings_json) — query direto
+        # Conditional column (summary, settings_json) — query directly
         n = con.execute(f'SELECT COUNT("{field}") FROM conversations').fetchone()[0]
     return fmt_pct(int(n) if pd.notna(n) else 0, _t)
 
 _schema_rows = [
-    {"Campo": "conversation_id", "Tipo": "str",       "Descricao": "ID unico (UUID/hash da plataforma)",                          "Cobertura": fmt_pct(_t, _t)},
-    {"Campo": "source",          "Tipo": "str",       "Descricao": f"Sempre '{SOURCE_KEY}' nesta tabela",                         "Cobertura": fmt_pct(_t, _t)},
-    {"Campo": "title",           "Tipo": "str?",      "Descricao": "Titulo gerado pelo servidor ou usuario",                      "Cobertura": _conv_cov("title")},
-    {"Campo": "created_at",      "Tipo": "timestamp", "Descricao": "Quando a conv foi criada",                                    "Cobertura": "100%"},
-    {"Campo": "updated_at",      "Tipo": "timestamp", "Descricao": "Ultima msg ou rename (servidor bumpa em algumas plataformas)","Cobertura": "100%"},
-    {"Campo": "message_count",   "Tipo": "int",       "Descricao": "Msgs visiveis (user+assistant nao hidden)",                   "Cobertura": "100%"},
-    {"Campo": "model",           "Tipo": "str?",      "Descricao": "Ultimo model_slug do assistant na conv",                      "Cobertura": _conv_cov("model")},
-    {"Campo": "mode",            "Tipo": "str?",      "Descricao": "chat / search / research / copilot / concise / dalle / cli",  "Cobertura": _conv_cov("mode")},
-    {"Campo": "project",         "Tipo": "str?",      "Descricao": "Nome do projeto/pasta na sidebar",                            "Cobertura": _conv_cov("project")},
-    {"Campo": "project_id",      "Tipo": "str?",      "Descricao": "ID do projeto",                                               "Cobertura": _conv_cov("project_id")},
-    {"Campo": "gizmo_id",        "Tipo": "str?",      "Descricao": "Custom GPT/agent vinculado",                                  "Cobertura": _conv_cov("gizmo_id")},
-    {"Campo": "is_preserved_missing","Tipo":"bool",   "Descricao": "True se sumiu do servidor (preservada local)",                "Cobertura": f"{safe_int(_cov['preserved'].iloc[0])} flagged"},
-    {"Campo": "last_seen_in_server","Tipo":"timestamp","Descricao": "Data da ultima run em que servidor retornou",                "Cobertura": _conv_cov("last_seen")},
-    {"Campo": "is_pinned",       "Tipo": "bool",      "Descricao": "Pin (depende da plataforma — algumas nao expoem)",            "Cobertura": f"{safe_int(_cov['pinned'].iloc[0])} flagged"},
-    {"Campo": "is_archived",     "Tipo": "bool",      "Descricao": "Archive (depende da plataforma)",                             "Cobertura": f"{safe_int(_cov['archived'].iloc[0])} flagged"},
-    {"Campo": "is_temporary",    "Tipo": "bool",      "Descricao": "Temporary chat (efemera — Claude.ai expoe)",                  "Cobertura": f"{safe_int(_cov['temporary'].iloc[0])} flagged"},
+    {"Field": "conversation_id", "Type": "str",       "Description": "Unique ID (platform UUID/hash)",                          "Coverage": fmt_pct(_t, _t)},
+    {"Field": "source",          "Type": "str",       "Description": f"Always '{SOURCE_KEY}' in this table",                    "Coverage": fmt_pct(_t, _t)},
+    {"Field": "title",           "Type": "str?",      "Description": "Title generated by server or user",                       "Coverage": _conv_cov("title")},
+    {"Field": "created_at",      "Type": "timestamp", "Description": "When the conv was created",                               "Coverage": "100%"},
+    {"Field": "updated_at",      "Type": "timestamp", "Description": "Last msg or rename (server bumps on some platforms)",     "Coverage": "100%"},
+    {"Field": "message_count",   "Type": "int",       "Description": "Visible msgs (user+assistant non-hidden)",                "Coverage": "100%"},
+    {"Field": "model",           "Type": "str?",      "Description": "Last assistant model_slug in the conv",                   "Coverage": _conv_cov("model")},
+    {"Field": "mode",            "Type": "str?",      "Description": "chat / search / research / copilot / concise / dalle / cli","Coverage": _conv_cov("mode")},
+    {"Field": "project",         "Type": "str?",      "Description": "Project/folder name in the sidebar",                      "Coverage": _conv_cov("project")},
+    {"Field": "project_id",      "Type": "str?",      "Description": "Project ID",                                              "Coverage": _conv_cov("project_id")},
+    {"Field": "gizmo_id",        "Type": "str?",      "Description": "Linked custom GPT/agent",                                 "Coverage": _conv_cov("gizmo_id")},
+    {"Field": "is_preserved_missing","Type":"bool",   "Description": "True if disappeared from server (preserved locally)",     "Coverage": f"{safe_int(_cov['preserved'].iloc[0])} flagged"},
+    {"Field": "last_seen_in_server","Type":"timestamp","Description": "Date of last run when server returned it",               "Coverage": _conv_cov("last_seen")},
+    {"Field": "is_pinned",       "Type": "bool",      "Description": "Pin (depends on platform — some don't expose)",           "Coverage": f"{safe_int(_cov['pinned'].iloc[0])} flagged"},
+    {"Field": "is_archived",     "Type": "bool",      "Description": "Archive (depends on platform)",                           "Coverage": f"{safe_int(_cov['archived'].iloc[0])} flagged"},
+    {"Field": "is_temporary",    "Type": "bool",      "Description": "Temporary chat (ephemeral — Claude.ai exposes)",          "Coverage": f"{safe_int(_cov['temporary'].iloc[0])} flagged"},
 ]
 if has_col(con, "conversations", "interaction_type"):
     _it_human = con.execute("SELECT COUNT(*) FROM conversations WHERE interaction_type='human_ai'").fetchone()[0]
     _it_ai = con.execute("SELECT COUNT(*) FROM conversations WHERE interaction_type='ai_ai'").fetchone()[0]
-    _schema_rows.append({"Campo": "interaction_type", "Tipo": "str", "Descricao": "human_ai (default) ou ai_ai (subagent CLI)", "Cobertura": f"human_ai={_it_human}, ai_ai={_it_ai}"})
+    _schema_rows.append({"Field": "interaction_type", "Type": "str", "Description": "human_ai (default) or ai_ai (subagent CLI)", "Coverage": f"human_ai={_it_human}, ai_ai={_it_ai}"})
 if has_col(con, "conversations", "account"):
     _n_acc = con.execute("SELECT COUNT(DISTINCT account) FROM conversations WHERE account IS NOT NULL").fetchone()[0]
-    _schema_rows.append({"Campo": "account", "Tipo": "str?", "Descricao": "Conta na plataforma (multi-conta)", "Cobertura": f"{_n_acc} distinta(s)"})
+    _schema_rows.append({"Field": "account", "Type": "str?", "Description": "Account on the platform (multi-account)", "Coverage": f"{_n_acc} distinct"})
 if has_col(con, "conversations", "summary"):
-    _schema_rows.append({"Campo": "summary", "Tipo": "str?", "Descricao": "Auto-resumo gerado pela plataforma", "Cobertura": _conv_cov("summary") if has_col(con, "conversations", "summary") else "—"})
+    _schema_rows.append({"Field": "summary", "Type": "str?", "Description": "Auto-summary generated by the platform", "Coverage": _conv_cov("summary") if has_col(con, "conversations", "summary") else "—"})
 if has_col(con, "conversations", "settings_json"):
-    _schema_rows.append({"Campo": "settings_json", "Tipo": "str?", "Descricao": "Feature flags / settings da conv (JSON)", "Cobertura": _conv_cov("settings_json") if has_col(con, "conversations", "settings_json") else "—"})
+    _schema_rows.append({"Field": "settings_json", "Type": "str?", "Description": "Feature flags / conv settings (JSON)", "Coverage": _conv_cov("settings_json") if has_col(con, "conversations", "settings_json") else "—"})
 if has_col(con, "conversations", "capture_method"):
-    _schema_rows.append({"Campo": "capture_method", "Tipo": "str", "Descricao": "extractor / manual_clipping_obsidian / manual_copypaste / manual_terminal_cc", "Cobertura": fmt_pct(_t, _t)})
+    _schema_rows.append({"Field": "capture_method", "Type": "str", "Description": "extractor / manual_clipping_obsidian / manual_copypaste / manual_terminal_cc", "Coverage": fmt_pct(_t, _t)})
 
 show_df(pd.DataFrame(_schema_rows))
 ```
 
 ```{python}
 #| label: conv-sample
-#| code-summary: "Amostra diversificada — conversations"
+#| code-summary: "Diversified sample — conversations"
 #| column: page
 
 _ctes = []
@@ -154,13 +154,13 @@ show_df(_sample)
 
 ## 1.2 Messages
 
-Mensagens user/assistant. Mensagens com `role=tool` viram `tool_events`
-(nao aparecem aqui). Mensagens internas (assistant chamando tool) ficam
-preservadas com `is_hidden=True` em algumas plataformas.
+User/assistant messages. Messages with `role=tool` become `tool_events`
+(don't appear here). Internal messages (assistant calling tool) are
+preserved with `is_hidden=True` on some platforms.
 
 ```{python}
 #| label: msg-schema
-#| code-summary: "Cobertura por campo — messages"
+#| code-summary: "Coverage per field — messages"
 
 _mt = table_count(con, "messages")
 _mcov = con.execute("""
@@ -183,40 +183,40 @@ def _msg_cov(f):
     return fmt_pct(int(n) if pd.notna(n) else 0, _mt)
 
 _msg_rows = [
-    {"Campo": "message_id",       "Tipo": "str",       "Descricao": "ID unico", "Cobertura": fmt_pct(_mt, _mt)},
-    {"Campo": "conversation_id",  "Tipo": "str",       "Descricao": "FK pra conversations", "Cobertura": "100%"},
-    {"Campo": "branch_id",        "Tipo": "str",       "Descricao": "FK pra branches (`<conv>_main` por default)", "Cobertura": "100%"},
-    {"Campo": "sequence",         "Tipo": "int",       "Descricao": "Ordem cronologica (1,2,3...)", "Cobertura": "100%"},
-    {"Campo": "role",             "Tipo": "str",       "Descricao": "user / assistant / system", "Cobertura": "100%"},
-    {"Campo": "content",          "Tipo": "str",       "Descricao": "Texto consolidado", "Cobertura": "100%"},
-    {"Campo": "model",            "Tipo": "str?",      "Descricao": "model_slug (NULL pra role=user)", "Cobertura": _msg_cov("model")},
-    {"Campo": "created_at",       "Tipo": "timestamp", "Descricao": "Hora da msg", "Cobertura": "100%"},
-    {"Campo": "thinking",         "Tipo": "str?",      "Descricao": "Reasoning blocks (Claude/DeepSeek R1/Gemini thoughts)", "Cobertura": _msg_cov("thinking")},
-    {"Campo": "token_count",      "Tipo": "int?",      "Descricao": "Token usage (DeepSeek populates ~98%, others sparse)", "Cobertura": _msg_cov("token_count")},
-    {"Campo": "word_count",       "Tipo": "int",       "Descricao": "Palavras na content", "Cobertura": _msg_cov("word_count")},
-    {"Campo": "content_types",    "Tipo": "str?",      "Descricao": "CSV de markers (text/code/dalle/image_upload/...)", "Cobertura": _msg_cov("content_types")},
-    {"Campo": "asset_paths",      "Tipo": "list?",     "Descricao": "Paths resolvidos de assets (uploads, gerados)", "Cobertura": _msg_cov("asset_paths")},
-    {"Campo": "attachment_names", "Tipo": "str?",      "Descricao": "Nomes dos arquivos anexados", "Cobertura": _msg_cov("attachment_names")},
-    {"Campo": "finish_reason",    "Tipo": "str?",      "Descricao": "stop / max_tokens / unknown / interrupted", "Cobertura": _msg_cov("finish_reason")},
-    {"Campo": "is_hidden",        "Tipo": "bool",      "Descricao": "True se interna (preservada nao user-facing)", "Cobertura": f"{safe_int(_mcov['hidden'].iloc[0]):,} flagged"},
-    {"Campo": "is_voice",         "Tipo": "bool",      "Descricao": "True se origem voz (audio_transcription)", "Cobertura": f"{safe_int(_mcov['voice'].iloc[0]):,} flagged"},
+    {"Field": "message_id",       "Type": "str",       "Description": "Unique ID", "Coverage": fmt_pct(_mt, _mt)},
+    {"Field": "conversation_id",  "Type": "str",       "Description": "FK to conversations", "Coverage": "100%"},
+    {"Field": "branch_id",        "Type": "str",       "Description": "FK to branches (`<conv>_main` by default)", "Coverage": "100%"},
+    {"Field": "sequence",         "Type": "int",       "Description": "Chronological order (1,2,3...)", "Coverage": "100%"},
+    {"Field": "role",             "Type": "str",       "Description": "user / assistant / system", "Coverage": "100%"},
+    {"Field": "content",          "Type": "str",       "Description": "Consolidated text", "Coverage": "100%"},
+    {"Field": "model",            "Type": "str?",      "Description": "model_slug (NULL for role=user)", "Coverage": _msg_cov("model")},
+    {"Field": "created_at",       "Type": "timestamp", "Description": "Msg timestamp", "Coverage": "100%"},
+    {"Field": "thinking",         "Type": "str?",      "Description": "Reasoning blocks (Claude reasoning, DeepSeek R1, Gemini thoughts)", "Coverage": _msg_cov("thinking")},
+    {"Field": "token_count",      "Type": "int?",      "Description": "Token usage (DeepSeek populates ~98%, others sparse)", "Coverage": _msg_cov("token_count")},
+    {"Field": "word_count",       "Type": "int",       "Description": "Words in content", "Coverage": _msg_cov("word_count")},
+    {"Field": "content_types",    "Type": "str?",      "Description": "CSV of markers (text/code/dalle/image_upload/...)", "Coverage": _msg_cov("content_types")},
+    {"Field": "asset_paths",      "Type": "list?",     "Description": "Resolved paths of assets (uploads, generated)", "Coverage": _msg_cov("asset_paths")},
+    {"Field": "attachment_names", "Type": "str?",      "Description": "Names of attached files", "Coverage": _msg_cov("attachment_names")},
+    {"Field": "finish_reason",    "Type": "str?",      "Description": "stop / max_tokens / unknown / interrupted", "Coverage": _msg_cov("finish_reason")},
+    {"Field": "is_hidden",        "Type": "bool",      "Description": "True if internal (preserved non user-facing)", "Coverage": f"{safe_int(_mcov['hidden'].iloc[0]):,} flagged"},
+    {"Field": "is_voice",         "Type": "bool",      "Description": "True if voice origin (audio_transcription)", "Coverage": f"{safe_int(_mcov['voice'].iloc[0]):,} flagged"},
 ]
 if has_col(con, "messages", "citations_json"):
     _n_cit = con.execute("SELECT COUNT(citations_json) FROM messages").fetchone()[0]
-    _msg_rows.append({"Campo": "citations_json", "Tipo": "str?", "Descricao": "Citations em text blocks (JSON)", "Cobertura": fmt_pct(int(_n_cit), _mt)})
+    _msg_rows.append({"Field": "citations_json", "Type": "str?", "Description": "Citations in text blocks (JSON)", "Coverage": fmt_pct(int(_n_cit), _mt)})
 if has_col(con, "messages", "attachments_json"):
     _n_att = con.execute("SELECT COUNT(attachments_json) FROM messages").fetchone()[0]
-    _msg_rows.append({"Campo": "attachments_json", "Tipo": "str?", "Descricao": "Attachments com extracted_content inline", "Cobertura": fmt_pct(int(_n_att), _mt)})
+    _msg_rows.append({"Field": "attachments_json", "Type": "str?", "Description": "Attachments with extracted_content inline", "Coverage": fmt_pct(int(_n_att), _mt)})
 if has_col(con, "messages", "start_timestamp"):
     _n_lat = con.execute("SELECT COUNT(start_timestamp) FROM messages WHERE stop_timestamp IS NOT NULL").fetchone()[0]
-    _msg_rows.append({"Campo": "start/stop_timestamp", "Tipo": "timestamp?", "Descricao": "Latencia por block (Claude.ai cobre ~98%)", "Cobertura": fmt_pct(int(_n_lat), _mt)})
+    _msg_rows.append({"Field": "start/stop_timestamp", "Type": "timestamp?", "Description": "Latency per block (Claude.ai covers ~98%)", "Coverage": fmt_pct(int(_n_lat), _mt)})
 
 show_df(pd.DataFrame(_msg_rows))
 ```
 
 ```{python}
 #| label: msg-sample
-#| code-summary: "Amostra diversificada — messages"
+#| code-summary: "Diversified sample — messages"
 #| column: page
 
 _msg_ctes = []
@@ -247,13 +247,13 @@ show_df(_msg_sample)
 
 ## 1.3 Tool Events
 
-Operacoes nao-conversacionais: search, code, canvas/artifact, image_generation,
-file_search, computer_use, mcp_*, search_result (Perplexity), e tools especificas
-de CLI (Bash, Read, Write, Edit, etc).
+Non-conversational operations: search, code, canvas/artifact, image_generation,
+file_search, computer_use, mcp_*, search_result (Perplexity), and CLI-specific
+tools (Bash, Read, Write, Edit, etc).
 
 ```{python}
 #| label: evt-schema
-#| code-summary: "Cobertura por campo — tool_events"
+#| code-summary: "Coverage per field — tool_events"
 
 _et = table_count(con, "tool_events")
 if _et > 0:
@@ -273,17 +273,17 @@ if _et > 0:
         return fmt_pct(int(n) if pd.notna(n) else 0, _et)
 
     _evt_rows = [
-        {"Campo": "event_id",         "Tipo": "str",   "Descricao": "ID unico", "Cobertura": fmt_pct(_et, _et)},
-        {"Campo": "conversation_id",  "Tipo": "str",   "Descricao": "FK", "Cobertura": "100%"},
-        {"Campo": "message_id",       "Tipo": "str",   "Descricao": "Msg parent", "Cobertura": "100%"},
-        {"Campo": "event_type",       "Tipo": "str",   "Descricao": "Categoria (search/code/artifact/image_generation/...)", "Cobertura": "100%"},
-        {"Campo": "tool_name",        "Tipo": "str?",  "Descricao": "Nome exato preservado (browser.search, python, Bash, etc)", "Cobertura": _e("tool_name")},
-        {"Campo": "file_path",        "Tipo": "str?",  "Descricao": "Path em disco (DALL-E, computer_use, Edit/Write CLI)", "Cobertura": _e("file_path")},
-        {"Campo": "result",           "Tipo": "str?",  "Descricao": "Output do tool (snippets, stdout, brief)", "Cobertura": _e("result")},
-        {"Campo": "command",          "Tipo": "str?",  "Descricao": "Comando executado (Bash CLI tool_events)", "Cobertura": _e("command")},
-        {"Campo": "duration_ms",      "Tipo": "int?",  "Descricao": "Duracao em ms (Codex correlaciona function_call ↔ exec_command_end)", "Cobertura": _e("duration_ms")},
-        {"Campo": "success",          "Tipo": "bool?", "Descricao": "True/False/None (CLIs)", "Cobertura": _e("success")},
-        {"Campo": "metadata_json",    "Tipo": "str?",  "Descricao": "JSON da metadata bruta", "Cobertura": _e("metadata_json")},
+        {"Field": "event_id",         "Type": "str",   "Description": "Unique ID", "Coverage": fmt_pct(_et, _et)},
+        {"Field": "conversation_id",  "Type": "str",   "Description": "FK", "Coverage": "100%"},
+        {"Field": "message_id",       "Type": "str",   "Description": "Parent msg", "Coverage": "100%"},
+        {"Field": "event_type",       "Type": "str",   "Description": "Category (search/code/artifact/image_generation/...)", "Coverage": "100%"},
+        {"Field": "tool_name",        "Type": "str?",  "Description": "Exact name preserved (browser.search, python, Bash, etc)", "Coverage": _e("tool_name")},
+        {"Field": "file_path",        "Type": "str?",  "Description": "Path on disk (DALL-E, computer_use, Edit/Write CLI)", "Coverage": _e("file_path")},
+        {"Field": "result",           "Type": "str?",  "Description": "Tool output (snippets, stdout, brief)", "Coverage": _e("result")},
+        {"Field": "command",          "Type": "str?",  "Description": "Executed command (Bash CLI tool_events)", "Coverage": _e("command")},
+        {"Field": "duration_ms",      "Type": "int?",  "Description": "Duration in ms (Codex correlates function_call ↔ exec_command_end)", "Coverage": _e("duration_ms")},
+        {"Field": "success",          "Type": "bool?", "Description": "True/False/None (CLIs)", "Coverage": _e("success")},
+        {"Field": "metadata_json",    "Type": "str?",  "Description": "Raw metadata JSON", "Coverage": _e("metadata_json")},
     ]
     show_df(pd.DataFrame(_evt_rows))
 
@@ -298,18 +298,18 @@ if _et > 0:
     """).df()
     show_df(_evt_sample)
 else:
-    show_md("> Sem tool_events nesta plataforma.")
+    show_md("> No tool_events on this platform.")
 ```
 
 ## 1.4 Branches
 
-Caminho linear no DAG da conv. Conv sem fork tem 1 branch (`<conv>_main`).
-Conv com fork tem N branches: `_main` vai do root ate o fork, cada fork
-comeca uma sub-branch (com `parent_branch_id`).
+Linear path in the conv DAG. Conv without fork has 1 branch (`<conv>_main`).
+Conv with fork has N branches: `_main` goes from root to the fork, each fork
+starts a sub-branch (with `parent_branch_id`).
 
 ```{python}
 #| label: br-schema
-#| code-summary: "Cobertura por campo — branches"
+#| code-summary: "Coverage per field — branches"
 
 _bt = table_count(con, "branches")
 if _bt > 0:
@@ -322,30 +322,30 @@ if _bt > 0:
     """).df()
 
     _br_rows = [
-        {"Campo": "branch_id",        "Tipo": "str",       "Descricao": "`<conv>_main` ou `<conv>_<root_node>`", "Cobertura": fmt_pct(_bt, _bt)},
-        {"Campo": "conversation_id",  "Tipo": "str",       "Descricao": "FK", "Cobertura": "100%"},
-        {"Campo": "root_message_id",  "Tipo": "str",       "Descricao": "Primeira msg da branch", "Cobertura": "100%"},
-        {"Campo": "leaf_message_id",  "Tipo": "str",       "Descricao": "Ultima msg seguindo children", "Cobertura": "100%"},
-        {"Campo": "is_active",        "Tipo": "bool",      "Descricao": "Contem `current_node` (1 por conv)", "Cobertura": f"{safe_int(_bcov['active'].iloc[0]):,} active"},
-        {"Campo": "created_at",       "Tipo": "timestamp", "Descricao": "create_time da root", "Cobertura": "100%"},
-        {"Campo": "parent_branch_id", "Tipo": "str?",      "Descricao": "NULL pra main; aponta pra branch que originou pra forks", "Cobertura": f"{safe_int(_bcov['forks'].iloc[0])} forks / {safe_int(_bcov['main'].iloc[0])} main"},
+        {"Field": "branch_id",        "Type": "str",       "Description": "`<conv>_main` or `<conv>_<root_node>`", "Coverage": fmt_pct(_bt, _bt)},
+        {"Field": "conversation_id",  "Type": "str",       "Description": "FK", "Coverage": "100%"},
+        {"Field": "root_message_id",  "Type": "str",       "Description": "First msg of the branch", "Coverage": "100%"},
+        {"Field": "leaf_message_id",  "Type": "str",       "Description": "Last msg following children", "Coverage": "100%"},
+        {"Field": "is_active",        "Type": "bool",      "Description": "Contains `current_node` (1 per conv)", "Coverage": f"{safe_int(_bcov['active'].iloc[0]):,} active"},
+        {"Field": "created_at",       "Type": "timestamp", "Description": "create_time of the root", "Coverage": "100%"},
+        {"Field": "parent_branch_id", "Type": "str?",      "Description": "NULL for main; points to originating branch for forks", "Coverage": f"{safe_int(_bcov['forks'].iloc[0])} forks / {safe_int(_bcov['main'].iloc[0])} main"},
     ]
     show_df(pd.DataFrame(_br_rows))
 else:
-    show_md("> Sem branches nesta plataforma.")
+    show_md("> No branches on this platform.")
 ```
 
-# 2. Cobertura e gaps
+# 2. Coverage and gaps
 
 ## 2.1 Capture method (extractor vs manual)
 
-A coluna `capture_method` (schema v3.2) distingue dado capturado pelo
-extractor automatizado versus dado importado manualmente (Obsidian Web
+The `capture_method` column (schema v3.2) distinguishes data captured by
+the automated extractor versus data imported manually (Obsidian Web
 Clipper, copy-paste, terminal screenshot).
 
 ```{python}
 #| label: capture-method
-#| code-summary: "Distribuicao de capture_method"
+#| code-summary: "capture_method distribution"
 
 if has_col(con, "conversations", "capture_method"):
     _cm = con.execute("""
@@ -358,20 +358,20 @@ if has_col(con, "conversations", "capture_method"):
     if len(_cm) > 1:
         fig = plotly_bar(
             _cm["method"].tolist(), _cm["n"].tolist(),
-            title="Conversas por capture_method",
+            title="Conversations by capture_method",
             color=SOURCE_COLOR, height=300, orientation="h",
         )
         fig.update_layout(yaxis=dict(autorange="reversed"))
         fig.show()
 else:
-    show_md("> Nesta plataforma, todas as convs sao do extractor (sem manual saves importadas).")
+    show_md("> On this platform, all convs are from the extractor (no manual saves imported).")
 ```
 
-## 2.2 Cobertura de model
+## 2.2 Model coverage
 
-`Message.model` so eh preenchido em msgs `role=assistant` (user msgs sao
-sempre NULL — usuario nao escolhe model). Em assistant msgs, depende do
-servidor incluir `model_slug` na resposta.
+`Message.model` is only populated on `role=assistant` msgs (user msgs are
+always NULL — user doesn't pick model). On assistant msgs, depends on the
+server including `model_slug` in the response.
 
 ```{python}
 #| label: model-by-role
@@ -379,8 +379,8 @@ servidor incluir `model_slug` na resposta.
 _mr = con.execute("""
     SELECT role,
         COUNT(*) AS total,
-        COUNT(model) AS com_model,
-        COUNT(*) - COUNT(model) AS sem_model,
+        COUNT(model) AS with_model,
+        COUNT(*) - COUNT(model) AS without_model,
         ROUND(COUNT(model) * 100.0 / NULLIF(COUNT(*),0), 1) AS pct
     FROM messages GROUP BY role ORDER BY role
 """).df()
@@ -389,9 +389,9 @@ show_df(_mr)
 
 ## 2.3 Thinking / reasoning coverage
 
-`Message.thinking` captura blocos de raciocinio interno (Claude reasoning,
-DeepSeek R1, Gemini `thoughts`, Qwen QwQ). Plataformas que nao expoem
-reasoning ficam zeradas.
+`Message.thinking` captures internal reasoning blocks (Claude reasoning,
+DeepSeek R1, Gemini `thoughts`, Qwen QwQ). Platforms that don't expose
+reasoning stay zeroed.
 
 ```{python}
 #| label: thinking-coverage
@@ -405,15 +405,15 @@ _th = con.execute("""
 _total_asst = int(_th["total_asst"].iloc[0])
 _with_th = int(_th["with_thinking"].iloc[0])
 show_df(pd.DataFrame([
-    {"Metrica": "Assistant msgs", "Valor": fmt_int(_total_asst)},
-    {"Metrica": "Com thinking",   "Valor": fmt_pct(_with_th, _total_asst)},
+    {"Metric": "Assistant msgs", "Value": fmt_int(_total_asst)},
+    {"Metric": "With thinking",  "Value": fmt_pct(_with_th, _total_asst)},
 ]))
 ```
 
 ## 2.4 Token count coverage
 
-`Message.token_count` quando o servidor expoe (DeepSeek 98%, Gemini parcial,
-demais raras).
+`Message.token_count` when the server exposes it (DeepSeek 98%, Gemini partial,
+others rare).
 
 ```{python}
 #| label: token-coverage
@@ -427,18 +427,18 @@ _total = int(_tk["total"].iloc[0])
 _wt = int(_tk["with_tokens"].iloc[0])
 _tot_tokens = _tk["total_tokens"].iloc[0]
 show_df(pd.DataFrame([
-    {"Metrica": "Total msgs", "Valor": fmt_int(_total)},
-    {"Metrica": "Com token_count", "Valor": fmt_pct(_wt, _total)},
-    {"Metrica": "Total tokens", "Valor": fmt_int(_tot_tokens) if pd.notna(_tot_tokens) else "—"},
+    {"Metric": "Total msgs", "Value": fmt_int(_total)},
+    {"Metric": "With token_count", "Value": fmt_pct(_wt, _total)},
+    {"Metric": "Total tokens", "Value": fmt_int(_tot_tokens) if pd.notna(_tot_tokens) else "—"},
 ]))
 ```
 
-## 2.5 Latencia por msg (start/stop timestamp)
+## 2.5 Latency per msg (start/stop timestamp)
 
 ```{python}
 #| label: latency
 
-# Latencia so eh calculavel se o tipo for TIMESTAMP e tiver valores.
+# Latency is only calculable if the type is TIMESTAMP and has values.
 _lat_ok = False
 if has_col(con, "messages", "start_timestamp") and has_col(con, "messages", "stop_timestamp"):
     _types = con.execute("DESCRIBE SELECT * FROM messages").df()
@@ -462,53 +462,53 @@ if _lat_ok:
         max_s=_lat["max_s"].fillna(0),
     ))
 else:
-    show_md("> Esta plataforma nao expoe `start_timestamp`/`stop_timestamp` populados.")
+    show_md("> This platform does not expose populated `start_timestamp`/`stop_timestamp`.")
 ```
 
-# 3. Volumes e distribuicoes
+# 3. Volumes and distributions
 
-## 3.1 Conversas criadas por mes (timeline + cumulativo)
+## 3.1 Conversations created per month (timeline + cumulative)
 
 ```{python}
 #| label: timeline
 
 _tl = con.execute("""
-    SELECT strftime(created_at, '%Y-%m') AS mes, COUNT(*) AS n
+    SELECT strftime(created_at, '%Y-%m') AS month, COUNT(*) AS n
     FROM conversations WHERE created_at IS NOT NULL
-    GROUP BY mes ORDER BY mes
+    GROUP BY month ORDER BY month
 """).df()
 
 if len(_tl):
     _tl["cumul"] = _tl["n"].cumsum()
     import plotly.graph_objects as go
     fig = go.Figure()
-    fig.add_trace(go.Bar(x=_tl["mes"], y=_tl["n"], name="Por mes",
+    fig.add_trace(go.Bar(x=_tl["month"], y=_tl["n"], name="Per month",
                          marker_color=SOURCE_COLOR, yaxis="y"))
-    fig.add_trace(go.Scatter(x=_tl["mes"], y=_tl["cumul"], name="Acumulado",
+    fig.add_trace(go.Scatter(x=_tl["month"], y=_tl["cumul"], name="Cumulative",
                              yaxis="y2", line=dict(color=MUTED, width=2)))
     fig.update_layout(
-        title=f"Conversas criadas por mes ({len(_tl)} meses cobertos)",
+        title=f"Conversations created per month ({len(_tl)} months covered)",
         height=380, template="plotly_white",
         xaxis=dict(type="category"),
-        yaxis=dict(title="Por mes"),
-        yaxis2=dict(title="Acumulado", overlaying="y", side="right"),
+        yaxis=dict(title="Per month"),
+        yaxis2=dict(title="Cumulative", overlaying="y", side="right"),
         margin=dict(t=50, b=80, l=40, r=40),
         legend=dict(orientation="h", y=-0.25),
     )
     fig.show()
 ```
 
-## 3.2 Activity heatmap (hora x dia da semana)
+## 3.2 Activity heatmap (hour × day of week)
 
-Quando tu usa a plataforma. Linhas = dia da semana (0=segunda),
-colunas = hora do dia (0-23).
+When you use the platform. Rows = day of week (0=Monday),
+columns = hour of day (0-23).
 
 ```{python}
 #| label: heatmap
 
 _hm = con.execute("""
     SELECT
-        EXTRACT(isodow FROM created_at) AS dow,  -- 1=segunda, 7=domingo
+        EXTRACT(isodow FROM created_at) AS dow,  -- 1=Monday, 7=Sunday
         EXTRACT(hour FROM created_at) AS hour,
         COUNT(*) AS n
     FROM conversations WHERE created_at IS NOT NULL
@@ -517,7 +517,7 @@ _hm = con.execute("""
 
 if len(_hm):
     _pivot = _hm.pivot(index="dow", columns="hour", values="n").fillna(0)
-    _days = ["Seg","Ter","Qua","Qui","Sex","Sab","Dom"]
+    _days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
     _pivot = _pivot.reindex(range(1,8))
     import plotly.graph_objects as go
     fig = go.Figure(go.Heatmap(
@@ -526,15 +526,15 @@ if len(_hm):
         showscale=True,
     ))
     fig.update_layout(
-        title="Atividade — convs criadas por hora x dia",
+        title="Activity — convs created by hour × day",
         height=300, template="plotly_white",
-        xaxis=dict(title="Hora", dtick=2),
+        xaxis=dict(title="Hour", dtick=2),
         margin=dict(t=50, b=40, l=60, r=20),
     )
     fig.show()
 ```
 
-## 3.3 Mensagens por role (visiveis vs hidden)
+## 3.3 Messages by role (visible vs hidden)
 
 ```{python}
 #| label: msgs-by-role
@@ -552,7 +552,7 @@ show_df(_role)
 
 ## 3.4 Word count: user vs assistant
 
-Distribuicao de palavras por mensagem, lado a lado.
+Word distribution per message, side by side.
 
 ```{python}
 #| label: word-count-user-asst
@@ -570,7 +570,7 @@ _wc = con.execute("""
 show_df(_wc)
 ```
 
-## 3.5 Tool events por categoria
+## 3.5 Tool events by category
 
 ```{python}
 #| label: events-by-type
@@ -585,7 +585,7 @@ if table_count(con, "tool_events") > 0:
 
     fig = plotly_bar(
         _et_dist["event_type"].tolist(), _et_dist["n"].tolist(),
-        title="ToolEvents por categoria",
+        title="ToolEvents by category",
         color=SOURCE_COLOR, height=350,
     )
     fig.show()
@@ -594,17 +594,17 @@ if table_count(con, "tool_events") > 0:
     if has_col(con, "tool_events", "success"):
         _sr = con.execute("""
             SELECT
-                SUM(CASE WHEN success THEN 1 ELSE 0 END) AS sucesso,
-                SUM(CASE WHEN success = false THEN 1 ELSE 0 END) AS erro,
-                SUM(CASE WHEN success IS NULL THEN 1 ELSE 0 END) AS desconhecido,
+                SUM(CASE WHEN success THEN 1 ELSE 0 END) AS success,
+                SUM(CASE WHEN success = false THEN 1 ELSE 0 END) AS error,
+                SUM(CASE WHEN success IS NULL THEN 1 ELSE 0 END) AS unknown,
                 COUNT(*) AS total
             FROM tool_events
         """).df()
         _t = int(_sr["total"].iloc[0])
         show_df(pd.DataFrame([
-            {"Status": "Sucesso",      "N": fmt_pct(safe_int(_sr['sucesso'].iloc[0]), _t)},
-            {"Status": "Erro",         "N": fmt_pct(safe_int(_sr['erro'].iloc[0]), _t)},
-            {"Status": "Desconhecido", "N": fmt_pct(safe_int(_sr['desconhecido'].iloc[0]), _t)},
+            {"Status": "Success", "N": fmt_pct(safe_int(_sr['success'].iloc[0]), _t)},
+            {"Status": "Error",   "N": fmt_pct(safe_int(_sr['error'].iloc[0]), _t)},
+            {"Status": "Unknown", "N": fmt_pct(safe_int(_sr['unknown'].iloc[0]), _t)},
         ]))
 
     # Duration (Codex)
@@ -621,10 +621,10 @@ if table_count(con, "tool_events") > 0:
         if int(_dur["n"].iloc[0]) > 0:
             show_df(_dur)
 else:
-    show_md("> Sem tool_events nesta plataforma.")
+    show_md("> No tool_events on this platform.")
 ```
 
-## 3.6 Top tools (por chamadas)
+## 3.6 Top tools (by calls)
 
 ```{python}
 #| label: top-tools
@@ -641,14 +641,14 @@ if table_count(con, "tool_events") > 0:
         fig = plotly_bar(
             _tt["tool_name"].tolist()[::-1],
             _tt["calls"].tolist()[::-1],
-            f"Top {len(_tt)} tools por chamadas",
+            f"Top {len(_tt)} tools by calls",
             color=SOURCE_COLOR, orientation="h", height=450,
         )
         fig.show()
         show_df(_tt)
 ```
 
-## 3.7 Top 10 modelos
+## 3.7 Top 10 models
 
 ```{python}
 #| label: top-models
@@ -660,16 +660,16 @@ _top = con.execute("""
 if len(_top):
     fig = plotly_bar(
         _top["model"].tolist(), _top["n"].tolist(),
-        title="Top 10 modelos (Conversation.model)",
+        title="Top 10 models (Conversation.model)",
         color=SOURCE_COLOR, height=350,
     )
     fig.show()
     show_df(_top)
 else:
-    show_md("> Esta plataforma nao registra `model` em conversations.")
+    show_md("> This platform does not record `model` on conversations.")
 ```
 
-## 3.8 Top 10 conversas mais longas
+## 3.8 Top 10 longest conversations
 
 ```{python}
 #| label: top-longest
@@ -685,7 +685,7 @@ _tl = con.execute("""
 show_df(_tl)
 ```
 
-## 3.9 Distribuicao de tamanho (msgs por conv)
+## 3.9 Size distribution (msgs per conv)
 
 ```{python}
 #| label: size-distribution
@@ -710,10 +710,10 @@ _sz = _sz.sort_values('bin')
 
 fig = plotly_bar(
     _sz["bin"].astype(str).tolist(), _sz["n"].tolist(),
-    title="Distribuicao de tamanho de conv",
+    title="Conversation size distribution",
     color=SOURCE_COLOR, height=300,
 )
-fig.update_xaxes(title="N msgs por conv")
+fig.update_xaxes(title="N msgs per conv")
 fig.update_yaxes(title="N convs")
 fig.show()
 
@@ -725,10 +725,10 @@ _st = con.execute("""
 show_df(_st)
 ```
 
-## 3.10 Lifetime da conv (updated_at − created_at)
+## 3.10 Conv lifetime (updated_at − created_at)
 
-Quanto tempo passa entre criar a conv e a ultima atualizacao. One-shot
-(< 1 dia) vs conversas que viraram projeto (> 7 dias).
+How much time passes between creating the conv and the last update. One-shot
+(< 1 day) vs conversations that became a project (> 7 days).
 
 ```{python}
 #| label: lifetime
@@ -742,28 +742,28 @@ _lf = con.execute("""
     SELECT
         CASE
             WHEN days < 0.04167 THEN '< 1h'
-            WHEN days < 1 THEN '1h-1dia'
-            WHEN days < 7 THEN '1-7 dias'
-            WHEN days < 30 THEN '7-30 dias'
-            WHEN days < 90 THEN '30-90 dias'
-            ELSE '> 90 dias'
+            WHEN days < 1 THEN '1h-1d'
+            WHEN days < 7 THEN '1-7 days'
+            WHEN days < 30 THEN '7-30 days'
+            WHEN days < 90 THEN '30-90 days'
+            ELSE '> 90 days'
         END AS bin,
         COUNT(*) AS n
     FROM lt GROUP BY bin
 """).df()
-_lf_order = ['< 1h','1h-1dia','1-7 dias','7-30 dias','30-90 dias','> 90 dias']
+_lf_order = ['< 1h','1h-1d','1-7 days','7-30 days','30-90 days','> 90 days']
 _lf['bin'] = pd.Categorical(_lf['bin'], categories=_lf_order, ordered=True)
 _lf = _lf.sort_values('bin')
 
 fig = plotly_bar(
     _lf["bin"].astype(str).tolist(), _lf["n"].tolist(),
-    title="Lifetime das convs (created_at → updated_at)",
+    title="Conversation lifetime (created_at → updated_at)",
     color=SOURCE_COLOR, height=300,
 )
 fig.show()
 ```
 
-## 3.11 Branches: forks por conv
+## 3.11 Branches: forks per conv
 
 ```{python}
 #| label: branches-forks
@@ -779,13 +779,13 @@ if table_count(con, "branches") > 0:
     show_df(_bd)
     fig = plotly_bar(
         _bd["branches_per_conv"].astype(str).tolist(), _bd["n_convs"].tolist(),
-        title="Convs por numero de branches (1 = sem fork)",
+        title="Convs by number of branches (1 = no fork)",
         color=SOURCE_COLOR, height=300,
     )
     fig.show()
 ```
 
-## 3.12 Account breakdown (multi-conta)
+## 3.12 Account breakdown (multi-account)
 
 ```{python}
 #| label: account-breakdown
@@ -795,7 +795,7 @@ if has_col(con, "conversations", "account") and ACCOUNT_FILTER is None:
     if _n_acc > 1:
         _ab = con.execute("""
             SELECT
-                COALESCE(account, '(sem account)') AS account,
+                COALESCE(account, '(no account)') AS account,
                 COUNT(*) AS convs,
                 SUM(message_count) AS total_msgs,
                 ROUND(AVG(message_count), 1) AS avg_msgs
@@ -803,19 +803,19 @@ if has_col(con, "conversations", "account") and ACCOUNT_FILTER is None:
         """).df()
         show_df(_ab)
     else:
-        show_md(f"> Conta unica nesta base (`account`={con.execute('SELECT account FROM conversations LIMIT 1').fetchone()[0]}).")
+        show_md(f"> Single account in this base (`account`={con.execute('SELECT account FROM conversations LIMIT 1').fetchone()[0]}).")
 elif ACCOUNT_FILTER is not None:
-    show_md(f"> Filtrado pra `account = '{ACCOUNT_FILTER}'`.")
+    show_md(f"> Filtered to `account = '{ACCOUNT_FILTER}'`.")
 else:
-    show_md("> Plataforma sem `account` populado.")
+    show_md("> Platform without populated `account`.")
 ```
 
-# 4. Preservation e estados especiais
+# 4. Preservation and special states
 
 ## 4.1 Active vs preserved_missing
 
-Convs **ativas no servidor** vs **preservadas localmente** (sumiram do
-servidor mas continuam no merged).
+Convs **active on the server** vs **preserved locally** (disappeared from
+the server but still in the merged).
 
 ```{python}
 #| label: preservation-counts
@@ -844,7 +844,7 @@ if _n_pres > 0:
     show_df(_pl)
 ```
 
-## 4.2 Estados especiais (pinned / archived / temporary)
+## 4.2 Special states (pinned / archived / temporary)
 
 ```{python}
 #| label: special-states
@@ -863,17 +863,17 @@ _a = safe_int(_st["archived"].iloc[0])
 _te = safe_int(_st["temporary"].iloc[0])
 
 show_df(pd.DataFrame([
-    {"Estado": "Pinned",    "N": fmt_pct(_p, _total)},
-    {"Estado": "Archived",  "N": fmt_pct(_a, _total)},
-    {"Estado": "Temporary", "N": fmt_pct(_te, _total)},
+    {"State": "Pinned",    "N": fmt_pct(_p, _total)},
+    {"State": "Archived",  "N": fmt_pct(_a, _total)},
+    {"State": "Temporary", "N": fmt_pct(_te, _total)},
 ]))
 ```
 
-## 4.3 Tabela completa filtravel
+## 4.3 Full filterable table
 
 ```{python}
 #| label: full-table
-#| code-summary: "Todas as conversas (itables — busca/sort/paging)"
+#| code-summary: "All conversations (itables — search/sort/paging)"
 #| column: page
 
 from itables import show as itable_show

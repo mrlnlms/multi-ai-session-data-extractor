@@ -1,13 +1,13 @@
 ---
 title: "Gemini — account-1 — Data Profile"
-subtitle: "Catalogo descritivo dos parquets do parser canonico (so account-1)"
+subtitle: "Descriptive catalog of canonical parser parquets (account-1 only)"
 source-title: "Gemini account-1"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -33,14 +33,14 @@ MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Gemini"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
 AUX_TABLES     = []
-ACCOUNT_FILTER = "1"  # so account-1 (hello.marlonlemes)
+ACCOUNT_FILTER = "1"  # account-1 only (hello.marlonlemes)
 
 con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **Gemini account-1** (`hello.marlonlemes`). Vista filtrada da pasta
-> consolidada `data/processed/Gemini/`. Para a vista das duas contas:
-> [`gemini.qmd`](gemini.html). Para account-2: [`gemini-acc-2.qmd`](gemini-acc-2.html).
+> **Gemini account-1** (`hello.marlonlemes`). Filtered view of the
+> consolidated folder `data/processed/Gemini/`. For the two-account view:
+> [`gemini.qmd`](gemini.html). For account-2: [`gemini-acc-2.qmd`](gemini-acc-2.html).
 
 {{< include _template.qmd >}}

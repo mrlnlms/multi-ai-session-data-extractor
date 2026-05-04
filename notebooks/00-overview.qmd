@@ -1,12 +1,12 @@
 ---
-title: "Overview cross-plataforma — Data Profile"
-subtitle: "Visao consolidada das 10 fontes (7 web + 3 CLI) — sem filtro"
+title: "Cross-platform overview — Data Profile"
+subtitle: "Consolidated view of the 10 sources (7 web + 3 CLI) — no filter"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -25,24 +25,24 @@ from src.parsers.quarto_helpers import (
     has_col, has_view, table_count, setup_unified_views,
 )
 
-# === Config do notebook ===
-SUBSET_TITLE     = "Cross-plataforma (todas)"
-SOURCES_FILTER   = None  # None = todas as 10 sources
+# === Notebook config ===
+SUBSET_TITLE     = "Cross-platform (all)"
+SOURCES_FILTER   = None  # None = all 10 sources
 UNIFIED_DIR      = _project_root / "data" / "unified"
 MUTED            = "#D1D5DB"
 
-# Paleta consistente com os qmds per-source
+# Palette consistent with the per-source qmds
 SOURCE_COLORS = {
     "chatgpt":     "#74AA9C",  # ChatGPT green
     "claude_ai":   "#CC785C",  # Anthropic orange
     "perplexity":  "#20808D",  # Perplexity teal
-    "qwen":        "#615CED",  # Qwen roxo
+    "qwen":        "#615CED",  # Qwen purple
     "deepseek":    "#3B82F6",  # DeepSeek blue
     "gemini":      "#4285F4",  # Google blue
     "notebooklm":  "#F4B400",  # Google yellow
-    "claude_code": "#7C3AED",  # CC roxo escuro
-    "codex":       "#374151",  # Codex cinza
-    "gemini_cli":  "#1A56DB",  # Gemini CLI azul escuro
+    "claude_code": "#7C3AED",  # CC dark purple
+    "codex":       "#374151",  # Codex gray
+    "gemini_cli":  "#1A56DB",  # Gemini CLI dark blue
 }
 
 con = duckdb.connect()

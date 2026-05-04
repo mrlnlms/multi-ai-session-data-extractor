@@ -1,13 +1,13 @@
 ---
 title: "Gemini CLI — Data Profile"
-subtitle: "Catalogo descritivo dos 4 parquets do parser canonico v3 (CLI local)"
+subtitle: "Descriptive catalog of the 4 canonical parser v3 parquets (local CLI)"
 source-title: "Gemini CLI"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -28,7 +28,7 @@ from src.parsers.quarto_helpers import (
 
 SOURCE_KEY     = "gemini_cli"
 SOURCE_TITLE   = "Gemini CLI"
-SOURCE_COLOR   = "#1A56DB"  # Google CLI azul
+SOURCE_COLOR   = "#1A56DB"  # Google CLI blue
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Gemini CLI"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
@@ -39,8 +39,8 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **Sobre Gemini CLI:** parquets capturados via copia incremental de
-> `~/.gemini/tmp/`. Source: `gemini_cli`, mode: `cli`. Schema JSON (nao JSONL).
-> `thoughts` array → thinking formatado. `toolCalls` correlacionados via status.
+> **About Gemini CLI:** parquets captured via incremental copy from
+> `~/.gemini/tmp/`. Source: `gemini_cli`, mode: `cli`. JSON schema (not JSONL).
+> `thoughts` array → formatted thinking. `toolCalls` correlated via status.
 
 {{< include _template.qmd >}}

@@ -1,13 +1,13 @@
 ---
 title: "Qwen — Data Profile"
-subtitle: "Catalogo descritivo dos parquets do parser canonico v3"
+subtitle: "Descriptive catalog of canonical parser v3 parquets"
 source-title: "Qwen"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -28,7 +28,7 @@ from src.parsers.quarto_helpers import (
 
 SOURCE_KEY     = "qwen"
 SOURCE_TITLE   = "Qwen"
-SOURCE_COLOR   = "#615CED"  # Qwen roxo/violeta
+SOURCE_COLOR   = "#615CED"  # Qwen purple/violet
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Qwen"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
@@ -39,11 +39,11 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **Sobre Qwen:** parser v3 cobrindo 8 chat_types mapeados pra mode
-> (chat / search / research / dalle), branches via DAG plano
-> (`parentId`/`childrenIds`), reasoning_content em msgs QwQ, search_results,
-> t2i/t2v/artifacts em ToolEvent, `pinned`/`archived` cross-platform,
-> projects com `custom_instruction` + presigned files.
+> **About Qwen:** parser v3 covering 8 chat_types mapped to mode
+> (chat / search / research / dalle), branches via flat DAG
+> (`parentId`/`childrenIds`), reasoning_content in QwQ msgs, search_results,
+> t2i/t2v/artifacts in ToolEvent, cross-platform `pinned`/`archived`,
+> projects with `custom_instruction` + presigned files.
 
 {{< include _template.qmd >}}
 

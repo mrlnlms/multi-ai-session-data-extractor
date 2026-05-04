@@ -1,12 +1,12 @@
 ---
-title: "Overview RAG — Data Profile"
-subtitle: "Subset: NotebookLM (workspace com sources/notes/outputs cross-account)"
+title: "RAG Overview — Data Profile"
+subtitle: "Subset: NotebookLM (workspace with sources/notes/outputs cross-account)"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -30,7 +30,7 @@ SOURCES_FILTER   = ["notebooklm"]
 UNIFIED_DIR      = _project_root / "data" / "unified"
 MUTED            = "#D1D5DB"
 
-# Cor por conta (NotebookLM tem 3: account-1 en, account-2 pt-BR, account-3 legacy)
+# Color per account (NotebookLM has 3: account-1 en, account-2 pt-BR, account-3 legacy)
 SOURCE_COLORS = {
     "notebooklm": "#F4B400",
 }

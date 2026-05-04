@@ -1,13 +1,13 @@
 ---
 title: "ChatGPT — Data Profile"
-subtitle: "Catalogo descritivo dos parquets do parser canonico"
+subtitle: "Descriptive catalog of canonical parser parquets"
 source-title: "ChatGPT"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -39,9 +39,9 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **Sobre ChatGPT:** parquets do parser canonico v3. Cobertura: tree-walk
-> completo (preserva branches off-path), voice (com direction in/out),
-> DALL-E (em ToolEvent), uploads (em Message), tether_quote, canvas,
+> **About ChatGPT:** canonical parser v3 parquets. Coverage: complete
+> tree-walk (preserves off-path branches), voice (with direction in/out),
+> DALL-E (in ToolEvent), uploads (in Message), tether_quote, canvas,
 > deep_research, custom_gpt vs project distinction, preservation
 > (`is_preserved_missing`, `last_seen_in_server`).
 
