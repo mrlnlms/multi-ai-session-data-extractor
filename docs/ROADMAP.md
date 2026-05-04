@@ -1,18 +1,18 @@
 # Roadmap
 
-Open work items, by category. Items closed via shipped releases are removed
-from this list (see `git log` for history). For the broader project context
-and current state, see [README.md](../README.md) and [CLAUDE.md](../CLAUDE.md).
+Open work items. Closed via shipped releases are removed from this list
+(see `git log` for history). For broader context, see
+[README.md](../README.md) and [CLAUDE.md](../CLAUDE.md).
 
 ## Capture & parse — features
 
 ### Claude Code image extraction
 
 Claude Code stores user-attached images **inline as base64** in JSONL
-session files (`content[].source.data` in `type=image` blocks). The parser
-currently does not handle `type=image` — it only processes `text`,
-`tool_use`, `tool_result`, and `thinking`. Sample scan: ~445 image blocks
-in 5 sessions, extrapolating to thousands across all sessions.
+session files (`content[].source.data` in `type=image` blocks). The
+parser currently does not handle `type=image` — only `text`, `tool_use`,
+`tool_result`, and `thinking`. Sample scan: ~445 image blocks in 5
+sessions, extrapolating to thousands across the corpus.
 
 **Plan:** in `src/parsers/claude_code.py`, in the content-block loop,
 detect `type == "image"`, decode base64, infer extension from
@@ -25,54 +25,36 @@ Code fields currently dropped: `message.usage` (token counts),
 
 ### Claude.ai memories
 
-`memories.json` exposed by Claude.ai (settings/memory feature) is not yet
-captured nor present in the canonical schema. Decide: ingest into a new
-auxiliary table, or treat as conversation-attached metadata. No current
-parser/extractor reference to memories.
+Claude.ai exposes a "Memory" feature in the UI (preferences/instructions
+the assistant remembers across sessions). The current extractor does not
+capture it — `src/extractors/claude_ai/api_client.py` has zero references
+to memory/preferences endpoints. Compare with ChatGPT, which already
+saves `chatgpt_memories.md` as part of every capture.
 
-### URL-targeted ingestion
-
-Single-conversation ingestion: given a chat URL
-(`claude.ai/chat/uuid`, `chatgpt.com/c/uuid`), open Playwright, capture
-that conversation, feed the pipeline. Useful for ad-hoc captures outside
-the periodic sync. Currently the only path is full sync.
+**Plan:**
+1. Probe the Claude.ai API to find the endpoint that returns memories
+   (likely under `/api/organizations/{org_id}/...`).
+2. Add it to `ClaudeAPIClient` and persist as `claude_ai_memories.md`
+   (or similar) in the raw output, mirroring ChatGPT's pattern.
+3. Decide whether memories enter the canonical schema as a new auxiliary
+   table or stay as a standalone artifact.
 
 ## Operational
-
-### CLI capture automation
-
-`cli-copy.py` runs manually before each pipeline. Possible automation
-paths: (1) Claude Code session-start hook, (2) cron daily, (3)
-macOS launchd plist. Without automation, gaps appear in the timeline
-(historical observation: 14-day gap in Apr/2026 with ~3.8k live sessions
-vs ~4k copied).
 
 ### ChatGPT capture-delete cycle
 
 The reconciler infrastructure (with `preserved_missing` flag for items
 removed from the server) is in place and validated. Operational next
-step: gradual delete of old conversations on the server. The next
+step: gradually delete old conversations on the server. The next
 incremental capture (`--since last`) should surface deleted IDs as
 `preserved_missing` while keeping the local raw intact. Replicable to
 other platforms once their reconcilers are equally validated.
 
-### Voice DOM pass decision
-
-`src/extractors/chatgpt/dom_voice.py::capture_voice_dom` is now
-redundant — `audio_transcription` arrives in the API response (see
-[extractor-findings.md](research/extractor-findings.md)). Decide:
-remove the dead code path, or keep as a theoretical fallback for cases
-where the API stops returning transcripts. `detect_voice_candidates`
-(heuristic) remains useful regardless.
-
-## Refinement
-
-### Data versioning beyond DVC
-
-Current state: DVC versions the full vault (raw + merged + processed +
-unified + external). Beyond that, no per-record ingestion timestamp and
-no git tag per run. Possible additions: timestamp column in
-`Message`/`Conversation` (when this row entered the unified set), git
-tags per pipeline run for reproducibility, or surfacing
-`_last_seen_in_server` more prominently. Driven by the question: "when
-did this specific conversation enter our local archive?"
+This is mostly a manual operational task — kept here as a reference
+point when reviewing chat details and deciding what to remove from the
+server. Automation is feasible (script that lists conversations older
+than N days without recent updates and calls the delete endpoint) but
+risky: a bug in the selection logic deletes the wrong conversations
+server-side, and although the reconciler preserves the local copy, you
+lose the ability to re-fetch updated versions from the server. Start
+manual; consider automation only after confidence is high.
