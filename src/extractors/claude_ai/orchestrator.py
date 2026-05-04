@@ -227,6 +227,16 @@ async def run_export(
             client, projs_to_fetch, output_dir, concurrency=3, skip_existing=False
         )
 
+        # Memory (preferences/instructions remembered across sessions)
+        memory_chars = 0
+        try:
+            memory_text = await client.get_memory()
+            memory_chars = len(memory_text)
+            (output_dir / "claude_ai_memory.md").write_text(memory_text, encoding="utf-8")
+            print(f"Memory: {memory_chars} chars")
+        except Exception as e:
+            print(f"Memory fetch falhou: {e}")
+
         # Build log
         log = {
             "started_at": started_at.isoformat(),

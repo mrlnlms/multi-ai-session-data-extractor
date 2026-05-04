@@ -120,10 +120,18 @@ GET /api/organizations/{org_id}/projects/{uuid}           # metadata
 GET /api/organizations/{org_id}/projects/{uuid}/docs      # knowledge sources with content
 GET /api/organizations/{org_id}/projects/{uuid}/files     # images / PDFs
 
+# Memory (preferences/instructions remembered across sessions)
+GET /api/organizations/{org_id}/memory
+  → {"memory": "<single markdown blob>"}
+
 # Assets — note absence of /organizations/ in the path
 GET /api/{org_id}/files/{file_uuid}/preview     # full image
 GET /api/{org_id}/files/{file_uuid}/thumbnail   # 400px (also PDF cover)
 ```
+
+**Memory caveat:** unlike ChatGPT (where `chatgpt_memories.md` is a list of discrete remembered facts), Claude.ai's `/memory` endpoint returns a **single markdown blob** containing the full remembered context. Saved as `claude_ai_memory.md` in the raw output. Empty when memory is disabled or has no content.
+
+**Endpoints to avoid in capture:** `/api/organizations/{org_id}/profile` returns billing data including tax IDs (CPF/SSN). Sensitive — do not capture as part of normal extraction.
 
 ### `file_kind` drives the download variant
 
