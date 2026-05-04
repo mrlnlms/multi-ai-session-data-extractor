@@ -185,10 +185,13 @@ ou re-enquadrados após validação empírica.
 
 ## Backlog principal
 
-1. **`notebooks/00-overview.qmd`** — visao consolidada cross-plataforma via
-   DuckDB UNION ALL. Pickup brief em `memory/project_pickup_brief_cross_platform.md`.
-2. **DVC pipeline filho ↔ pai** (decorrente da limpeza) — filho versiona
-   canonicos via DVC, pai consome via `dvc import-url`. Pickup brief em
+1. ~~**`notebooks/00-overview.qmd`**~~ **SHIPPED 2026-05-04** — visao
+   consolidada cross-plataforma via DuckDB UNION ALL. 4 qmds: geral, web,
+   cli, rag. Template em `_template_overview.qmd`. Materializa
+   `data/unified/` via `scripts/unify-parquets.py` (11 parquets — 4
+   canonicos + 7 auxiliares).
+2. **DVC pipeline filho ↔ consumer** — filho versiona
+   canonicos via DVC, consumer consome via `dvc import-url`. Pickup brief em
    `memory/project_pickup_brief_dvc_pipeline.md`. Fase 6 da limpeza
    (delete `processed/`/`unified/` no pai) é consequencia natural disso.
 3. **Pos-shipping:** publicacao opensource (sanitizar credenciais,

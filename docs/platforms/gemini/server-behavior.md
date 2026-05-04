@@ -77,8 +77,12 @@ raw[0][i][4]        — [created_at_secs, microseconds]
 - ❌ **Branches/drafts** — `raw[0][i][1]` tem 2 response_ids alternados
   (provavel multi-draft), mas estrutura ainda nao mapeada. **Nao surfaced
   na v3** (poucos casos detectados).
-- ❌ **Search/grounding citations** — 1/80 convs com 'grounding' substring,
-  estrutura nao mapeada. TODO probe.
+- ✅ **Search/grounding citations** — extraidas via
+  `extract_turn_citations()` em `_gemini_helpers.py` (probe 2026-05-04).
+  Padrao posicional `[favicon, source_url, title, snippet, ...]` onde
+  favicon contem `gstatic.com/faviconV2`. Resultado: 416 search_results
+  estruturados em 9 messages (Search/Deep Research) — populadas em
+  `Message.citations_json` + ToolEvents tipo `search_result`.
 - ❌ **Voice / TTS audio** — provavel `resp[12]` (audio chunks?), nao
   identificado em probe.
 
