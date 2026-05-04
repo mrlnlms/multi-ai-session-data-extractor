@@ -1,13 +1,13 @@
 ---
 title: "Claude Code — Data Profile"
-subtitle: "Catalogo descritivo dos 4 parquets do parser canonico v3 (CLI local)"
+subtitle: "Descriptive catalog of the 4 canonical parser v3 parquets (local CLI)"
 source-title: "Claude Code"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -28,7 +28,7 @@ from src.parsers.quarto_helpers import (
 
 SOURCE_KEY     = "claude_code"
 SOURCE_TITLE   = "Claude Code"
-SOURCE_COLOR   = "#7C3AED"  # Anthropic dev roxo
+SOURCE_COLOR   = "#7C3AED"  # Anthropic dev purple
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Claude Code"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
@@ -39,9 +39,9 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **Sobre Claude Code:** parquets capturados via copia incremental de
-> `~/.claude/projects/`. Source: `claude_code`, mode: `cli`. Cada notebook
-> eh uma sessao JSONL. Subagents (sidechains) viram `interaction_type='ai_ai'`
-> com `parent_session_id` apontando pro main.
+> **About Claude Code:** parquets captured via incremental copy from
+> `~/.claude/projects/`. Source: `claude_code`, mode: `cli`. Each notebook
+> is a JSONL session. Subagents (sidechains) become `interaction_type='ai_ai'`
+> with `parent_session_id` pointing to the main.
 
 {{< include _template.qmd >}}

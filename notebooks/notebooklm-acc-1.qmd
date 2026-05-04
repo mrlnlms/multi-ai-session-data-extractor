@@ -1,13 +1,13 @@
 ---
 title: "NotebookLM — account-1 — Data Profile"
-subtitle: "Catalogo descritivo dos parquets do parser v3 (so account-1, en)"
+subtitle: "Descriptive catalog of parser v3 parquets (account-1 only, en)"
 source-title: "NotebookLM account-1"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -39,8 +39,8 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **NotebookLM account-1** (`hello.marlonlemes`, en). Vista filtrada da
-> pasta consolidada. Para visao das 3 contas: [`notebooklm.qmd`](notebooklm.html).
+> **NotebookLM account-1** (`hello.marlonlemes`, en). Filtered view of the
+> consolidated folder. For the 3-account view: [`notebooklm.qmd`](notebooklm.html).
 > account-2: [`notebooklm-acc-2.qmd`](notebooklm-acc-2.html). legacy:
 > [`notebooklm-legacy.qmd`](notebooklm-legacy.html).
 

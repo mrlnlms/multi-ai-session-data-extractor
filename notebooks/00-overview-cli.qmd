@@ -1,12 +1,12 @@
 ---
-title: "Overview CLI — Data Profile"
-subtitle: "Subset: 3 fontes CLI (Claude Code, Codex, Gemini CLI)"
+title: "CLI Overview — Data Profile"
+subtitle: "Subset: 3 CLI sources (Claude Code, Codex, Gemini CLI)"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -25,7 +25,7 @@ from src.parsers.quarto_helpers import (
     has_col, has_view, table_count, setup_unified_views,
 )
 
-SUBSET_TITLE     = "CLI (3 fontes locais)"
+SUBSET_TITLE     = "CLI (3 local sources)"
 SOURCES_FILTER   = ["claude_code", "codex", "gemini_cli"]
 UNIFIED_DIR      = _project_root / "data" / "unified"
 MUTED            = "#D1D5DB"

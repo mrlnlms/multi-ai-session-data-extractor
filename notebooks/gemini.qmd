@@ -1,13 +1,13 @@
 ---
-title: "Gemini — Data Profile (consolidado)"
-subtitle: "Visao agregada das 2 contas, com stacked bars por conta nos pontos-chave"
-source-title: "Gemini (consolidado)"
+title: "Gemini — Data Profile (consolidated)"
+subtitle: "Aggregated view of the 2 accounts, with stacked bars by account at key points"
+source-title: "Gemini (consolidated)"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -33,19 +33,19 @@ MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Gemini"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
 AUX_TABLES     = []
-ACCOUNT_FILTER = None  # consolidated — sem filter
+ACCOUNT_FILTER = None  # consolidated — no filter
 
 con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **Sobre Gemini (consolidado):** agrega account-1 (`hello.marlonlemes`) +
-> account-2 (`marloonlemes`). Schema raw eh **posicional** (Google batchexecute):
-> caminhos descobertos via probe. 8 modelos detectados, 41% das assistant msgs
-> com thinking, image generation via lh3.googleusercontent.com → ToolEvent +
-> `Message.asset_paths`. Pin descoberto via probe (`c[2]` do MaZiqc).
+> **About Gemini (consolidated):** aggregates account-1 (`hello.marlonlemes`) +
+> account-2 (`marloonlemes`). Raw schema is **positional** (Google batchexecute):
+> paths discovered via probe. 8 models detected, 41% of assistant msgs
+> with thinking, image generation via lh3.googleusercontent.com → ToolEvent +
+> `Message.asset_paths`. Pin discovered via probe (`c[2]` of MaZiqc).
 >
-> Para vista de uma conta so: [`gemini-acc-1.qmd`](gemini-acc-1.html) /
+> For a single-account view: [`gemini-acc-1.qmd`](gemini-acc-1.html) /
 > [`gemini-acc-2.qmd`](gemini-acc-2.html).
 
 {{< include _template.qmd >}}

@@ -1,13 +1,13 @@
 ---
 title: "Codex — Data Profile"
-subtitle: "Catalogo descritivo dos parquets do parser canonico v3 (CLI local)"
+subtitle: "Descriptive catalog of canonical parser v3 parquets (local CLI)"
 source-title: "Codex"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -26,10 +26,10 @@ from src.parsers.quarto_helpers import (
     has_col, has_view, table_count, setup_notebook,
 )
 
-# === Config do notebook ===
+# === Notebook config ===
 SOURCE_KEY    = "codex"
 SOURCE_TITLE  = "Codex"
-SOURCE_COLOR  = "#374151"   # OpenAI dev cinza escuro
+SOURCE_COLOR  = "#374151"   # OpenAI dev dark gray
 MUTED         = "#D1D5DB"
 PROCESSED     = _project_root / "data" / "processed" / "Codex"
 TABLES        = ["conversations", "messages", "tool_events", "branches"]
@@ -40,10 +40,10 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **Sobre Codex CLI:** parquets capturados via copia incremental de
-> `~/.codex/sessions/`. Source: `codex`, mode: `cli`. Feature distintiva:
-> `function_call` correlacionado com `exec_command_end` via `call_id` →
-> `duration_ms` + `success` exatos. `agent_reasoning` acumulado vira
-> `thinking` da proxima `agent_message`.
+> **About Codex CLI:** parquets captured via incremental copy from
+> `~/.codex/sessions/`. Source: `codex`, mode: `cli`. Distinctive feature:
+> `function_call` correlated with `exec_command_end` via `call_id` →
+> exact `duration_ms` + `success`. Accumulated `agent_reasoning` becomes
+> the `thinking` of the next `agent_message`.
 
 {{< include _template.qmd >}}

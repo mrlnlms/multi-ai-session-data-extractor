@@ -1,5 +1,5 @@
-/* CSS compartilhado pros notebooks Quarto descritivos.
-   Adaptado de ~/Desktop/AI Interaction Analysis/notebooks/data-profile/_style.css. */
+/* Shared CSS for the descriptive Quarto notebooks.
+   Adapted from ~/AI Interaction Analysis/notebooks/data-profile/_style.css. */
 
 :root {
     --source-color: #74AA9C;  /* ChatGPT green */
@@ -7,7 +7,7 @@
     --border: #e5e7eb;
 }
 
-/* Imagens em outputs ocupam largura total */
+/* Images in outputs take full width */
 .cell-output-display img {
     width: 100% !important;
     height: auto !important;
@@ -15,7 +15,7 @@
     margin: 0 auto !important;
 }
 
-/* Tabelas com mais respiro */
+/* Tables with more breathing room */
 .cell-output-display table.dataframe,
 .cell-output-display table {
     border-collapse: collapse;
@@ -47,7 +47,7 @@
     margin: 0.5rem 0 1.5rem;
 }
 
-/* Code-fold mais discreto */
+/* More discreet code-fold */
 details > summary {
     color: var(--muted);
     font-size: 0.88em;

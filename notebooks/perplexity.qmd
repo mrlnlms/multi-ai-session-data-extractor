@@ -1,13 +1,13 @@
 ---
 title: "Perplexity — Data Profile"
-subtitle: "Catalogo descritivo dos parquets do parser canonico v3"
+subtitle: "Descriptive catalog of canonical parser v3 parquets"
 source-title: "Perplexity"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -39,10 +39,10 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **Sobre Perplexity:** parser v3 cobrindo threads (copilot/concise) +
+> **About Perplexity:** parser v3 covering threads (copilot/concise) +
 > pages (research, `conversation_id='page:<slug>'`) + spaces. Search results
-> extraidos de `blocks[*].web_result_block.web_results` viram tool_events.
-> `is_pinned` em threads, ENTRY_DELETED preserva orphans em spaces. Modes:
+> extracted from `blocks[*].web_result_block.web_results` become tool_events.
+> `is_pinned` on threads, ENTRY_DELETED preserves orphans in spaces. Modes:
 > copilot/concise/research.
 
 {{< include _template.qmd >}}

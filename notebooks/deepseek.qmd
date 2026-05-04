@@ -1,13 +1,13 @@
 ---
 title: "DeepSeek — Data Profile"
-subtitle: "Catalogo descritivo dos parquets do parser canonico v3"
+subtitle: "Descriptive catalog of canonical parser v3 parquets"
 source-title: "DeepSeek"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -39,10 +39,10 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **Sobre DeepSeek:** parser v3 cobrindo R1 reasoning (thinking ~31% das
+> **About DeepSeek:** parser v3 covering R1 reasoning (thinking ~31% of
 > msgs!), `accumulated_token_usage` (token_count ~98%), branches via int IDs
-> (`current_message_id` + `parent_id`), search_results com structure rica,
+> (`current_message_id` + `parent_id`), search_results with rich structure,
 > `model_type=expert` → mode=research, `status` enum (FINISHED/INCOMPLETE/WIP)
-> em finish_reason, files per msg em attachment_names.
+> in finish_reason, files per msg in attachment_names.
 
 {{< include _template.qmd >}}

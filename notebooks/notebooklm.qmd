@@ -1,13 +1,13 @@
 ---
-title: "NotebookLM — Data Profile (consolidado, multi-conta)"
-subtitle: "Catalogo descritivo dos parquets do parser v3 (account-1 + account-2 + account-3 legacy)"
-source-title: "NotebookLM (consolidado)"
+title: "NotebookLM — Data Profile (consolidated, multi-account)"
+subtitle: "Descriptive catalog of parser v3 parquets (account-1 + account-2 + account-3 legacy)"
+source-title: "NotebookLM (consolidated)"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -39,26 +39,26 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **Sobre NotebookLM (consolidado):** agrega 3 contas:
+> **About NotebookLM (consolidated):** aggregates 3 accounts:
 >
 > - **account-1** (en) — `hello.marlonlemes`
 > - **account-2** (pt-BR) — `marloonlemes`
-> - **account-3** (legacy) — `more.design`, conta extinta capturada em mar/2026
->   pelo extractor antigo. Snapshot raw em
+> - **account-3** (legacy) — `more.design`, extinct account captured in
+>   Mar/2026 by the old extractor. Raw snapshot in
 >   `data/external/notebooklm-snapshots/more-design-2026-03-30/`,
->   parquets `notebooklm_manual_*.parquet` via parser legacy
+>   parquets `notebooklm_manual_*.parquet` via legacy parser
 >   (`capture_method = 'legacy_notebooklm_more_design'`).
 >
-> NotebookLM nao eh chat puro — cada notebook gera ate 9 tipos de outputs
-> (audio, blog, video, flashcards, quiz, data table, slide deck, infographic,
-> mind map). Schema canonico (Conversation/Message/ToolEvent/Branch) eh
-> complementado por 5 tabelas auxiliares (sources, notes, outputs,
-> guide_questions, source_guides).
+> NotebookLM is not pure chat — each notebook generates up to 9 types of
+> outputs (audio, blog, video, flashcards, quiz, data table, slide deck,
+> infographic, mind map). The canonical schema
+> (Conversation/Message/ToolEvent/Branch) is complemented by 5 auxiliary
+> tables (sources, notes, outputs, guide_questions, source_guides).
 >
-> `guide.summary` vira system message (sequence=0) em todo notebook —
-> garante `message_count >= 1` mesmo quando chat=None.
+> `guide.summary` becomes a system message (sequence=0) on every notebook —
+> ensures `message_count >= 1` even when chat=None.
 >
-> Para vista de uma conta so: [`notebooklm-acc-1.qmd`](notebooklm-acc-1.html) /
+> For a single-account view: [`notebooklm-acc-1.qmd`](notebooklm-acc-1.html) /
 > [`notebooklm-acc-2.qmd`](notebooklm-acc-2.html) /
 > [`notebooklm-legacy.qmd`](notebooklm-legacy.html).
 

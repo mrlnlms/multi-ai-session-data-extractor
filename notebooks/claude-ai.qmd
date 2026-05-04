@@ -1,13 +1,13 @@
 ---
 title: "Claude.ai — Data Profile"
-subtitle: "Catalogo descritivo dos parquets do parser canonico v3.1"
+subtitle: "Descriptive catalog of canonical parser v3.1 parquets"
 source-title: "Claude.ai"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -39,12 +39,13 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **Sobre Claude.ai:** parser v3.1 com gap-fill (Backlog #41 do projeto-mae
-> fechado). Cobertura: branches via DAG plano, thinking blocks, tool_use/result
-> com MCP detection (3 sinais), `is_starred → is_pinned`, `is_temporary`,
-> `summary` auto-gerado, `settings_json`, `citations_json`, `attachments_json`
-> com extracted_content inline, `start/stop_timestamp` (~98% latencia),
-> projects com `project_metadata` + `project_docs` (546 docs / 23M chars).
+> **About Claude.ai:** parser v3.1 with gap-fill (parent-project Backlog
+> #41 closed). Coverage: branches via flat DAG, thinking blocks,
+> tool_use/result with MCP detection (3 signals), `is_starred → is_pinned`,
+> `is_temporary`, auto-generated `summary`, `settings_json`, `citations_json`,
+> `attachments_json` with extracted_content inline, `start/stop_timestamp`
+> (~98% latency), projects with `project_metadata` + `project_docs`
+> (546 docs / 23M chars).
 
 {{< include _template.qmd >}}
 

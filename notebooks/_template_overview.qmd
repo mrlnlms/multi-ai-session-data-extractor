@@ -1,13 +1,13 @@
-## Sobre este documento
+## About this document
 
-Visao **cross-platform** dos parquets canonicos consolidados em
-`data/unified/`. Diferente dos qmds per-source (`<plat>.qmd`) que descrevem
-**uma** plataforma, aqui o foco eh **comparar** as plataformas — stacked
-bars por source, distribuicao temporal cruzada, modelos cross, capture_method,
-preservation global.
+**Cross-platform** view of the canonical parquets consolidated in
+`data/unified/`. Unlike the per-source qmds (`<plat>.qmd`) which describe
+**one** platform, here the focus is on **comparing** platforms — stacked
+bars by source, cross temporal distribution, cross models, capture_method,
+global preservation.
 
-Setup do per-subset qmd define `SOURCES_FILTER` (vazio = todas; lista pra
-subset tipo Web Chat / CLI / RAG).
+The per-subset qmd setup defines `SOURCES_FILTER` (empty = all; list for a
+subset like Web Chat / CLI / RAG).
 
 ```{python}
 #| label: overview-totals
@@ -18,7 +18,7 @@ for table in ["conversations","messages","tool_events","branches",
               "project_metadata","project_docs"]:
     n = table_count(con, table)
     if n:
-        _rows.append({"Tabela": f"{table}.parquet", "Rows": fmt_int(n)})
+        _rows.append({"Table": f"{table}.parquet", "Rows": fmt_int(n)})
 show_df(pd.DataFrame(_rows))
 ```
 
@@ -34,25 +34,25 @@ _newest = _period["newest"].iloc[0]
 _last = _period["last_update"].iloc[0]
 
 _meta_rows = [
-    {"Campo": "Subset", "Valor": SUBSET_TITLE},
-    {"Campo": "Sources incluidas", "Valor": ", ".join(SOURCES_FILTER) if SOURCES_FILTER else "todas (10)"},
-    {"Campo": "Periodo de criacao", "Valor": f"{_oldest:%Y-%m-%d} → {_newest:%Y-%m-%d}" if pd.notna(_oldest) else "—"},
-    {"Campo": "Ultima atualizacao", "Valor": f"{_last:%Y-%m-%d %H:%M}" if pd.notna(_last) else "—"},
+    {"Field": "Subset", "Value": SUBSET_TITLE},
+    {"Field": "Sources included", "Value": ", ".join(SOURCES_FILTER) if SOURCES_FILTER else "all (10)"},
+    {"Field": "Creation period", "Value": f"{_oldest:%Y-%m-%d} → {_newest:%Y-%m-%d}" if pd.notna(_oldest) else "—"},
+    {"Field": "Last update", "Value": f"{_last:%Y-%m-%d %H:%M}" if pd.notna(_last) else "—"},
 ]
 show_df(pd.DataFrame(_meta_rows))
 ```
 
-# 1. Comparativo plataforma × métricas
+# 1. Platform × metrics comparison
 
-Tabela pivot: cada linha eh uma plataforma, cada coluna eh uma metrica.
-Vista de uma vez "quem tem o que".
+Pivot table: each row is a platform, each column is a metric.
+See "who has what" at a glance.
 
 ```{python}
 #| label: comparative-table
 
 _comp = con.execute("""
     SELECT
-        source AS plataforma,
+        source AS platform,
         COUNT(*) AS convs,
         SUM(message_count) AS msgs_total,
         ROUND(AVG(message_count), 1) AS avg_msgs,
@@ -71,11 +71,11 @@ show_df(_comp)
 #| label: tools-by-source
 
 _tools = con.execute("""
-    SELECT source AS plataforma,
+    SELECT source AS platform,
         COUNT(*) AS tool_events,
         COUNT(DISTINCT tool_name) AS unique_tools,
-        SUM(CASE WHEN success THEN 1 ELSE 0 END) AS sucesso,
-        SUM(CASE WHEN success = false THEN 1 ELSE 0 END) AS erro
+        SUM(CASE WHEN success THEN 1 ELSE 0 END) AS success,
+        SUM(CASE WHEN success = false THEN 1 ELSE 0 END) AS error
     FROM tool_events
     GROUP BY source
     ORDER BY tool_events DESC
@@ -83,32 +83,32 @@ _tools = con.execute("""
 show_df(_tools)
 ```
 
-# 2. Distribuição temporal
+# 2. Temporal distribution
 
-## 2.1 Conversas criadas por mês (stacked por plataforma)
+## 2.1 Conversations created per month (stacked by platform)
 
 ```{python}
 #| label: timeline-stacked
 
 _tl = con.execute("""
-    SELECT strftime(created_at, '%Y-%m') AS mes,
-        source AS plataforma,
+    SELECT strftime(created_at, '%Y-%m') AS month,
+        source AS platform,
         COUNT(*) AS n
     FROM conversations
     WHERE created_at IS NOT NULL
-    GROUP BY mes, source
-    ORDER BY mes, source
+    GROUP BY month, source
+    ORDER BY month, source
 """).df()
 
 if len(_tl):
     import plotly.graph_objects as go
-    pivot = _tl.pivot(index="mes", columns="plataforma", values="n").fillna(0)
+    pivot = _tl.pivot(index="month", columns="platform", values="n").fillna(0)
     fig = go.Figure()
     for col in pivot.columns:
         fig.add_trace(go.Bar(x=pivot.index, y=pivot[col],
                               name=col, marker_color=SOURCE_COLORS.get(col, MUTED)))
     fig.update_layout(
-        barmode="stack", title="Conversas criadas por mes (stacked por plataforma)",
+        barmode="stack", title="Conversations created per month (stacked by platform)",
         height=400, template="plotly_white",
         xaxis=dict(type="category"),
         margin=dict(t=50, b=80, l=40, r=20),
@@ -117,42 +117,42 @@ if len(_tl):
     fig.show()
 ```
 
-## 2.2 Crescimento acumulado por plataforma
+## 2.2 Cumulative growth by platform
 
 ```{python}
 #| label: cumulative-by-source
 
 _cum = con.execute("""
-    SELECT strftime(created_at, '%Y-%m') AS mes,
-        source AS plataforma,
+    SELECT strftime(created_at, '%Y-%m') AS month,
+        source AS platform,
         COUNT(*) AS n
     FROM conversations
     WHERE created_at IS NOT NULL
-    GROUP BY mes, source
-    ORDER BY mes, source
+    GROUP BY month, source
+    ORDER BY month, source
 """).df()
 
 if len(_cum):
     import plotly.graph_objects as go
     fig = go.Figure()
-    for src in _cum["plataforma"].unique():
-        sub = _cum[_cum["plataforma"] == src].sort_values("mes")
+    for src in _cum["platform"].unique():
+        sub = _cum[_cum["platform"] == src].sort_values("month")
         cum = sub["n"].cumsum()
         fig.add_trace(go.Scatter(
-            x=sub["mes"], y=cum, mode="lines+markers", name=src,
+            x=sub["month"], y=cum, mode="lines+markers", name=src,
             line=dict(color=SOURCE_COLORS.get(src, MUTED), width=2),
         ))
     fig.update_layout(
-        title="Crescimento acumulado por plataforma",
+        title="Cumulative growth by platform",
         height=400, template="plotly_white",
-        xaxis=dict(type="category", title="Mes"),
-        yaxis=dict(title="Convs acumuladas"),
+        xaxis=dict(type="category", title="Month"),
+        yaxis=dict(title="Cumulative convs"),
         margin=dict(t=50, b=40, l=40, r=20),
     )
     fig.show()
 ```
 
-## 2.3 Activity heatmap (hora × dia, todas as fontes)
+## 2.3 Activity heatmap (hour × day, all sources)
 
 ```{python}
 #| label: heatmap-cross
@@ -169,29 +169,29 @@ if len(_hm):
     import plotly.graph_objects as go
     pivot = _hm.pivot(index="dow", columns="hour", values="n").fillna(0)
     pivot = pivot.reindex(range(1, 8))
-    days = ["Seg","Ter","Qua","Qui","Sex","Sab","Dom"]
+    days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
     fig = go.Figure(go.Heatmap(
         z=pivot.values, x=list(pivot.columns), y=days,
         colorscale=[[0, "#ffffff"], [1, "#1f2937"]],
     ))
     fig.update_layout(
-        title="Atividade — hora x dia (todas as plataformas)",
+        title="Activity — hour × day (all platforms)",
         height=300, template="plotly_white",
-        xaxis=dict(title="Hora", dtick=2),
+        xaxis=dict(title="Hour", dtick=2),
         margin=dict(t=50, b=40, l=60, r=20),
     )
     fig.show()
 ```
 
-# 3. Modelos cross-platform
+# 3. Cross-platform models
 
-## 3.1 Top 20 modelos (com badge de source)
+## 3.1 Top 20 models (with source badge)
 
 ```{python}
 #| label: top-models-cross
 
 _tm = con.execute("""
-    SELECT model, source AS plataforma, COUNT(*) AS n
+    SELECT model, source AS platform, COUNT(*) AS n
     FROM conversations WHERE model IS NOT NULL
     GROUP BY model, source
     ORDER BY n DESC LIMIT 20
@@ -199,7 +199,7 @@ _tm = con.execute("""
 show_df(_tm)
 ```
 
-## 3.2 Heatmap modelo × plataforma (top 30 modelos)
+## 3.2 Model × platform heatmap (top 30 models)
 
 ```{python}
 #| label: model-platform-heat
@@ -209,7 +209,7 @@ _mph = con.execute("""
         SELECT model FROM conversations WHERE model IS NOT NULL
         GROUP BY model ORDER BY COUNT(*) DESC LIMIT 30
     )
-    SELECT model, source AS plataforma, COUNT(*) AS n
+    SELECT model, source AS platform, COUNT(*) AS n
     FROM conversations
     WHERE model IN (SELECT model FROM top_models)
     GROUP BY model, source
@@ -217,24 +217,24 @@ _mph = con.execute("""
 
 if len(_mph):
     import plotly.graph_objects as go
-    pivot = _mph.pivot(index="model", columns="plataforma", values="n").fillna(0)
+    pivot = _mph.pivot(index="model", columns="platform", values="n").fillna(0)
     fig = go.Figure(go.Heatmap(
         z=pivot.values, x=list(pivot.columns), y=list(pivot.index),
         colorscale=[[0, "#ffffff"], [1, "#1f2937"]],
         text=pivot.values, texttemplate="%{text:.0f}",
     ))
     fig.update_layout(
-        title="Distribuicao de uso: modelo × plataforma",
+        title="Usage distribution: model × platform",
         height=600, template="plotly_white",
         margin=dict(t=50, b=40, l=140, r=20),
     )
     fig.show()
 ```
 
-# 4. Capture method (proveniência do dado)
+# 4. Capture method (data provenance)
 
-Distingue dado capturado pelo extractor automatico vs importado via parsers
-manuais (clippings_obsidian, copypaste_web, terminal_claude_code,
+Distinguishes data captured by the automatic extractor vs imported via manual
+parsers (clippings_obsidian, copypaste_web, terminal_claude_code,
 legacy_notebooklm).
 
 ```{python}
@@ -244,7 +244,7 @@ if has_col(con, "conversations", "capture_method"):
     _cm = con.execute("""
         SELECT
             COALESCE(capture_method, 'extractor') AS method,
-            source AS plataforma,
+            source AS platform,
             COUNT(*) AS n
         FROM conversations
         GROUP BY method, source
@@ -253,32 +253,32 @@ if has_col(con, "conversations", "capture_method"):
     show_df(_cm)
 
     import plotly.graph_objects as go
-    pivot = _cm.pivot(index="method", columns="plataforma", values="n").fillna(0)
+    pivot = _cm.pivot(index="method", columns="platform", values="n").fillna(0)
     fig = go.Figure()
     for col in pivot.columns:
         fig.add_trace(go.Bar(x=pivot.index, y=pivot[col],
                               name=col, marker_color=SOURCE_COLORS.get(col, MUTED)))
     fig.update_layout(
-        barmode="stack", title="Conversas por capture_method (stacked por plataforma)",
+        barmode="stack", title="Conversations by capture_method (stacked by platform)",
         height=400, template="plotly_white",
         margin=dict(t=50, b=80, l=40, r=20),
         legend=dict(orientation="h", y=-0.25),
     )
     fig.show()
 else:
-    show_md("> `capture_method` ausente nas views (todos extractor).")
+    show_md("> `capture_method` absent in the views (all extractor).")
 ```
 
-# 5. Tool events cross-platform
+# 5. Cross-platform tool events
 
-## 5.1 Top 20 tools usados
+## 5.1 Top 20 tools used
 
 ```{python}
 #| label: top-tools-cross
 
 if table_count(con, "tool_events") > 0:
     _tt = con.execute("""
-        SELECT tool_name, source AS plataforma, COUNT(*) AS calls
+        SELECT tool_name, source AS platform, COUNT(*) AS calls
         FROM tool_events
         WHERE tool_name IS NOT NULL AND tool_name != ''
         GROUP BY tool_name, source
@@ -287,27 +287,27 @@ if table_count(con, "tool_events") > 0:
     show_df(_tt)
 ```
 
-## 5.2 Tools por categoria (event_type) cross
+## 5.2 Tools by category (event_type) cross
 
 ```{python}
 #| label: events-by-type-cross
 
 if table_count(con, "tool_events") > 0:
     _et = con.execute("""
-        SELECT event_type, source AS plataforma, COUNT(*) AS n
+        SELECT event_type, source AS platform, COUNT(*) AS n
         FROM tool_events
         GROUP BY event_type, source
         ORDER BY n DESC
     """).df()
 
     import plotly.graph_objects as go
-    pivot = _et.pivot(index="event_type", columns="plataforma", values="n").fillna(0)
+    pivot = _et.pivot(index="event_type", columns="platform", values="n").fillna(0)
     fig = go.Figure()
     for col in pivot.columns:
         fig.add_trace(go.Bar(x=pivot.index, y=pivot[col],
                               name=col, marker_color=SOURCE_COLORS.get(col, MUTED)))
     fig.update_layout(
-        barmode="stack", title="ToolEvents por event_type (stacked por plataforma)",
+        barmode="stack", title="ToolEvents by event_type (stacked by platform)",
         height=400, template="plotly_white",
         margin=dict(t=50, b=80, l=40, r=20),
         legend=dict(orientation="h", y=-0.25),
@@ -322,10 +322,10 @@ if table_count(con, "tool_events") > 0:
 
 if has_col(con, "tool_events", "success"):
     _sr = con.execute("""
-        SELECT source AS plataforma,
-            SUM(CASE WHEN success THEN 1 ELSE 0 END) AS sucesso,
-            SUM(CASE WHEN success = false THEN 1 ELSE 0 END) AS erro,
-            SUM(CASE WHEN success IS NULL THEN 1 ELSE 0 END) AS desconhecido,
+        SELECT source AS platform,
+            SUM(CASE WHEN success THEN 1 ELSE 0 END) AS success,
+            SUM(CASE WHEN success = false THEN 1 ELSE 0 END) AS error,
+            SUM(CASE WHEN success IS NULL THEN 1 ELSE 0 END) AS unknown,
             COUNT(*) AS total
         FROM tool_events
         GROUP BY source
@@ -335,16 +335,16 @@ if has_col(con, "tool_events", "success"):
     if len(_sr):
         show_df(_sr)
     else:
-        show_md("> Nenhuma plataforma neste subset registra success em tool_events.")
+        show_md("> No platform in this subset records success on tool_events.")
 ```
 
-# 6. Word counts cross-platform
+# 6. Cross-platform word counts
 
 ```{python}
 #| label: words-cross
 
 _wc = con.execute("""
-    SELECT source AS plataforma, role,
+    SELECT source AS platform, role,
         ROUND(AVG(word_count), 0)::INT AS avg_words,
         MEDIAN(word_count)::INT AS median_words,
         MAX(word_count) AS max_words,
@@ -357,17 +357,17 @@ _wc = con.execute("""
 show_df(_wc)
 ```
 
-# 7. Preservation e estados especiais
+# 7. Preservation and special states
 
 ## 7.1 Preserved missing global
 
-Convs ativas no servidor vs preservadas localmente (sumiram do servidor).
+Convs active on the server vs preserved locally (disappeared from server).
 
 ```{python}
 #| label: preservation-cross
 
 _pres = con.execute("""
-    SELECT source AS plataforma,
+    SELECT source AS platform,
         SUM(is_preserved_missing::INT) AS preserved,
         COUNT(*) AS total,
         ROUND(SUM(is_preserved_missing::INT) * 100.0 / NULLIF(COUNT(*),0), 1) AS pct
@@ -379,7 +379,7 @@ _pres = con.execute("""
 if len(_pres):
     show_df(_pres)
 else:
-    show_md("> Zero convs preservadas (deletadas do servidor) neste subset.")
+    show_md("> Zero preserved convs (deleted from server) in this subset.")
 ```
 
 ## 7.2 Pinned / Archived / Temporary
@@ -388,7 +388,7 @@ else:
 #| label: states-cross
 
 _st = con.execute("""
-    SELECT source AS plataforma,
+    SELECT source AS platform,
         SUM(is_pinned::INT) AS pinned,
         SUM(is_archived::INT) AS archived,
         SUM(is_temporary::INT) AS temporary,
@@ -401,13 +401,13 @@ _st = con.execute("""
 if len(_st):
     show_df(_st)
 else:
-    show_md("> Nenhuma plataforma deste subset registra pin/archive/temporary.")
+    show_md("> No platform in this subset records pin/archive/temporary.")
 ```
 
-# 8. Lifetime das conversas
+# 8. Conversation lifetime
 
-`updated_at - created_at`. Distingue one-shot (< 1 dia) de threads que
-viraram projeto (> 7 dias).
+`updated_at - created_at`. Distinguishes one-shot (< 1 day) from threads
+that became a project (> 7 days).
 
 ```{python}
 #| label: lifetime-cross
@@ -418,33 +418,33 @@ _lf = con.execute("""
         FROM conversations
         WHERE updated_at IS NOT NULL AND created_at IS NOT NULL
     )
-    SELECT source AS plataforma,
+    SELECT source AS platform,
         CASE
             WHEN days < 0.04167 THEN '< 1h'
-            WHEN days < 1 THEN '1h-1dia'
-            WHEN days < 7 THEN '1-7 dias'
-            WHEN days < 30 THEN '7-30 dias'
-            WHEN days < 90 THEN '30-90 dias'
-            ELSE '> 90 dias'
+            WHEN days < 1 THEN '1h-1d'
+            WHEN days < 7 THEN '1-7 days'
+            WHEN days < 30 THEN '7-30 days'
+            WHEN days < 90 THEN '30-90 days'
+            ELSE '> 90 days'
         END AS bin,
         COUNT(*) AS n
     FROM lt GROUP BY source, bin
 """).df()
 
 if len(_lf):
-    _order = ['< 1h','1h-1dia','1-7 dias','7-30 dias','30-90 dias','> 90 dias']
+    _order = ['< 1h','1h-1d','1-7 days','7-30 days','30-90 days','> 90 days']
     _lf['bin'] = pd.Categorical(_lf['bin'], categories=_order, ordered=True)
-    _lf = _lf.sort_values(['bin', 'plataforma'])
+    _lf = _lf.sort_values(['bin', 'platform'])
 
     import plotly.graph_objects as go
-    pivot = _lf.pivot(index="bin", columns="plataforma", values="n").fillna(0)
+    pivot = _lf.pivot(index="bin", columns="platform", values="n").fillna(0)
     pivot = pivot.reindex(_order)
     fig = go.Figure()
     for col in pivot.columns:
         fig.add_trace(go.Bar(x=pivot.index.astype(str), y=pivot[col],
                               name=col, marker_color=SOURCE_COLORS.get(col, MUTED)))
     fig.update_layout(
-        barmode="stack", title="Lifetime das convs (stacked por plataforma)",
+        barmode="stack", title="Conversation lifetime (stacked by platform)",
         height=400, template="plotly_white",
         margin=dict(t=50, b=80, l=40, r=20),
         legend=dict(orientation="h", y=-0.25),
@@ -452,7 +452,7 @@ if len(_lf):
     fig.show()
 ```
 
-# 9. Tabela completa cross-platform filtrável
+# 9. Full filterable cross-platform table
 
 ```{python}
 #| label: full-table-cross
@@ -462,7 +462,7 @@ from itables import show as itable_show
 
 _full = con.execute("""
     SELECT
-        source AS plataforma,
+        source AS platform,
         substr(conversation_id, 1, 8) AS conv_id,
         title,
         message_count AS msgs,

@@ -1,13 +1,13 @@
 ---
 title: "NotebookLM — legacy more.design — Data Profile"
-subtitle: "Captura legacy de 2026-03-30 (conta extinta). Parquets _manual_ via parser legacy."
+subtitle: "Legacy capture from 2026-03-30 (extinct account). _manual_ parquets via legacy parser."
 source-title: "NotebookLM legacy more.design"
 jupyter: python3
 ---
 
 ```{python}
 #| label: setup
-#| code-summary: "Setup — paths, conexao DuckDB, helpers"
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
 
 import sys
 from pathlib import Path
@@ -39,14 +39,14 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **NotebookLM legacy more.design.** Conta extinta (`more.design`, pt-BR),
-> capturada em 2026-03-30 pelo extractor antigo do projeto-mae. Snapshot
-> raw em `data/external/notebooklm-snapshots/more-design-2026-03-30/`,
-> parquets `notebooklm_manual_*.parquet` via parser legacy
+> **NotebookLM legacy more.design.** Extinct account (`more.design`, pt-BR),
+> captured on 2026-03-30 by the old extractor of the parent project. Raw
+> snapshot in `data/external/notebooklm-snapshots/more-design-2026-03-30/`,
+> parquets `notebooklm_manual_*.parquet` via legacy parser
 > (`capture_method = 'legacy_notebooklm_more_design'`). 11 notebooks /
 > 33 msgs / 27 outputs / 6 briefs.
 >
-> Para visao das 3 contas: [`notebooklm.qmd`](notebooklm.html).
+> For the 3-account view: [`notebooklm.qmd`](notebooklm.html).
 > account-1: [`notebooklm-acc-1.qmd`](notebooklm-acc-1.html). account-2:
 > [`notebooklm-acc-2.qmd`](notebooklm-acc-2.html).
 
