@@ -168,10 +168,29 @@ Estas validações exigem conta Pro Max e ficam em aberto até alguém testar:
   web** (smoke tests com fixtures: build_plan + run_reconciliation +
   preservation + idempotência), **funções puras dos 6 extractors web**
   (parsing, dedup, baseline de discovery, target_path, ext_from_url).
+- **CI roda em Ubuntu + macOS x Python 3.12/3.13** (4 combinações de
+  unit) + integration smoke (Quarto render + Playwright import + Streamlit
+  healthcheck + 10 imports de plataforma).
 - **HTTP/auth/Playwright dos extractors sem teste de unidade.** A lógica
   é validada empiricamente nos syncs reais. Mockar Playwright/httpx é
   caro (~20h de setup + frágil quando a plataforma muda). Caso valha,
   ficar em backlog pra v1.0.
+
+## Cobertura de ambiente
+
+- **Línguas testadas:** en + pt-BR (NotebookLM acc-1/acc-2,
+  Gemini acc-1/acc-2). Outras línguas podem ter strings UI hardcoded em
+  probes (ex: "Deep Dive" / "Aprofundar" no NotebookLM) que não foram
+  exercitadas. Quando aparecer, é fix pontual.
+- **Account tiers testados:** Free / Pro. Enterprise / Team / Max não
+  validados (ver Perplexity Pro/Max acima como exemplo concreto). Schemas
+  canônicos têm os campos genéricos; ajustes finos quando contributor
+  com tier maior testar.
+- **Volume validado:** confirmado até ~140k mensagens (Claude Code) /
+  ~1.2GB raw (NotebookLM acc-1). Acima de ~500k mensagens, parsers que
+  carregam tudo em memória podem precisar de streaming chunked
+  (`pyarrow.ParquetWriter` em loop em vez de `to_parquet` direto). Não
+  é caso atual; refator quando alguém reportar.
 
 ## Limitações operacionais
 

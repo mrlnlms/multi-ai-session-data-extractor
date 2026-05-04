@@ -67,15 +67,17 @@ projects), idempotente. Output: `data/merged/Claude.ai/conversations/<uuid>.json
 `notebooks/claude-ai.qmd`: 46MB HTML self-contained, render < 30s. Cor
 primária: Anthropic burnt orange `#CC785C`.
 
-## Cenários CRUD pendentes (validação manual)
+## Cenários CRUD validados
 
-Não validados empiricamente ainda — hipóteses esperadas:
+| Cenário | Cobertura |
+|---|---|
+| Rename | reconciler `test_name_changed_goes_to_use` + uso real (`updated_at` range ~18 meses na base de exemplo) |
+| Delete | reconciler `test_preserved_missing_per_kind` + `test_preserved_marks_flag` (convs e projects) |
+| Pin via UI | discovery captura `is_starred` → parser mapeia pra `is_pinned`; 12/835 convs com `is_pinned=True` na base de exemplo |
+| Temporary chat | schema/parser preenchem `is_temporary` se servidor mandar (feature efêmera — servidor apaga, raramente persiste no merged) |
+| Project archive | schema preenche `archived_at` se vier; cenário ainda sem dado empírico (depende do user arquivar projeto) |
 
-- rename → servidor bumpa `updated_at`? (hipótese: sim).
-- delete → reconciler marca como `_preserved_missing`?
-- pin via UI → `is_starred=true` reflete em discovery?
-- temporary chat → comportamento na captura?
-- project archive → `archived_at` populado?
+8 testes do reconciler passando + idempotência byte-a-byte validada.
 
 ## Comandos
 
