@@ -47,17 +47,24 @@ class CodexParser(BaseParser):
     def __init__(self, account: Optional[str] = None):
         super().__init__(account=account)
         self.branches: list[Branch] = []
+        self._conv_source_files: dict[str, set[str]] = {}
+        self._input_path: Optional[Path] = None
 
     def reset(self):
         super().reset()
         self.branches = []
+        self._conv_source_files = {}
+        self._input_path = None
 
     def parse(self, input_path: Path) -> None:
         """Le todas sessoes em year/month/day/rollout-*.jsonl."""
         input_path = Path(input_path)
+        self._input_path = input_path
         for session_file in sorted(input_path.rglob("rollout-*.jsonl")):
             self._parse_session(session_file)
         self._build_branches()
+        from src.extractors.cli.preservation import mark_cli_preservation
+        mark_cli_preservation(self)
 
     def parse_files(self, files: list[Path]) -> None:
         """Processa apenas a lista de arquivos especificada (uso incremental)."""
@@ -165,6 +172,15 @@ class CodexParser(BaseParser):
 
         session_id = meta["id"]
         cwd = meta.get("cwd", "")
+
+        # Registra rel path pra preservation tracking (cli-copy preserva
+        # arquivos quando user apaga do source HOME)
+        if self._input_path is not None:
+            try:
+                rel = str(session_file.relative_to(self._input_path))
+                self._conv_source_files.setdefault(session_id, set()).add(rel)
+            except ValueError:
+                pass  # session_file nao eh subpath de input_path
 
         # Build messages interleaved by timestamp
         all_msgs = []

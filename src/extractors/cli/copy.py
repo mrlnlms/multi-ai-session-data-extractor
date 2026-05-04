@@ -103,6 +103,41 @@ def copy_claude_code() -> dict[str, list[Path]]:
     return {"new": new_files, "updated": updated_files}
 
 
+def current_source_files(source: str) -> set[str]:
+    """Lista RELATIVE paths de arquivos atualmente no HOME do CLI.
+
+    Util pra parsers detectarem `is_preserved_missing`: arquivos em
+    `data/raw/<CLI>/` que ja nao estao no source HOME foram deletados
+    pelo user (mas continuam preservados localmente pelo cli-copy).
+
+    Returns: set de paths relativos ao `cfg['src']`. Vazio se source nao
+    existir (ex: rodando em outra maquina sem o CLI instalado).
+    """
+    cfg = SOURCES.get(source)
+    if not cfg or not cfg["src"].exists():
+        return set()
+    src = cfg["src"]
+    if source == "claude_code":
+        # Raiz: <encoded-cwd>/<id>.jsonl + subagents: <encoded-cwd>/<parent>/subagents/<sub>.jsonl
+        return {
+            str(p.relative_to(src))
+            for p in src.glob("**/*.jsonl")
+        }
+    if source == "codex":
+        # ~/.codex/sessions/<year>/<month>/<day>/rollout-*.jsonl
+        return {
+            str(p.relative_to(src))
+            for p in src.glob("**/rollout-*.jsonl")
+        }
+    if source == "gemini_cli":
+        # ~/.gemini/tmp/<hash>/chats/session-*.json
+        return {
+            str(p.relative_to(src))
+            for p in src.glob("**/*.json")
+        }
+    return set()
+
+
 def copy_source(source: str) -> dict[str, list[Path]]:
     """Copia 1 source. Retorna {new, updated}."""
     cfg = SOURCES[source]
