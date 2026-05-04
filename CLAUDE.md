@@ -114,9 +114,10 @@ Marcos arquiteturais 2026-05-04 — todos shipped:
    `_template_overview.qmd`, `data/unified/` materializado via
    `scripts/unify-parquets.py` (11 parquets).
 2. **DVC pipeline filho-pai** — filho versiona pipeline completo (raw +
-   merged + processed + unified + external) via gdrive. Pai consome
-   `processed/` e `unified/` via `dvc import` do GitHub. Runbook em
-   `docs/dvc-runbook.md`.
+   merged + processed + unified + external) via gdrive em
+   `ai-interaction-source-dvc`. Pai consome `processed/` e `unified/` via
+   `dvc import` do GitHub e versiona derivados em `ai-interaction-analysis-dvc`
+   (cofres separados desde 2026-05-04). Runbook: `docs/dvc-runbook.md`.
 3. **Publicacao opensource** — repo publico, README/SETUP/CONTRIBUTING/CI/
    badges/LICENSE, secao DVC opcional pra contributors em `docs/SETUP.md`.
 
@@ -155,8 +156,8 @@ outras**. Tabela cumulativa em `docs/cross-platform-features.md`.
 
 Filho eh o cofre canonico: `data/raw/` + `data/merged/` + `data/processed/`
 + `data/unified/` + `data/external/<subdirs>` versionados em gdrive
-(pasta `ai-interaction-dvc`, mesmo remote do projeto pai). Permite recover
-total apos deletar plataforma + apagar `data/` localmente.
+(pasta `ai-interaction-source-dvc`, ID `101HMnOKvRYPZ6qQQu9iqCDcyWr_qx8fo`).
+Permite recover total apos deletar plataforma + apagar `data/` localmente.
 
 **Apos rodar extractor / reconciler / parser, sempre:**
 
@@ -171,9 +172,17 @@ git add data/*.dvc data/external/*.dvc data/.gitignore data/external/.gitignore
 .venv/bin/dvc push
 ```
 
-**NAO rodar `dvc gc` casualmente** — historico das capturas eh precious
-(principio 1). Filho e pai compartilham remote; gc num repo pode apagar
-blobs do outro. Detalhes + recover + troubleshooting em
+**Cofres separados pai/filho desde 2026-05-04** — filho usa
+`ai-interaction-source-dvc` (101HMnOK...), pai (`AI Interaction Analysis/`)
+usa `ai-interaction-analysis-dvc` (13YGXSUK...). `dvc gc` agora eh **seguro**
+neste projeto: nao afeta blobs do pai. Pai consome `processed/` e `unified/`
+daqui via `dvc import` (puxa via Git+DVC, nao precisa do remote do pai).
+
+**Schema contract no pai:** mudancas em colunas/tipos de
+`data/unified/*.parquet` viram PR em `docs/unified-schema.md` no projeto pai
+**antes** do push aqui — pai tem smoke test (`scripts/smoke_test_unified.py`)
+que valida schema + NOT NULL + VALID_SOURCES + nao-encolhimento. Mudancas
+silenciosas quebram analises do pai. Detalhes + recover + troubleshooting:
 `docs/dvc-runbook.md`.
 
 ## Estrutura
