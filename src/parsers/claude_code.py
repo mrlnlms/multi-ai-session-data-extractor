@@ -23,12 +23,21 @@ Branches: 1 _main por Conversation (Claude Code nao tem fork — chat eh linear)
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+
+_MIME_EXT = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+}
 
 from src.parsers.base import BaseParser
 from src.schema.models import (
@@ -326,6 +335,37 @@ class ClaudeCodeParser(BaseParser):
         if messages:
             self.messages.extend(messages)
 
+    def _save_image_block(
+        self,
+        block: dict,
+        session_file: Path,
+        session_id: str,
+        msg_seq: int,
+        block_idx: int,
+    ) -> Optional[str]:
+        # Imagens user-attached em sessoes Claude Code chegam inline base64.
+        # Decodifica e salva em <raw_root>/_images/<session_id>/seq_idx.<ext>;
+        # retorna path relativo pra registrar em attachment_names.
+        source = block.get("source") or {}
+        if source.get("type") != "base64":
+            return None
+        media_type = source.get("media_type") or ""
+        ext = _MIME_EXT.get(media_type, ".bin")
+        data = source.get("data")
+        if not data:
+            return None
+        raw_root = getattr(self, "_input_path", None) or session_file.parent.parent
+        out_dir = Path(raw_root) / "_images" / session_id
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"{msg_seq}_{block_idx}{ext}"
+        if not out_path.exists():
+            try:
+                out_path.write_bytes(base64.b64decode(data))
+            except Exception as e:
+                logger.warning(f"  {session_file}: falha decode imagem msg={msg_seq}: {e}")
+                return None
+        return f"_images/{session_id}/{out_path.name}"
+
     def _parse_session(
         self,
         session_file: Path,
@@ -405,18 +445,37 @@ class ClaudeCodeParser(BaseParser):
 
                 # GOTCHA: content pode ser string direta ou lista de blocos
                 # Bug pre-a391e5d descartava string content, perdendo 10.7k msgs
+                text_parts: list[str] = []
+                image_blocks: list[dict] = []
                 if isinstance(content, str):
-                    text_parts = [content] if content.strip() else []
+                    if content.strip():
+                        text_parts.append(content)
                 elif isinstance(content, list):
-                    text_parts = [item.get("text", "") for item in content
-                                  if isinstance(item, dict) and item.get("type") == "text"]
+                    for item in content:
+                        if not isinstance(item, dict):
+                            continue
+                        itype = item.get("type")
+                        if itype == "text":
+                            text_parts.append(item.get("text", ""))
+                        elif itype == "image":
+                            image_blocks.append(item)
                 else:
                     continue
 
-                if not text_parts:
+                if not text_parts and not image_blocks:
                     continue  # So tem tool_result, nao gera Message
 
                 seq += 1
+                ct_set: set[str] = set()
+                if text_parts:
+                    ct_set.add("text")
+                attachment_names: list[str] = []
+                for idx, block in enumerate(image_blocks):
+                    saved = self._save_image_block(block, session_file, session_id, seq, idx)
+                    if saved:
+                        attachment_names.append(saved)
+                        ct_set.add("image")
+
                 messages.append(Message(
                     message_id=evt.get("uuid", f"{session_id}_{seq}"),
                     conversation_id=session_id,
@@ -427,7 +486,8 @@ class ClaudeCodeParser(BaseParser):
                     model=None,
                     created_at=self._ts(evt.get("timestamp")),
                     account=self.account,
-                    content_types="text",
+                    content_types=",".join(sorted(ct_set)) if ct_set else "text",
+                    attachment_names=",".join(attachment_names) if attachment_names else None,
                 ))
 
             elif etype == "assistant":
