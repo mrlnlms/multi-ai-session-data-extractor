@@ -107,18 +107,23 @@ todos resolvidos ou re-enquadrados apos validacao empirica:
 
 ## Backlog principal
 
-1. ~~`notebooks/00-overview.qmd`~~ **SHIPPED 2026-05-04** — visao consolidada
-   cross-plataforma via DuckDB UNION ALL. 4 qmds: geral, web, cli, rag.
-   Template em `_template_overview.qmd`. Materializa `data/unified/` via
-   `scripts/unify-parquets.py` (11 parquets — 4 canonicos + 7 auxiliares).
-2. ~~DVC pipeline pra consumers externos~~ **EM EXECUCAO 2026-05-04** —
-   filho versiona pipeline completo (raw + merged + processed + unified +
-   external) como cofre completo via gdrive. Pai consumira `processed/` e
-   `unified/` via `dvc import-url`. Runbook em `docs/dvc-runbook.md`.
-3. ~~Pos-shipping: publicacao opensource~~ **SHIPPED 2026-05-04** — repo
-   publico no GitHub, README/SETUP/CONTRIBUTING/CI/badges/LICENSE,
-   secao DVC opcional documentada em `docs/SETUP.md` (contributors podem
-   usar proprio gdrive remote via `--local` overrides).
+Marcos arquiteturais 2026-05-04 — todos shipped:
+
+1. **`notebooks/00-overview.qmd`** — visao consolidada cross-plataforma via
+   DuckDB UNION ALL. 4 qmds (geral, web, cli, rag), template
+   `_template_overview.qmd`, `data/unified/` materializado via
+   `scripts/unify-parquets.py` (11 parquets).
+2. **DVC pipeline filho-pai** — filho versiona pipeline completo (raw +
+   merged + processed + unified + external) via gdrive. Pai consome
+   `processed/` e `unified/` via `dvc import` do GitHub. Runbook em
+   `docs/dvc-runbook.md`.
+3. **Publicacao opensource** — repo publico, README/SETUP/CONTRIBUTING/CI/
+   badges/LICENSE, secao DVC opcional pra contributors em `docs/SETUP.md`.
+
+Trabalho aberto pos-2026-05-04: ver [docs/ROADMAP.md](docs/ROADMAP.md)
+(7 items: Claude Code image extraction, Claude.ai memories, ingestao por
+URL, automacao CLI capture, ChatGPT delete cycle, voice DOM pass decisao,
+versionamento avancado).
 
 ## Cross-feature checks (pin, archive, voice, share)
 
