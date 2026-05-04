@@ -111,8 +111,10 @@ todos resolvidos ou re-enquadrados apos validacao empirica:
    cross-plataforma via DuckDB UNION ALL. 4 qmds: geral, web, cli, rag.
    Template em `_template_overview.qmd`. Materializa `data/unified/` via
    `scripts/unify-parquets.py` (11 parquets — 4 canonicos + 7 auxiliares).
-2. **DVC pipeline pra consumers externos** — versionar canonicos via DVC,
-   pipelines de analise consumem via `dvc import-url`.
+2. ~~DVC pipeline pra consumers externos~~ **EM EXECUCAO 2026-05-04** —
+   filho versiona pipeline completo (raw + merged + processed + unified +
+   external) como cofre completo via gdrive. Pai consumira `processed/` e
+   `unified/` via `dvc import-url`. Runbook em `docs/dvc-runbook.md`.
 3. **Pos-shipping:** publicacao opensource (sanitizar credenciais, README,
    exemplos).
 
@@ -143,6 +145,31 @@ outras**. Tabela cumulativa em `docs/cross-platform-features.md`.
    `Conversation`, `Message`, `ToolEvent`, `ConversationProject`, `Branch`.
    Extractors entregam raw/merged JSON; parsers entregam parquet nesse
    schema; analise consome parquet read-only.
+
+## DVC — cofre completo dos dados
+
+Filho eh o cofre canonico: `data/raw/` + `data/merged/` + `data/processed/`
++ `data/unified/` + `data/external/<subdirs>` versionados em gdrive
+(pasta `ai-interaction-dvc`, mesmo remote do projeto pai). Permite recover
+total apos deletar plataforma + apagar `data/` localmente.
+
+**Apos rodar extractor / reconciler / parser, sempre:**
+
+```bash
+.venv/bin/dvc add data/raw data/merged data/processed data/unified \
+    data/external/manual-saves data/external/deep-research-md \
+    data/external/perplexity-orphan-threads data/external/deepseek-snapshots \
+    data/external/chatgpt-extension-snapshot data/external/claude-ai-snapshots \
+    data/external/notebooklm-snapshots data/external/openai-gdpr-export
+git add data/*.dvc data/external/*.dvc data/.gitignore data/external/.gitignore
+~/.claude/scripts/commit.sh "data: snapshot apos <operacao>"
+.venv/bin/dvc push
+```
+
+**NAO rodar `dvc gc` casualmente** — historico das capturas eh precious
+(principio 1). Filho e pai compartilham remote; gc num repo pode apagar
+blobs do outro. Detalhes + recover + troubleshooting em
+`docs/dvc-runbook.md`.
 
 ## Estrutura
 
