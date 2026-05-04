@@ -3,16 +3,14 @@
 Le sessoes JSONL de `data/raw/Claude Code/<encoded-cwd>/*.jsonl` (e subagents
 em `<encoded-cwd>/<session-id>/subagents/*.jsonl`).
 
-Gotchas mapeados (do projeto pai — 14 tests, multiples bug fixes):
+Gotchas mapeados:
 
-1. **`content` pode ser str OU list** — fix recuperou 10.7k msgs (commit a391e5d).
+1. **`content` pode ser str OU list** — afeta msgs com tool calls aninhadas.
 2. **Sessoes orfas** — JSONL raiz some mas subagents + ~/.claude/usage-data/
-   session-meta/<uuid>.json sobrevivem. Reconstroi stub parent (commit d2b2ffc:
-   resgatou 352 sessoes + 1723 subagents).
+   session-meta/<uuid>.json sobrevivem. Reconstroi stub parent.
 3. **`isSidechain` filter** — sessoes principais filtram sidechain=True;
    subagents processam tudo.
-4. **Subagent `conversation_id` usa filename** (nao sessionId — colidia com parent,
-   commit 66d5cbc).
+4. **Subagent `conversation_id` usa filename** (nao sessionId — colide com parent).
 5. **`tool_results` em user msgs seguintes** — 2 passes pra correlacionar.
 6. **`interaction_type`** — 'human_ai' (raiz) vs 'ai_ai' (subagent) +
    `parent_session_id` no subagent.

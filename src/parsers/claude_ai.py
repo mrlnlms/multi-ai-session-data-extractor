@@ -276,8 +276,8 @@ class ClaudeAIParser(BaseParser):
         thinking = concat_thinking_blocks(content_blocks)
         block_types = collect_block_types(content_blocks)
 
-        # Attachments com extracted_content (1.8k+ no projeto-mae,
-        # texto extraido fica inline em attachments_json)
+        # Attachments com extracted_content — texto extraido fica inline
+        # em attachments_json
         attachments = msg.get("attachments") or []
         att_names = collect_attachment_names(attachments)
         att_serialized = serialize_attachments(attachments)

@@ -1,7 +1,8 @@
 """Playwright login persistente pra NotebookLM.
 
-2 contas ativas: account-1 (en, original "hello") e account-2 (pt-BR, original
-"marloon"). more.design foi perdida (raw antigo preservado no projeto pai).
+Suporta multiplas contas via sufixo (account-1, account-2, etc). Cada conta
+tem profile persistente em .storage/notebooklm-profile-<N>/ gerado via
+scripts/notebooklm-login.py.
 """
 
 from pathlib import Path

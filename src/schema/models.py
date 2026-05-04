@@ -148,7 +148,7 @@ class ProjectDoc:
     """Doc de project (knowledge file/source) com content inline.
 
     Tabela auxiliar do parser v3.1 — usado pra Claude.ai onde projects tem
-    docs com content extraido (23M chars em 546 docs no projeto-mae).
+    docs com content extraido (pode chegar a dezenas de MB de texto inline).
     Schema agnostico ao source pra permitir reuso em outras plataformas
     (ChatGPT project_sources tambem se encaixa).
     """

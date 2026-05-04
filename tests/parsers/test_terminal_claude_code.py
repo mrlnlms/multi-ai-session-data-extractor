@@ -6,22 +6,22 @@ from src.parsers.terminal_claude_code import TerminalClaudeCodeParser
 
 FIXTURE_SIMPLE = """╭─── Claude Code v2.1.38 ──────────────────────────────────────────────────────╮
 │                                        │ Tips for getting started            │
-│          Welcome back Marlon!          │ Run /init to create a CLAUDE.md fi… │
+│          Welcome back User!            │ Run /init to create a CLAUDE.md fi… │
 │                 ▐▛███▜▌                │                                     │
 │                ▝▜█████▛▘               │                                     │
 │                  ▘▘ ▝▝                 │                                     │
 │         Opus 4.6 · Claude Max          │                                     │
-│   ~/Desktop/local-workbench/obsidian   │                                     │
+│   ~/Desktop/example-vault              │                                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
 ❯ olá, qual vault tem o plugin codemaker?
 
 ⏺ Vou procurar o plugin "codemaker" nas pastas de plugins de cada vault.
 
-⏺ Bash(mdfind -name "codemaker" -onlyin /Users/mosx)
-  ⎿  /Users/mosx/Library/CloudStorage/path/to/CodeMaker
+⏺ Bash(mdfind -name "codemaker" -onlyin /Users/example)
+  ⎿  /Users/example/Library/CloudStorage/path/to/CodeMaker
 
-⏺ Encontrei! O plugin está no vault local-workbench.
+⏺ Encontrei! O plugin está no vault example-vault.
 """
 
 FIXTURE_MULTI_TURN = """╭─── Claude Code v2.1.37 ──────────────────────────────────────────────────────╮

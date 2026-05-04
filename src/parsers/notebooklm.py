@@ -7,10 +7,10 @@ data/processed/NotebookLM/:
 
 Schema canonico em src/schema/models.py.
 
-Decisoes de design (ver docs/superpowers/specs/2026-05-02-notebooklm-schema-design.md):
+Decisoes de design:
 - guide.summary vira system message (sequence=0) em todo notebook — garante
-  message_count >= 1 mesmo quando chat=None (76% dos notebooks no legacy
-  do projeto pai tem chat=None).
+  message_count >= 1 mesmo quando chat=None (a maioria dos notebooks tem
+  chat=None empiricamente).
 - 1 conversation por notebook
 - 1 branch (main) por conversation — NotebookLM nao tem fork
 - output_type=10 reservado pra mind_map

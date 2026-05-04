@@ -132,8 +132,8 @@ def block_time_bounds_iso(content_blocks: list) -> tuple[Optional[str], Optional
 
 
 def is_mcp_tool_use(block: dict) -> bool:
-    """Detecta MCP no tool_use checando os 3 sinais que a spec do projeto pai
-    listou: integration_name, mcp_server_url, is_mcp_app."""
+    """Detecta MCP no tool_use via 3 sinais: integration_name,
+    mcp_server_url, is_mcp_app."""
     if not isinstance(block, dict):
         return False
     return bool(

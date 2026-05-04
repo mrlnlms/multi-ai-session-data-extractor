@@ -1,6 +1,6 @@
 """Parser pra captura legacy do NotebookLM (conta `more.design`, mar/2026).
 
-Formato legacy do extractor antigo do projeto pai:
+Formato legacy de extractor antigo:
     <notebook_uuid>/
       notebook.json   {uuid, title, emoji, sources[{uuid, name}], guide{summary, questions[3]}}
       chat.json       (opcional) [{id, timestamp, role, content}, ...]
@@ -11,8 +11,8 @@ Formato legacy do extractor antigo do projeto pai:
         unnamed.png        infographics
         <uuid>_brief.md    briefings/relatorios
 
-Conta `more.design` foi extinta antes do canonico assumir, dado preservado
-em data/external/notebooklm-snapshots/more-design-2026-03-30/.
+Conta legacy extinta antes do canonico assumir, dado preservado em
+data/external/notebooklm-snapshots/.
 
 source = 'notebooklm', account = '3', capture_method = 'legacy_notebooklm_more_design'
 """
