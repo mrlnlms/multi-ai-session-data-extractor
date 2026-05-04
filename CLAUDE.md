@@ -168,13 +168,20 @@ Status real validado empiricamente em 2026-05-04:
   citation, dedup por url). Resultado: 416 search results estruturados
   em 9 messages que usaram Search/Deep Research.
 
-**Único TODO real ainda pendente:**
-- `src/parsers/_notebooklm_helpers.py:290` — `extract_mind_map_tree`.
-  141 mind maps capturados mas só metadata
-  (`[mm_uuid, nb_uuid, [timestamp]]`, ~138 chars). Tree completa de
-  nodes (estrutura hierárquica do mind map) precisa de outro RPC.
-  Precisa: Chrome MCP com sessão NotebookLM ativa + abrir um mind map +
-  capturar requests de rede pra identificar o RPC alternativo.
+- ~~`src/parsers/_notebooklm_helpers.py:290` — mind map tree~~
+  **FECHADO 2026-05-04**. A tree completa (root + children recursivo
+  com nomes dos nodes) já estava sendo baixada pelo extractor em
+  `data/raw/NotebookLM/account-{N}/assets/mind_maps/<nb>_<mm>.json` —
+  o parser só estava lendo a metadata do RPC `CYK0Xb` ignorando o
+  asset baixado. Fix em `scripts/notebooklm-parse.py`: glob por
+  `<nb_uuid>_*.json` em `assets/mind_maps/` (mm_uuid do metadata pode
+  divergir após regenerate; pegar arquivo mais recente). Resultado:
+  75 de 141 mind maps agora com tree completa (até 75KB de hierarquia
+  de nodes); 65 ficam com metadata-only porque asset não foi baixado
+  (regenerate upstream ou falha de download — não-bloqueante).
+
+**Zero TODOs reais pendentes.** Os 4 originais foram todos resolvidos
+ou re-enquadrados após validação empírica.
 
 ## Backlog principal
 

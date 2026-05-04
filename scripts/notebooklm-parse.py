@@ -82,13 +82,39 @@ def _load_account(account_dir: Path, account: str) -> dict:
                     continue
             nb["_artifacts_individual"] = individual
 
-        # Carregar mind_map tree
+        # Carregar mind_map: metadata (CYK0Xb) + tree completa (asset)
+        # - notebooks/<nb>_mind_map_tree.json: metadata do RPC com mm_uuid
+        # - assets/mind_maps/<nb>_<mm>.json: tree completa com {name, children}
+        # Nota: mm_uuid do metadata pode divergir do nome do asset (regenerate
+        # bumpa o mm_uuid). Procurar por prefixo nb_uuid* eh mais confiavel.
         mm_path = nb_dir / f"{nb_uuid}_mind_map_tree.json"
         if mm_path.exists():
             try:
-                nb["_mind_map_tree"] = json.loads(mm_path.read_text(encoding="utf-8"))
+                mm_metadata = json.loads(mm_path.read_text(encoding="utf-8"))
+                nb["_mind_map_tree"] = mm_metadata
             except Exception:
                 pass
+
+        # Buscar tree completa por prefixo nb_uuid em assets/mind_maps/
+        mm_assets_dir = account_dir / "assets" / "mind_maps"
+        if mm_assets_dir.exists():
+            asset_matches = sorted(
+                mm_assets_dir.glob(f"{nb_uuid}_*.json"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,  # mais recente primeiro
+            )
+            if asset_matches:
+                try:
+                    asset_data = json.loads(asset_matches[0].read_text(encoding="utf-8"))
+                    if asset_data.get("tree"):
+                        nb["_mind_map_tree"] = {
+                            **(nb.get("_mind_map_tree") or {}),
+                            "tree": asset_data["tree"],
+                            # Se metadata divergir, usar mm_uuid do asset (mais novo)
+                            "mind_map_uuid": asset_data.get("mind_map_uuid"),
+                        }
+                except Exception:
+                    pass
 
         notebooks.append(nb)
 

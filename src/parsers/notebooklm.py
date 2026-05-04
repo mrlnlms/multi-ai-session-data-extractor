@@ -285,7 +285,13 @@ class NotebookLMParser:
         mm_payload = nb.get("_mind_map_tree")
         if mm_payload:
             mm_uuid = mm_payload.get("mind_map_uuid", f"{nb_uuid}_mm")
-            tree_json = extract_mind_map_tree(mm_payload.get("raw"))
+            # Preferir 'tree' completa (asset) quando disponivel; fallback
+            # pra serializacao de 'raw' (metadata do CYK0Xb).
+            tree_full = mm_payload.get("tree")
+            if tree_full:
+                content_str = json.dumps(tree_full, ensure_ascii=False)
+            else:
+                content_str = extract_mind_map_tree(mm_payload.get("raw"))
             outputs.append(NotebookLMOutput(
                 output_id=mm_uuid,
                 conversation_id=conv_id,
@@ -296,7 +302,7 @@ class NotebookLMParser:
                 title=None,
                 status=None,
                 asset_path=None,
-                content=tree_json or None,
+                content=content_str or None,
                 source_refs_json=None,
                 created_at=created_at,
             ))

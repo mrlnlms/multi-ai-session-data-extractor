@@ -91,12 +91,13 @@ Limitações se dividem em 3 categorias:
   periodicamente e bumpa o timestamp sem mudança real de conteúdo. O
   reconciler usa hash semântico (não timestamp) pra decidir refetch —
   comportamento já mitigado por design.
-- **Mind map — só metadata, tree completa pendente.** 141 mind maps
-  capturados em `notebooklm_outputs.parquet`, mas o `content` é só
-  metadata (`[mm_uuid, nb_uuid, [timestamp]]`, ~138 chars). A tree
-  hierárquica de nodes não está mapeada — o RPC `CYK0Xb` atual retorna
-  só metadata. Pra ter tree completa, precisa identificar outro RPC
-  via probe Chrome MCP com sessão NotebookLM ativa.
+- **Mind map — 75 de 141 com tree completa.** A tree hierárquica
+  (root + children recursivo) é baixada pelo extractor em
+  `data/raw/NotebookLM/account-{N}/assets/mind_maps/<nb>_<mm>.json` e
+  populada em `notebooklm_outputs.parquet` campo `content` (até 75KB
+  de hierarquia). Os 66 mind maps restantes ficam com só metadata
+  porque o asset não foi baixado (regenerate upstream ou falha de
+  download — não bloqueante).
 - **Chat real — não é bug, é estado dos dados.** Dos 143 notebooks
   atuais, 0 têm chat populado upstream (user não fez chats reais nos
   notebooks). As 138 messages capturadas são `role=system`
