@@ -16,9 +16,7 @@ data/external/
 │   └── terminal-claude-code/
 ├── openai-gdpr-export/                 # GDPR oficial OpenAI
 │   ├── 2026-03-27/                     #   primeiro snapshot
-│   ├── 2026-04-27/                     #   segundo snapshot (mais recente)
-│   └── _archive/                       #   zips originais preservados
-│       └── 2026-04-27.zip
+│   └── 2026-04-27/                     #   segundo snapshot (mais recente)
 ├── chatgpt-extension-snapshot/         # snapshot via extensão Chrome (ChatGPT)
 │   └── 2026-03-27/
 ├── claude-ai-snapshots/                # snapshots brutos Claude.ai (pré-extractor)
@@ -57,9 +55,8 @@ Exports oficiais OpenAI via ferramenta GDPR. Contém `Contact Info/`,
 contém conversations parseáveis pro schema canônico (são metadados de billing
 + usage). Preservado como blob histórico.
 
-- `2026-03-27/` — 230MB, primeiro export (vindo do projeto pai)
-- `2026-04-27/` — 396MB descomprimido, segundo export (vindo de Downloads/)
-- `_archive/2026-04-27.zip` — zip original preservado
+- `2026-03-27/` — 230MB, primeiro export
+- `2026-04-27/` — 396MB descomprimido, segundo export
 
 ### chatgpt-extension-snapshot/ ⏸ preservado (sem parser)
 
@@ -99,7 +96,6 @@ específico antes de implementar.
 - **Por plataforma + tipo**: `chatgpt-extension-snapshot/`, `claude-ai-snapshots/`,
   `openai-gdpr-export/`
 - **Datas no path**: `<categoria>/<YYYY-MM-DD>/` quando há múltiplos snapshots
-- **`_archive/` subpasta**: pra arquivos compactados originais (zips, tars)
 
 ## Adicionando novas fontes externas
 

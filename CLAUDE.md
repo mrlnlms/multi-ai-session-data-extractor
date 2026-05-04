@@ -77,7 +77,7 @@ manual-saves vs futuras fontes externas no mesmo parquet via UNION.
 | Categoria | Tamanho | Conteudo |
 |---|---|---|
 | `manual-saves/` | 1.8MB | Inputs ativos pros 3 parsers manuais (parsavel) |
-| `openai-gdpr-export/` + archive | 1.0GB | Exports GDPR oficiais OpenAI |
+| `openai-gdpr-export/` | 626M | Exports GDPR oficiais OpenAI (2 snapshots) |
 | `chatgpt-extension-snapshot/2026-03-27/` | 51MB | conversations.json + memories.md + instructions.json |
 | `claude-ai-snapshots/` | 360MB | snapshots brutos pre-extractor |
 | `deepseek-snapshots/2026-03-27/` | 3.2MB | UI export pre-extractor |
