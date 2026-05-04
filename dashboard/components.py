@@ -13,9 +13,9 @@ STATUS_BADGES: dict[str, str] = {
 
 STATUS_LABEL: dict[str, str] = {
     "green": "OK",
-    "yellow": "atencao",
-    "red": "atrasado",
-    "gray": "nunca rodou",
+    "yellow": "warning",
+    "red": "overdue",
+    "gray": "never ran",
 }
 
 
@@ -32,20 +32,20 @@ def relative_time(when: Optional[datetime], now: Optional[datetime] = None) -> s
     delta = now - when
     seconds = int(delta.total_seconds())
     if seconds < 0:
-        return "agora"
+        return "now"
     if seconds < 60:
-        return f"{seconds}s atras"
+        return f"{seconds}s ago"
     if seconds < 3600:
-        return f"{seconds // 60}min atras"
+        return f"{seconds // 60}min ago"
     if seconds < 86400:
-        return f"{seconds // 3600}h atras"
+        return f"{seconds // 3600}h ago"
     days = seconds // 86400
     if days < 60:
-        return f"{days}d atras"
+        return f"{days}d ago"
     months = days // 30
     if months < 24:
-        return f"{months}mes atras"
-    return f"{days // 365}a atras"
+        return f"{months}mo ago"
+    return f"{days // 365}y ago"
 
 
 def format_size(num_bytes: int) -> str:

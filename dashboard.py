@@ -16,21 +16,21 @@ from dashboard.sync import quarto_installed
 
 def _sidebar() -> None:
     st.sidebar.title("AI Sessions Tracker")
-    st.sidebar.caption("Captura cumulativa multi-plataforma")
+    st.sidebar.caption("Cumulative multi-platform capture")
     if st.sidebar.button("🏠 Overview"):
         st.session_state["view"] = "overview"
         st.rerun()
 
     st.sidebar.divider()
-    st.sidebar.caption("**Ambiente**")
-    st.sidebar.write(f"Quarto: {'✅ instalado' if quarto_installed() else '➖ ausente (Fase 3)'}")
+    st.sidebar.caption("**Environment**")
+    st.sidebar.write(f"Quarto: {'✅ installed' if quarto_installed() else '➖ missing (Phase 3)'}")
     st.sidebar.caption(
-        "Logs: capture_log.jsonl em data/raw/&lt;plat&gt;, "
-        "reconcile_log.jsonl em data/merged/&lt;plat&gt;."
+        "Logs: capture_log.jsonl in data/raw/&lt;plat&gt;, "
+        "reconcile_log.jsonl in data/merged/&lt;plat&gt;."
     )
 
     st.sidebar.divider()
-    if st.sidebar.button("🔁 Recarregar dados"):
+    if st.sidebar.button("🔁 Reload data"):
         st.cache_data.clear()
         st.rerun()
 
