@@ -1,50 +1,50 @@
-# Setup detalhado
+# Detailed setup
 
-Guia completo do zero pra ter o projeto rodando e a primeira captura
-funcionando. Para visão geral do projeto, ver [README.md](../README.md).
+Complete guide from zero to get the project running and the first capture
+working. For a project overview, see [README.md](../README.md).
 
-## Pré-requisitos
+## Prerequisites
 
-- **Python ≥3.12** (testado em 3.12 e 3.14)
-- **macOS ou Linux** (Windows não testado)
-- **~5GB de espaço livre** (depende de quantas conversas você tem)
-- **Git** para clonar o repositório
+- **Python ≥3.12** (tested on 3.12 and 3.14)
+- **macOS or Linux** (Windows not tested)
+- **~5GB of free space** (depends on how many conversations you have)
+- **Git** to clone the repository
 
-Verifique a versão:
+Check the version:
 
 ```bash
 python3 --version
-# Python 3.12.0 ou superior
+# Python 3.12.0 or higher
 ```
 
-## Instalação
+## Installation
 
 ```bash
-git clone <url-do-repo>
+git clone <repo-url>
 cd multi-ai-session-data-extractor
 
-# Cria ambiente virtual isolado
+# Create isolated virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Instala o pacote em modo editável + dependências de desenvolvimento
+# Install the package in editable mode + dev dependencies
 pip install -e ".[dev]"
 
-# Instala o navegador Chromium para Playwright (~200MB)
+# Install the Chromium browser for Playwright (~200MB)
 playwright install chromium
 ```
 
-A partir daqui, sempre que abrir um terminal novo:
+From here on, whenever you open a new terminal:
 
 ```bash
 source .venv/bin/activate
 ```
 
-## Login (1 vez por plataforma)
+## Login (once per platform)
 
-Cada plataforma precisa de login interativo uma vez. O script abre um
-navegador, você loga manualmente, e o profile fica salvo em
-`.storage/<plataforma>-profile-<conta>/` (gitignored).
+Each platform needs an interactive login once. The script opens a
+browser, you log in manually, and the profile is saved at
+`.storage/<platform>-profile-<account>/` (gitignored).
 
 ```bash
 python scripts/chatgpt-login.py
@@ -56,173 +56,218 @@ python scripts/perplexity-login.py
 python scripts/qwen-login.py
 ```
 
-**O que esperar:**
+**What to expect:**
 
-1. Uma janela do Chromium abre na página de login da plataforma.
-2. Você completa o login (email, senha, eventualmente captcha ou 2FA).
-3. Quando carrega o dashboard/home da plataforma, o script detecta e
-   fecha o navegador sozinho — ou você pode fechar manualmente.
-4. O profile fica preservado e os syncs subsequentes não pedem login de
-   novo (até o cookie expirar — geralmente meses).
+1. A Chromium window opens on the platform's login page.
+2. You complete the login (email, password, possibly captcha or 2FA).
+3. When the platform's dashboard/home loads, the script detects it and
+   closes the browser on its own — or you can close it manually.
+4. The profile is preserved and subsequent syncs do not ask for login
+   again (until the cookie expires — usually months).
 
-**CLIs (Claude Code, Codex, Gemini CLI):** não precisam de login. Os
-dados são copiados diretamente do diretório local
+**CLIs (Claude Code, Codex, Gemini CLI):** no login needed. Data
+is copied directly from the local directory
 (`~/.claude/projects/`, `~/.codex/sessions/`, `~/.gemini/tmp/`).
 
-## Primeira captura
+## First capture
 
-Recomendado começar com 1 plataforma para validar:
+Recommended starting with 1 platform to validate:
 
 ```bash
 python scripts/chatgpt-sync.py
 ```
 
-O sync faz tudo em sequência:
+Sync runs everything in sequence:
 
-1. **Captura** — baixa via API interna, salva em `data/raw/ChatGPT/`.
-2. **Download de assets** — imagens (DALL-E, uploads), arquivos de
-   projects, etc.
-3. **Reconcile** — consolida com captura anterior em
-   `data/merged/ChatGPT/`. Conversas que sumiram do servidor ficam com
-   `is_preserved_missing=True`.
-4. **Parse** (manual, não roda automático) — converte para parquet:
+1. **Capture** — downloads via the internal API, saves to `data/raw/ChatGPT/`.
+2. **Asset download** — images (DALL-E, uploads), project files,
+   etc.
+3. **Reconcile** — consolidates with the previous capture in
+   `data/merged/ChatGPT/`. Conversations that disappeared from the server
+   end up with `is_preserved_missing=True`.
+4. **Parse** (manual, does not run automatically) — converts to parquet:
 
 ```bash
 python scripts/chatgpt-parse.py
 ```
 
-Isso gera 4-6 parquets em `data/processed/ChatGPT/` no schema canônico.
+This generates 4-6 parquets in `data/processed/ChatGPT/` in the canonical schema.
 
-Repita os syncs para outras plataformas. Depois consolida tudo num
-único conjunto cross-platform:
+Repeat sync for other platforms. Then consolidate everything into a
+single cross-platform set:
 
 ```bash
 python scripts/unify-parquets.py
 ```
 
-Isso gera 11 parquets em `data/unified/`.
+This generates 11 parquets in `data/unified/`.
 
-## Multi-conta (Gemini, NotebookLM)
+## Multi-account (Gemini, NotebookLM)
 
-Gemini suporta 2 contas Google. NotebookLM suporta 3 (incluindo legacy).
+Gemini supports 2 Google accounts. NotebookLM supports 3 (including legacy).
 
-Para Gemini:
+For Gemini:
 
 ```bash
-# Login em cada conta separadamente
+# Login to each account separately
 python scripts/gemini-login.py --account 1
 python scripts/gemini-login.py --account 2
 
-# Sync das duas contas
+# Sync both accounts
 python scripts/gemini-sync.py
 
-# Ou só uma
+# Or just one
 python scripts/gemini-sync.py --account 1
 ```
 
-Mesmo padrão para NotebookLM (`--account 1` / `--account 2`).
+Same pattern for NotebookLM (`--account 1` / `--account 2`).
 
-## Troubleshooting comum
+## Common troubleshooting
 
-### "Cookie expirado" / "redirect para login" no sync
+### "Expired cookie" / "redirect to login" during sync
 
-O cookie da plataforma expirou. Refaça o login:
+The platform's cookie expired. Redo the login:
 
 ```bash
 python scripts/chatgpt-login.py
 ```
 
-### ChatGPT abre janela mesmo no sync (não é headless)
+### ChatGPT opens a window even during sync (not headless)
 
-Comportamento esperado — Cloudflare detecta clientes sem janela. Idem
-para Perplexity. Outras plataformas (Claude.ai, Gemini, NotebookLM,
-Qwen, DeepSeek) rodam sem janela visível.
+Expected behavior — Cloudflare detects clients without a window. Same
+for Perplexity. Other platforms (Claude.ai, Gemini, NotebookLM,
+Qwen, DeepSeek) run without a visible window.
 
-### "Discovery drop detectado" / sync abortado
+### "Discovery drop detected" / sync aborted
 
-O extractor protege contra capturas parciais. Se a listagem inicial
-caiu mais de 20% comparado com a maior captura histórica, ele aborta
-antes de gravar para não corromper o `data/raw/` cumulativo.
+The extractor protects against partial captures. If the initial listing
+dropped more than 20% compared to the largest historical capture, it aborts
+before writing so as not to corrupt the cumulative `data/raw/`.
 
-Causas comuns:
+Common causes:
 
-- Endpoint de discovery instável (ex: `/projects` da OpenAI eventualmente
-  retorna 404)
-- Cookie expirou e fallback resolve só parcialmente
-- Servidor mudou estrutura
+- Unstable discovery endpoint (e.g. OpenAI's `/projects` occasionally
+  returns 404)
+- Cookie expired and fallback only partially resolves
+- Server changed structure
 
-Soluções:
+Solutions:
 
 ```bash
-# Tentar de novo (instabilidade transiente geralmente resolve)
+# Try again (transient instability usually resolves)
 python scripts/chatgpt-sync.py
 
-# Investigar manualmente
+# Investigate manually
 python scripts/chatgpt-sync.py --dry-run
 ```
 
-### Sync demora muito
+### Sync takes too long
 
-A primeira captura é lenta porque baixa **tudo**. Capturas seguintes
-são incrementais e rápidas (segundos para minutos).
+The first capture is slow because it downloads **everything**. Subsequent
+captures are incremental and fast (seconds to minutes).
 
-Tempos típicos da primeira captura:
+Typical first-capture times:
 
-| Plataforma | Tempo |
+| Platform | Time |
 |---|---|
 | Claude.ai | 10-30 min |
-| ChatGPT | 5-30 min (depende do volume) |
-| NotebookLM | 30-90 min (binários grandes — slide decks, audios) |
-| Outras | 1-10 min |
+| ChatGPT | 5-30 min (depends on volume) |
+| NotebookLM | 30-90 min (large binaries — slide decks, audios) |
+| Others | 1-10 min |
 
-### "ModuleNotFoundError" ao rodar scripts
+### "ModuleNotFoundError" when running scripts
 
-Você esqueceu de ativar o `.venv` ou não está no diretório raiz do
-projeto:
+You forgot to activate `.venv` or you're not in the project root
+directory:
 
 ```bash
 source .venv/bin/activate
-cd /caminho/para/multi-ai-session-data-extractor
+cd /path/to/multi-ai-session-data-extractor
 PYTHONPATH=. python scripts/<script>.py
 ```
 
-### Perplexity HTTP 403 no sync
+### Perplexity HTTP 403 during sync
 
-Mesma causa do ChatGPT — Cloudflare. O sync já roda com janela visível
-para essa plataforma; se mesmo assim der 403, recriar o profile:
+Same cause as ChatGPT — Cloudflare. Sync already runs with a visible
+window for this platform; if you still get 403, recreate the profile:
 
 ```bash
 rm -rf .storage/perplexity-profile-default
 python scripts/perplexity-login.py
 ```
 
-### Quero recapturar do zero (descartar incremental)
+### I want to recapture from scratch (discard incremental)
 
 ```bash
 python scripts/chatgpt-sync.py --full
 ```
 
-Isso força refetch de todas as conversas (não só as que mudaram). Ainda
-preserva o que estiver em `data/raw/`.
+This forces refetch of all conversations (not just the ones that changed). It still
+preserves whatever is in `data/raw/`.
 
-### Quero apagar tudo e começar do zero
+### I want to delete everything and start over
 
 ```bash
-# CUIDADO: apaga raw + merged + processed (mas .storage/ permanece)
+# CAUTION: deletes raw + merged + processed (but .storage/ remains)
 rm -rf data/raw data/merged data/processed data/unified
 ```
 
-Cookies/profile (`.storage/`) não são apagados. Para apagar tudo
-inclusive logins:
+Cookies/profile (`.storage/`) are not deleted. To delete everything
+including logins:
 
 ```bash
 rm -rf data/ .storage/
 ```
 
-## Próximos passos
+## Optional: DVC backup (full vault)
 
-- **Dashboard local** — `PYTHONPATH=. streamlit run dashboard.py`
-- **Documentos descritivos por plataforma** —
-  `quarto render notebooks/<plat>.qmd` (ver [operations.md](operations.md))
-- **Análise dos parquets** — leia `data/unified/*.parquet` no pandas/DuckDB
-- **Limitações conhecidas** — [LIMITATIONS.md](LIMITATIONS.md)
+The pipeline writes to `data/raw/`, `data/merged/`, `data/processed/`,
+`data/unified/`, `data/external/`. These directories are gitignored — they
+hold personal data that must not go to the repo.
+
+If you want a versioned backup (so you can delete locally and recover
+later, or roll back to any historical state), set up DVC with your own
+Google Drive folder:
+
+```bash
+# 1. Install dvc[gdrive] (already in requirements.txt)
+.venv/bin/pip install -r requirements.txt
+
+# 2. Create a folder in your own Google Drive, copy its ID from the URL.
+#    Then point DVC at it (overrides the default config from this repo):
+.venv/bin/dvc remote modify --local gdrive_remote url gdrive://<YOUR_FOLDER_ID>
+
+# 3. Optional — set your own OAuth client (avoids sharing the default app):
+#    https://console.cloud.google.com/auth/clients (create a Desktop client)
+.venv/bin/dvc remote modify --local gdrive_remote gdrive_client_id <YOUR_CLIENT_ID>
+.venv/bin/dvc remote modify --local gdrive_remote gdrive_client_secret <YOUR_CLIENT_SECRET>
+
+# 4. Track and push (~minutes to hours depending on data volume)
+.venv/bin/dvc add data/raw data/merged data/processed data/unified \
+    data/external/manual-saves data/external/deep-research-md \
+    data/external/perplexity-orphan-threads data/external/deepseek-snapshots \
+    data/external/chatgpt-extension-snapshot data/external/claude-ai-snapshots \
+    data/external/notebooklm-snapshots data/external/openai-gdpr-export
+git add data/*.dvc data/external/*.dvc data/.gitignore data/external/.gitignore
+git commit -m "data: initial dvc snapshot"
+.venv/bin/dvc push
+```
+
+The `--local` flag writes to `.dvc/config.local` (gitignored), so your
+`gdrive_folder_id` and OAuth secret never go to a public fork. The repo's
+default `.dvc/config` is kept as a working example; you only need to
+override what's specific to you.
+
+To restore on a new machine: clone the repo, restore `.dvc/config.local`
+(from your backup or recreate via the same `dvc remote modify --local`
+commands), then `dvc pull`.
+
+Full operational guide: [dvc-runbook.md](dvc-runbook.md).
+
+## Next steps
+
+- **Local dashboard** — `PYTHONPATH=. streamlit run dashboard.py`
+- **Per-platform descriptive documents** —
+  `quarto render notebooks/<plat>.qmd` (see [operations.md](operations.md))
+- **Parquet analysis** — read `data/unified/*.parquet` in pandas/DuckDB
+- **Known limitations** — [LIMITATIONS.md](LIMITATIONS.md)

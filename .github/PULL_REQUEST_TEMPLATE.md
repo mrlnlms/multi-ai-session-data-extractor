@@ -1,32 +1,32 @@
-## Resumo
+## Summary
 
-<!-- O que esta PR muda? 1-3 linhas. -->
+<!-- What does this PR change? 1-3 lines. -->
 
-## Plataforma(s) afetada(s)
+## Affected platform(s)
 
 <!-- ChatGPT / Claude.ai / Gemini / NotebookLM / Qwen / DeepSeek / Perplexity / Claude Code / Codex / Gemini CLI / cross-platform / docs / infra -->
 
-## Tipo
+## Type
 
 - [ ] Bug fix
-- [ ] Nova feature
-- [ ] Cobertura adicional em plataforma existente
-- [ ] Refator (sem mudança de comportamento)
+- [ ] New feature
+- [ ] Additional coverage on an existing platform
+- [ ] Refactor (no behavior change)
 - [ ] Doc
-- [ ] Mudança de schema (`src/schema/models.py` — breaking)
+- [ ] Schema change (`src/schema/models.py` — breaking)
 
 ## Checklist
 
-- [ ] Testes passam (`PYTHONPATH=. pytest`)
-- [ ] Testes adicionados/atualizados pra cobrir mudança
-- [ ] Sem credenciais ou paths pessoais commitados
-- [ ] Doc atualizada (CLAUDE.md, docs/, comentários) quando aplicável
-- [ ] Commits assinados com nome real
+- [ ] Tests pass (`PYTHONPATH=. pytest`)
+- [ ] Tests added/updated to cover the change
+- [ ] No credentials or personal paths committed
+- [ ] Docs updated (CLAUDE.md, docs/, comments) when applicable
+- [ ] Commits signed with real name
 
-## Como testar
+## How to test
 
-<!-- Comando exato + estado esperado. Se aplicável, screenshot/log do
-dashboard antes/depois. -->
+<!-- Exact command + expected state. If applicable, screenshot/log of the
+dashboard before/after. -->
 
 ```bash
 

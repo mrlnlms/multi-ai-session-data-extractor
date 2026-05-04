@@ -1,22 +1,22 @@
 # serve-qmds.sh — cheatsheet
 
-Script local pra subir/derrubar o servidor HTTP que serve os data profiles
-(`notebooks/_output/<plat>.html`) no navegador.
+Local script to bring up/tear down the HTTP server that serves the data profiles
+(`notebooks/_output/<plat>.html`) in the browser.
 
-## Uso
+## Usage
 
 ```bash
-./scripts/serve-qmds.sh           # sobe + url no terminal
-./scripts/serve-qmds.sh status    # rodando ou parado?
-./scripts/serve-qmds.sh open      # sobe (se preciso) + abre 15 abas
-./scripts/serve-qmds.sh stop      # mata
+./scripts/serve-qmds.sh           # bring up + url in the terminal
+./scripts/serve-qmds.sh status    # running or stopped?
+./scripts/serve-qmds.sh open      # bring up (if needed) + open 15 tabs
+./scripts/serve-qmds.sh stop      # kill
 ./scripts/serve-qmds.sh restart   # stop + start
 ```
 
-## O que ele faz diferente do `python -m http.server` cru
+## What it does differently from raw `python -m http.server`
 
-- Roda em background (fecha terminal e continua) — `nohup` + redirect de stdout
-- Guarda PID em `.serve-qmds.pid` (gitignored) — `stop` mata pelo PID exato, sem precisar de `lsof`
-- Detecta porta ocupada antes de tentar subir (mensagem útil em vez de erro stack)
-- Idempotente — `start` rodando já = mostra URL, não dá erro
-- `open` abre as 15 abas do safari/chrome (default browser)
+- Runs in the background (close the terminal and it keeps going) — `nohup` + stdout redirect
+- Stores PID in `.serve-qmds.pid` (gitignored) — `stop` kills by exact PID, no need for `lsof`
+- Detects an occupied port before trying to bring it up (useful message instead of stack trace)
+- Idempotent — `start` while already running = shows the URL, no error
+- `open` opens 15 tabs in safari/chrome (default browser)

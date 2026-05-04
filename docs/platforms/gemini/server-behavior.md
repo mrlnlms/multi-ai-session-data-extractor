@@ -1,26 +1,26 @@
-# Gemini — comportamento do servidor (validado empiricamente)
+# Gemini — server behavior (empirically validated)
 
-Probe inicial em 2026-05-02 sobre **80 convs** (47 conta-1 + 33 conta-2)
-capturadas via batchexecute (rpcids `MaZiqc` list + `hNvQHb` fetch).
+Initial probe on 2026-05-02 over **80 convs** (47 account-1 + 33 account-2)
+captured via batchexecute (rpcids `MaZiqc` list + `hNvQHb` fetch).
 
-## Volume e cobertura
+## Volume and coverage
 
-| Conta | Convs | Imagens dl | Deep Research | Total assets |
+| Account | Convs | Images dl | Deep Research | Total assets |
 |---|---|---|---|---|
 | account-1 | 47 | 126 | ~6 (extracted) | 172 |
 | account-2 | 33 | 89 | 12 (extracted) | 113 |
 | **Total** | **80** | **215** | **~18** | **285** |
 
-## Schema raw — posicional (sem keys)
+## Raw schema — positional (no keys)
 
-Caminhos descobertos via probe (`scripts/gemini-probe-schema.py`):
+Paths discovered via probe (`scripts/gemini-probe-schema.py`):
 
 ```
 raw                 — list[4] = [turns_wrapper, ?, None, ?]
-raw[0]              — list de turns
+raw[0]              — list of turns
 raw[0][i]           — turn = [ids, response_ids, user_msg, response_data, ts]
 raw[0][i][0]        — [conv_id, response_id]
-raw[0][i][1]        — [conv_id, resp_id_a, resp_id_b]  (alternativas/drafts)
+raw[0][i][1]        — [conv_id, resp_id_a, resp_id_b]  (alternatives/drafts)
 raw[0][i][2]        — user message: [[user_text], turn_seq, null, ...]
 raw[0][i][3]        — response data (25 fields)
 raw[0][i][3][0][0]  — main response: [resp_id, [text_chunks], ..., thinking_data]
@@ -29,7 +29,7 @@ raw[0][i][3][21]    — model name (e.g. '2.5 Flash', '3 Pro', 'Nano Banana')
 raw[0][i][4]        — [created_at_secs, microseconds]
 ```
 
-## Modelos detectados (Gemini-side display names)
+## Detected models (Gemini-side display names)
 
 | Model | Convs (last seen) | Msgs |
 |---|---|---|
@@ -42,134 +42,135 @@ raw[0][i][4]        — [created_at_secs, microseconds]
 | Nano Banana 2 | 1 | 3 |
 | 2.5 Pro | 1 | 1 |
 
-`Nano Banana` = codename do image generation Gemini (Flash 2.0/2.5 Image).
-`3 Flash Thinking` = modelo com reasoning visivel.
+`Nano Banana` = codename for Gemini image generation (Flash 2.0/2.5 Image).
+`3 Flash Thinking` = model with visible reasoning.
 
-## Features observadas
+## Observed features
 
-- ✅ **Multi-conta:** 2 contas Google distintas, profiles separados
-  (`.storage/gemini-profile-{1,2}/`). Cada conta pode ter conjunto disjunto
-  de convs.
-- ✅ **Thinking blocks** em `resp[0][0][37+]` — array nested de strings.
-  Heuristica de extracao: blocos >=200 chars que NAO aparecem no
-  main response. **41% das assistant msgs tem thinking** (116/280).
-- ✅ **Image generation** via Nano Banana — URLs em
-  `lh3.googleusercontent.com/gg/...` (presigned). **215 imagens** baixadas
-  via asset_downloader. Resolvidas em `Message.asset_paths` via
+- ✅ **Multi-account:** 2 distinct Google accounts, separate profiles
+  (`.storage/gemini-profile-{1,2}/`). Each account may have a disjoint set
+  of convs.
+- ✅ **Thinking blocks** in `resp[0][0][37+]` — nested array of strings.
+  Extraction heuristic: blocks >=200 chars that do NOT appear in the
+  main response. **41% of assistant msgs have thinking** (116/280).
+- ✅ **Image generation** via Nano Banana — URLs in
+  `lh3.googleusercontent.com/gg/...` (presigned). **215 images** downloaded
+  via asset_downloader. Resolved in `Message.asset_paths` via
   `assets_manifest.json`.
-- ✅ **Deep Research** — markdown reports gerados. Extraidos OFFLINE pelo
-  asset_downloader (varre raw, detecta strings >2500 chars que parecem
-  markdown report). **~18 reports** extraidos.
-- ✅ **Locale** em `resp[8]` (e.g. 'BR') — preservado em `settings_json`.
-- ✅ **Sharing** — ~16 convs com substring 'share' no JSON (URLs
-  `g.co/gemini/share/...`). Nao surfaced no schema canonico v3 — TODO probe
-  estrutural.
+- ✅ **Deep Research** — markdown reports generated. Extracted OFFLINE by
+  asset_downloader (sweeps raw, detects strings >2500 chars that look like
+  a markdown report). **~18 reports** extracted.
+- ✅ **Locale** in `resp[8]` (e.g. 'BR') — preserved in `settings_json`.
+- ✅ **Sharing** — ~16 convs with substring 'share' in the JSON (URLs
+  `g.co/gemini/share/...`). Not surfaced in canonical schema v3 — TODO
+  structural probe.
 
-## Limitacoes do schema (vs ChatGPT/Claude.ai)
+## Schema limitations (vs ChatGPT/Claude.ai)
 
-- ❌ **Sem `updated_at`** — Gemini so expoe `created_at_secs`. Parser usa
-  `max(turn timestamps)` como proxy. Implicacao: msgs novas em conv
-  existente NAO bumpam timestamp do discovery — uso de `--full` necessario
-  pra forcar refetch nesses casos.
-- ❌ **Sem `pinned`/`archived` flags** detectados no schema raw nem no
-  discovery. Provavelmente Gemini nao tem essas features (ou estao em
-  endpoint separado nao mapeado).
-- ❌ **Branches/drafts** — `raw[0][i][1]` tem 2 response_ids alternados
-  (provavel multi-draft), mas estrutura ainda nao mapeada. **Nao surfaced
-  na v3** (poucos casos detectados).
-- ✅ **Search/grounding citations** — extraidas via
-  `extract_turn_citations()` em `_gemini_helpers.py` (probe 2026-05-04).
-  Padrao posicional `[favicon, source_url, title, snippet, ...]` onde
-  favicon contem `gstatic.com/faviconV2`. Resultado: 416 search_results
-  estruturados em 9 messages (Search/Deep Research) — populadas em
-  `Message.citations_json` + ToolEvents tipo `search_result`.
-- ❌ **Voice / TTS audio** — provavel `resp[12]` (audio chunks?), nao
-  identificado em probe.
+- ❌ **No `updated_at`** — Gemini only exposes `created_at_secs`. Parser uses
+  `max(turn timestamps)` as a proxy. Implication: new msgs in an existing
+  conv do NOT bump the discovery timestamp — `--full` is necessary to force
+  refetch in those cases.
+- ❌ **No `pinned`/`archived` flags** detected in the raw schema or in
+  discovery. Gemini probably doesn't have these features (or they're in a
+  separate, unmapped endpoint).
+- ❌ **Branches/drafts** — `raw[0][i][1]` has 2 alternating response_ids
+  (likely multi-draft), but the structure is still not mapped. **Not surfaced
+  in v3** (few cases detected).
+- ✅ **Search/grounding citations** — extracted via
+  `extract_turn_citations()` in `_gemini_helpers.py` (probe 2026-05-04).
+  Positional pattern `[favicon, source_url, title, snippet, ...]` where
+  favicon contains `gstatic.com/faviconV2`. Result: 416 structured
+  search_results in 9 messages (Search/Deep Research) — populated in
+  `Message.citations_json` + ToolEvents of type `search_result`.
+- ❌ **Voice / TTS audio** — likely `resp[12]` (audio chunks?), not
+  identified in probe.
 
-## Bugs descobertos durante migracao (preventivos vs Qwen+DeepSeek)
+## Bugs found during migration (preventive vs Qwen+DeepSeek)
 
-Mesmos 3 padroes do Qwen/DeepSeek aplicados preventivamente em Gemini:
+The same 3 patterns from Qwen/DeepSeek applied preventively to Gemini:
 
-1. **`_get_max_known_discovery(output_dir)`** (nao `parent`) — evita
-   vazamento entre plataformas.
-2. **`discover()` lazy persist** (separado de `persist_discovery()`) —
-   garante que fail-fast nao corrompa baseline incremental.
-3. **`--full` propagado pro reconcile** em `gemini-sync.py`.
+1. **`_get_max_known_discovery(output_dir)`** (not `parent`) — avoids
+   leakage across platforms.
+2. **`discover()` lazy persist** (separate from `persist_discovery()`) —
+   ensures fail-fast does not corrupt the incremental baseline.
+3. **`--full` propagated to reconcile** in `gemini-sync.py`.
 
 Plus:
-4. **Multi-conta** — orchestrator/reconciler operam per-account; sync
-   orchestrador (`gemini-sync.py`) itera ambas. Subpastas `account-{N}/`
-   em raw e merged.
-5. **Dashboard adaptado** — `_collect_logs()` agora suporta tanto layout
-   flat (`base/capture_log.jsonl`) quanto multi-account
+4. **Multi-account** — orchestrator/reconciler operate per-account; the sync
+   orchestrator (`gemini-sync.py`) iterates over both. `account-{N}/`
+   subfolders in raw and merged.
+5. **Adapted dashboard** — `_collect_logs()` now supports both flat layout
+   (`base/capture_log.jsonl`) and multi-account
    (`base/account-*/capture_log.jsonl`).
 
-## Comportamento observado
+## Observed behavior
 
-- **Discovery:** `MaZiqc` rpc retorna lista paginada com `[uuid, title,
-  created_at_secs]`. Estavel em probes consecutivos.
-- **Fetch transient errors:** primeira run em conta-1 teve 18 fetches retornando
-  None (provavel rate limit do batchexecute). Retry incremental pegou
-  todos limpos. **`fetch_conversations` nao tem retry built-in** —
-  considerar adicionar exponential backoff em iteracao futura.
+- **Discovery:** the `MaZiqc` rpc returns a paginated list with `[uuid, title,
+  created_at_secs]`. Stable across consecutive probes.
+- **Fetch transient errors:** the first run on account-1 had 18 fetches returning
+  None (likely batchexecute rate limit). The incremental retry picked them
+  all up cleanly. **`fetch_conversations` has no built-in retry** —
+  consider adding exponential backoff in a future iteration.
 - **`hNvQHb` payload:** `[conv_uuid, 10, None, 1, [0], [4], None, 1]` —
-  funcional em 2026-05-02. Hash do rpcid pode mudar — fail-fast cobre.
+  functional in 2026-05-02. The rpcid hash may change — fail-fast covers it.
 
-## Bateria CRUD UI — 2026-05-02 (account-1, hello.marlonlemes@gmail.com)
+## UI CRUD battery — 2026-05-02 (account-1, hello.marlonlemes@gmail.com)
 
-User executou 4 acoes na UI. 4/4 cenarios cobertos:
+User executed 4 actions in the UI. 4/4 scenarios covered:
 
-| Acao | Chat | Resultado parquet | Notas |
+| Action | Chat | Parquet result | Notes |
 |---|---|---|---|
-| Rename → "Benchmarks Smiles Gol Pesqusias" | `c_dc5c683537a19cd1` | ✅ title bate | `created_at_secs` NAO bumpa em rename — usa title-diff no reconciler |
-| Pin → "Análise de Dados da Cota Parlamentar" | `c_98c60a18de056385` | ✅ `is_pinned=True` | Pin flag em `c[2]` do listing MaZiqc (descoberto via probe) |
-| Delete | `c_b17426c13c5e1bc3` | ✅ `is_preserved_missing=True` | Title + last_seen preservados |
-| Share URL gerada (`/share/c2a6a6436942`) | n/a | ✅ confirmado upstream-only | Servidor NAO modifica body, listing nem campos do chat — share gera URL publica isolada |
+| Rename → "Benchmarks Smiles Gol Pesqusias" | `c_dc5c683537a19cd1` | ✅ title matches | `created_at_secs` does NOT bump on rename — uses title-diff in the reconciler |
+| Pin → "Análise de Dados da Cota Parlamentar" | `c_98c60a18de056385` | ✅ `is_pinned=True` | Pin flag in `c[2]` of the MaZiqc listing (discovered via probe) |
+| Delete | `c_b17426c13c5e1bc3` | ✅ `is_preserved_missing=True` | Title + last_seen preserved |
+| Share URL generated (`/share/c2a6a6436942`) | n/a | ✅ confirmed upstream-only | Server does NOT modify body, listing, or chat fields — share generates an isolated public URL |
 
-## Pin descoberto via probe
+## Pin discovered via probe
 
-Schema do listing MaZiqc tem 10 fields per conv:
+The MaZiqc listing schema has 10 fields per conv:
 ```
 [0] conv_id      (str)
 [1] title        (str)
-[2] pinned       (True ou None)   ← FLAG DESCOBERTO
+[2] pinned       (True or None)   ← FLAG DISCOVERED
 [5] [secs, nanos] timestamp
-[9] int          (sempre 2 nesta base)
+[9] int          (always 2 in this base)
 ```
 
-Probe: `scripts/gemini-probe-pin-share.py`. Comparacao entre chat pinado e
-chats normais revelou diferenca em posicao [2]. RPC ids alternativos
-testados (EaipR, yQzmHb, VhQOs) retornaram 400 — pin nao tem endpoint
-dedicado (igual ChatGPT que tambem nao expoe `/pinned` separado mas usa
-flag no body do listing).
+Probe: `scripts/gemini-probe-pin-share.py`. Comparison between a pinned chat
+and normal chats revealed a difference in position [2]. Alternative RPC ids
+tested (EaipR, yQzmHb, VhQOs) returned 400 — pin has no dedicated endpoint
+(same as ChatGPT, which also doesn't expose a separate `/pinned` but uses a
+flag in the listing body).
 
-## Bugs adicionais descobertos+fixados na bateria
+## Additional bugs found+fixed in the battery
 
-4. **Orchestrator nao passava `skip_existing=False`** pro fetcher — `--full`
-   mode ainda pulava bodies locais e nao capturava mudancas de servidor.
-   Mesmo padrao do Qwen original. Fix: `skip_existing=False` quando
-   `to_fetch` ja foi filtrado pelo orchestrator.
-5. **Discovery extractor nao captava `pinned`** (campo `c[2]`) — adicionado
-   em `list_conversations()` + `persist_discovery()` + reconciler `build_plan`
-   detecta `pinned_changed` como signal de update.
+4. **Orchestrator did not pass `skip_existing=False`** to the fetcher —
+   `--full` mode still skipped local bodies and didn't capture server changes.
+   Same pattern as the original Qwen. Fix: `skip_existing=False` when
+   `to_fetch` was already filtered by the orchestrator.
+5. **Discovery extractor did not capture `pinned`** (field `c[2]`) — added
+   in `list_conversations()` + `persist_discovery()` + reconciler `build_plan`
+   detects `pinned_changed` as an update signal.
 
-## Comportamento de servidor (validado 2026-05-02)
+## Server behavior (validated 2026-05-02)
 
-- **Rename:** `created_at_secs` NAO bumpa. Detection eh via title-diff no
-  reconciler. Body local fica stale ate `--full` ou title detection.
-- **Pin:** flag em `c[2]` do listing imediatamente apos action. Bumpa
-  algum timestamp interno? Nao detectavel via campos atuais.
-- **Delete:** chat some do listing → reconciler marca `_preserved_missing`,
-  `last_seen_in_server` preserva data anterior, body do raw eh preservado.
-- **Share:** gera URL publica em `gemini.google.com/share/<id>`. NAO
-  modifica body do chat, NAO adiciona campo no listing. URL eh "fora" do
-  schema do chat — feature de export, nao de estado. **Nao eh gap do
-  extractor.**
+- **Rename:** `created_at_secs` does NOT bump. Detection is via title-diff
+  in the reconciler. Local body stays stale until `--full` or title detection.
+- **Pin:** flag in `c[2]` of the listing immediately after the action. Bumps
+  some internal timestamp? Not detectable via current fields.
+- **Delete:** chat disappears from listing → reconciler marks
+  `_preserved_missing`, `last_seen_in_server` preserves the previous date,
+  raw body is preserved.
+- **Share:** generates a public URL at `gemini.google.com/share/<id>`. Does
+  NOT modify the chat body, does NOT add a field to the listing. The URL is
+  "outside" the chat schema — an export feature, not state. **Not an
+  extractor gap.**
 
-## Pendencias residuais (nao bloqueantes)
+## Residual pending items (non-blocking)
 
-- [ ] **Branches/drafts** (`raw[0][i][1]` com 2 response_ids) — estrutura
-  nao mapeada, raros casos detectados.
-- [ ] **Search/grounding citations** — 1/80 convs com 'grounding' substring,
-  estrutura nao mapeada.
-- [ ] **Add to notebook** — integracao com NotebookLM, nao testada.
+- [ ] **Branches/drafts** (`raw[0][i][1]` with 2 response_ids) — structure
+  not mapped, rare cases detected.
+- [ ] **Search/grounding citations** — 1/80 convs with 'grounding' substring,
+  structure not mapped.
+- [ ] **Add to notebook** — NotebookLM integration, not tested.

@@ -1,46 +1,46 @@
 ---
 name: Bug report
-about: Reportar um problema reproduzível
+about: Report a reproducible problem
 title: "[bug] "
 labels: bug
 ---
 
-## Descrição
+## Description
 
-<!-- O que aconteceu? Comparar com o esperado. -->
+<!-- What happened? Compare with what was expected. -->
 
-## Plataforma afetada
+## Affected platform
 
 <!-- ChatGPT / Claude.ai / Gemini / NotebookLM / Qwen / DeepSeek / Perplexity / Claude Code / Codex / Gemini CLI -->
 
-## Passos pra reproduzir
+## Steps to reproduce
 
 1.
 2.
 3.
 
-## Comando exato rodado
+## Exact command run
 
 ```bash
 
 ```
 
-## Erro completo
+## Full error
 
-<!-- Stderr / traceback / saída relevante. Cole o texto, não screenshot. -->
-
-```
+<!-- Stderr / traceback / relevant output. Paste the text, not a screenshot. -->
 
 ```
 
-## Ambiente
+```
+
+## Environment
 
 - OS (macOS/Linux):
 - Python (`python3 --version`):
 - Branch / commit:
 
-## Checagens prévias
+## Pre-checks
 
-- [ ] Não está em [LIMITATIONS.md](../../docs/LIMITATIONS.md) como limitação conhecida
-- [ ] Reproduz no último `main` (`git pull`)
-- [ ] Sem credenciais commitadas no log colado
+- [ ] Not listed in [LIMITATIONS.md](../../docs/LIMITATIONS.md) as a known limitation
+- [ ] Reproduces on latest `main` (`git pull`)
+- [ ] No credentials committed in the pasted log

@@ -1,47 +1,47 @@
-# docs — índice
+# docs — index
 
-Documentação do projeto, organizada por tema.
+Project documentation, organized by topic.
 
-## Universal — leitura recomendada antes de tocar o código
+## Universal — recommended reading before touching the code
 
-- **[SETUP.md](SETUP.md)** — guia detalhado do zero (instalação, login
-  por plataforma, primeira captura, troubleshooting).
-- **[LIMITATIONS.md](LIMITATIONS.md)** — gaps e limitações conhecidas
-  (upstream, cobertura adicional pendente, testes).
-- **[SECURITY.md](SECURITY.md)** — política de credenciais, ToS
-  disclaimer, boas práticas antes de subir o repositório.
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** — como reportar issues, fazer
-  PR, adicionar plataforma nova (8 fases), lições transferíveis.
-- **[glossary.md](glossary.md)** — termos do projeto (discovery, merged,
-  preserved_missing, fail-fast, parser canônico, branches, ToolEvent,
-  data profile template, etc).
-- **[operations.md](operations.md)** — comandos comuns no terminal (sync
-  por plataforma, render Quarto, smoke tests, sintomas → causa).
-- **[serve-qmds.md](serve-qmds.md)** — cheatsheet do `scripts/serve-qmds.sh`
-  (sobe/derruba servidor local pros data profiles).
+- **[SETUP.md](SETUP.md)** — detailed guide from zero (installation, login
+  per platform, first capture, troubleshooting).
+- **[LIMITATIONS.md](LIMITATIONS.md)** — known gaps and limitations
+  (upstream, additional pending coverage, tests).
+- **[SECURITY.md](SECURITY.md)** — credentials policy, ToS
+  disclaimer, best practices before pushing the repository.
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — how to report issues, open
+  PRs, add a new platform (8 phases), transferable lessons.
+- **[glossary.md](glossary.md)** — project terms (discovery, merged,
+  preserved_missing, fail-fast, canonical parser, branches, ToolEvent,
+  data profile template, etc.).
+- **[operations.md](operations.md)** — common terminal commands (sync
+  per platform, Quarto render, smoke tests, symptoms → cause).
+- **[serve-qmds.md](serve-qmds.md)** — `scripts/serve-qmds.sh` cheatsheet
+  (start/stop local server for the data profiles).
 - **[cross-platform-features.md](cross-platform-features.md)** — pin,
-  archive, voice, share por plataforma (cumulative cross-feature checks).
+  archive, voice, share per platform (cumulative cross-feature checks).
 
-## Overview cross-platform
+## Cross-platform overview
 
-`data/unified/` materializa 11 parquets consolidados das 10 sources via
-`scripts/unify-parquets.py`. 4 qmds em `notebooks/00-overview*.qmd`
-(geral, web, cli, rag) consomem o unified com filtros diferentes.
-Verbete completo em [glossary.md](glossary.md) seção "data/unified/".
+`data/unified/` materializes 11 consolidated parquets from the 10 sources via
+`scripts/unify-parquets.py`. 4 qmds in `notebooks/00-overview*.qmd`
+(general, web, cli, rag) consume the unified set with different filters.
+Full entry in [glossary.md](glossary.md) section "data/unified/".
 
-## Por plataforma
+## Per platform
 
-Cada plataforma web tem `state.md` (cobertura técnica) +
-`server-behavior.md` (comportamento upstream observado). Plataformas CLI
-têm apenas `README.md` (são derivadas de arquivos locais, sem servidor).
+Each web platform has `state.md` (technical coverage) +
+`server-behavior.md` (observed upstream behavior). CLI platforms
+have only `README.md` (they're derived from local files, no server).
 
-| Plataforma | Tipo | Docs locais |
+| Platform | Type | Local docs |
 |---|---|---|
 | **ChatGPT** | web | [README](platforms/chatgpt/README.md) · [state](platforms/chatgpt/state.md) · [server-behavior](platforms/chatgpt/server-behavior.md) |
 | **Claude.ai** | web | [state](platforms/claude-ai/state.md) |
 | **DeepSeek** | web | [state](platforms/deepseek/state.md) · [server-behavior](platforms/deepseek/server-behavior.md) |
-| **Gemini** | web (multi-conta) | [state](platforms/gemini/state.md) · [server-behavior](platforms/gemini/server-behavior.md) |
-| **NotebookLM** | web (multi-conta) | [state](platforms/notebooklm/state.md) · [server-behavior](platforms/notebooklm/server-behavior.md) |
+| **Gemini** | web (multi-account) | [state](platforms/gemini/state.md) · [server-behavior](platforms/gemini/server-behavior.md) |
+| **NotebookLM** | web (multi-account) | [state](platforms/notebooklm/state.md) · [server-behavior](platforms/notebooklm/server-behavior.md) |
 | **Perplexity** | web | [state](platforms/perplexity/state.md) |
 | **Qwen** | web | [state](platforms/qwen/state.md) · [server-behavior](platforms/qwen/server-behavior.md) |
 | **Claude Code** | CLI | [README](platforms/claude-code/README.md) |
@@ -50,5 +50,5 @@ têm apenas `README.md` (são derivadas de arquivos locais, sem servidor).
 
 ## Dashboard
 
-- [dashboard/manual.md](dashboard/manual.md) — manual de funcionalidades
-  + operação (Streamlit local, single-user, read-only).
+- [dashboard/manual.md](dashboard/manual.md) — features manual
+  + operation (local Streamlit, single-user, read-only).

@@ -1,104 +1,104 @@
-# Glossário — termos do projeto
+# Glossary — project terms
 
-Pra entender logs, status e mensagens dos scripts.
-
----
-
-## Os 3 números que parecem iguais mas NÃO são
-
-### 1. Discovery (foto do servidor agora)
-
-**O que é:** quantas conversas o ChatGPT.com está mostrando **neste momento**.
-
-**Pode subir?** Sim, quando você cria conv nova.
-**Pode baixar?** Sim, quando você deleta conv ou ela expira no servidor.
-**É dado nosso?** Não — é foto do estado do servidor, refletida pela API.
-
-Onde aparece: log `Discovery: {'total': 1168}` durante captura.
+To understand logs, status messages, and script output.
 
 ---
 
-### 2. Merged (nosso histórico cumulativo)
+## The 3 numbers that look alike but are NOT the same
 
-**O que é:** o catálogo local com TODAS as convs que já vimos alguma vez.
+### 1. Discovery (snapshot of the server right now)
 
-**Pode subir?** Sim, quando capturamos algo novo.
-**Pode baixar?** **Não.** Convs apagadas no servidor viram `preserved_missing` mas continuam aqui.
-**É dado nosso?** Sim — é a fonte de verdade local.
+**What it is:** how many conversations ChatGPT.com is showing **at this moment**.
 
-Onde fica: `data/merged/ChatGPT/chatgpt_merged.json`.
+**Can it go up?** Yes, when you create a new conv.
+**Can it go down?** Yes, when you delete a conv or it expires on the server.
+**Is it our data?** No — it's a snapshot of the server's state, reflected by the API.
 
----
-
-### 3. Baseline (régua interna do fail-fast)
-
-**O que é:** o **maior valor de discovery** já registrado em qualquer log de captura no disco.
-
-**Serve pra que?** Detectar quando o servidor da OpenAI tá flakey e mente. Se a discovery atual cai mais de 20% vs baseline, o sistema **aborta antes de salvar dado corrompido**.
-
-**É dado nosso?** Não — é instrumento de medição. Pode ser resetado sem perder dado.
-
-Função: `_get_max_known_discovery()` em `src/extractors/chatgpt/orchestrator.py`.
+Where it appears: log `Discovery: {'total': 1168}` during capture.
 
 ---
 
-## Outros termos que aparecem nos logs
+### 2. Merged (our cumulative history)
+
+**What it is:** the local catalog with EVERY conv we've ever seen.
+
+**Can it go up?** Yes, when we capture something new.
+**Can it go down?** **No.** Convs deleted on the server become `preserved_missing` but stay here.
+**Is it our data?** Yes — it's the local source of truth.
+
+Where it lives: `data/merged/ChatGPT/chatgpt_merged.json`.
+
+---
+
+### 3. Baseline (the fail-fast internal yardstick)
+
+**What it is:** the **highest discovery value** ever recorded in any capture log on disk.
+
+**What's it for?** Detecting when the OpenAI server is flaky and lying. If current discovery drops more than 20% vs the baseline, the system **aborts before saving corrupted data**.
+
+**Is it our data?** No — it's a measurement instrument. It can be reset without losing data.
+
+Function: `_get_max_known_discovery()` in `src/extractors/chatgpt/orchestrator.py`.
+
+---
+
+## Other terms that show up in the logs
 
 ### Preserved missing
 
-Conv (ou source) que **estava no nosso merged anterior mas sumiu do servidor**. Não apagamos — marcamos com `preserved_missing: true` (no caso de conv) ou `_preserved_missing: true` (no caso de source).
+A conv (or source) that **was in our previous merged but disappeared from the server**. We don't delete it — we mark it with `preserved_missing: true` (in the conv case) or `_preserved_missing: true` (in the source case).
 
-Princípio: **nunca rebaixar histórico mesmo quando o servidor esquece.**
+Principle: **never downgrade history even when the server forgets.**
 
 ### Fail-fast
 
-Aborta a captura **antes de salvar** quando detecta sintoma de bug do servidor (discovery muito menor que o histórico). Threshold: 20% de queda.
+Aborts the capture **before saving** when it detects a server bug symptom (discovery much smaller than the history). Threshold: 20% drop.
 
-Razão: sem isso, raw fica corrompido e contamina a próxima base incremental.
+Reason: without this, raw becomes corrupted and contaminates the next incremental base.
 
 ### Hardlink
 
-Mesmo arquivo físico no disco, com **mais de um nome** (mais de um path). Não duplica espaço — só etiquetas extras apontando pro mesmo livro.
+The same physical file on disk, with **more than one name** (more than one path). It doesn't duplicate space — just extra labels pointing to the same book.
 
-Usado quando capturas antigas e novas referenciam os mesmos binários (assets, project_sources). Apagar um path = arrancar uma etiqueta. O arquivo só some quando a última etiqueta for arrancada.
+Used when old and new captures reference the same binaries (assets, project_sources). Deleting one path = removing a label. The file is only gone when the last label is removed.
 
 ### Raw
 
-A pasta `data/raw/ChatGPT/` — captura direta do servidor, sem reconciliação. Mutada in-place a cada run. Tem `chatgpt_raw.json` + binários (assets, project_sources) + logs.
+The folder `data/raw/ChatGPT/` — direct capture from the server, no reconciliation. Mutated in-place every run. Has `chatgpt_raw.json` + binaries (assets, project_sources) + logs.
 
 ### Reconcile
 
-O processo que pega o **raw atual** + **merged anterior** e produz o **merged novo** com toda a preservation aplicada (convs apagadas viram preserved, novas viram added, atualizadas viram updated, inalteradas viram copied).
+The process that takes the **current raw** + **previous merged** and produces the **new merged** with all preservation applied (deleted convs become preserved, new ones become added, updated ones become updated, unchanged ones become copied).
 
 ### Incremental
 
-Modo de captura que NÃO refetcha tudo. Só baixa convs que mudaram desde a última run (comparando `update_time`). Acelera muito as runs depois da primeira.
+Capture mode that does NOT refetch everything. Only downloads convs that changed since the last run (comparing `update_time`). Greatly speeds up runs after the first.
 
 ### Brute force (`--full`)
 
-Modo de captura que **refetcha tudo**. Usa quando tem suspeita de raw corrompido ou quer reset.
+Capture mode that **refetches everything**. Use when you suspect raw is corrupted or want a reset.
 
 ### Voice pass
 
-Etapa opcional que escaneia convs procurando mensagens de áudio (Voice Mode) cujo texto não veio pela API. Pra cada candidata, abre a conv no DOM e raspa o transcript. Lento — pode-se pular com `--no-voice-pass`.
+Optional stage that scans convs looking for audio messages (Voice Mode) whose text didn't come through the API. For each candidate, opens the conv in the DOM and scrapes the transcript. Slow — can be skipped with `--no-voice-pass`.
 
 ### Multi-account
 
-Plataformas onde o user tem **mais de uma conta** e queremos capturar todas
-juntas. Hoje **Gemini** e **NotebookLM** são multi-conta no projeto (2 contas
-Google em `.storage/gemini-profile-{1,2}/` e `.storage/notebooklm-profile-{1,2}/`).
+Platforms where the user has **more than one account** and we want to capture all
+of them together. Today **Gemini** and **NotebookLM** are multi-account in the project (2 Google
+accounts in `.storage/gemini-profile-{1,2}/` and `.storage/notebooklm-profile-{1,2}/`).
 
-Implicações arquiteturais:
-- Pasta única por conta: `data/raw/Gemini/account-{N}/` e `data/merged/Gemini/account-{N}/`
-- Sync orquestrador (`gemini-sync.py`) itera ambas as contas em sequência por padrão; aceita `--account N` pra rodar só uma
-- `Conversation.account` ('1' ou '2') no schema canônico; `conversation_id` recebe namespace `account-{N}_{uuid}` pra prevenir colisão entre contas
-- Dashboard (`_collect_logs()`) agrega capture/reconcile logs across `account-*/` subpastas
-- Quarto: 3 documentos (`gemini.qmd` consolidado com stacked bars por conta + `gemini-acc-1.qmd` e `gemini-acc-2.qmd` no template canônico filtrado)
+Architectural implications:
+- Single folder per account: `data/raw/Gemini/account-{N}/` and `data/merged/Gemini/account-{N}/`
+- Sync orchestrator (`gemini-sync.py`) iterates both accounts in sequence by default; accepts `--account N` to run just one
+- `Conversation.account` ('1' or '2') in the canonical schema; `conversation_id` gets namespace `account-{N}_{uuid}` to prevent collision between accounts
+- Dashboard (`_collect_logs()`) aggregates capture/reconcile logs across `account-*/` subfolders
+- Quarto: 3 documents (`gemini.qmd` consolidated with stacked bars per account + `gemini-acc-1.qmd` and `gemini-acc-2.qmd` on the canonical template, filtered)
 
 ## NotebookLM-specifics
 
-NotebookLM é a única plataforma que **não é chat puro** — cada notebook
-é um workspace que gera ate **9 tipos de outputs distintos**:
+NotebookLM is the only platform that **isn't pure chat** — each notebook
+is a workspace that generates up to **9 distinct output types**:
 
 1. **Audio overview** (.m4a) — type=1
 2. **Blog post** (markdown) — type=2
@@ -109,176 +109,176 @@ NotebookLM é a única plataforma que **não é chat puro** — cada notebook
 7. **Infographic** (JSON) — type=9
 8. **Mind map** (tree JSON) — type=10 (custom)
 
-**Tabelas auxiliares NotebookLM-specific** no parquet:
-- `notebooklm_sources.parquet` — PDFs/links uploaded com texto extraído
-- `notebooklm_source_guides.parquet` — summary + tags + questions por source (RPC tr032e)
-- `notebooklm_notes.parquet` — notes/briefs gerados pela IA
-- `notebooklm_outputs.parquet` — os 9 tipos acima
-- `notebooklm_guide_questions.parquet` — perguntas sugeridas pelo guide
+**NotebookLM-specific auxiliary tables** in the parquet:
+- `notebooklm_sources.parquet` — uploaded PDFs/links with extracted text
+- `notebooklm_source_guides.parquet` — summary + tags + questions per source (RPC tr032e)
+- `notebooklm_notes.parquet` — AI-generated notes/briefs
+- `notebooklm_outputs.parquet` — the 9 types above
+- `notebooklm_guide_questions.parquet` — questions suggested by the guide
 
-Total: 9 parquets (4 canônicos + 5 auxiliares) — único caso no projeto.
+Total: 9 parquets (4 canonical + 5 auxiliary) — the only such case in the project.
 
 ---
 
-## Os 4 estados de uma conv no reconcile
+## The 4 states of a conv in reconcile
 
-| Estado | Significado | Onde está |
+| State | Meaning | Where it is |
 |---|---|---|
-| `added` | Existe no current, não existia no previous | conv **nova** |
-| `updated` | Existe em ambos, mas current tem `update_time` ou enrichment maior | conv **mudou** |
-| `copied` | Existe em ambos, sem mudança | conv **inalterada** |
-| `preserved_missing` | Existe no previous mas não no current (sumiu do servidor) | **preservada localmente** |
+| `added` | Exists in current, didn't exist in previous | **new** conv |
+| `updated` | Exists in both, but current has higher `update_time` or enrichment | conv **changed** |
+| `copied` | Exists in both, no change | conv **unchanged** |
+| `preserved_missing` | Exists in previous but not in current (gone from the server) | **preserved locally** |
 
-Cada run gera contadores desses 4 estados em `reconcile_log.jsonl`.
+Each run produces counters for these 4 states in `reconcile_log.jsonl`.
 
 ---
 
-## Termos do parser canônico (Fase 2 do ChatGPT — `src/parsers/chatgpt.py`)
+## Canonical parser terms (ChatGPT Phase 2 — `src/parsers/chatgpt.py`)
 
-### Parquet canônico / `processed`
+### Canonical parquet / `processed`
 
-Saída do parser em `data/processed/<Source>/`. 4 tabelas (ChatGPT):
+Parser output in `data/processed/<Source>/`. 4 tables (ChatGPT):
 `conversations.parquet`, `messages.parquet`, `tool_events.parquet`,
-`branches.parquet`. Schema definido em `src/schema/models.py`. Interface
-universal consumida pelo dashboard descritivo (Quarto) e por pipelines
-externos de análise qualitativa.
+`branches.parquet`. Schema defined in `src/schema/models.py`. Universal
+interface consumed by the descriptive dashboard (Quarto) and by external
+qualitative-analysis pipelines.
 
 ### Branch
 
-Caminho linear no `mapping` da conv. Conv sem fork tem 1 branch (`<conv>_main`).
-Conv com fork (node com ≥2 children) tem N branches: a main vai do root até
-o fork, cada child do fork começa uma sub-branch própria com
-`parent_branch_id` apontando pra origem. `is_active=True` em exatamente 1
-branch por conv (a que contém `current_node`). v2 ignorava forks off-path —
-v3 preserva tudo.
+Linear path inside the conv's `mapping`. A conv with no fork has 1 branch (`<conv>_main`).
+A conv with a fork (node with ≥2 children) has N branches: main goes from the root to
+the fork, each child of the fork starts its own sub-branch with
+`parent_branch_id` pointing to the origin. `is_active=True` on exactly 1
+branch per conv (the one containing `current_node`). v2 ignored off-path forks —
+v3 preserves everything.
 
 ### ToolEvent
 
-Linha em `tool_events.parquet`. Representa uma operação não-conversacional:
-busca (`search`), execução de código (`code`), canvas, deep research, geração
-de imagem (`image_generation`), citação (`quote` = tether_quote), memória
-(`bio`), file_search, computer_use, etc. Cada msg do raw com `author.role=tool`
-vira um ToolEvent. A msg correspondente NÃO aparece em `messages.parquet`
-(filtrada — só `role∈{user,assistant}` vira Message).
+Row in `tool_events.parquet`. Represents a non-conversational operation:
+search (`search`), code execution (`code`), canvas, deep research, image
+generation (`image_generation`), citation (`quote` = tether_quote), memory
+(`bio`), file_search, computer_use, etc. Each raw msg with `author.role=tool`
+becomes a ToolEvent. The corresponding msg does NOT appear in `messages.parquet`
+(filtered out — only `role∈{user,assistant}` becomes a Message).
 
 ### is_preserved_missing / last_seen_in_server
 
-Campos canônicos da Conversation derivados do `_last_seen_in_server` do raw:
-`is_preserved_missing=True` quando `_last_seen_in_server` ≠ data da última
-run conhecida no merged (idempotente, independente de `today`). Permite
-downstream filtrar "convs ativas no servidor" vs "preservadas localmente"
-sem reimplementar a heurística.
+Canonical Conversation fields derived from raw's `_last_seen_in_server`:
+`is_preserved_missing=True` when `_last_seen_in_server` ≠ date of the last
+known run in merged (idempotent, independent of `today`). Lets
+downstream filter "convs active on the server" vs "preserved locally"
+without reimplementing the heuristic.
 
 ### Custom GPT vs Project (gizmo_id)
 
-`gizmo_id` no raw mistura dois conceitos pelo prefixo:
-- `g-p-*` → Project (pasta com sources). Vai pra `Conversation.project_id`.
-- `g-*` (não `g-p-*`) → Custom GPT real. Vai pra `Conversation.gizmo_id`.
+`gizmo_id` in raw mixes two concepts via the prefix:
+- `g-p-*` → Project (folder with sources). Goes to `Conversation.project_id`.
+- `g-*` (not `g-p-*`) → real Custom GPT. Goes to `Conversation.gizmo_id`.
 
-Empírico: ~1045 convs em projects, ~1 conv com Custom GPT real (na base atual).
+Empirical: ~1045 convs in projects, ~1 conv with a real Custom GPT (current base).
 
 ---
 
-## Outputs visíveis
+## Visible outputs
 
 ### `LAST_CAPTURE.md` / `LAST_RECONCILE.md`
 
-Snapshot human-readable da última run. Bate o olho e vê quando + counts. Sobrescrito a cada run.
+Human-readable snapshot of the last run. Quick glance shows when + counts. Overwritten each run.
 
 ### `capture_log.jsonl` / `reconcile_log.jsonl`
 
-Histórico cumulativo, append-only — uma linha por run. Não pode ser reconstruído depois (sem backdating), por isso é gravado na hora de cada execução.
+Cumulative history, append-only — one line per run. Cannot be reconstructed afterwards (without backdating), so it's written at the moment of each execution.
 
 ---
 
-## `data/unified/` — parquets cross-platform consolidados
+## `data/unified/` — consolidated cross-platform parquets
 
-Output do `scripts/unify-parquets.py`. 11 parquets que concatenam os 10
-sources × extractor + manual saves em uma vista cross-platform:
+Output of `scripts/unify-parquets.py`. 11 parquets that concatenate the 10
+sources × extractor + manual saves into a cross-platform view:
 
-- 4 canonicas: `conversations`, `messages`, `tool_events`, `branches`
-- 7 auxiliares: `sources`, `notes`, `outputs`, `guide_questions`,
+- 4 canonical: `conversations`, `messages`, `tool_events`, `branches`
+- 7 auxiliary: `sources`, `notes`, `outputs`, `guide_questions`,
   `source_guides` (NotebookLM), `project_metadata`, `project_docs`
   (Qwen + Claude.ai)
 
-**Estrategia:** concat com `pd.concat` + dedup por PK composta
-`[source, conversation_id, ...]` (ou `[source, project_id, ...]` pras
-auxiliares de project), `keep='last'`. Defesa contra dups internas
-(parsers que emitem rows duplicadas) + propagacao de fix de parser.
+**Strategy:** concat with `pd.concat` + dedup by composite PK
+`[source, conversation_id, ...]` (or `[source, project_id, ...]` for the
+project auxiliaries), `keep='last'`. Defense against internal dups
+(parsers that emit duplicate rows) + parser-fix propagation.
 
-**Decisao:** este projeto materializa `data/unified/` em casa; pipelines
-de consumo externos (analise qualitativa, etc) leem via `dvc import-url`
-desses 11 parquets. Este projeto e a casa canonica de dados; consumers
-sao read-only.
+**Decision:** this project materializes `data/unified/` in-house; external
+consumer pipelines (qualitative analysis, etc.) read via `dvc import-url`
+from those 11 parquets. This project is the canonical data home; consumers
+are read-only.
 
-**Idempotente:** rodar 1x ou 100x produz arquivos byte-a-byte identicos.
-Se apagar `data/unified/`, basta rodar `scripts/unify-parquets.py` de
-novo. Sem estado escondido.
+**Idempotent:** running it 1x or 100x produces byte-for-byte identical files.
+If you delete `data/unified/`, just run `scripts/unify-parquets.py`
+again. No hidden state.
 
-**Bugs cobertos:**
-- DeepSeek `message_id` int 1-98 local-por-conv → PK composta com
-  `conversation_id` desambigua
-- Claude Code subagents que reusam parent's `message_id` em compactacao
-  `/compact` → PK composta resolve
-- `project_metadata` sem coluna `source` no schema → enriquecida via
+**Bugs covered:**
+- DeepSeek `message_id` int 1-98 local-per-conv → composite PK with
+  `conversation_id` disambiguates
+- Claude Code subagents reusing parent's `message_id` on `/compact`
+  compaction → composite PK resolves
+- `project_metadata` without a `source` column in the schema → enriched via
   filename (`qwen_project_metadata.parquet` → `source='qwen'`)
 
-**Helper pros qmds:** `setup_unified_views(con, unified_dir,
-sources_filter)` em `src/parsers/quarto_helpers.py` carrega os 11
-parquets como views DuckDB com filtro opcional `WHERE source IN (...)`
-pra subset (Web Chat, CLI, RAG). Usado pelos 4 qmds em
+**Helper for the qmds:** `setup_unified_views(con, unified_dir,
+sources_filter)` in `src/parsers/quarto_helpers.py` loads the 11
+parquets as DuckDB views with optional `WHERE source IN (...)` filter
+for subsetting (Web Chat, CLI, RAG). Used by the 4 qmds in
 `notebooks/00-overview*.qmd`.
 
 ---
 
 ## Data profile template (`notebooks/_template.qmd`)
 
-Partial Quarto compartilhado por 14 qmds — escrito 1 vez, renderizado 14
-vezes com SOURCE_KEY/COLOR/AUX_TABLES diferentes. Estrutura: 1.x schema
-+ sample por tabela canonica, 2.x cobertura/gaps (capture_method, model,
-thinking, tokens, latencia), 3.x volumes/distribuicoes (timeline, heatmap,
+Quarto partial shared by 14 qmds — written once, rendered 14
+times with different SOURCE_KEY/COLOR/AUX_TABLES. Structure: 1.x schema
++ sample per canonical table, 2.x coverage/gaps (capture_method, model,
+thinking, tokens, latency), 3.x volumes/distributions (timeline, heatmap,
 words, tools, lifetime, branches, account), 4.x preservation/states/itable.
 
-Conditionals via `has_col(con, table, col)` — secoes so aparecem se a
-plataforma tem a coluna. Per-account filter via `ACCOUNT_FILTER` na config
-do per-source qmd.
+Conditionals via `has_col(con, table, col)` — sections only appear if the
+platform has the column. Per-account filter via `ACCOUNT_FILTER` in the
+per-source qmd config.
 
-**Partial pra auxiliares:** `_template_aux.qmd` itera `AUX_TABLES_CONFIG`
-dict — gera schema/sample/stats pra `sources` (NotebookLM), `notes`,
-`outputs`, `guide_questions`, `source_guides`, `project_metadata` (Qwen/
-Claude.ai), `project_docs`. Configurado em `AUX_TABLES = [...]` no
-per-source qmd.
+**Auxiliary partial:** `_template_aux.qmd` iterates over the
+`AUX_TABLES_CONFIG` dict — generates schema/sample/stats for `sources`
+(NotebookLM), `notes`, `outputs`, `guide_questions`, `source_guides`,
+`project_metadata` (Qwen/Claude.ai), `project_docs`. Configured in
+`AUX_TABLES = [...]` in the per-source qmd.
 
-**Helpers:** `src/parsers/quarto_helpers.py` — 11 funcoes (setup_views_with_manual,
+**Helpers:** `src/parsers/quarto_helpers.py` — 11 functions (setup_views_with_manual,
 setup_notebook, has_col, has_view, table_count, fmt_pct, fmt_int, safe_int,
-show_df, show_md, plotly_bar). 40 testes em `tests/parsers/test_quarto_helpers.py`.
+show_df, show_md, plotly_bar). 40 tests in `tests/parsers/test_quarto_helpers.py`.
 
-**Per-source qmd:** ~50 linhas. Setup (SOURCE_KEY, SOURCE_TITLE, SOURCE_COLOR,
+**Per-source qmd:** ~50 lines. Setup (SOURCE_KEY, SOURCE_TITLE, SOURCE_COLOR,
 PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER) + `setup_notebook(...)` +
-`{{< include _template.qmd >}}` (+ opcional `{{< include _template_aux.qmd >}}`).
+`{{< include _template.qmd >}}` (+ optional `{{< include _template_aux.qmd >}}`).
 
 ---
 
-## Lembrete fundamental
+## Fundamental reminder
 
-> **Discovery pode baixar. Merged não.**
+> **Discovery can go down. Merged cannot.**
 
-Se ver discovery caindo, é porque o servidor mudou. Se ver merged crescendo, é porque capturamos mais histórico. Se ver merged baixando — é bug e tem que investigar.
+If you see discovery dropping, it's because the server changed. If you see merged growing, it's because we captured more history. If you see merged dropping — that's a bug and needs investigation.
 
 ---
 
-## Comportamento do servidor ChatGPT (validado empiricamente)
+## ChatGPT server behavior (empirically validated)
 
-### `update_time` em rename de conv
+### `update_time` on conv rename
 
-O servidor **bumpa `update_time` para a hora atual** quando renomeias um chat pela sidebar. Validado em 2026-04-28 com 2 chats antigos (out/2025 e mai/2025) — ambos saltaram para 2026-04-28 ao serem renomeados.
+The server **bumps `update_time` to the current time** when you rename a chat from the sidebar. Validated 2026-04-28 with 2 old chats (Oct/2025 and May/2025) — both jumped to 2026-04-28 when renamed.
 
-**Implicação:** rename é detectado pelo caminho incremental normal (`update_time > cutoff` força refetch). O guardrail extra no código (`_filter_incremental_targets` comparando `title` da discovery vs `prev_raw`) é defesa em profundidade caso o comportamento mude.
+**Implication:** rename is detected by the normal incremental path (`update_time > cutoff` forces refetch). The extra guardrail in code (`_filter_incremental_targets` comparing discovery `title` vs `prev_raw`) is defense in depth in case the behavior changes.
 
-### Rename de project
+### Project rename
 
-Sempre detectado, independente de `update_time`. O `project_names` é re-fetched a cada run (via DOM scrape ou API). Como `_project_name` é injetado em todas as convs do project no enrichment, o reconciler detecta mudança via diff de campos `_*`.
+Always detected, regardless of `update_time`. `project_names` is re-fetched every run (via DOM scrape or API). Since `_project_name` is injected into all convs of the project on enrichment, the reconciler detects the change via diff of `_*` fields.
 
-### `/projects` 404 intermitente
+### `/projects` 404 intermittent
 
-A discovery tem fallback automático: `/projects` → `/gizmos/discovery/mine` → DOM scrape do sidebar. Fail-fast só dispara se TODOS falharem juntos (raro). Aceita captura parcial só quando explicitamente em última instância (e ainda assim, se a captura cair >20% do baseline histórico, aborta).
+Discovery has automatic fallback: `/projects` → `/gizmos/discovery/mine` → DOM scrape of the sidebar. Fail-fast only triggers if ALL fail together (rare). Accepts partial capture only when explicitly used as last resort (and even then, if the capture drops >20% from the historical baseline, it aborts).

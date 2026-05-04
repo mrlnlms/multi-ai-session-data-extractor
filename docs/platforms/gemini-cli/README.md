@@ -1,25 +1,25 @@
 # Gemini CLI
 
-Source: `gemini_cli`. Mode: `cli`. Dado local — copy incremental de
+Source: `gemini_cli`. Mode: `cli`. Local data — incremental copy from
 `~/.gemini/tmp/`.
 
-## Especificidades do schema
+## Schema specifics
 
-- **Schema JSON** (não JSONL como Claude Code/Codex): `session-<timestamp>-<sid>.json`
-- **Snapshots periódicos:** mesma sessão pode ter N arquivos com mesmo
-  `sessionId` interno. Parser consolida em 1 Conversation com dedup por
-  `message_id`. Ver `src/parsers/gemini_cli.py:_parse_session`.
-- `thoughts` array → `thinking` formatado.
-- `toolCalls` correlacionados via status (`success`/`error`).
+- **JSON schema** (not JSONL like Claude Code/Codex): `session-<timestamp>-<sid>.json`
+- **Periodic snapshots:** the same session can have N files with the
+  same internal `sessionId`. Parser consolidates into 1 Conversation
+  with dedup by `message_id`. See `src/parsers/gemini_cli.py:_parse_session`.
+- `thoughts` array → formatted `thinking`.
+- `toolCalls` correlated via status (`success`/`error`).
 
-## Por quê não tem `server-behavior.md`
+## Why there is no `server-behavior.md`
 
-CLI não tem servidor. Ver `docs/platforms/claude-code/README.md` pra
-padrão "preservation a nível de raw via cli-copy".
+The CLI has no server. See `docs/platforms/claude-code/README.md` for
+the "preservation at the raw level via cli-copy" pattern.
 
-## Onde a info real mora
+## Where the real info lives
 
 - **Parser:** `src/parsers/gemini_cli.py`
 - **Copy script:** `src/extractors/cli/copy.py`
 - **Quarto data profile:** `notebooks/gemini-cli.qmd`
-- **Sync orquestrador:** `scripts/gemini-cli-sync.py`
+- **Sync orchestrator:** `scripts/gemini-cli-sync.py`

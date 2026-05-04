@@ -1,22 +1,23 @@
 # Codex (CLI)
 
-Source: `codex`. Mode: `cli`. Dado local — copy incremental de
+Source: `codex`. Mode: `cli`. Local data — incremental copy from
 `~/.codex/sessions/`.
 
-## Especificidades do schema
+## Schema specifics
 
-- **`function_call` ↔ `exec_command_end`** correlacionados via `call_id`
-  → `duration_ms` + `success` exatos por tool call.
-- **`agent_reasoning`** acumulado vira `thinking` da próxima `agent_message`.
+- **`function_call` ↔ `exec_command_end`** correlated via `call_id`
+  → exact `duration_ms` + `success` per tool call.
+- **`agent_reasoning`** accumulated becomes `thinking` of the next
+  `agent_message`.
 
-## Por quê não tem `server-behavior.md`
+## Why there is no `server-behavior.md`
 
-CLI não tem servidor. Ver `docs/platforms/claude-code/README.md` pra
-padrão "preservation a nível de raw via cli-copy".
+The CLI has no server. See `docs/platforms/claude-code/README.md` for
+the "preservation at the raw level via cli-copy" pattern.
 
-## Onde a info real mora
+## Where the real info lives
 
 - **Parser:** `src/parsers/codex.py`
 - **Copy script:** `src/extractors/cli/copy.py`
 - **Quarto data profile:** `notebooks/codex.qmd`
-- **Sync orquestrador:** `scripts/codex-sync.py`
+- **Sync orchestrator:** `scripts/codex-sync.py`

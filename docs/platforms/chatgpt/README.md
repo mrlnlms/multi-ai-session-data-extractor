@@ -1,18 +1,18 @@
 # ChatGPT
 
-ChatGPT é a **plataforma de referência** do projeto — todo o resto foi
-modelado a partir dela.
+ChatGPT is the project's **reference platform** — everything else was
+modeled after it.
 
-## Documentação local
+## Local documentation
 
-- [`state.md`](state.md) — pipeline (sync 4 etapas), parser canônico, CRUD
-  validado, comandos.
-- [`server-behavior.md`](server-behavior.md) — comportamento upstream
-  observado (rename bumps `update_time`, fallbacks de discovery, etc).
+- [`state.md`](state.md) — pipeline (4-step sync), canonical parser, validated
+  CRUD, commands.
+- [`server-behavior.md`](server-behavior.md) — observed upstream behavior
+  (rename bumps `update_time`, discovery fallbacks, etc).
 
-## Documentação relacionada
+## Related documentation
 
-- [`notebooks/chatgpt.qmd`](../../../notebooks/chatgpt.qmd) — Quarto data
-  profile descritivo.
-- [`docs/CONTRIBUTING.md`](../../CONTRIBUTING.md#adicionando-uma-plataforma-nova)
-  — usar ChatGPT como modelo pra adicionar plataforma nova (8 fases).
+- [`notebooks/chatgpt.qmd`](../../../notebooks/chatgpt.qmd) — descriptive
+  Quarto data profile.
+- [`docs/CONTRIBUTING.md`](../../CONTRIBUTING.md#adding-a-new-platform)
+  — use ChatGPT as the model for adding a new platform (8 phases).

@@ -1,69 +1,69 @@
-# DeepSeek — cobertura técnica
+# DeepSeek — technical coverage
 
 ## Pipeline
 
-- **Pasta única cumulativa:** `data/raw/DeepSeek/` e `data/merged/DeepSeek/`.
-- **Sync orquestrador (2 etapas):** `scripts/deepseek-sync.py` (capture +
+- **Single cumulative folder:** `data/raw/DeepSeek/` and `data/merged/DeepSeek/`.
+- **Sync orchestrator (2 steps):** `scripts/deepseek-sync.py` (capture +
   reconcile).
-- **Captura headless.**
-- **Auth:** profile persistente em `.storage/deepseek-profile-<conta>/`
-  (gerado via `scripts/deepseek-login.py`).
+- **Headless capture.**
+- **Auth:** persistent profile in `.storage/deepseek-profile-<account>/`
+  (generated via `scripts/deepseek-login.py`).
 
-## Cobertura
+## Coverage
 
-Chat sessions capturadas. Reconciler v3 (FEATURES_VERSION=2): sem
-projects (DeepSeek não expõe).
+Chat sessions captured. Reconciler v3 (FEATURES_VERSION=2): no
+projects (DeepSeek does not expose them).
 
-### Volume de referência
+### Reference volume
 
 - 79 chat_sessions.
 - 722 messages / 20 tool_events / 271 branches.
 
-## Parser canônico
+## Canonical parser
 
 `src/parsers/deepseek.py` + `_deepseek_helpers.py`.
 
-### Cobertura
+### Coverage
 
-- **R1 reasoning → `Message.thinking`** (~31% das msgs num corpus de
-  referência — alta cobertura).
-- **`thinking_elapsed_secs`** sumarizado em
+- **R1 reasoning → `Message.thinking`** (~31% of msgs in a reference
+  corpus — high coverage).
+- **`thinking_elapsed_secs`** summarized in
   `settings_json.thinking_elapsed_total_secs`.
-- **`accumulated_token_usage`** → `Message.token_count` (~98% cobertura).
+- **`accumulated_token_usage`** → `Message.token_count` (~98% coverage).
 - **`pinned` → `is_pinned`** (cross-platform).
 - **`agent`** (chat/agent) + **`model_type`** (default/thinking) → `mode`.
-  - `model_type='expert'` mapeado pra `mode='research'` (R1 reasoner).
-- **`current_message_id` + `parent_id`** (int IDs) → branches DAG plano.
-  ~2.4 branches/conv (DeepSeek tem muito regenerate).
-- **`search_results`** (estrutura rica com title/url/metadata) →
+  - `model_type='expert'` mapped to `mode='research'` (R1 reasoner).
+- **`current_message_id` + `parent_id`** (int IDs) → flat DAG branches.
+  ~2.4 branches/conv (DeepSeek has lots of regenerate).
+- **`search_results`** (rich structure with title/url/metadata) →
   ToolEvent + `Message.citations_json`.
-- **`incomplete_message` + `status`** → `Message.finish_reason` (100% cob.).
+- **`incomplete_message` + `status`** → `Message.finish_reason` (100% cov.).
 - **`status` enum:** `FINISHED`/`INCOMPLETE`/`WIP`.
 - **Files per msg** → `attachment_names`.
 - **`feedback`/`tips`/`ban_edit`/`ban_regenerate`/`thinking_elapsed_secs`**
-  preservados em `Message.attachments_json`.
+  preserved in `Message.attachments_json`.
 
-> **Nota:** Schema antigo do legacy parser estava DESATUALIZADO (esperava
-> `mapping` + `fragments`, mas API atual retorna `chat_messages` flat com
-> campos dedicados). Parser v3 é rewrite total.
+> **Note:** The legacy parser's old schema was OUTDATED (it expected
+> `mapping` + `fragments`, but the current API returns flat `chat_messages`
+> with dedicated fields). Parser v3 is a complete rewrite.
 
-## Quarto descritivo
+## Descriptive Quarto
 
-`notebooks/deepseek.qmd`: 8MB HTML, cor azul royal.
+`notebooks/deepseek.qmd`: 8MB HTML, royal blue color.
 
-## Cenários CRUD validados
+## Validated CRUD scenarios
 
-| Cenário | Resultado |
+| Scenario | Result |
 |---|---|
-| Rename | title bate em parquet, `updated_at` bumpa |
-| Pin | `is_pinned=True`, `updated_at` bumpa |
-| Delete | `is_preserved_missing=True`, `last_seen_in_server` preservado |
+| Rename | title matches in parquet, `updated_at` bumps |
+| Pin | `is_pinned=True`, `updated_at` bumps |
+| Delete | `is_preserved_missing=True`, `last_seen_in_server` preserved |
 
-## Documentos relacionados
+## Related documents
 
-- `docs/platforms/deepseek/server-behavior.md` — comportamento upstream.
+- `docs/platforms/deepseek/server-behavior.md` — upstream behavior.
 
-## Comandos
+## Commands
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/deepseek-sync.py

@@ -1,207 +1,207 @@
-# Dashboard — manual de funcionalidades + operação
+# Dashboard — feature manual + operations
 
-Documento vivo do que existe no dashboard (manual de funcionalidades +
-operação). Pareado com `plan.md` (plan histórico das 4 fases).
+Living document of what exists in the dashboard (feature manual +
+operations). Paired with `plan.md` (historical plan of the 4 phases).
 
-Roda com:
+Run with:
 
 ```bash
 PYTHONPATH=. .venv/bin/streamlit run dashboard.py
 ```
 
-Abre em <http://localhost:8501>. Detalhes de operação (background,
-healthcheck, acesso programático via `AppTest`, MCP browser, gotchas) na
-seção 10 deste arquivo.
+Opens at <http://localhost:8501>. Operations details (background,
+healthcheck, programmatic access via `AppTest`, MCP browser, gotchas) in
+section 10 of this file.
 
 ---
 
-## 1. Filosofia ("zero trato")
+## 1. Philosophy ("zero interpretation")
 
-O dashboard apresenta dados, **nao interpreta**. Counts, distribuicoes,
-timelines, status. Sem analise de sentimento, clustering semantico, coding
-qualitativo, ranking de "qualidade" ou narrative discovery. Quem quer
-interpretacao pesada leva os parquets pra um pipeline analitico proprio.
+The dashboard presents data, **does not interpret it**. Counts, distributions,
+timelines, status. No sentiment analysis, semantic clustering, qualitative
+coding, "quality" ranking, or narrative discovery. Whoever wants heavy
+interpretation takes the parquets to their own analytical pipeline.
 
-Tambem **read-only**: o dashboard nunca edita os dados que o sync produziu.
-Os botoes disparam o sync original via subprocess; nao reescrevem JSONs nem
-remergeam por conta propria.
+Also **read-only**: the dashboard never edits the data the sync produced.
+Buttons trigger the original sync via subprocess; they don't rewrite JSONs or
+re-merge on their own.
 
 ---
 
-## 2. Layout geral
+## 2. General layout
 
-### Sidebar (sempre visivel)
+### Sidebar (always visible)
 
-| Elemento | O que faz |
+| Element | What it does |
 |---|---|
-| Titulo "AI Sessions Tracker" | Branding, sem acao |
-| Botao "🏠 Overview" | Volta pra pagina inicial (mesmo de "← Voltar" no drill-down) |
-| Status do Quarto | Mostra `✅ instalado` ou `➖ ausente`. Quando instalado, drill-down de cada plataforma exibe link "Ver dados detalhados" pro `notebooks/_output/<plat>.html`. |
-| Caption sobre logs | Lembra onde os `capture_log.jsonl` e `reconcile_log.jsonl` ficam |
-| Botao "🔁 Recarregar dados" | Limpa o `st.cache_data` e re-roda o script. Use depois de rodar sync no terminal pra refletir no dashboard sem reiniciar |
+| Title "AI Sessions Tracker" | Branding, no action |
+| "🏠 Overview" button | Returns to the home page (same as "← Back" in drill-down) |
+| Quarto status | Shows `✅ installed` or `➖ missing`. When installed, the drill-down for each platform shows a "View detailed data" link to `notebooks/_output/<plat>.html`. |
+| Caption about logs | Reminds where `capture_log.jsonl` and `reconcile_log.jsonl` live |
+| "🔁 Reload data" button | Clears `st.cache_data` and re-runs the script. Use after running sync in the terminal so the dashboard reflects the changes without restart |
 
-### Roteamento
+### Routing
 
-Single-page, decidido por `st.session_state["view"]`:
+Single-page, decided by `st.session_state["view"]`:
 
-- `"overview"` (default) → renderiza `dashboard/pages/overview.py`
-- `"platform"` + `selected_platform` → renderiza `dashboard/pages/platform.py`
+- `"overview"` (default) → renders `dashboard/pages/overview.py`
+- `"platform"` + `selected_platform` → renders `dashboard/pages/platform.py`
 
-Trocar de view nao destrui estado dos botoes; o session_state persiste enquanto
-a aba do browser estiver aberta.
-
----
-
-## 3. Pagina Overview
-
-### KPIs cross-plataforma (4 metricas no topo)
-
-| Metric | Origem |
-|---|---|
-| **Total capturado** | Soma de `total_convs` de todos os mergeds encontrados |
-| **Active** | Soma de `active` (visto no servidor hoje) |
-| **Preserved missing** | Soma de `preserved_missing` (cumulativo, no merged mas sumiu do servidor) |
-| **Plataformas com dados** | Quantas das 7 conhecidas tem alguma captura |
-
-### Linha "Ultima sync global"
-
-Pega a captura mais recente cross-plataforma e mostra `<relativa> (<plat>, <data UTC>)`.
-Some se nenhuma plataforma tiver capturas.
-
-### Alertas
-
-- ⚠️ `N plataformas atrasadas` — lista as que estao em status vermelho (>3d sem sync)
-- 🚨 `Discovery drop detectado em: ...` — flag quando a discovery mais recente
-  caiu mais que 20% vs o maior valor historico (sintoma de `/projects` flaky no ChatGPT)
-
-### Botao "🔄 Atualizar todas"
-
-Sequencial: pra cada plataforma com sync ou export script disponivel, dispara
-`subprocess.run(...)` bloqueante, exibe spinner com nome, mostra ✅ ou ❌ no
-fim. Limpa o cache no final pra a UI refletir os dados novos.
-
-**Importante:** ChatGPT roda em modo headed por design (Cloudflare detecta
-headless). Vai abrir browser do Playwright durante o sync — comportamento
-esperado, nao bug. Documentado em `CLAUDE.md` na secao "Headless vs headed
-por plataforma".
-
-### Tabela de plataformas
-
-Uma linha por plataforma conhecida (incluindo as que ainda nao rodaram):
-
-| Coluna | Conteudo |
-|---|---|
-| Status | Badge: 🟢 (<24h) · 🟡 (1-3d) · 🔴 (>3d) · ⚫ (nunca rodou) |
-| Plataforma | Nome canonico (ChatGPT, Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity) |
-| Ultima captura | Tempo relativo da ultima entrada em `capture_log.jsonl` |
-| Ultima conv mexida (servidor) | Placeholder `—` na Fase 1 (precisa abrir merged.json — calculo so feito no drill-down) |
-| Total / Active / Preserved | Numeros do merged se existir, `—` caso contrario |
-
-### Botoes de navegacao
-
-Abaixo da tabela, 1 botao por plataforma — clicar muda `view` pra `platform`
-e seta `selected_platform`. Equivale a um drill-down direto.
-
-### Timeline de captura
-
-Plotly com `discovery_total` em funcao de `run_started_at`, uma linha por
-plataforma com capturas. Vazio mostra mensagem orientativa.
+Switching views does not destroy button state; session_state persists while
+the browser tab stays open.
 
 ---
 
-## 4. Pagina Drill-down (uma plataforma)
+## 3. Overview page
+
+### Cross-platform KPIs (4 metrics at the top)
+
+| Metric | Source |
+|---|---|
+| **Total captured** | Sum of `total_convs` from all mergeds found |
+| **Active** | Sum of `active` (seen on the server today) |
+| **Preserved missing** | Sum of `preserved_missing` (cumulative, in merged but gone from the server) |
+| **Platforms with data** | How many of the 7 known have any capture |
+
+### "Last global sync" line
+
+Picks the most recent capture across platforms and shows `<relative> (<plat>, <UTC date>)`.
+Disappears if no platform has captures.
+
+### Alerts
+
+- ⚠️ `N platforms behind` — lists those in red status (>3d without sync)
+- 🚨 `Discovery drop detected on: ...` — flags when the most recent discovery
+  dropped more than 20% vs the highest historical value (symptom of `/projects` flaky on ChatGPT)
+
+### "🔄 Update all" button
+
+Sequential: for each platform with a sync or export script available, fires
+a blocking `subprocess.run(...)`, shows a spinner with the name, displays ✅ or ❌ at the
+end. Clears the cache at the end so the UI reflects the new data.
+
+**Important:** ChatGPT runs in headed mode by design (Cloudflare detects
+headless). Playwright will open a browser during sync — expected
+behavior, not a bug. Documented in `CLAUDE.md` in the "Headless vs headed
+per platform" section.
+
+### Platforms table
+
+One row per known platform (including those that haven't run yet):
+
+| Column | Content |
+|---|---|
+| Status | Badge: 🟢 (<24h) · 🟡 (1-3d) · 🔴 (>3d) · ⚫ (never ran) |
+| Platform | Canonical name (ChatGPT, Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity) |
+| Last capture | Relative time of the last entry in `capture_log.jsonl` |
+| Last conv touched (server) | Placeholder `—` in Phase 1 (requires opening merged.json — calculation only done in drill-down) |
+| Total / Active / Preserved | Numbers from merged if it exists, `—` otherwise |
+
+### Navigation buttons
+
+Below the table, 1 button per platform — clicking changes `view` to `platform`
+and sets `selected_platform`. Equivalent to a direct drill-down.
+
+### Capture timeline
+
+Plotly with `discovery_total` over `run_started_at`, one line per
+platform with captures. Empty shows a guidance message.
+
+---
+
+## 4. Drill-down page (one platform)
 
 ### Header
 
-- Botao "← Voltar" no topo (volta pra overview)
-- Titulo `<badge> <Nome>` + caption do status
+- "← Back" button at the top (returns to overview)
+- Title `<badge> <Name>` + status caption
 
-### Status panel (3 metricas)
+### Status panel (3 metrics)
 
-| Metric | Conteudo |
+| Metric | Content |
 |---|---|
-| **Ultima captura** | Tempo relativo + caption com data UTC absoluta |
-| **Ultimo reconcile** | Tempo relativo + caption com data UTC absoluta |
-| **Storage local** | Soma `data/raw/<plat>/` + `data/merged/<plat>/`, com breakdown na caption |
+| **Last capture** | Relative time + caption with absolute UTC date |
+| **Last reconcile** | Relative time + caption with absolute UTC date |
+| **Local storage** | Sum of `data/raw/<plat>/` + `data/merged/<plat>/`, with breakdown in the caption |
 
-Acima dele: alerta vermelho 🚨 se houver discovery drop nos logs.
+Above it: red 🚨 alert if there is a discovery drop in the logs.
 
-### Botao de sync
+### Sync button
 
-Pra cada plataforma:
+For each platform:
 
-- Se existe `<plat>-sync.py` (todas as 7 plataformas hoje): label `🔄 Sync <Nome>`, roda
-  `chatgpt-sync.py --no-voice-pass` (ou equivalente)
-- Se so existe `<plat>-export.py` (Claude.ai, Gemini, NotebookLM, Qwen,
-  DeepSeek, Perplexity): label `🔄 Export <Nome> (sem orquestrador ainda)`,
-  roda o export standalone
-- Sem nenhum dos dois: caption explicando que falta script
+- If `<plat>-sync.py` exists (all 7 platforms today): label `🔄 Sync <Name>`, runs
+  `chatgpt-sync.py --no-voice-pass` (or equivalent)
+- If only `<plat>-export.py` exists (Claude.ai, Gemini, NotebookLM, Qwen,
+  DeepSeek, Perplexity): label `🔄 Export <Name> (no orchestrator yet)`,
+  runs the standalone export
+- Neither exists: caption explaining the script is missing
 
-Comportamento na execucao:
+Behavior on execution:
 
-1. `st.spinner` com o comando final visivel (ex: "Rodando chatgpt-sync.py --no-voice-pass...")
-2. Bloqueante (subprocess.run com capture_output)
-3. Sucesso (`returncode == 0`): `✅ Sync concluido` + expander "stdout" com as
-   ultimas 3000 chars + cache clear + rerun pra refletir os dados
-4. Falha (`returncode != 0`): `❌ Falhou (exit N)` + expander "stderr" com
-   tudo que veio
-5. Excecao: `❌ <mensagem>` direto
+1. `st.spinner` with the final command visible (e.g., "Running chatgpt-sync.py --no-voice-pass...")
+2. Blocking (subprocess.run with capture_output)
+3. Success (`returncode == 0`): `✅ Sync complete` + "stdout" expander with the
+   last 3000 chars + cache clear + rerun to reflect the data
+4. Failure (`returncode != 0`): `❌ Failed (exit N)` + "stderr" expander with
+   everything that came in
+5. Exception: `❌ <message>` directly
 
-### Conteudo capturado (so se houver merged.json)
+### Captured content (only if merged.json exists)
 
-Le o `<plat>_merged.json` cacheado (chave = path + mtime).
+Reads cached `<plat>_merged.json` (key = path + mtime).
 
-Metricas em 3 linhas de cards:
+Metrics in 3 rows of cards:
 
 1. Total convs · Active · Preserved missing · Archived
-2. Em projects · Standalone · Distinct projects
-3. Conv mais antiga · Atividade mais recente
+2. In projects · Standalone · Distinct projects
+3. Oldest conv · Most recent activity
 
-E uma metric solta: Mensagens estimadas (count de nodes com `message`
-nao-nulo no `mapping` cumulativo).
+And a standalone metric: Estimated messages (count of nodes with non-null
+`message` in the cumulative `mapping`).
 
-### Grafico de criacao por mes
+### Creation-by-month chart
 
-Bar chart Plotly com a contagem de convs criadas por mes (chave `YYYY-MM`).
-Util pra ver curva de adocao ao longo do tempo.
+Plotly bar chart with the count of convs created per month (key `YYYY-MM`).
+Useful for seeing the adoption curve over time.
 
 ### Expanders
 
-Tres listas detalhadas, todas escondidas por default pra nao poluir:
+Three detailed lists, all hidden by default to avoid clutter:
 
-- **Modelos usados (top 10)** — extrai `metadata.model_slug` ou
-  `metadata.default_model_slug` de cada message no mapping. Nao tem 1:1 com
-  count de convs (uma conv pode usar varios modelos)
-- **Top projects por convs** — agrega por `_project_id`, mostra nome quando
-  conhecido (`_project_name`)
-- **Convs preservadas (deletadas no servidor)** — lista todas as convs cujo
-  `_last_seen_in_server` nao bate com a data atual
+- **Models used (top 10)** — extracts `metadata.model_slug` or
+  `metadata.default_model_slug` from each message in the mapping. Doesn't have a 1:1 with
+  conv count (one conv can use multiple models)
+- **Top projects by convs** — aggregates by `_project_id`, shows name when
+  known (`_project_name`)
+- **Preserved convs (deleted on server)** — lists all convs whose
+  `_last_seen_in_server` doesn't match the current date
 
-### Project sources (so se houver pasta no raw)
+### Project sources (only if there's a folder in raw)
 
-Bloco com 4+3 metricas sobre `data/raw/<plat>/project_sources/`:
+Block with 4+3 metrics about `data/raw/<plat>/project_sources/`:
 
-- Projects · Com files · Vazios · Tamanho total
-- Files active · Files preserved · Projects 100% preserved
+- Projects · With files · Empty · Total size
+- Active files · Preserved files · 100% preserved projects
 
-Detecta `_preserved_missing: true` em entradas do `_files.json` pra contar
+Detects `_preserved_missing: true` in `_files.json` entries to count
 preservation.
 
-### Historico (tabs)
+### History (tabs)
 
-Tabs "Capturas" e "Reconciles" com tabelas montadas dos `.jsonl`:
+Tabs "Captures" and "Reconciles" with tables built from the `.jsonl` files:
 
-| Capturas | Reconciles |
+| Captures | Reconciles |
 |---|---|
-| Inicio · Duracao · Discovery · Fetch ok · Erros | Quando · Added · Updated · Copied · Preserved missing · Warnings |
+| Start · Duration · Discovery · Fetch ok · Errors | When · Added · Updated · Copied · Preserved missing · Warnings |
 
-Mais novas no topo.
+Newest at the top.
 
 ---
 
-## 5. Caches e invalidacao
+## 5. Caches and invalidation
 
-Pra nao reler 119MB de `chatgpt_merged.json` a cada interacao:
+To avoid re-reading 119MB of `chatgpt_merged.json` on every interaction:
 
 ```python
 @st.cache_data(show_spinner=False)
@@ -209,101 +209,101 @@ def _cached_merged_stats(merged_path_str: str, mtime: float):
     return compute_merged_stats(Path(merged_path_str))
 ```
 
-A chave de cache inclui o `mtime` do arquivo: se o sync regravar o merged,
-o mtime muda e o cache invalida automaticamente.
+The cache key includes the file's `mtime`: if sync rewrites merged,
+the mtime changes and the cache invalidates automatically.
 
-Manualmente:
+Manually:
 
-- Botao "🔁 Recarregar dados" no sidebar
-- Apos cada sync iniciado pelo dashboard (cache.clear automatico)
+- "🔁 Reload data" button in the sidebar
+- After every sync started by the dashboard (automatic cache.clear)
 
 ---
 
-## 6. Discovery automatica de plataformas
+## 6. Automatic platform discovery
 
-`dashboard/data.py` declara:
+`dashboard/data.py` declares:
 
 ```python
 KNOWN_PLATFORMS = ["ChatGPT", "Claude.ai", "Gemini", "NotebookLM",
                    "Qwen", "DeepSeek", "Perplexity"]
 ```
 
-Mas tambem varre `data/raw/` e `data/merged/`. A lista final eh
-`KNOWN_PLATFORMS + extras encontrados em disco`. Resultado:
+But it also scans `data/raw/` and `data/merged/`. The final list is
+`KNOWN_PLATFORMS + extras found on disk`. Result:
 
-- Plataformas conhecidas aparecem mesmo sem captura (status ⚫)
-- Pasta nova em disco aparece automaticamente, sem mexer no codigo
+- Known platforms appear even without a capture (status ⚫)
+- A new folder on disk shows up automatically, no code change needed
 
 ---
 
-## 7. Erros e mensagens amigaveis
+## 7. Errors and friendly messages
 
-| Situacao | O que mostra |
+| Situation | What it shows |
 |---|---|
-| Plataforma sem captura | `Nenhuma captura encontrada para <plat>. Use o botao abaixo para rodar a primeira sync.` |
-| Plataforma sem script | `Nenhum script de sync ou export para <plat> ainda. Implementar scripts/<plat>-sync.py libera o botao.` |
-| Sync falhou | Codigo de saida + expander stderr |
-| Excecao no subprocess | Mensagem da excecao direto |
-| Discovery drop | Banner vermelho explicando o threshold de 20% |
-| Sem merged.json | Caption "Nenhum merged.json encontrado para esta plataforma." |
-| Quarto ausente | No sidebar: `➖ ausente`. Drill-down não mostra link "Ver dados detalhados" — instalar `quarto` (brew/standalone) e re-rodar `<plat>-parse.py` + `quarto render notebooks/<plat>.qmd`. |
+| Platform with no capture | `No capture found for <plat>. Use the button below to run the first sync.` |
+| Platform with no script | `No sync or export script for <plat> yet. Implementing scripts/<plat>-sync.py unlocks the button.` |
+| Sync failed | Exit code + stderr expander |
+| Subprocess exception | Exception message directly |
+| Discovery drop | Red banner explaining the 20% threshold |
+| No merged.json | Caption "No merged.json found for this platform." |
+| Quarto missing | In sidebar: `➖ missing`. Drill-down does not show "View detailed data" link — install `quarto` (brew/standalone) and re-run `<plat>-parse.py` + `quarto render notebooks/<plat>.qmd`. |
 
 ---
 
-## 8. O que ainda **nao** existe
+## 8. What does **not** yet exist
 
-Parsers v3, Quarto descritivos e sync orquestrador das 7 plataformas estao
-shipados. O que continua fora de escopo do dashboard (por design):
+V3 parsers, descriptive Quarto, and sync orchestrator for the 7 platforms are
+shipped. What remains out of scope for the dashboard (by design):
 
-- **Modelos por conv**: hoje contamos `model_slug` por mensagem (granularidade
-  fina). "Modelo default da conv" eh derivado do parser canonico
-  (`Conversation.model` = ultimo model_slug do assistant), mas o dashboard
-  ainda apresenta a granularidade por mensagem.
-- **Projects deletados inteiros** (cross-source): drill-down ja mostra
-  "Projects 100% preserved" em project_sources, mas nao tem visualizacao
-  cruzada de chats orfaos de projects deletados.
-- **Visao cross-plataforma agregada**: o overview tem KPIs cross, mas nao
-  tem comparativo lado-a-lado (ex: distribuicao temporal das 7 simultaneas).
-  Fica pro `notebooks/00-overview.qmd` (backlog).
-- **Analise interpretativa** — sentiment, clustering, topic detection. Por
-  design fica em pipelines externos (este projeto so produz parquets).
+- **Models per conv**: today we count `model_slug` per message (fine
+  granularity). "Default model of the conv" is derived from the canonical parser
+  (`Conversation.model` = last assistant `model_slug`), but the dashboard
+  still presents the per-message granularity.
+- **Entire deleted projects** (cross-source): drill-down already shows
+  "100% preserved projects" in project_sources, but has no cross
+  visualization of orphaned chats from deleted projects.
+- **Aggregated cross-platform view**: overview has cross KPIs but no
+  side-by-side comparison (e.g., temporal distribution of all 7 simultaneously).
+  Belongs in `notebooks/00-overview.qmd` (backlog).
+- **Interpretive analysis** — sentiment, clustering, topic detection. By
+  design this lives in external pipelines (this project only produces parquets).
 
 ---
 
-## 9. Arquivos relevantes
+## 9. Relevant files
 
 ```
 dashboard.py                       # entry point
 dashboard/
 ├── __init__.py
-├── data.py                        # discovery + leitura de logs/JSON
-├── metrics.py                     # extracao de metricas (catalogo sec 6 do plan)
-├── components.py                  # status badge, formatacao de tempo/tamanho
-├── sync.py                        # subprocess wrapper, deteccao de scripts
+├── data.py                        # discovery + reading logs/JSON
+├── metrics.py                     # metric extraction (catalog sec 6 of the plan)
+├── components.py                  # status badge, time/size formatting
+├── sync.py                        # subprocess wrapper, script detection
 └── pages/
     ├── overview.py
     └── platform.py
 ```
 
-`README.md` — seção "Dashboard" com instalação e comandos básicos.
+`README.md` — "Dashboard" section with installation and basic commands.
 
 ---
 
-## 10. Operação
+## 10. Operations
 
-### 10.1. Subir
+### 10.1. Bring up
 
-Pré-requisito: venv com deps do `requirements.txt` instaladas.
+Prerequisite: venv with `requirements.txt` deps installed.
 
-Comando padrao (foreground, prende o terminal):
+Default command (foreground, holds the terminal):
 
 ```bash
 PYTHONPATH=. .venv/bin/streamlit run dashboard.py
 ```
 
-Roda em <http://localhost:8501> por default. `Ctrl+C` no terminal pra parar.
+Runs at <http://localhost:8501> by default. `Ctrl+C` in the terminal to stop.
 
-Em background (libera o shell, log em arquivo):
+In the background (frees the shell, log to a file):
 
 ```bash
 PYTHONPATH=. .venv/bin/streamlit run dashboard.py \
@@ -312,7 +312,7 @@ PYTHONPATH=. .venv/bin/streamlit run dashboard.py \
   > /tmp/dashboard.log 2>&1 &
 ```
 
-Porta diferente (se 8501 ocupada):
+Different port (if 8501 is occupied):
 
 ```bash
 PYTHONPATH=. .venv/bin/streamlit run dashboard.py --server.port 8512
@@ -324,13 +324,13 @@ PYTHONPATH=. .venv/bin/streamlit run dashboard.py --server.port 8512
 curl -sf http://localhost:8501/_stcore/health && echo OK
 ```
 
-Listar processo:
+List process:
 
 ```bash
 lsof -nP -iTCP:8501 -sTCP:LISTEN
 ```
 
-### 10.3. Parar
+### 10.3. Stop
 
 Foreground: `Ctrl+C`. Background:
 
@@ -338,23 +338,23 @@ Foreground: `Ctrl+C`. Background:
 lsof -nP -iTCP:8501 -sTCP:LISTEN | awk 'NR>1 {print $2}' | xargs kill
 ```
 
-### 10.4. Acessar
+### 10.4. Access
 
-| Quem | URL |
+| Who | URL |
 |---|---|
-| Você, browser nesta máquina | <http://localhost:8501> |
-| Outro device na mesma LAN | `http://<ip-da-maquina-na-lan>:8501` (Streamlit imprime no boot como "Network URL") |
-| Outra sessão Claude com MCP browser | <http://localhost:8501> via `mcp__claude-in-chrome__tabs_create_mcp` |
-| Outra sessão Claude sem browser | API `streamlit.testing.v1.AppTest` (programático) |
+| You, browser on this machine | <http://localhost:8501> |
+| Another device on the same LAN | `http://<machine-ip-on-the-lan>:8501` (Streamlit prints it on boot as "Network URL") |
+| Another Claude session with MCP browser | <http://localhost:8501> via `mcp__claude-in-chrome__tabs_create_mcp` |
+| Another Claude session without browser | API `streamlit.testing.v1.AppTest` (programmatic) |
 
-**Não use a "External URL"** que o Streamlit imprime no boot — é seu IP
-público, expõe o dashboard pra internet sem nenhuma autenticação. Auth ficou
-explicitamente fora de escopo (ver `dashboard-plan.md` seção 9).
+**Do not use the "External URL"** that Streamlit prints on boot — it's your
+public IP, exposing the dashboard to the internet without any authentication.
+Auth is explicitly out of scope (see `dashboard-plan.md` section 9).
 
-### 10.5. Acesso programático (sem browser)
+### 10.5. Programmatic access (no browser)
 
-Outra sessão Claude pode rodar o app sem subir servidor, pra ler estado
-ou rodar smoke test:
+Another Claude session can run the app without bringing up a server, to read state
+or run a smoke test:
 
 ```python
 from streamlit.testing.v1 import AppTest
@@ -365,7 +365,7 @@ print('title:', at.title[0].value)
 print('errors:', [str(e) for e in at.error])
 print('metrics:', [(m.label, m.value) for m in at.metric])
 
-# drill-down de uma plataforma
+# drill-down for a platform
 at = AppTest.from_file('dashboard.py')
 at.session_state['view'] = 'platform'
 at.session_state['selected_platform'] = 'ChatGPT'
@@ -374,30 +374,29 @@ print('metrics:', [(m.label, m.value) for m in at.metric])
 print('dataframes:', len(at.dataframe))
 ```
 
-Útil pra: smoke test, outra sessão verificar estado sem browser, CI futura.
+Useful for: smoke test, another session checking state without a browser, future CI.
 
-Warning `missing ScriptRunContext` é inócuo (esperado fora do runtime do
-Streamlit).
+The `missing ScriptRunContext` warning is harmless (expected outside the Streamlit runtime).
 
-### 10.6. Acesso via Claude-in-Chrome (outra sessão)
+### 10.6. Access via Claude-in-Chrome (another session)
 
-Se a outra sessão tem MCP browser:
+If the other session has the MCP browser:
 
-1. Garante que o Streamlit está no ar (10.1 ou healthcheck 10.2)
+1. Make sure Streamlit is up (10.1 or healthcheck 10.2)
 2. `mcp__claude-in-chrome__tabs_create_mcp(url="http://localhost:8501")`
-3. Espera renderizar (Streamlit usa WebSocket — uns 2-3s pra UI montar)
-4. `mcp__claude-in-chrome__read_page` pra extrair texto
-5. `mcp__claude-in-chrome__computer` pra clicar em botões
+3. Wait for it to render (Streamlit uses WebSocket — about 2-3s for the UI to mount)
+4. `mcp__claude-in-chrome__read_page` to extract text
+5. `mcp__claude-in-chrome__computer` to click buttons
 
-Mire em elementos com `data-testid="stMetricLabel"`,
-`data-testid="stDataFrame"`, etc — Streamlit gera IDs estáveis.
+Target elements with `data-testid="stMetricLabel"`,
+`data-testid="stDataFrame"`, etc. — Streamlit generates stable IDs.
 
-### 10.7. Gotchas comuns
+### 10.7. Common gotchas
 
-| Sintoma | Causa / Fix |
+| Symptom | Cause / Fix |
 |---|---|
-| `ModuleNotFoundError: dashboard` | Faltou `PYTHONPATH=.` antes do `streamlit run` |
-| Porta 8501 ocupada | `--server.port <outra>` ou matar processo (10.3) |
-| Mudei dado fora do dashboard, UI não atualiza | Clica "🔁 Recarregar dados" no sidebar |
-| Sync trava com browser do Playwright aberto | Esperado pra ChatGPT (Cloudflare detecta headless). Espera o subprocess terminar — UI exibe spinner |
-| Tabela de plataformas não mostra alguma | Discovery automática varre `data/raw/<plat>/` e `data/merged/<plat>/`. Se vazia, fica `⚫ nunca rodou`. Se nem isso, conferir nome em `KNOWN_PLATFORMS` (`dashboard/data.py`) |
+| `ModuleNotFoundError: dashboard` | Missing `PYTHONPATH=.` before `streamlit run` |
+| Port 8501 occupied | `--server.port <other>` or kill the process (10.3) |
+| Changed data outside the dashboard, UI doesn't update | Click "🔁 Reload data" in the sidebar |
+| Sync hangs with Playwright browser open | Expected for ChatGPT (Cloudflare detects headless). Wait for the subprocess to finish — UI shows a spinner |
+| Platforms table doesn't show some entry | Automatic discovery scans `data/raw/<plat>/` and `data/merged/<plat>/`. If empty, it stays `⚫ never ran`. If not even that, check the name in `KNOWN_PLATFORMS` (`dashboard/data.py`) |

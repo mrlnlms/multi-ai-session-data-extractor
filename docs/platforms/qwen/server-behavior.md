@@ -1,7 +1,7 @@
-# Qwen — comportamento do servidor (validado empiricamente)
+# Qwen — server behavior (empirically validated)
 
-Espelho de `Comportamento do servidor ChatGPT` no CLAUDE.md. CRUD diff
-sobre **4 snapshots** (3 do projeto-pai + 1 atual), 2026-04-24 → 2026-05-01.
+Mirror of `ChatGPT server behavior` in CLAUDE.md. CRUD diff over
+**4 snapshots** (3 from the parent project + 1 current), 2026-04-24 → 2026-05-01.
 
 | Snapshot | Chats |
 |---|---|
@@ -10,99 +10,102 @@ sobre **4 snapshots** (3 do projeto-pai + 1 atual), 2026-04-24 → 2026-05-01.
 | Qwen Data/2026-04-24T17-48 | 112 |
 | current (2026-05-01) | 115 |
 
-## CRUD entre snapshots consecutivos
+## CRUD between consecutive snapshots
 
-| Transicao | Added | Removed | Renamed | Pin changed | updated_at bumped |
+| Transition | Added | Removed | Renamed | Pin changed | updated_at bumped |
 |---|---|---|---|---|---|
 | 16-10 → 17-47 | 0 | 0 | 0 | 0 | 0 |
 | 17-47 → 17-48 | 3 | 0 | 0 | 0 | 0 |
 | 17-48 → current | 3 | 0 | 0 | 0 | 0 |
 
-## Inferencias
+## Inferences
 
-- **Add funcionando:** 6 novos chats criados ao longo de 7 dias detectados
-- **Sem deletes nesta janela:** preservation pattern nao foi exercitado.
-  Quando user deletar, validar com bateria UI.
-- **Sem rename/pin/archive nesta janela:** behavior mais granular (rename
-  bumpa updated_at? archive expoe flag?) so dara pra confirmar com UI manual.
-- **`updated_at` nao bumpou em chats existentes:** comportamento esperado
-  porque tambem nao houve atividade neles. Ainda nao sabemos se rename
-  bumpa — TODO bateria.
+- **Add working:** 6 new chats created over 7 days were detected
+- **No deletes in this window:** preservation pattern was not exercised.
+  When the user deletes, validate with UI battery.
+- **No rename/pin/archive in this window:** finer-grained behavior
+  (does rename bump updated_at? does archive expose a flag?) can only
+  be confirmed via manual UI.
+- **`updated_at` did not bump on existing chats:** expected behavior
+  because there was also no activity on them. We still don't know if
+  rename bumps — TODO battery.
 
-## Schema: features confirmadas presentes
+## Schema: confirmed-present features
 
-- ✅ `pinned`: bool no schema raw + parser
-- ✅ `archived`: bool no schema raw + parser (nesta base 0 archived)
-- ✅ `project_id`: 3 chats em projects (Teste IA Interaction, Qualia, Travel)
-- ✅ `share_id`: campo no schema, **0 valores nesta base** — feature
-  existe na UI mas nao testada
-- ✅ `folder_id`: campo no schema, **0 valores nesta base** — folders
-  feature existe na UI mas nao testada
+- ✅ `pinned`: bool in raw schema + parser
+- ✅ `archived`: bool in raw schema + parser (0 archived in this base)
+- ✅ `project_id`: 3 chats in projects (Teste IA Interaction, Qualia, Travel)
+- ✅ `share_id`: field in schema, **0 values in this base** — feature
+  exists in UI but not tested
+- ✅ `folder_id`: field in schema, **0 values in this base** — folders
+  feature exists in UI but not tested
 - ✅ 8 `chat_type`: t2t / search / deep_research / t2i / t2v / artifacts /
   learn / null
 
-## Bateria CRUD UI — 2026-05-01 (Pro account)
+## UI CRUD battery — 2026-05-01 (Pro account)
 
-User executou 4 acoes na UI; sync `--full` rodou apos cada lote pra
-forcar refetch dos bodies.
+User executed 4 actions in the UI; `--full` sync ran after each batch
+to force body refetch.
 
-| Acao | Chat | Resultado parquet | updated_at no servidor |
+| Action | Chat | Parquet result | updated_at on server |
 |---|---|---|---|
-| Rename → "Codemarker V2 from mqda" | `8c97d9ab` | ✅ title bate | bumpa (2026-02-17 → 2026-05-02) |
-| Pin | `240ac30f` | ✅ `is_pinned=True` | bumpa (2026-02-20 → 2026-05-02) |
-| Archive | `75924b8e` | ⚠️ `is_archived=False` | bumpa, mas flag NAO persiste |
-| Delete | `2d7e6a81` | ✅ `is_preserved_missing=True` | sumiu do listing |
+| Rename → "Codemarker V2 from mqda" | `8c97d9ab` | ✅ title matches | bumps (2026-02-17 → 2026-05-02) |
+| Pin | `240ac30f` | ✅ `is_pinned=True` | bumps (2026-02-20 → 2026-05-02) |
+| Archive | `75924b8e` | ⚠️ `is_archived=False` | bumps, but flag does NOT persist |
+| Delete | `2d7e6a81` | ✅ `is_preserved_missing=True` | gone from listing |
 
-## Inferencias confirmadas
+## Confirmed inferences
 
-- **Rename bumpa `updated_at`** (igual ChatGPT, igual Perplexity). Caminho
-  incremental normal cobre — guardrail title-diff fica como defesa.
-- **Pin reflete em `pinned`** no body do chat retornado pelo `/v2/chats/{id}`
-  E no listing `/v2/chats/?page=N`. Endpoint dedicado `/v2/chats/pinned`
-  tambem retorna o chat. Bumpa `updated_at`.
-- **Delete remove do listing** + reconciler marca `_preserved_missing: True`
-  no merged. `last_seen_in_server` preserva data anterior.
-- **Archive eh no-op observavel upstream** (limitacao Qwen Pro/free):
-    - Servidor aceita request (`updated_at` bumpa de fato)
-    - Body retorna `archived: False` mesmo apos action
-    - Endpoint `/v2/chats/archived` existe mas retorna `len=0`
-    - TODOS os listings (`?archived=true`, `?show_archived=true`,
-      `?include_archived=true`, `/all`) ainda incluem o chat com mesmos campos
-    - Mesmo padrao do Perplexity Enterprise-only archive
-    - **Nao eh gap do extractor** — schema canonico tem `is_archived` field,
-      so nunca True em conta Pro/free
+- **Rename bumps `updated_at`** (same as ChatGPT, same as Perplexity).
+  Normal incremental path covers it — title-diff guardrail stays as
+  defense.
+- **Pin reflects in `pinned`** in the chat body returned by `/v2/chats/{id}`
+  AND in the `/v2/chats/?page=N` listing. Dedicated endpoint
+  `/v2/chats/pinned` also returns the chat. Bumps `updated_at`.
+- **Delete removes from listing** + reconciler marks `_preserved_missing: True`
+  in merged. `last_seen_in_server` preserves the prior date.
+- **Archive is an observable upstream no-op** (Qwen Pro/free limitation):
+    - Server accepts the request (`updated_at` does bump)
+    - Body returns `archived: False` even after the action
+    - Endpoint `/v2/chats/archived` exists but returns `len=0`
+    - ALL listings (`?archived=true`, `?show_archived=true`,
+      `?include_archived=true`, `/all`) still include the chat with the same fields
+    - Same pattern as Perplexity Enterprise-only archive
+    - **Not an extractor gap** — canonical schema has `is_archived`
+      field, just never True on Pro/free account
     - Probe: `scripts/qwen-probe-archived.py`
 
-## Bugs descobertos+fixados nesta bateria
+## Bugs discovered+fixed in this battery
 
-1. **`_get_max_known_discovery(output_dir.parent)` vazava entre plataformas.**
-   Antes da migracao pra pasta unica, `output_dir.parent` era a pasta da
-   plataforma (com subpastas timestampeadas). Apos migracao, virou
-   `data/raw/` → rglob caminhava todas as plataformas e pegava maximo de
-   ChatGPT (1171) ou Claude.ai (835). Fix: passar `output_dir`.
-   Aplicado em todos os 4 orchestrators (qwen, deepseek, claude_ai, chatgpt).
+1. **`_get_max_known_discovery(output_dir.parent)` leaked across platforms.**
+   Before migrating to a single folder, `output_dir.parent` was the
+   platform folder (with timestamped subfolders). After migration, it
+   became `data/raw/` → rglob walked all platforms and picked the max
+   from ChatGPT (1171) or Claude.ai (835). Fix: pass `output_dir`.
+   Applied to all 4 orchestrators (qwen, deepseek, claude_ai, chatgpt).
 
-2. **`discover()` persistia antes do fail-fast.** Se fail-fast abortava,
-   discovery_ids.json ja estava com novos timestamps e proxima run carregava
-   prev_map ja com novos ts → 0 refetched mesmo havendo mudancas. Fix:
-   separar `discover()` (puro fetch) de `persist_discovery()` (chamado pelo
-   orchestrator pos fail-fast). Aplicado em qwen.
+2. **`discover()` persisted before fail-fast.** If fail-fast aborted,
+   discovery_ids.json already had new timestamps and the next run
+   loaded prev_map already with new ts → 0 refetched even when there
+   were changes. Fix: separate `discover()` (pure fetch) from
+   `persist_discovery()` (called by the orchestrator after fail-fast).
+   Applied to qwen.
 
-3. **`qwen-sync.py --full` nao propagava pro reconcile.** `--full` so
-   forcava extractor refetch. Reconciler usava `to_copy` (read merged anterior)
-   pra chats sem updated_at diff, mantendo bodies stale. Fix: passar
-   `full=args.full` ao `run_reconciliation`. Aplicado em qwen-sync.py +
-   deepseek-sync.py + claude-sync.py.
+3. **`qwen-sync.py --full` did not propagate to reconcile.** `--full`
+   only forced extractor refetch. Reconciler used `to_copy` (read prior
+   merged) for chats without updated_at diff, keeping stale bodies.
+   Fix: pass `full=args.full` to `run_reconciliation`. Applied to
+   qwen-sync.py + deepseek-sync.py + claude-sync.py.
 
-## Outras features observadas (nao testadas via parser nesta bateria)
+## Other observed features (not tested via parser in this battery)
 
-- ✅ **Clone:** opcao no menu (per-chat). Semantica: cria novo `chat_id`
-  com historico copiado — equivalente a "add" no diff. Skip pq nao testa
-  preservation/state-machine novo.
-- ✅ **Download:** menu per-chat exporta JSON (`.json`) ou plain text
-  (`.txt`). Confirma que o schema parseado eh essencialmente o oficial
-  exposto ao usuario. Sem implicacao pro extractor.
-- ✅ **Move to Project:** opcao no menu — testavel via probe `project_id`
-  diff em snapshots consecutivos.
-- ✅ **Share:** opcao no menu, popula `share_id`. Nao exercitado.
-- ✅ **Folder:** `folder_id` no schema, nao exercitado.
+- ✅ **Clone:** option in the menu (per-chat). Semantics: creates a new
+  `chat_id` with copied history — equivalent to "add" in the diff. Skipped
+  because it does not test preservation/new state-machine.
+- ✅ **Download:** per-chat menu exports JSON (`.json`) or plain text
+  (`.txt`). Confirms the parsed schema is essentially the official one
+  exposed to the user. No implication for the extractor.
+- ✅ **Move to Project:** menu option — testable via `project_id` diff
+  probe in consecutive snapshots.
+- ✅ **Share:** menu option, populates `share_id`. Not exercised.
+- ✅ **Folder:** `folder_id` in schema, not exercised.
