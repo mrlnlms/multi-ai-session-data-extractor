@@ -21,7 +21,10 @@ Limitacoes conhecidas:
 - Gemini nao expoe updated_at — usa max(turn timestamps) como proxy
 - Branches (drafts/regenerate alternativos via turn[1]): nao implementado
   na v3 (poucos casos detectados — adicionar quando aparecer dado real)
-- Search/grounding citations: estrutura ainda nao mapeada (TODO probe)
+- Search/grounding citations: extraidas via extract_turn_citations
+  (probe 2026-05-04). Detecta listas [favicon_url, source_url, title,
+  snippet, ...] no schema posicional. Populadas em Message.citations_json
+  + ToolEvents tipo 'search_result' (1 por citation, dedup por url).
 
 Output: data/processed/Gemini/{conversations,messages,tool_events}.parquet
 """
@@ -40,6 +43,7 @@ from src.parsers._gemini_helpers import (
     conv_last_timestamp,
     conv_turns,
     extract_image_urls_from_turn,
+    extract_turn_citations,
     turn_assistant_response_id,
     turn_assistant_text,
     turn_locale,
@@ -230,6 +234,9 @@ class GeminiParser(BaseParser):
                 if local:
                     asset_paths.append(local)
 
+            # Search/Deep Research citations (probe 2026-05-04)
+            citations = extract_turn_citations(turn)
+
             if assistant_text or thinking or img_urls:
                 seq += 1
                 asst_msg_id = f"{conv_id}_t{turn_idx}_asst"
@@ -250,6 +257,8 @@ class GeminiParser(BaseParser):
                     asset_paths=asset_paths or None,
                     attachment_names=json.dumps(attachment_filenames, ensure_ascii=False)
                         if attachment_filenames else None,
+                    citations_json=json.dumps(citations, ensure_ascii=False)
+                        if citations else None,
                 ))
                 msg_ids_in_order.append(asst_msg_id)
                 msg_count += 1
@@ -271,6 +280,19 @@ class GeminiParser(BaseParser):
                                 "response_id": resp_id,
                             }, ensure_ascii=False),
                         ))
+
+                # ToolEvent por citation (Search/Deep Research)
+                for cite_idx, cite in enumerate(citations):
+                    self.events.append(ToolEvent(
+                        event_id=f"{asst_msg_id}_cite_{cite_idx}",
+                        conversation_id=conv_id,
+                        message_id=asst_msg_id,
+                        source=SOURCE,
+                        event_type="search_result",
+                        tool_name="gemini_search",
+                        result=cite.get("snippet"),
+                        metadata_json=json.dumps(cite, ensure_ascii=False),
+                    ))
 
         # Conversation
         url = f"https://gemini.google.com/app/{uuid.lstrip('c_')}"

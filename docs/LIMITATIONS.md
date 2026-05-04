@@ -71,10 +71,11 @@ Limitações se dividem em 3 categorias:
   o estado anterior fica em `turn[1]` mas o parser v3 não captura — só
   o estado ativo. (Backlog: implementar quando aparecer caso real
   representativo.)
-- **Search/grounding citations:** quando você usa Search/Deep Research,
-  o tool event tipo `search` é registrado, mas as citations dentro do
-  resultado não são estruturadas. Estrutura pendente de mapeamento
-  via probe.
+- ~~**Search/grounding citations**~~ **FECHADO 2026-05-04**: tool events
+  tipo `search_result` são criados (1 por citation com URL, título,
+  snippet, favicon, deduplicados por URL). Também populam
+  `Message.citations_json` no parquet de mensagens. Base atual: 416
+  search results em 9 messages que usaram Deep Research.
 - **Share URL:** Gemini permite compartilhar uma conversa por URL
   pública. Esse estado não é gravado no body da conv (o servidor gera a
   URL e mantém isolada). Não é gap do extractor — não é capturável.

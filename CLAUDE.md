@@ -158,9 +158,14 @@ de probe com dado real:
 - `src/parsers/_notebooklm_helpers.py:290` — `extract_mind_map_tree`
   serializa metadata cru. Tree completa de nodes não mapeada. Precisa:
   probe Chrome MCP por RPC alternativo.
-- `src/parsers/gemini.py:24` — Search/grounding citations não extraídas
-  de `tool_events` (event_type='search' registrado, mas citations
-  internas não estruturadas). Precisa: probe Gemini com Search ativo.
+- ~~`src/parsers/gemini.py:24` — Search/grounding citations~~ **FECHADO 2026-05-04**.
+  Probe sobre raw existente identificou padrão de citation no schema
+  posicional: lista `[favicon, source_url, title, snippet, ...]` onde
+  favicon contém `gstatic.com/faviconV2`. `extract_turn_citations()` em
+  `_gemini_helpers.py` faz walk recursivo procurando esse padrão e
+  popula `Message.citations_json` + ToolEvents tipo `search_result`
+  (1 por citation, dedup por url). Resultado: 416 search results
+  estruturados em 9 messages que usaram Search/Deep Research.
 
 Quando atacar: abrir uma sessão dedicada com browser/Chrome MCP + plataforma
 logada, probar e atualizar parser.

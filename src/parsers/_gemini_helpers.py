@@ -23,6 +23,63 @@ import re
 from typing import Any
 
 
+CITATION_FAVICON_HOST = "gstatic.com/faviconV2"
+_EXTERNAL_EXCLUDE = (
+    "googleusercontent", "gstatic.com", "fonts.gstatic",
+    "ssl.gstatic", "lh.google.com", "google.com/url",
+)
+
+
+def _is_external_url(url: str) -> bool:
+    if not url or not url.startswith("http"):
+        return False
+    return not any(d in url for d in _EXTERNAL_EXCLUDE)
+
+
+def extract_turn_citations(turn: Any) -> list[dict]:
+    """Extrai citations de Search/Deep Research num turn assistant.
+
+    Schema (probe 2026-05-04): Search/Deep Research embute citations como
+    listas com forma fixa no positional schema:
+        [favicon_url, source_url, title, snippet, ...]
+    onde favicon_url contem 'gstatic.com/faviconV2', source_url eh URL
+    externo, title e snippet sao strings.
+
+    Walk recursivo procurando listas com essa forma. Dedup por url.
+    Retorna: [{"url", "title", "snippet", "favicon"}, ...]
+    """
+    seen_urls: set[str] = set()
+    out: list[dict] = []
+
+    def walk(obj: Any, depth: int = 0) -> None:
+        if depth > 15:
+            return
+        if isinstance(obj, list):
+            if (len(obj) >= 4
+                and isinstance(obj[0], str) and CITATION_FAVICON_HOST in obj[0]
+                and isinstance(obj[1], str) and _is_external_url(obj[1])
+                and isinstance(obj[2], str)
+                and isinstance(obj[3], str)):
+                url = obj[1]
+                if url not in seen_urls:
+                    seen_urls.add(url)
+                    out.append({
+                        "url": url,
+                        "title": obj[2],
+                        "snippet": obj[3],
+                        "favicon": obj[0],
+                    })
+                return
+            for item in obj:
+                walk(item, depth + 1)
+        elif isinstance(obj, dict):
+            for v in obj.values():
+                walk(v, depth + 1)
+
+    walk(turn)
+    return out
+
+
 def _path(obj: Any, *idx: int, default: Any = None) -> Any:
     """Navega path posicional defensivo. _path(arr, 0, 1, 2) ~ arr[0][1][2]."""
     cur = obj
