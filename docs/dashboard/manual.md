@@ -252,9 +252,8 @@ Mas tambem varre `data/raw/` e `data/merged/`. A lista final eh
 
 ## 8. O que ainda **nao** existe
 
-Atualizado em 2026-05-03 — fases 2 (parsers v3), 3 (Quarto descritivos) e 4
-(sync orquestrador pras 7 plataformas) **shipped**. O que continua fora de
-escopo do dashboard (por design):
+Parsers v3, Quarto descritivos e sync orquestrador das 7 plataformas estao
+shipados. O que continua fora de escopo do dashboard (por design):
 
 - **Modelos por conv**: hoje contamos `model_slug` por mensagem (granularidade
   fina). "Modelo default da conv" eh derivado do parser canonico
