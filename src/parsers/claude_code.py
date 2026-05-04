@@ -59,10 +59,16 @@ class ClaudeCodeParser(BaseParser):
     def __init__(self, account: Optional[str] = None):
         super().__init__(account=account)
         self.branches: list[Branch] = []
+        self._chain_links: dict[str, str] = {}
+        self._conv_source_files: dict[str, set[str]] = {}
+        self._input_path: Optional[Path] = None
 
     def reset(self):
         super().reset()
         self.branches = []
+        self._chain_links = {}
+        self._conv_source_files = {}
+        self._input_path = None
 
     def parse(self, input_path: Path) -> None:
         """Le sessoes JSONL de todos os projetos em input_path.
@@ -72,55 +78,129 @@ class ClaudeCodeParser(BaseParser):
           - *.jsonl (sessoes principais)
           - {session-uuid}/subagents/*.jsonl (subagents)
 
-        Sessoes orfas (subagents sem JSONL raiz) sao processadas com stub parent
-        reconstruido a partir de ~/.claude/usage-data/session-meta/<uuid>.json.
+        **Threads compactadas (`/compact`)**: o Claude Code grava JSONLs novos
+        com filename diferente do `sessionId` interno quando o usuario faz
+        `/compact`. Cada arquivo tem 1 evento inicial referenciando o parent
+        sessionId — e os demais eventos com sessionId=filename. Reconstroi a
+        thread logica seguindo essa cadeia: TODOS os JSONLs com mesmo
+        sessionId raiz consolidam numa unica Conversation (conv_id = raiz).
+
+        Sessoes orfas (root sem JSONL proprio mas com subagents/ + session-meta)
+        ainda sao processadas com stub parent — porem so quando a propria raiz
+        nao tem nenhum JSONL apontando pra ela.
         """
         input_path = Path(input_path)
-        orphan_count = 0
+        self._input_path = input_path
 
+        # FASE 1: descobrir cadeias de compactacao globalmente
+        self._chain_links = self._build_chain_links(input_path)
+
+        orphan_count = 0
         for project_dir in sorted(input_path.iterdir()):
             if not project_dir.is_dir():
                 continue
 
             # 1) JSONLs raiz + subagents dessas sessoes
-            processed_parents: set[str] = set()
+            processed_filenames: set[str] = set()
             for session_file in sorted(project_dir.glob("*.jsonl")):
-                parent_id = session_file.stem
-                processed_parents.add(parent_id)
-                self._parse_session(session_file, interaction_type="human_ai")
+                filename_id = session_file.stem
+                processed_filenames.add(filename_id)
+                root_id = self._find_root(filename_id)
 
-                subagents_dir = project_dir / parent_id / "subagents"
+                # override_conv_id=root_id consolida todos JSONLs da thread
+                # numa unica Conversation
+                self._parse_session(
+                    session_file,
+                    interaction_type="human_ai",
+                    override_conv_id=root_id,
+                )
+
+                subagents_dir = project_dir / filename_id / "subagents"
                 if subagents_dir.is_dir():
                     for sub_file in sorted(subagents_dir.glob("*.jsonl")):
+                        # parent_session_id sempre aponta pra raiz da thread,
+                        # nao pro filename intermediario
                         self._parse_session(
                             sub_file,
                             interaction_type="ai_ai",
-                            parent_session_id=parent_id,
+                            parent_session_id=root_id,
                         )
 
-            # 2) Pastas <uuid>/subagents/ ORFAS (parent JSONL ausente)
+            # 2) Pastas <uuid>/subagents/ sem JSONL proprio
             for item in sorted(project_dir.iterdir()):
                 if not item.is_dir():
                     continue
-                parent_id = item.name
-                if parent_id in processed_parents:
+                folder_id = item.name
+                if folder_id in processed_filenames:
                     continue
                 subagents_dir = item / "subagents"
                 if not subagents_dir.is_dir():
                     continue
-                self._reconstruct_orphan_parent(parent_id, project_dir.name)
+
+                root_id = self._find_root(folder_id)
+                # Se folder_id eh a raiz da thread (e nao mid-cadeia), criar stub
+                if root_id == folder_id:
+                    self._reconstruct_orphan_parent(folder_id, project_dir.name)
+                    orphan_count += 1
+
+                # Subagents sempre apontam pra raiz (mesmo se folder eh mid-cadeia)
                 for sub_file in sorted(subagents_dir.glob("*.jsonl")):
                     self._parse_session(
                         sub_file,
                         interaction_type="ai_ai",
-                        parent_session_id=parent_id,
+                        parent_session_id=root_id,
                     )
-                orphan_count += 1
 
         if orphan_count:
             logger.info(f"  Claude Code: {orphan_count} sessoes orfas (stub parent reconstruido)")
 
         self._build_branches()
+        from src.extractors.cli.preservation import mark_cli_preservation
+        mark_cli_preservation(self)
+
+    def _build_chain_links(self, input_path: Path) -> dict[str, str]:
+        """Identifica cadeias de compactacao varrendo o primeiro sessionId de
+        cada JSONL.
+
+        Quando o usuario faz `/compact`, o JSONL novo tem o sessionId interno
+        do parent no PRIMEIRO evento (e dominante=filename nos demais). Aqui
+        coletamos esse "ponteiro" pra construir o grafo de cadeias.
+
+        Retorna: {filename → parent_sessionId} pra arquivos com cadeia
+        detectada (filename != primeiro_sessionId).
+        """
+        links: dict[str, str] = {}
+        for project_dir in input_path.iterdir():
+            if not project_dir.is_dir():
+                continue
+            for jsonl in project_dir.glob("*.jsonl"):
+                filename_id = jsonl.stem
+                first_sid = None
+                try:
+                    with open(jsonl, encoding="utf-8") as f:
+                        for line in f:
+                            try:
+                                evt = json.loads(line)
+                                sid = evt.get("sessionId")
+                                if sid:
+                                    first_sid = sid
+                                    break
+                            except json.JSONDecodeError:
+                                continue
+                except OSError:
+                    continue
+                if first_sid and first_sid != filename_id:
+                    links[filename_id] = first_sid
+        return links
+
+    def _find_root(self, filename_id: str) -> str:
+        """Segue chain_links ate a raiz da thread (sem parent)."""
+        seen = set()
+        current = filename_id
+        while current in self._chain_links and current not in seen:
+            seen.add(current)
+            current = self._chain_links[current]
+        return current
 
     def parse_files(self, files: list[Path]) -> None:
         """Processa lista especifica de arquivos (uso incremental).
@@ -177,6 +257,10 @@ class ClaudeCodeParser(BaseParser):
 
         JSONL raiz sumiu (bug do CC pre-mar/2026) mas subagents + session-meta
         sobreviveram. Reconstroi conversation com first_prompt + stats reais.
+
+        Idempotente: se conv `parent_id` ja existe (criada via cadeia
+        compactada que aponta pra esse parent), nao cria dup — apenas anexa
+        o stub message se nao houver primeira msg ainda.
         """
         meta_path = _SESSION_META_DIR / f"{parent_id}.json"
         meta = {}
@@ -196,6 +280,20 @@ class ClaudeCodeParser(BaseParser):
         created_at = self._ts(start_time) if start_time else pd.NaT
         updated_at = self._ts(user_ts[-1]) if user_ts else created_at
 
+        existing = next(
+            (c for c in self.conversations if c.conversation_id == parent_id),
+            None,
+        )
+        if existing:
+            # Conv ja existe (mensagens vieram via cadeia compactada). NAO duplica;
+            # apenas atualiza campos vazios e mantem timestamps mais antigos.
+            if not existing.project and project_path:
+                existing.project = project_path
+            if pd.notna(created_at) and (existing.created_at is None or created_at < existing.created_at):
+                existing.created_at = created_at
+            return
+
+        # Conv nao existe: cria stub completo
         messages = []
         if first_prompt:
             messages.append(Message(
@@ -235,6 +333,7 @@ class ClaudeCodeParser(BaseParser):
         session_file: Path,
         interaction_type: str = "human_ai",
         parent_session_id: Optional[str] = None,
+        override_conv_id: Optional[str] = None,
     ) -> None:
         try:
             text = session_file.read_text(encoding="utf-8")
@@ -243,13 +342,22 @@ class ClaudeCodeParser(BaseParser):
             return
         lines = text.strip().split("\n")
         events = []
+        seen_uuids: set[str] = set()  # dedup eventos repetidos no JSONL bruto
         for line in lines:
             if not line.strip():
                 continue
             try:
-                events.append(json.loads(line))
+                evt = json.loads(line)
             except json.JSONDecodeError:
                 continue  # skip malformed lines
+            # Bug do Claude Code: subagents JSONL pode gravar o MESMO evento
+            # ate 3x (mesmo uuid, timestamp, content). Dedup defensivo aqui.
+            uuid = evt.get("uuid")
+            if uuid and uuid in seen_uuids:
+                continue
+            if uuid:
+                seen_uuids.add(uuid)
+            events.append(evt)
 
         # Subagents (ai_ai): processar todos os eventos (isSidechain=true e o esperado)
         # Sessoes principais (human_ai): filtrar sidechain
@@ -382,22 +490,70 @@ class ClaudeCodeParser(BaseParser):
         if not session_id or not messages:
             return
 
-        timestamps = [m.created_at for m in messages if m.created_at is not None]
+        # Override conv_id (usado quando este JSONL pertence a uma thread
+        # compactada — todos os JSONLs da thread consolidam em conv_id=raiz).
+        if override_conv_id:
+            final_conv_id = override_conv_id
+            for m in messages:
+                m.conversation_id = final_conv_id
+            for e in tool_events:
+                e.conversation_id = final_conv_id
+        else:
+            final_conv_id = session_id
 
-        self.conversations.append(Conversation(
-            conversation_id=session_id,
-            source=self.source_name,
-            title=slug,
-            created_at=min(timestamps) if timestamps else None,
-            updated_at=max(timestamps) if timestamps else None,
-            message_count=len(messages),
-            model=None,  # varia por msg
-            account=self.account,
-            mode="cli",
-            project=cwd,
-            interaction_type=interaction_type,
-            parent_session_id=parent_session_id,
-        ))
+        # Registra rel path do session_file pra preservation tracking.
+        # Pra threads compactadas: todos os JSONLs (root + subagents) contam
+        # pro final_conv_id. Pra subagents: tambem registra pro parent
+        # (preservation eh thread-level: thread sumiu = parent + subagents
+        # todos sumiram).
+        if self._input_path is not None:
+            try:
+                rel = str(session_file.relative_to(self._input_path))
+                self._conv_source_files.setdefault(final_conv_id, set()).add(rel)
+                if parent_session_id:
+                    self._conv_source_files.setdefault(parent_session_id, set()).add(rel)
+            except ValueError:
+                pass
+
+        timestamps = [m.created_at for m in messages if m.created_at is not None]
+        new_min = min(timestamps) if timestamps else None
+        new_max = max(timestamps) if timestamps else None
+
+        # MERGE em conv existente quando override aponta pra conv ja criada
+        # (caso de N JSONLs da mesma thread compactada).
+        existing = next((c for c in self.conversations if c.conversation_id == final_conv_id), None)
+        if existing:
+            # Acumula contagem; expande janela de timestamps; mantem cwd/slug
+            # ja registrados. Renumera sequence pra evitar colisao.
+            offset = existing.message_count
+            for m in messages:
+                m.sequence += offset
+            existing.message_count += len(messages)
+            if new_min and (existing.created_at is None or new_min < existing.created_at):
+                existing.created_at = new_min
+            if new_max and (existing.updated_at is None or new_max > existing.updated_at):
+                existing.updated_at = new_max
+            # Title (slug): preserva o ja existente; preenche com slug atual se vazio
+            if not existing.title and slug:
+                existing.title = slug
+            if not existing.project and cwd:
+                existing.project = cwd
+        else:
+            self.conversations.append(Conversation(
+                conversation_id=final_conv_id,
+                source=self.source_name,
+                title=slug,
+                created_at=new_min,
+                updated_at=new_max,
+                message_count=len(messages),
+                model=None,  # varia por msg
+                account=self.account,
+                mode="cli",
+                project=cwd,
+                interaction_type=interaction_type,
+                parent_session_id=parent_session_id,
+            ))
+
         self.messages.extend(messages)
         self.events.extend(tool_events)
 

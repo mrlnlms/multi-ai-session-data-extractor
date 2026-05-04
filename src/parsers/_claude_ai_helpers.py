@@ -108,12 +108,15 @@ def collect_citations(content_blocks: list) -> list[dict]:
     return out
 
 
-def block_time_bounds(content_blocks: list) -> tuple[Optional[str], Optional[str]]:
+def block_time_bounds_iso(content_blocks: list) -> tuple[Optional[str], Optional[str]]:
     """Retorna (min start_timestamp, max stop_timestamp) entre todos os blocks.
 
-    Util pra medir latencia: quanto tempo total Claude levou pra produzir
-    a msg (incluindo thinking + tool calls + text). Strings ISO — caller
+    Schema Claude.ai: cada block tem `start_timestamp`/`stop_timestamp`
+    strings ISO. Util pra medir latencia: quanto tempo total Claude levou
+    pra produzir a msg (incluindo thinking + tool calls + text). Caller
     converte pra Timestamp.
+
+    Diferente de `block_time_bounds_epoch` (qwen) que trabalha com epoch ints.
     """
     starts, stops = [], []
     for b in content_blocks or []:
@@ -307,9 +310,11 @@ def build_branches(
         # Agora desce de path_up[-1] (mais antigo da branch) ate uma folha
         # via primeiro child (heuristica simples — preserva content)
         branch_root = path_up[-1] if path_up else uid
-        branch_id_short = uid[:8]
+        # uuid completo no branch_id pra evitar colisao entre branches
+        # iniciadas no mesmo segundo (Claude.ai usa UUIDv7 — primeiros 8
+        # chars sao timestamp, colidem se 2+ branches forks proximos no tempo)
         branch_count += 1
-        branch_id = f"{conv_id}_branch_{branch_id_short}"
+        branch_id = f"{conv_id}_branch_{uid}"
 
         # Coleta todas as msgs descendentes deste branch_root que nao estao em main
         stack = [branch_root]

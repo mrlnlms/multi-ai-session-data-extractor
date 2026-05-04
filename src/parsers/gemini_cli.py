@@ -47,10 +47,14 @@ class GeminiCLIParser(BaseParser):
     def __init__(self, account: Optional[str] = None):
         super().__init__(account=account)
         self.branches: list[Branch] = []
+        self._conv_source_files: dict[str, set[str]] = {}
+        self._input_path: Optional[Path] = None
 
     def reset(self):
         super().reset()
         self.branches = []
+        self._conv_source_files = {}
+        self._input_path = None
 
     def parse(self, input_path: Path) -> None:
         """Le sessoes JSON de todos os projetos em input_path.
@@ -59,6 +63,7 @@ class GeminiCLIParser(BaseParser):
         cada um com chats/*.json.
         """
         input_path = Path(input_path)
+        self._input_path = input_path
         for project_dir in sorted(input_path.iterdir()):
             if not project_dir.is_dir():
                 continue
@@ -69,6 +74,8 @@ class GeminiCLIParser(BaseParser):
             for session_file in sorted(chats_dir.glob("session-*.json")):
                 self._parse_session(session_file, project_name)
         self._build_branches()
+        from src.extractors.cli.preservation import mark_cli_preservation
+        mark_cli_preservation(self)
 
     def parse_files(self, files: list[Path]) -> None:
         """Processa lista especifica (uso incremental). Infere project do path."""
@@ -130,6 +137,15 @@ class GeminiCLIParser(BaseParser):
         session_id = data.get("sessionId")
         if not session_id:
             return
+
+        # Registra rel path pra preservation tracking
+        if self._input_path is not None:
+            try:
+                rel = str(session_file.relative_to(self._input_path))
+                self._conv_source_files.setdefault(session_id, set()).add(rel)
+            except ValueError:
+                pass
+
         created_at = self._ts(data.get("startTime"))
         updated_at = self._ts(data.get("lastUpdated"))
 
@@ -226,20 +242,57 @@ class GeminiCLIParser(BaseParser):
                         metadata_json=metadata_json,
                     ))
 
-        self.conversations.append(Conversation(
-            conversation_id=session_id,
-            source=self.source_name,
-            title=None,
-            created_at=created_at,
-            updated_at=updated_at,
-            message_count=len(messages),
-            model=next((m.model for m in messages if m.model), None),
-            account=self.account,
-            mode="cli",
-            project=project_name,
-        ))
-        self.messages.extend(messages)
-        self.events.extend(events)
+        # Gemini CLI grava snapshots periodicos: varios arquivos
+        # `session-<timestamp>-<sid>.json` com mesmo sessionId interno. As msgs
+        # se sobrepoem entre snapshots (snapshot mais novo eh superset). Aqui
+        # consolidamos numa unica Conversation por sessionId, deduplicando msgs
+        # por id (preservation: mantemos a maior cobertura).
+        existing = next(
+            (c for c in self.conversations if c.conversation_id == session_id),
+            None,
+        )
+        if existing:
+            # Dedup: pegar apenas msgs com id que nao apareceu antes nessa conv
+            existing_msg_ids = {
+                m.message_id for m in self.messages
+                if m.conversation_id == session_id
+            }
+            new_msgs = [m for m in messages if m.message_id not in existing_msg_ids]
+            if new_msgs:
+                # Renumera sequence pra continuar do ultimo
+                offset = existing.message_count
+                for m in new_msgs:
+                    m.sequence += offset
+                self.messages.extend(new_msgs)
+                existing.message_count += len(new_msgs)
+            # Mesma logica pros tool_events
+            existing_evt_ids = {
+                e.event_id for e in self.events
+                if e.conversation_id == session_id
+            }
+            new_events = [e for e in events if e.event_id not in existing_evt_ids]
+            if new_events:
+                self.events.extend(new_events)
+            # Expande janela de timestamps
+            if created_at is not None and (existing.created_at is None or created_at < existing.created_at):
+                existing.created_at = created_at
+            if updated_at is not None and (existing.updated_at is None or updated_at > existing.updated_at):
+                existing.updated_at = updated_at
+        else:
+            self.conversations.append(Conversation(
+                conversation_id=session_id,
+                source=self.source_name,
+                title=None,
+                created_at=created_at,
+                updated_at=updated_at,
+                message_count=len(messages),
+                model=next((m.model for m in messages if m.model), None),
+                account=self.account,
+                mode="cli",
+                project=project_name,
+            ))
+            self.messages.extend(messages)
+            self.events.extend(events)
 
     def branches_df(self) -> pd.DataFrame:
         return branches_to_df(self.branches)
