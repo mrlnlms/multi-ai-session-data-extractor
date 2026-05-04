@@ -4,25 +4,6 @@ Open work items. Closed via shipped releases are removed from this list
 (see `git log` for history). For broader context, see
 [README.md](../README.md) and [CLAUDE.md](../CLAUDE.md).
 
-## Capture & parse — features
-
-### Claude Code image extraction
-
-Claude Code stores user-attached images **inline as base64** in JSONL
-session files (`content[].source.data` in `type=image` blocks). The
-parser currently does not handle `type=image` — only `text`, `tool_use`,
-`tool_result`, and `thinking`. Sample scan: ~445 image blocks in 5
-sessions, extrapolating to thousands across the corpus.
-
-**Plan:** in `src/parsers/claude_code.py`, in the content-block loop,
-detect `type == "image"`, decode base64, infer extension from
-`source.media_type` (`image/jpeg` → `.jpg`), save to
-`data/raw/Claude Code Data/_images/{session_id}/{msg_seq}_{block_idx}.{ext}`,
-register the path in `attachment_names` of the `Message`. Other Claude
-Code fields currently dropped: `message.usage` (token counts),
-`gitBranch`, `cwd`, `permissionMode`. Details in
-[docs/research/extractor-findings.md](research/extractor-findings.md).
-
 ## Operational
 
 ### ChatGPT capture-delete cycle

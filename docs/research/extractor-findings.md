@@ -392,20 +392,16 @@ The login script for each platform persists this state to `.storage/<platform>-p
 
 ## Known parser limitations / future work
 
-### Claude Code: image base64 inline
+### Claude Code: lower-priority dropped fields
 
-Claude Code stores user-attached images **inline as base64** in the JSONL session files (`content[].source.data` in `type=image` blocks). Current parser does not handle `type=image` — only `text`, `tool_use`, `tool_result`, `thinking`. As a result:
+Claude Code parser today extracts text, tool_use, tool_result, thinking,
+images (decoded from inline base64 → `_images/{session_id}/{seq}_{idx}.{ext}`,
+registered in `attachment_names`), and per-message token counts via
+`message.usage`. The following fields are still dropped and could be
+promoted to the schema if they prove useful for analysis:
 
-- Hundreds of images per session can be present in raw but invisible in the unified parquet
-- `~/.claude/image-cache/` is **not** authoritative — it is a UI-disposable cache. Use the JSONL inline data.
-
-When implementing: in the content-block loop, detect `type == "image"`, decode base64 from `source.data`, infer extension from `source.media_type` (`image/jpeg` → `.jpg`), save to `data/raw/Claude Code Data/_images/{session_id}/{msg_seq}_{block_idx}.{ext}`, and register the path in `attachment_names` of the `Message`.
-
-Other Claude Code fields currently dropped by the parser:
-
-- `message.usage` (token counts per message)
-- `gitBranch`, `cwd`, `permissionMode` (per-session operational context — useful for cross-project analysis)
-- `attachment` records (separate from image blocks)
+- `gitBranch`, `cwd`, `permissionMode` (per-session operational context)
+- `attachment` records distinct from image blocks (file references)
 
 ### Codex: `context_compacted` events
 
