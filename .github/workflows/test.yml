@@ -56,15 +56,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          # jupyter eh exigido pelo Quarto pra executar code blocks Python
+          # (nao eh runtime dependency do projeto, so do render).
+          pip install jupyter
 
       - name: Setup Quarto
         uses: quarto-dev/quarto-actions/setup@v2
 
       - name: Smoke — Quarto render
-        env:
-          QUARTO_PYTHON: ${{ github.workspace }}/.venv-or-system/bin/python
         run: |
-          # Quarto usa o python do sistema (PATH); deps ja instaladas acima
+          # Quarto descobre python via PATH (configurado pelo setup-python).
           quarto render tests/ci-smoke.qmd
           test -f tests/ci-smoke.html
           echo "✓ Quarto render OK ($(wc -c < tests/ci-smoke.html) bytes)"
