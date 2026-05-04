@@ -143,32 +143,38 @@ Migracoes feitas durante a limpeza:
 - Perplexity orphan thread (CV evaluation) → `data/external/perplexity-orphan-threads/`
 - more.design NotebookLM → `data/external/notebooklm-snapshots/` + parser legacy + account-3
 
-## TODOs com probe pendente (exigem session live)
+## TODOs com probe pendente
 
-Não bloqueiam captura básica — são gaps de cobertura adicional que precisam
-de probe com dado real:
+Status real validado empiricamente em 2026-05-04:
 
-- `src/extractors/chatgpt/dom_voice.py:21` — Pass 2 voice DOM seletores.
-  Voice msgs já são detectadas no Pass 1 (raw heuristic) — Pass 2 adicionaria
-  texto transcribed. Precisa: ChatGPT logado + voice conv + inspect.
-- `src/parsers/_notebooklm_helpers.py:148` — `extract_chat_turns` retorna
-  `[]` quando `chat_raw` não-None (schema posicional desconhecido).
-  Empírico: 371 arquivos chat raw, **0 com conteúdo não-null** — TODO é
-  defensivo. Precisa: notebook com chat populado.
-- `src/parsers/_notebooklm_helpers.py:290` — `extract_mind_map_tree`
-  serializa metadata cru. Tree completa de nodes não mapeada. Precisa:
-  probe Chrome MCP por RPC alternativo.
-- ~~`src/parsers/gemini.py:24` — Search/grounding citations~~ **FECHADO 2026-05-04**.
-  Probe sobre raw existente identificou padrão de citation no schema
-  posicional: lista `[favicon, source_url, title, snippet, ...]` onde
-  favicon contém `gstatic.com/faviconV2`. `extract_turn_citations()` em
-  `_gemini_helpers.py` faz walk recursivo procurando esse padrão e
-  popula `Message.citations_json` + ToolEvents tipo `search_result`
-  (1 por citation, dedup por url). Resultado: 416 search results
-  estruturados em 9 messages que usaram Search/Deep Research.
+**Já capturados (TODOs de 'cobertura adicional' que viraram redundantes):**
+- ~~`src/extractors/chatgpt/dom_voice.py:21` — Pass 2 voice DOM~~
+  **Suficiente sem o Pass 2.** 127 de 131 voice messages no parquet ChatGPT
+  já têm texto da transcrição via Pass 1 (raw heuristic com
+  `audio_transcription`). Os 4 restantes são edge cases (transcrição
+  falhou upstream). Pass 2 DOM seria over-engineering pra 4 casos
+  marginais — código fica disponível mas não vale ativar.
+- ~~`src/parsers/_notebooklm_helpers.py:148` — extract_chat_turns~~
+  **Não é bug, é estado dos dados.** 0 dos 143 notebooks têm chat
+  populado (user não fez chats reais nos notebooks). Quando aparecer
+  chat real upstream, parser tem placeholder (pode falhar se schema
+  for diferente — mas só tem como saber com dado real).
+- ~~`src/parsers/gemini.py:24` — Search/grounding citations~~
+  **FECHADO 2026-05-04.** Probe sobre raw existente identificou padrão
+  no schema posicional: lista `[favicon, source_url, title, snippet,
+  ...]` onde favicon contém `gstatic.com/faviconV2`.
+  `extract_turn_citations()` em `_gemini_helpers.py` faz walk recursivo
+  e popula `Message.citations_json` + ToolEvents `search_result` (1 por
+  citation, dedup por url). Resultado: 416 search results estruturados
+  em 9 messages que usaram Search/Deep Research.
 
-Quando atacar: abrir uma sessão dedicada com browser/Chrome MCP + plataforma
-logada, probar e atualizar parser.
+**Único TODO real ainda pendente:**
+- `src/parsers/_notebooklm_helpers.py:290` — `extract_mind_map_tree`.
+  141 mind maps capturados mas só metadata
+  (`[mm_uuid, nb_uuid, [timestamp]]`, ~138 chars). Tree completa de
+  nodes (estrutura hierárquica do mind map) precisa de outro RPC.
+  Precisa: Chrome MCP com sessão NotebookLM ativa + abrir um mind map +
+  capturar requests de rede pra identificar o RPC alternativo.
 
 ## Backlog principal
 

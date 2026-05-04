@@ -16,12 +16,13 @@ Limitações se dividem em 3 categorias:
 
 ### ChatGPT
 
-- **Voice — texto transcrito via DOM:** as mensagens de voz são
-  identificadas (`is_voice=True`) pelo extractor, mas a etapa "Pass 2"
-  que extrairia o texto transcribed via DOM scraping está com seletores
-  CSS pendentes de validação. Voice está marcada, mas o conteúdo da
-  mensagem fica vazio quando a transcrição não está no JSON da API.
-  Arquivo: `src/extractors/chatgpt/dom_voice.py`.
+- **Voice — 97% das transcrições já capturadas via Pass 1.** 127 de 131
+  voice messages têm texto da transcrição populado (via raw heuristic
+  detectando `audio_transcription` em parts). 4 messages voice ficam
+  com texto vazio (edge cases — transcrição falhou upstream). O Pass 2
+  via DOM scraping (`src/extractors/chatgpt/dom_voice.py`) existe mas
+  não é necessário pra essa cobertura — over-engineering pros 4 casos
+  remanescentes.
 - **8 assets irrecuperáveis:** alguns assets antigos não estão mais
   disponíveis no servidor (parents foram apagados). Documentado como
   "failed=8" no download — não é bug.
@@ -90,13 +91,18 @@ Limitações se dividem em 3 categorias:
   periodicamente e bumpa o timestamp sem mudança real de conteúdo. O
   reconciler usa hash semântico (não timestamp) pra decidir refetch —
   comportamento já mitigado por design.
-- **Mind map tree completa:** o RPC atual (`CYK0Xb`) retorna apenas
-  metadata. Tree completa de nodes não está mapeada — atual
-  implementação serializa o JSON cru. (Probe pendente de RPC alternativo.)
-- **Chat real:** dos 143 notebooks atuais, **0 têm chat populado** (o
-  campo está `None` em todos). O parser tem placeholder para extrair
-  quando aparecer — quando aparecer chat real, será necessário mapear
-  o schema.
+- **Mind map — só metadata, tree completa pendente.** 141 mind maps
+  capturados em `notebooklm_outputs.parquet`, mas o `content` é só
+  metadata (`[mm_uuid, nb_uuid, [timestamp]]`, ~138 chars). A tree
+  hierárquica de nodes não está mapeada — o RPC `CYK0Xb` atual retorna
+  só metadata. Pra ter tree completa, precisa identificar outro RPC
+  via probe Chrome MCP com sessão NotebookLM ativa.
+- **Chat real — não é bug, é estado dos dados.** Dos 143 notebooks
+  atuais, 0 têm chat populado upstream (user não fez chats reais nos
+  notebooks). As 138 messages capturadas são `role=system`
+  (`guide.summary` virando seq=0). Quando você fizer chats reais no
+  futuro, parser tem placeholder em `_extract_chat_turns()` — pode
+  precisar mapear o schema posicional.
 
 ### Claude Code (CLI)
 
