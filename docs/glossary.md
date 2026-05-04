@@ -191,6 +191,75 @@ Histórico cumulativo, append-only — uma linha por run. Não pode ser reconstr
 
 ---
 
+## `data/unified/` — parquets cross-platform consolidados
+
+Output do `scripts/unify-parquets.py`. 11 parquets que concatenam os 10
+sources × extractor + manual saves em uma vista cross-platform:
+
+- 4 canonicas: `conversations`, `messages`, `tool_events`, `branches`
+- 7 auxiliares: `sources`, `notes`, `outputs`, `guide_questions`,
+  `source_guides` (NotebookLM), `project_metadata`, `project_docs`
+  (Qwen + Claude.ai)
+
+**Estrategia:** concat com `pd.concat` + dedup por PK composta
+`[source, conversation_id, ...]` (ou `[source, project_id, ...]` pras
+auxiliares de project), `keep='last'`. Defesa contra dups internas
+(parsers que emitem rows duplicadas) + propagacao de fix de parser.
+
+**Decisao:** filho materializa `data/unified/`, NAO o consumer
+(`~/Desktop/AI Interaction Analysis/`). Filho é a casa canonica de
+dados; consumer vai consumir via `dvc import-url` desses 11 parquets.
+Decorrente da decisao "filho eh casa canonica" em
+`memory/project_canonical_data_home.md`.
+
+**Idempotente:** rodar 1x ou 100x produz arquivos byte-a-byte identicos.
+Se apagar `data/unified/`, basta rodar `scripts/unify-parquets.py` de
+novo. Sem estado escondido.
+
+**Bugs cobertos:**
+- DeepSeek `message_id` int 1-98 local-por-conv → PK composta com
+  `conversation_id` desambigua
+- Claude Code subagents que reusam parent's `message_id` em compactacao
+  `/compact` → PK composta resolve
+- `project_metadata` sem coluna `source` no schema → enriquecida via
+  filename (`qwen_project_metadata.parquet` → `source='qwen'`)
+
+**Helper pros qmds:** `setup_unified_views(con, unified_dir,
+sources_filter)` em `src/parsers/quarto_helpers.py` carrega os 11
+parquets como views DuckDB com filtro opcional `WHERE source IN (...)`
+pra subset (Web Chat, CLI, RAG). Usado pelos 4 qmds em
+`notebooks/00-overview*.qmd`.
+
+---
+
+## Data profile template (`notebooks/_template.qmd`)
+
+Partial Quarto compartilhado por 14 qmds — escrito 1 vez, renderizado 14
+vezes com SOURCE_KEY/COLOR/AUX_TABLES diferentes. Estrutura: 1.x schema
++ sample por tabela canonica, 2.x cobertura/gaps (capture_method, model,
+thinking, tokens, latencia), 3.x volumes/distribuicoes (timeline, heatmap,
+words, tools, lifetime, branches, account), 4.x preservation/states/itable.
+
+Conditionals via `has_col(con, table, col)` — secoes so aparecem se a
+plataforma tem a coluna. Per-account filter via `ACCOUNT_FILTER` na config
+do per-source qmd.
+
+**Partial pra auxiliares:** `_template_aux.qmd` itera `AUX_TABLES_CONFIG`
+dict — gera schema/sample/stats pra `sources` (NotebookLM), `notes`,
+`outputs`, `guide_questions`, `source_guides`, `project_metadata` (Qwen/
+Claude.ai), `project_docs`. Configurado em `AUX_TABLES = [...]` no
+per-source qmd.
+
+**Helpers:** `src/parsers/quarto_helpers.py` — 11 funcoes (setup_views_with_manual,
+setup_notebook, has_col, has_view, table_count, fmt_pct, fmt_int, safe_int,
+show_df, show_md, plotly_bar). 40 testes em `tests/parsers/test_quarto_helpers.py`.
+
+**Per-source qmd:** ~50 linhas. Setup (SOURCE_KEY, SOURCE_TITLE, SOURCE_COLOR,
+PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER) + `setup_notebook(...)` +
+`{{< include _template.qmd >}}` (+ opcional `{{< include _template_aux.qmd >}}`).
+
+---
+
 ## Lembrete fundamental
 
 > **Discovery pode baixar. Merged não.**

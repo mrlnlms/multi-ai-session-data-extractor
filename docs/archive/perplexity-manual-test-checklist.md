@@ -6,9 +6,9 @@
 > features e cobrir gaps. Todas as fases foram executadas (com adaptações)
 > durante a bateria de 2026-05-01 com conta Pro. Resultados consolidados em:
 >
-> - `docs/perplexity-audit-findings.md` — bateria UI 2026-05-01 (achados empíricos)
-> - `docs/perplexity-journey-2026-05-01.md` — 10 lições transferíveis
-> - `docs/perplexity-pending-validations.md` — Pro/Max features (TODO público) + limitações upstream
+> - `docs/platforms/perplexity/audit-findings.md` — bateria UI 2026-05-01 (achados empíricos)
+> - `docs/platforms/perplexity/journey-2026-05-01.md` — 10 lições transferíveis
+> - `docs/platforms/perplexity/pending-validations.md` — Pro/Max features (TODO público) + limitações upstream
 >
 > Mantido como referência histórica do approach exploratório. **Não usar
 > como fonte de verdade pra estado atual.**

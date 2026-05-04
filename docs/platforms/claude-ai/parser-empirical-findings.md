@@ -2,7 +2,7 @@
 
 Findings coletados sobre o raw real (~835 convs + 83 projects capturados em
 2026-05-01 via `scripts/claude-sync.py`). Espelha
-`docs/parser-v3-empirical-findings.md` do ChatGPT.
+`docs/parser-v3/empirical-findings.md` do ChatGPT.
 
 ## 1. Top-level conversation schema
 

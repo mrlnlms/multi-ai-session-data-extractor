@@ -1,7 +1,7 @@
 # Dashboard — manual de funcionalidades + operação
 
 Documento vivo do que existe no dashboard (manual de funcionalidades +
-operação). Pareado com `dashboard-plan.md` (plan histórico das 4 fases).
+operação). Pareado com `plan.md` (plan histórico das 4 fases).
 
 Roda com:
 
@@ -9,9 +9,9 @@ Roda com:
 PYTHONPATH=. .venv/bin/streamlit run dashboard.py
 ```
 
-Abre em <http://localhost:8501>. Pra detalhes de operacao (background,
-healthcheck, acesso programatico via `AppTest`, MCP browser, gotchas), ver
-`dashboard-operations.md`.
+Abre em <http://localhost:8501>. Detalhes de operação (background,
+healthcheck, acesso programático via `AppTest`, MCP browser, gotchas) na
+seção 10 deste arquivo.
 
 ---
 
@@ -36,7 +36,7 @@ remergeam por conta propria.
 |---|---|
 | Titulo "AI Sessions Tracker" | Branding, sem acao |
 | Botao "🏠 Overview" | Volta pra pagina inicial (mesmo de "← Voltar" no drill-down) |
-| Status do Quarto | Mostra `✅ instalado` ou `➖ ausente (Fase 3)` — apenas informativo na Fase 1, sem efeito visivel |
+| Status do Quarto | Mostra `✅ instalado` ou `➖ ausente`. Quando instalado, drill-down de cada plataforma exibe link "Ver dados detalhados" pro `notebooks/_output/<plat>.html`. |
 | Caption sobre logs | Lembra onde os `capture_log.jsonl` e `reconcile_log.jsonl` ficam |
 | Botao "🔁 Recarregar dados" | Limpa o `st.cache_data` e re-roda o script. Use depois de rodar sync no terminal pra refletir no dashboard sem reiniciar |
 
@@ -130,7 +130,7 @@ Acima dele: alerta vermelho 🚨 se houver discovery drop nos logs.
 
 Pra cada plataforma:
 
-- Se existe `<plat>-sync.py` (so ChatGPT hoje): label `🔄 Sync <Nome>`, roda
+- Se existe `<plat>-sync.py` (todas as 7 plataformas hoje): label `🔄 Sync <Nome>`, roda
   `chatgpt-sync.py --no-voice-pass` (ou equivalente)
 - Se so existe `<plat>-export.py` (Claude.ai, Gemini, NotebookLM, Qwen,
   DeepSeek, Perplexity): label `🔄 Export <Nome> (sem orquestrador ainda)`,
@@ -246,27 +246,28 @@ Mas tambem varre `data/raw/` e `data/merged/`. A lista final eh
 | Excecao no subprocess | Mensagem da excecao direto |
 | Discovery drop | Banner vermelho explicando o threshold de 20% |
 | Sem merged.json | Caption "Nenhum merged.json encontrado para esta plataforma." |
-| Quarto ausente | No sidebar: `➖ ausente (Fase 3)` (sem efeito na Fase 1) |
+| Quarto ausente | No sidebar: `➖ ausente`. Drill-down não mostra link "Ver dados detalhados" — instalar `quarto` (brew/standalone) e re-rodar `<plat>-parse.py` + `quarto render notebooks/<plat>.qmd`. |
 
 ---
 
-## 8. O que ainda **nao** existe (entra nas fases seguintes)
+## 8. O que ainda **nao** existe
 
-Pra evitar surpresa:
+Atualizado em 2026-05-03 — fases 2 (parsers v3), 3 (Quarto descritivos) e 4
+(sync orquestrador pras 7 plataformas) **shipped**. O que continua fora de
+escopo do dashboard (por design):
 
-- **Parser** (Fase 2): nada de parquet ainda. As metricas de mensagens sao
-  estimativas leves direto do `mapping` em JSON. Tabela completa filtravel
-  com busca por titulo/texto entra na Fase 2/3.
-- **Quarto** (Fase 3): botao "Ver dados detalhados" nao existe ainda. O
-  sidebar so reporta presenca do binario.
-- **Outras plataformas** (Fase 4): so ChatGPT tem sync orquestrador. As
-  outras 6 caem no fallback de export individual ate cada uma ganhar seu
-  proprio `<plat>-sync.py`.
 - **Modelos por conv**: hoje contamos `model_slug` por mensagem (granularidade
-  fina). Modelo "default da conversa" precisa do parser.
+  fina). "Modelo default da conv" eh derivado do parser canonico
+  (`Conversation.model` = ultimo model_slug do assistant), mas o dashboard
+  ainda apresenta a granularidade por mensagem.
 - **Projects deletados inteiros** (cross-source): drill-down ja mostra
   "Projects 100% preserved" em project_sources, mas nao tem visualizacao
   cruzada de chats orfaos de projects deletados.
+- **Visao cross-plataforma agregada**: o overview tem KPIs cross, mas nao
+  tem comparativo lado-a-lado (ex: distribuicao temporal das 7 simultaneas).
+  Fica pro `notebooks/00-overview.qmd` (backlog).
+- **Analise interpretativa** — sentiment, clustering, topic detection. Por
+  design fica em `~/Desktop/AI Interaction Analysis/`.
 
 ---
 
@@ -285,9 +286,9 @@ dashboard/
     └── platform.py
 ```
 
-`docs/dashboard-plan.md` — plan formal das 4 fases (histórico de decisões).
+`docs/dashboard/plan.md` — plan formal das 4 fases (histórico de decisões — todas shipped).
 
-`README.md` — secao "Dashboard (Fase 1)" com instalacao e comandos basicos.
+`README.md` — seção "Dashboard" com instalação e comandos básicos.
 
 ---
 

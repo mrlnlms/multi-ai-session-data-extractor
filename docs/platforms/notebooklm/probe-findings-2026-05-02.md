@@ -242,4 +242,4 @@ legacy v1. v3 ⊇ legacy estritamente:
 - Pin/star: NotebookLM tem essa feature? (descobrir na UI — provavel: não)
 - Add source: reflete em sources.parquet? `update_time` bumpa?
 
-Documentar resultados em `docs/notebooklm-server-behavior.md` após bateria.
+Documentar resultados em `docs/platforms/notebooklm/server-behavior.md` após bateria.

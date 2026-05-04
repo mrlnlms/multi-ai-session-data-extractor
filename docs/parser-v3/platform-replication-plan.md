@@ -1,5 +1,10 @@
 # Replicação do padrão ChatGPT pras 6 plataformas restantes
 
+> **Status: TODAS as 7 plataformas web shipped (2026-05-03)** + 3 fontes
+> CLI (claude_code, codex, gemini_cli) + 3 parsers de manual saves. Mantido
+> como playbook histórico — referência pra futuras plataformas (futuras
+> extensões ao Anthropic Models, novos providers, etc).
+
 Playbook pra trazer Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek e
 Perplexity ao mesmo nível de cobertura que o ChatGPT já tem hoje
 (2026-04-28). ChatGPT serve de **referência viva** — copiar estrutura,
@@ -7,7 +12,7 @@ adaptar gotchas.
 
 ---
 
-## 1. Estado atual (atualizado 2026-05-02)
+## 1. Estado atual (atualizado 2026-05-03)
 
 | Plataforma | Extractor | Reconciler | Sync orquestr. | Pasta única | Parser canônico | Script parse | QMD |
 |---|---|---|---|---|---|---|---|
@@ -17,17 +22,26 @@ adaptar gotchas.
 | **Qwen** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **DeepSeek** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Gemini** | ✅ | ✅ | ✅ (multi-conta) | ✅ (per-account) | ✅ | ✅ | ✅ (3 docs: consolidado + per-account) |
-| NotebookLM | ✅ | ✅ | ✅ (multi-conta) | ✅ (per-account) | ✅ | ✅ | ✅ (3 docs: consolidado + per-account, 9 parquets) |
+| **NotebookLM** | ✅ | ✅ | ✅ (multi-conta) | ✅ (per-account) | ✅ | ✅ | ✅ (4 docs: consolidado + 2 per-account + legacy more.design, 9 parquets) |
 
-**⚠️ legacy (NotebookLM):** existe `src/parsers/notebooklm.py` mas é o MVP do
-projeto-mãe (não no schema v3). Precisa rewrite — porém NotebookLM tem 9 tipos
-de outputs (audio, video, slide deck, blog, flashcards, quiz, etc) e pode
-exigir extensão do schema canônico antes do rewrite. Última plataforma do
-backlog.
+**Adicionalmente shipped** (não eram parte do plano original — 3 CLIs):
+- **Claude Code** — copy de `~/.claude/projects/`, parser v3 com
+  subagents (`interaction_type='ai_ai'`), 3 docs Quarto
+- **Codex** — copy de `~/.codex/sessions/`, `function_call` ↔
+  `exec_command_end` correlacionados
+- **Gemini CLI** — copy de `~/.gemini/tmp/`, JSON nao JSONL
 
-**6/7 plataformas shipped.** Bateria CRUD UI completa em todas (rename + pin
-+ delete + features especificas). Bugs descobertos durante batterias estão
-documentados em `docs/<plat>-server-behavior.md`.
+**Manual saves** (parsers em `src/parsers/manual/`): clippings_obsidian,
+copypaste_web, terminal_claude_code. Schema v3.2 introduziu
+`Conversation.capture_method` distinguindo extractor vs manual.
+
+**Template canonico de notebooks (2026-05-03):** 14 qmds compartilham
+`notebooks/_template.qmd` + helpers em `src/parsers/quarto_helpers.py`.
+Per-source qmd tem ~50 linhas. Ver `docs/glossary.md` "Data profile template".
+
+**7/7 plataformas web shipped.** Bateria CRUD UI completa em todas (rename
++ pin + delete + features específicas). Bugs descobertos durante baterias
+estão em `docs/platforms/<plat>/server-behavior.md`.
 
 ---
 
@@ -94,7 +108,7 @@ end-to-end.
 - Meta-tests em `test_fixtures_integrity.py` por plataforma
 - Doc empírico: `docs/<source>-parser-empirical-findings.md`
 
-**Modelo:** `docs/parser-v3-empirical-findings.md` + 9 fixtures do ChatGPT.
+**Modelo:** `docs/parser-v3/empirical-findings.md` + 9 fixtures do ChatGPT.
 
 ### Fase E — Parser canônico (rewrite)
 
@@ -131,22 +145,28 @@ end-to-end.
 - Documentar diferenças em `docs/<source>-parser-validation.md`
 - Critério: parser novo ⊇ parser antigo (pode ter mais — não pode ter menos)
 
-**Modelo:** `docs/parser-v3-validation.md`.
+**Modelo:** `docs/parser-v3/validation.md`.
 
 ### Fase H — Notebook Quarto descritivo
 
 **Objetivo:** `notebooks/<source>.qmd` rendirizando HTML estático no
 padrão "zero trato".
 
-- Espelhar estrutura do `notebooks/chatgpt.qmd` (4 seções: Dados disponíveis,
-  Cobertura, Volumes, Preservation)
-- Adaptar gráficos/tabelas conforme features da plataforma
-- Cor primária dedicada (define nova cor em `_style.css` ou inline)
-- Render via `quarto render notebooks/<source>.qmd` em < 30s
-- HTML self-contained < 100 MB
+- **Atualização (2026-05-03):** template canônico em `notebooks/_template.qmd`
+  + helpers em `src/parsers/quarto_helpers.py`. Per-source qmd tem ~50
+  linhas — só config (SOURCE_KEY, SOURCE_TITLE, SOURCE_COLOR, PROCESSED,
+  TABLES, AUX_TABLES, ACCOUNT_FILTER) + `setup_notebook(...)` +
+  `{{< include _template.qmd >}}`. Estrutura inteira (1.x schema/sample,
+  2.x cobertura, 3.x volumes/distrib, 4.x preservation) sai pronto.
+- Cor primária da plataforma em `SOURCE_COLOR` (constante única).
+- Tabelas auxiliares (NotebookLM 5, Qwen/Claude.ai 2): adicionar nomes
+  em `AUX_TABLES = [...]` + incluir `_template_aux.qmd`.
+- Render via `quarto render notebooks/<source>.qmd` em ~20-60s.
+- HTML self-contained ~40 MB (embed-resources).
 
-**Modelo:** `notebooks/chatgpt.qmd` (916 linhas, 4 seções, 5 figuras
-plotly, 29 blocos Python).
+**Modelo:** qualquer um dos 14 qmds — `notebooks/codex.qmd` é o menor
+(~49 linhas). Helpers e testes em `src/parsers/quarto_helpers.py` /
+`tests/parsers/test_quarto_helpers.py` (40 testes).
 
 ---
 
@@ -320,7 +340,7 @@ Estimativas otimistas se padrão fluir. Add 30% de buffer pra surpresas
 
 ### 10.1. Não escrever plan formal por plataforma sem dados
 
-Ler `docs/parser-v3-empirical-findings.md` — pattern foi: explorar dados
+Ler `docs/parser-v3/empirical-findings.md` — pattern foi: explorar dados
 reais antes de plan. Plan especulativo vira refator. Pra cada plataforma:
 
 1. Roda sync (Fase A+B) → tem merged em mãos

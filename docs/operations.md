@@ -65,10 +65,11 @@ PYTHONPATH=. .venv/bin/python scripts/gemini-sync.py --account 1
 
 ### NotebookLM
 
-Sem orquestrador ainda (backlog). Use export standalone:
+Multi-conta (3 contas: account-1 en, account-2 pt-BR, account-3 legacy more.design):
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/notebooklm-export.py
+PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py             # ambas contas web
+PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py --account 1 # so account-1
 ```
 
 ---
@@ -195,22 +196,72 @@ PYTHONPATH=. .venv/bin/python scripts/claude-sync.py
 
 ## Render Quarto descritivo (HTML self-contained)
 
-Após `<plat>-parse.py`, gerar HTML descritivo:
+Após `<plat>-parse.py` (ou `<cli>-copy.py` + `<cli>-parse.py`), gerar HTML
+descritivo. Os 14 qmds compartilham `notebooks/_template.qmd` — adicionar
+secao nova mexe em 1 lugar so.
 
 ```bash
+# Plataformas web (7)
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/chatgpt.qmd
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/claude-ai.qmd
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/perplexity.qmd
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/qwen.qmd
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/deepseek.qmd
 
-# Gemini tem 3 documentos: consolidado + 1 per-account
+# CLIs (3) — dado local, sem captura web
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/claude-code.qmd
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/codex.qmd
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/gemini-cli.qmd
+
+# Gemini multi-conta (consolidado + 2 per-account)
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/gemini.qmd
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/gemini-acc-1.qmd
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/gemini-acc-2.qmd
+
+# NotebookLM multi-conta (consolidado + 2 per-account + 1 legacy)
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/notebooklm.qmd
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/notebooklm-acc-1.qmd
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/notebooklm-acc-2.qmd
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/notebooklm-legacy.qmd
 ```
 
-Output em `notebooks/_output/<plat>.html` (gitignored, ~50MB self-contained).
+Output em `notebooks/_output/<plat>.html` (gitignored, ~40MB self-contained,
+~20-60s cada).
+
+**Overviews cross-plataforma** (a partir de `data/unified/`):
+
+```bash
+# Materializar unified primeiro (depois de qualquer <plat>-parse.py)
+PYTHONPATH=. .venv/bin/python scripts/unify-parquets.py
+
+# Renderizar os 4 overviews
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview.qmd      # todas as 10 sources
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview-web.qmd  # 6 web
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview-cli.qmd  # 3 CLIs
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview-rag.qmd  # NotebookLM
+```
+
+**Servir local:**
+
+```bash
+./scripts/serve-qmds.sh           # sobe (default = start)
+./scripts/serve-qmds.sh status    # rodando ou parado?
+./scripts/serve-qmds.sh open      # abre 15 abas no browser
+./scripts/serve-qmds.sh stop      # para
+./scripts/serve-qmds.sh restart   # stop + start
+
+# Variaveis (opcionais):
+PORT=8766 ./scripts/serve-qmds.sh         # porta diferente
+OUTPUT_DIR=other ./scripts/serve-qmds.sh  # outro dir
+```
+
+PID + log gravados em `.serve-qmds.{pid,log}` (gitignored). Servidor sobe
+em background — fecha terminal e continua rodando ate `stop`.
+
+**Helpers e testes:** `src/parsers/quarto_helpers.py` cobre setup
+(setup_views_with_manual + setup_notebook), schema/query (has_col/has_view/
+table_count) e display (fmt_pct/fmt_int/safe_int/show_df/plotly_bar). Testes
+em `tests/parsers/test_quarto_helpers.py` (40 testes).
 
 ---
 

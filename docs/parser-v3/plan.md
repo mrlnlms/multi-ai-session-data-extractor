@@ -1,14 +1,14 @@
 # Plan: parser ChatGPT v3 (raw → parquet)
 
 > **Status: IMPLEMENTADO em 2026-04-28.** Parser v3 promovido a `chatgpt`
-> canônico. Ver `src/parsers/chatgpt.py`, `docs/parser-v3-validation.md`,
+> canônico. Ver `src/parsers/chatgpt.py`, `docs/parser-v3/validation.md`,
 > e os 3 commits backdated em `feat/parser-v3-canonico` (mergeada em main).
 > Versões antigas em `_backup-temp/parser-v3-promocao-2026-04-28/` (gitignored).
 > Os critérios de pronto das Fases 2a, 2b, 2c, 2d foram atendidos. Este doc
 > fica como histórico do plan formal — não editar pra refletir estado.
 
 Plan formal pra implementação do parser v3 do ChatGPT. **Informado por
-dados empíricos** coletados em [parser-v3-empirical-findings.md](parser-v3-empirical-findings.md).
+dados empíricos** coletados em [empirical-findings.md](empirical-findings.md).
 
 Outra sessão (paralela à de dashboard) implementa este plan.
 
@@ -532,7 +532,7 @@ ainda). AI Interaction Analysis pode consumir parquets minimamente úteis.
   - Mesmas convs em ambos? (deve ser igual)
   - Msgs do v3 ⊇ msgs do v2 (v3 pode ter mais por causa de branches)
   - Tool events só no v3 (v2 não gera)
-- Documentar diferenças em `docs/parser-v3-validation.md`
+- Documentar diferenças em `docs/parser-v3/validation.md`
 
 **Critério de pronto:**
 - ✅ Diff documentado

@@ -153,5 +153,5 @@ unica fica mais simples (so threads).
   `expert` = R1 reasoner mode. Parser mapeia expert/thinking/reasoner →
   mode='research'.
 - [x] **CRUD historico via parent snapshots:** validado em
-  `docs/deepseek-server-behavior.md` (2 snapshots, +1 added, 0 deletes).
+  `docs/platforms/deepseek/server-behavior.md` (2 snapshots, +1 added, 0 deletes).
 - [ ] **Rename via UI:** `updated_at` bumpa? — manual TODO, nao bloqueia

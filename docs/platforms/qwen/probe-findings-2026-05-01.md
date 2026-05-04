@@ -184,4 +184,4 @@ Outros chat_types unicos pra fixtures: `artifacts` (980a5719), `t2v`
   por URL expirada). 196MB local. Parser resolve via `assets_manifest.json`:
   171 msgs com `asset_paths` populados.
 - [x] **CRUD historico via parent snapshots:** validado em
-  `docs/qwen-server-behavior.md` (4 snapshots, +6 added, 0 deletes/renames).
+  `docs/platforms/qwen/server-behavior.md` (4 snapshots, +6 added, 0 deletes/renames).

@@ -2,8 +2,8 @@
 
 Status do extractor em 2026-05-01: **shipped**. Bateria CRUD UI executada
 em 2026-05-01 com conta Pro. Detalhes empíricos em
-`docs/perplexity-audit-findings.md` (seção "Bateria UI 2026-05-01") e
-`docs/perplexity-journey-2026-05-01.md`.
+`docs/platforms/perplexity/audit-findings.md` (seção "Bateria UI 2026-05-01") e
+`docs/platforms/perplexity/journey-2026-05-01.md`.
 
 Este doc lista o que ficou **fora do escopo** do shipping atual.
 
