@@ -34,6 +34,10 @@ static/quarto/
 # OS
 .DS_Store
 
+# Media (screencasts, recordings)
+*.mov
+*.mp4
+
 # R
 .Rhistory
 
