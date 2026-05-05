@@ -810,6 +810,124 @@ else:
     show_md("> Platform without populated `account`.")
 ```
 
+## 3.13 Project linkage (chats ↔ native project / cwd)
+
+Canonical fact only — what the platform itself reports via `project_id`
+(stable native ID) and `project` (textual name or `cwd` for CLIs). Semantic
+aliasing, path grouping and NLP-inferred matches are analysis work and live
+in the consumer project, not here.
+
+```{python}
+#| label: projects-coverage
+
+_n_pid = (
+    con.execute("SELECT COUNT(project_id) FROM conversations").fetchone()[0]
+    if has_col(con, "conversations", "project_id") else 0
+)
+_n_proj = (
+    con.execute("SELECT COUNT(project) FROM conversations").fetchone()[0]
+    if has_col(con, "conversations", "project") else 0
+)
+_total_convs = con.execute("SELECT COUNT(*) FROM conversations").fetchone()[0]
+
+if _n_pid + _n_proj == 0:
+    show_md(
+        "> This platform doesn't expose a project concept "
+        "(`project_id` and `project` are NULL by design)."
+    )
+else:
+    _with_any = con.execute(
+        "SELECT COUNT(*) FROM conversations "
+        "WHERE project_id IS NOT NULL OR project IS NOT NULL"
+    ).fetchone()[0]
+    show_md(
+        f"**Coverage:** {fmt_pct(_with_any, _total_convs)} conversations "
+        f"linked to a project. "
+        f"`project_id` populated in {fmt_int(_n_pid)} rows, "
+        f"`project` (text/path) populated in {fmt_int(_n_proj)} rows."
+    )
+```
+
+```{python}
+#| label: projects-top
+
+if _n_pid > 0:
+    _top = con.execute("""
+        SELECT
+            project_id,
+            project,
+            COUNT(*)        AS n_convs,
+            MIN(created_at) AS first_conv,
+            MAX(created_at) AS last_conv
+        FROM conversations
+        WHERE project_id IS NOT NULL
+        GROUP BY project_id, project
+        ORDER BY n_convs DESC
+        LIMIT 20
+    """).df()
+    _n_total_projs = con.execute(
+        "SELECT COUNT(DISTINCT project_id) FROM conversations "
+        "WHERE project_id IS NOT NULL"
+    ).fetchone()[0]
+    _top["first_conv"] = pd.to_datetime(_top["first_conv"], utc=True).dt.strftime("%Y-%m-%d")
+    _top["last_conv"]  = pd.to_datetime(_top["last_conv"],  utc=True).dt.strftime("%Y-%m-%d")
+    show_md(f"**{_n_total_projs} distinct native projects** — top {len(_top)} below (raw names).")
+    show_df(_top)
+
+    if len(_top) > 0:
+        import plotly.graph_objects as go
+        _bar = _top.head(15)
+        fig = go.Figure(go.Bar(
+            y=_bar["project"], x=_bar["n_convs"],
+            orientation="h",
+            marker_color=SOURCE_COLOR,
+            text=_bar["n_convs"].apply(fmt_int),
+            textposition="outside",
+        ))
+        fig.update_layout(
+            title=f"Top {len(_bar)} native projects (of {_n_total_projs} total)",
+            height=max(320, 28 * len(_bar)),
+            template="plotly_white",
+            yaxis=dict(autorange="reversed"),
+            margin=dict(l=200, t=50, b=40, r=20),
+        )
+        fig.show()
+elif _n_proj > 0:
+    _top = con.execute("""
+        SELECT
+            project,
+            COUNT(*)        AS n_convs,
+            MIN(created_at) AS first_conv,
+            MAX(created_at) AS last_conv
+        FROM conversations
+        WHERE project IS NOT NULL
+        GROUP BY project
+        ORDER BY n_convs DESC
+        LIMIT 20
+    """).df()
+    _n_paths = con.execute(
+        "SELECT COUNT(DISTINCT project) FROM conversations WHERE project IS NOT NULL"
+    ).fetchone()[0]
+    _top["first_conv"] = pd.to_datetime(_top["first_conv"], utc=True).dt.strftime("%Y-%m-%d")
+    _top["last_conv"]  = pd.to_datetime(_top["last_conv"],  utc=True).dt.strftime("%Y-%m-%d")
+    show_md(
+        f"**{_n_paths} distinct paths** (raw `cwd`, no normalisation — fragments of the same "
+        f"repo across machines/subfolders are kept separate). Top {len(_top)} below."
+    )
+    show_df(_top)
+```
+
+```{python}
+#| label: projects-metadata-pointer
+
+if has_view(con, "project_metadata") and table_count(con, "project_metadata") > 0:
+    _n_pm = table_count(con, "project_metadata")
+    show_md(
+        f"> Per-project metadata (descriptions, system prompts, timestamps) is available in "
+        f"`project_metadata` ({_n_pm} rows). See section 5 for schema and sample."
+    )
+```
+
 # 4. Preservation and special states
 
 ## 4.1 Active vs preserved_missing
