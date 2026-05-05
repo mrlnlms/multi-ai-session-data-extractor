@@ -224,7 +224,12 @@ def overview_qmds() -> list[tuple[str, Path]]:
         else:
             # 00-overview-web -> 'Web Chat', 00-overview-cli -> 'CLI', etc
             tail = stem.replace("00-overview-", "")
-            mapping = {"web": "Web Chat", "cli": "CLI", "rag": "RAG (NotebookLM)"}
+            mapping = {
+                "web": "Web Chat",
+                "cli": "CLI",
+                "rag": "RAG (NotebookLM)",
+                "projects": "Projects (canonical)",
+            }
             label = mapping.get(tail, tail.replace("-", " ").title())
         out.append((label, qmd))
     return out

@@ -1,0 +1,538 @@
+---
+title: "Cross-platform overview — Projects (canonical fact)"
+subtitle: "How conversations link to native projects/spaces/cwd as reported by each platform"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
+
+import sys
+from pathlib import Path
+
+_this = Path.cwd()
+_project_root = _this if (_this / "src").exists() else _this.parent
+sys.path.insert(0, str(_project_root))
+
+import pandas as pd
+import duckdb
+from itables import init_notebook_mode
+init_notebook_mode(all_interactive=False)
+
+from src.parsers.quarto_helpers import (
+    fmt_pct, fmt_int, show_df, show_md, plotly_bar,
+    has_col, has_view, table_count, setup_unified_views,
+)
+
+UNIFIED_DIR = _project_root / "data" / "unified"
+MUTED       = "#D1D5DB"
+
+SOURCE_COLORS = {
+    "chatgpt":     "#74AA9C",
+    "claude_ai":   "#CC785C",
+    "perplexity":  "#20808D",
+    "qwen":        "#615CED",
+    "deepseek":    "#3B82F6",
+    "gemini":      "#4285F4",
+    "notebooklm":  "#F4B400",
+    "claude_code": "#7C3AED",
+    "codex":       "#374151",
+    "gemini_cli":  "#1A56DB",
+}
+
+SOURCE_LABEL = {
+    "chatgpt":     "ChatGPT",
+    "claude_ai":   "Claude.ai",
+    "perplexity":  "Perplexity",
+    "qwen":        "Qwen",
+    "deepseek":    "DeepSeek",
+    "gemini":      "Gemini",
+    "notebooklm":  "NotebookLM",
+    "claude_code": "Claude Code",
+    "codex":       "Codex",
+    "gemini_cli":  "Gemini CLI",
+}
+
+# Classification: which platforms expose a project concept natively
+PROJECT_NATIVE = {"chatgpt", "claude_ai", "qwen", "perplexity"}
+PROJECT_CLI    = {"claude_code", "codex", "gemini_cli"}
+PROJECT_NONE   = {"deepseek", "gemini", "notebooklm"}
+
+con = duckdb.connect()
+_setup = setup_unified_views(con, UNIFIED_DIR, sources_filter=None)
+```
+
+## About this document
+
+The **canonical fact** of chat-to-project mapping, as reported by each
+platform. This notebook covers **plane 1** only — what the source itself
+exposes via API/raw payload:
+
+- `conversations.project_id` — stable native ID (when the platform has one)
+- `conversations.project`    — textual name/path (free-form; CLIs put `cwd` here)
+- `project_metadata.parquet` — per-project metadata (Claude.ai system prompts, Qwen)
+
+Inference, semantic normalisation, NLP-matched orphans and path grouping
+(e.g. `/qda` and `/qualia-coding` → same canonical project) live in the
+**consumer** project — not here. This notebook is descriptive of the raw
+fact only.
+
+Three buckets, by platform behaviour:
+
+| Bucket | Platforms | What `project*` means |
+|---|---|---|
+| **Native project**       | ChatGPT, Claude.ai, Qwen, Perplexity (spaces) | Manual user grouping inside the platform |
+| **CLI working directory**| Claude Code, Codex, Gemini CLI                | `cwd` of the session (file path) |
+| **No concept**           | DeepSeek, Gemini, NotebookLM                  | Always NULL by design |
+
+## 1. Coverage by platform
+
+```{python}
+#| label: coverage-by-platform
+
+cov = con.execute("""
+SELECT
+    source,
+    COUNT(*)                                      AS total_convs,
+    COUNT(project_id)                             AS with_project_id,
+    COUNT(project)                                AS with_project_text,
+    COUNT(CASE WHEN project_id IS NOT NULL
+               OR project    IS NOT NULL THEN 1 END) AS with_any
+FROM conversations
+GROUP BY source
+ORDER BY source
+""").fetchdf()
+
+cov["bucket"] = cov["source"].map(
+    lambda s: "native" if s in PROJECT_NATIVE
+    else "cli" if s in PROJECT_CLI
+    else "none-by-design"
+)
+cov["pct_any"] = (cov["with_any"] / cov["total_convs"] * 100).round(1)
+cov["label"]   = cov["source"].map(SOURCE_LABEL)
+
+display_df = cov[[
+    "label", "bucket", "total_convs",
+    "with_project_id", "with_project_text", "with_any", "pct_any"
+]].rename(columns={
+    "label":             "Source",
+    "bucket":            "Bucket",
+    "total_convs":       "Total convs",
+    "with_project_id":   "with project_id",
+    "with_project_text": "with project (text)",
+    "with_any":          "with any",
+    "pct_any":           "% any",
+})
+
+show_df(display_df)
+```
+
+```{python}
+#| label: coverage-stacked-chart
+
+import plotly.graph_objects as go
+
+cov_sorted = cov.sort_values("with_any", ascending=False)
+orphans = cov_sorted["total_convs"] - cov_sorted["with_any"]
+
+fig = go.Figure()
+fig.add_trace(go.Bar(
+    x=cov_sorted["label"],
+    y=cov_sorted["with_any"],
+    name="With project (any form)",
+    marker_color="#3B82F6",
+    text=cov_sorted["with_any"].apply(fmt_int),
+    textposition="inside",
+))
+fig.add_trace(go.Bar(
+    x=cov_sorted["label"],
+    y=orphans,
+    name="Without project",
+    marker_color=MUTED,
+    text=orphans.apply(fmt_int),
+    textposition="inside",
+))
+fig.update_layout(
+    barmode="stack",
+    title="Conversations with vs without a project link, per source",
+    height=420,
+    template="plotly_white",
+    legend=dict(orientation="h", yanchor="bottom", y=1.02),
+    xaxis_title=None,
+    yaxis_title="conversations",
+)
+fig.show()
+```
+
+## 2. Native projects (plane 1: as reported by the platform)
+
+Top projects per platform that expose the concept natively. Names are
+**raw** — exactly as the platform stores them. Aliasing/normalisation is
+*not* part of this view.
+
+### ChatGPT
+
+```{python}
+#| label: chatgpt-top-projects
+
+if "chatgpt" in cov["source"].values:
+    df = con.execute("""
+    SELECT
+        project_id,
+        project,
+        COUNT(*)            AS n_convs,
+        MIN(created_at)     AS first_conv,
+        MAX(created_at)     AS last_conv
+    FROM conversations
+    WHERE source = 'chatgpt' AND project_id IS NOT NULL
+    GROUP BY project_id, project
+    ORDER BY n_convs DESC
+    LIMIT 20
+    """).fetchdf()
+    total_chatgpt_projs = con.execute(
+        "SELECT COUNT(DISTINCT project_id) FROM conversations "
+        "WHERE source='chatgpt' AND project_id IS NOT NULL"
+    ).fetchone()[0]
+    if not df.empty:
+        df["first_conv"] = pd.to_datetime(df["first_conv"], utc=True).dt.strftime("%Y-%m-%d")
+        df["last_conv"]  = pd.to_datetime(df["last_conv"],  utc=True).dt.strftime("%Y-%m-%d")
+        show_df(df.rename(columns={
+            "project_id": "Project ID",
+            "project":    "Name (raw)",
+            "n_convs":    "Convs",
+            "first_conv": "First",
+            "last_conv":  "Last",
+        }))
+        top_n = df.head(15)
+        fig = go.Figure(go.Bar(
+            y=top_n["project"], x=top_n["n_convs"],
+            orientation="h",
+            marker_color=SOURCE_COLORS["chatgpt"],
+            text=top_n["n_convs"].apply(fmt_int),
+            textposition="outside",
+        ))
+        fig.update_layout(
+            title=f"ChatGPT — top 15 native projects (of {len(df)} shown / {total_chatgpt_projs} total)",
+            height=520, template="plotly_white",
+            yaxis=dict(autorange="reversed"), margin=dict(l=200),
+        )
+        fig.show()
+```
+
+### Claude.ai
+
+```{python}
+#| label: claude-ai-top-projects
+
+if "claude_ai" in cov["source"].values:
+    df = con.execute("""
+    SELECT
+        project_id,
+        project,
+        COUNT(*)            AS n_convs,
+        MIN(created_at)     AS first_conv,
+        MAX(created_at)     AS last_conv
+    FROM conversations
+    WHERE source = 'claude_ai' AND project_id IS NOT NULL
+    GROUP BY project_id, project
+    ORDER BY n_convs DESC
+    LIMIT 20
+    """).fetchdf()
+    total_claude_projs = con.execute(
+        "SELECT COUNT(DISTINCT project_id) FROM conversations "
+        "WHERE source='claude_ai' AND project_id IS NOT NULL"
+    ).fetchone()[0]
+    if not df.empty:
+        df["first_conv"] = pd.to_datetime(df["first_conv"], utc=True).dt.strftime("%Y-%m-%d")
+        df["last_conv"]  = pd.to_datetime(df["last_conv"],  utc=True).dt.strftime("%Y-%m-%d")
+        show_df(df.rename(columns={
+            "project_id": "Project ID",
+            "project":    "Name (raw)",
+            "n_convs":    "Convs",
+            "first_conv": "First",
+            "last_conv":  "Last",
+        }))
+        top_n = df.head(15)
+        fig = go.Figure(go.Bar(
+            y=top_n["project"], x=top_n["n_convs"],
+            orientation="h",
+            marker_color=SOURCE_COLORS["claude_ai"],
+            text=top_n["n_convs"].apply(fmt_int),
+            textposition="outside",
+        ))
+        fig.update_layout(
+            title=f"Claude.ai — top 15 native projects (of {len(df)} shown / {total_claude_projs} total)",
+            height=520, template="plotly_white",
+            yaxis=dict(autorange="reversed"), margin=dict(l=250),
+        )
+        fig.show()
+```
+
+### Qwen
+
+```{python}
+#| label: qwen-top-projects
+
+if "qwen" in cov["source"].values:
+    df = con.execute("""
+    SELECT
+        project_id,
+        project,
+        COUNT(*)            AS n_convs,
+        MIN(created_at)     AS first_conv,
+        MAX(created_at)     AS last_conv
+    FROM conversations
+    WHERE source = 'qwen' AND project_id IS NOT NULL
+    GROUP BY project_id, project
+    ORDER BY n_convs DESC
+    """).fetchdf()
+    if df.empty:
+        show_md("No Qwen conversations have a `project_id` populated.")
+    else:
+        df["first_conv"] = pd.to_datetime(df["first_conv"], utc=True).dt.strftime("%Y-%m-%d")
+        df["last_conv"]  = pd.to_datetime(df["last_conv"],  utc=True).dt.strftime("%Y-%m-%d")
+        show_df(df.rename(columns={
+            "project_id": "Project ID",
+            "project":    "Name (raw)",
+            "n_convs":    "Convs",
+            "first_conv": "First",
+            "last_conv":  "Last",
+        }))
+```
+
+### Perplexity (spaces)
+
+```{python}
+#| label: perplexity-top-projects
+
+if "perplexity" in cov["source"].values:
+    df = con.execute("""
+    SELECT
+        project_id,
+        project,
+        COUNT(*)            AS n_convs,
+        MIN(created_at)     AS first_conv,
+        MAX(created_at)     AS last_conv
+    FROM conversations
+    WHERE source = 'perplexity' AND project_id IS NOT NULL
+    GROUP BY project_id, project
+    ORDER BY n_convs DESC
+    """).fetchdf()
+    if df.empty:
+        show_md("No Perplexity conversations have a space (`project_id`) populated.")
+    else:
+        df["first_conv"] = pd.to_datetime(df["first_conv"], utc=True).dt.strftime("%Y-%m-%d")
+        df["last_conv"]  = pd.to_datetime(df["last_conv"],  utc=True).dt.strftime("%Y-%m-%d")
+        show_df(df.rename(columns={
+            "project_id": "Space ID",
+            "project":    "Name (raw)",
+            "n_convs":    "Convs",
+            "first_conv": "First",
+            "last_conv":  "Last",
+        }))
+```
+
+## 3. CLI working directory (raw `cwd`, no grouping)
+
+For CLIs the platform has no project concept — instead, each session
+records the **working directory** where it was launched. The filho stores
+that path verbatim in `project`. Path-level fragmentation (different
+subfolders of the same repo, or moves across machines) is **expected** and
+is *not* normalised here. Grouping into a canonical "project_group" is
+analysis work and lives in the consumer project.
+
+```{python}
+#| label: cli-fragmentation
+
+cli_df = con.execute("""
+SELECT
+    source,
+    project,
+    COUNT(*)        AS n_convs,
+    MIN(created_at) AS first_conv,
+    MAX(created_at) AS last_conv
+FROM conversations
+WHERE source IN ('claude_code','codex','gemini_cli')
+  AND project IS NOT NULL
+GROUP BY source, project
+ORDER BY n_convs DESC
+""").fetchdf()
+
+if cli_df.empty:
+    show_md("No CLI conversations have a `project` (cwd) populated.")
+else:
+    summary = cli_df.groupby("source").agg(
+        unique_paths=("project", "nunique"),
+        total_convs =("n_convs", "sum"),
+    ).reset_index()
+    summary["label"] = summary["source"].map(SOURCE_LABEL)
+    summary["avg_convs_per_path"] = (summary["total_convs"] / summary["unique_paths"]).round(1)
+
+    show_df(summary[["label", "unique_paths", "total_convs", "avg_convs_per_path"]].rename(columns={
+        "label":               "CLI",
+        "unique_paths":        "Unique paths",
+        "total_convs":         "Total convs",
+        "avg_convs_per_path":  "Avg convs/path",
+    }))
+```
+
+```{python}
+#| label: cli-top-paths
+
+if not cli_df.empty:
+    top = cli_df.head(20).copy()
+    top["short"] = top["project"].apply(
+        lambda p: p.replace("/Users/mosx/Desktop/", "~/Desktop/")
+                   .replace("/Users/mosx/", "~/")
+                   if isinstance(p, str) else p
+    )
+    top["label"] = top["source"].map(SOURCE_LABEL)
+    show_df(top[["label", "short", "n_convs"]].rename(columns={
+        "label":   "CLI",
+        "short":   "Path (raw, abbreviated)",
+        "n_convs": "Convs",
+    }))
+```
+
+## 4. Project metadata (`project_metadata.parquet`)
+
+Per-project metadata exported by platforms that ship richer info than just
+ID + name (descriptions, system prompts, creation dates). Filho carries
+this as a separate canonical table.
+
+```{python}
+#| label: project-metadata-coverage
+
+if has_view(con, "project_metadata"):
+    pm = con.execute("""
+    SELECT source, COUNT(*) AS n_projects
+    FROM project_metadata
+    GROUP BY source
+    ORDER BY n_projects DESC
+    """).fetchdf()
+    if pm.empty:
+        show_md("`project_metadata.parquet` is empty.")
+    else:
+        pm["label"] = pm["source"].map(SOURCE_LABEL)
+        show_df(pm[["label", "n_projects"]].rename(columns={
+            "label":     "Source",
+            "n_projects":"Projects with metadata",
+        }))
+
+    cols = con.execute("DESCRIBE SELECT * FROM project_metadata").fetchdf()
+    show_md(f"**Columns available:** `{', '.join(cols['column_name'].tolist())}`")
+else:
+    show_md("`project_metadata` view not present.")
+```
+
+## 5. Gap-by-design vs gap-real
+
+Two different reasons a conversation can be project-less. Mixing them in a
+single "orphan" bucket hides the difference and inflates the apparent
+problem.
+
+- **Gap-by-design** — platform has no project concept. NULL is the correct
+  value. Nothing to fix at the extractor layer.
+- **Gap-real** — platform *does* have the concept, but the conversation was
+  not assigned to a project (user behaviour, not extractor failure).
+
+```{python}
+#| label: gap-decomposition
+
+decomp = con.execute(f"""
+SELECT
+    source,
+    COUNT(*)                                                    AS total,
+    COUNT(CASE WHEN project_id IS NULL AND project IS NULL
+               THEN 1 END)                                      AS orphans
+FROM conversations
+GROUP BY source
+""").fetchdf()
+
+decomp["bucket"] = decomp["source"].map(
+    lambda s: "native" if s in PROJECT_NATIVE
+    else "cli" if s in PROJECT_CLI
+    else "none-by-design"
+)
+
+decomp["gap_type"] = decomp["bucket"].map({
+    "none-by-design": "by-design",
+    "native":         "real",
+    "cli":            "real",
+})
+
+decomp["label"] = decomp["source"].map(SOURCE_LABEL)
+decomp["pct_orphan"] = (decomp["orphans"] / decomp["total"] * 100).round(1)
+
+# Only show gap-real platforms in the "to investigate" table
+real = decomp[decomp["gap_type"] == "real"].sort_values("pct_orphan", ascending=False)
+by_design = decomp[decomp["gap_type"] == "by-design"]
+
+show_md("### Gap-real (platform has the concept; some convs unassigned)")
+show_df(real[["label", "bucket", "total", "orphans", "pct_orphan"]].rename(columns={
+    "label":        "Source",
+    "bucket":       "Bucket",
+    "total":        "Total",
+    "orphans":      "Without project",
+    "pct_orphan":   "% orphan",
+}))
+
+show_md("### Gap-by-design (platform has no project concept; NULL is correct)")
+show_df(by_design[["label", "total"]].rename(columns={
+    "label":  "Source",
+    "total":  "Total convs (all NULL by design)",
+}))
+```
+
+```{python}
+#| label: gap-stacked
+
+import plotly.graph_objects as go
+
+real_sorted = real.sort_values("orphans", ascending=False)
+linked = real_sorted["total"] - real_sorted["orphans"]
+
+fig = go.Figure()
+fig.add_trace(go.Bar(
+    x=real_sorted["label"],
+    y=linked,
+    name="Linked to a project",
+    marker_color="#10B981",
+    text=linked.apply(fmt_int),
+    textposition="inside",
+))
+fig.add_trace(go.Bar(
+    x=real_sorted["label"],
+    y=real_sorted["orphans"],
+    name="Orphan (gap-real)",
+    marker_color="#F59E0B",
+    text=real_sorted["orphans"].apply(fmt_int),
+    textposition="inside",
+))
+fig.update_layout(
+    barmode="stack",
+    title="Gap-real only — platforms that expose project concept",
+    height=400,
+    template="plotly_white",
+    legend=dict(orientation="h", yanchor="bottom", y=1.02),
+    xaxis_title=None,
+    yaxis_title="conversations",
+)
+fig.show()
+```
+
+## What lives in the consumer
+
+Anything not strictly reported by the platform belongs in the analysis
+project, not here:
+
+- Semantic aliasing (e.g. `MOSx` ≡ `Personal`)
+- Path grouping (e.g. `/qda` and `/qualia-coding` → same project_group)
+- NLP-inferred matches for orphan conversations
+- Per-conversation overrides
+- Multi-project membership
+
+The consumer's `enriched_projects.parquet` records each canonical mapping
+together with provenance (`method` ∈ {`native_project`, `path_mapping`,
+`conversation_override`}) so the chain back to the raw fact is auditable.
