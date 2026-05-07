@@ -166,7 +166,10 @@ Permite recover total apos deletar plataforma + apagar `data/` localmente.
     data/external/manual-saves data/external/deep-research-md \
     data/external/perplexity-orphan-threads data/external/deepseek-snapshots \
     data/external/chatgpt-extension-snapshot data/external/claude-ai-snapshots \
-    data/external/notebooklm-snapshots data/external/openai-gdpr-export
+    data/external/notebooklm-snapshots data/external/openai-gdpr-export \
+    data/external/claude-code-config-snapshots \
+    data/external/codex-config-snapshots \
+    data/external/gemini-config-snapshots
 git add data/*.dvc data/external/*.dvc data/.gitignore data/external/.gitignore
 ~/.claude/scripts/commit.sh "data: snapshot apos <operacao>"
 .venv/bin/dvc push
@@ -216,7 +219,10 @@ com:
     data/external/manual-saves data/external/deep-research-md \
     data/external/perplexity-orphan-threads data/external/deepseek-snapshots \
     data/external/chatgpt-extension-snapshot data/external/claude-ai-snapshots \
-    data/external/notebooklm-snapshots data/external/openai-gdpr-export
+    data/external/notebooklm-snapshots data/external/openai-gdpr-export \
+    data/external/claude-code-config-snapshots \
+    data/external/codex-config-snapshots \
+    data/external/gemini-config-snapshots
 git add data/*.dvc data/external/*.dvc data/.gitignore data/external/.gitignore
 ~/.claude/scripts/commit.sh "data: snapshot apos <plat> sync (<stats>)"
 .venv/bin/dvc push   # blobs pro source-dvc no gdrive
