@@ -63,7 +63,7 @@ def _sync_tree(src: Path, dst: Path, glob_pattern: str = "**/*") -> dict[str, li
 
 
 def copy_claude_code() -> dict[str, list[Path]]:
-    """Copia ~/.claude/projects/*.jsonl (raiz) + */subagents/*.jsonl."""
+    """Copia ~/.claude/projects/*.jsonl (raiz) + */subagents/*.jsonl + memory/*.md."""
     src = SOURCES["claude_code"]["src"]
     dst = SOURCES["claude_code"]["dst"]
     if not src.exists():
@@ -167,7 +167,7 @@ def current_source_files(source: str) -> set[str]:
         }
     if source == "codex":
         # ~/.codex/sessions/<year>/<month>/<day>/rollout-*.jsonl
-        sessions_root = src  # Path.home() / ".codex" / "sessions"
+        sessions_root = src
         memories_root = Path.home() / ".codex" / "memories"
         out = {
             str(p.relative_to(sessions_root))
