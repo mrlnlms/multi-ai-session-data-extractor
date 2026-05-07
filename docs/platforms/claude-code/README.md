@@ -23,6 +23,14 @@ same way — sessions are JSONL files in the user's filesystem.
   `src/parsers/claude_code.py` (Phase 1: `_build_chain_links`).
 - **Repeated events in raw JSONL:** defensive dedup by `uuid`.
 
+## Parquets gerados
+
+- `claude_code_conversations.parquet` — 1 linha por sessao
+- `claude_code_messages.parquet` — msgs user/assistant
+- `claude_code_tool_events.parquet` — tool calls/results
+- `claude_code_branches.parquet` — 1 _main por sessao
+- `claude_code_agent_memories.parquet` — parser le `<encoded-cwd>/memory/*.md` por projeto, materializa parquet com kind/name/description da frontmatter; preservation tracked via `home_memory_files` do `current_source_files("claude_code")`
+
 ## Where the real info lives
 
 - **Parser:** `src/parsers/claude_code.py`

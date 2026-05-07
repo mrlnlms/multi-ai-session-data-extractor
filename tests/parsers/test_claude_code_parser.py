@@ -295,12 +295,14 @@ def test_write_parquets(tmp_path):
         "claude_code_messages.parquet",
         "claude_code_tool_events.parquet",
         "claude_code_branches.parquet",
+        "claude_code_agent_memories.parquet",
     }
     assert {p.name for p in out_dir.glob("*.parquet")} == expected
     assert stats["conversations"] == 1
     assert stats["messages"] == 2
     assert stats["tool_events"] == 1
     assert stats["branches"] == 1
+    assert "agent_memories" in stats
 
 
 def test_idempotent_parquets(tmp_path):
