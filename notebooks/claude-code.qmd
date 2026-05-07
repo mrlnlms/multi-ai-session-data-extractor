@@ -32,7 +32,7 @@ SOURCE_COLOR   = "#7C3AED"  # Anthropic dev purple
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Claude Code"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
-AUX_TABLES     = []
+AUX_TABLES     = ["agent_memories"]
 ACCOUNT_FILTER = None
 
 con = duckdb.connect()
