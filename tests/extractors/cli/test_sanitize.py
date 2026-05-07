@@ -36,3 +36,10 @@ def test_handles_settings_without_env_field():
 def test_malformed_json_returns_none():
     out = sanitize_claude_settings("{not valid json")
     assert out is None
+
+
+def test_redacts_password_key_in_env():
+    raw = json.dumps({"env": {"DB_PASSWORD": "hunter2", "HOST": "localhost"}})
+    out = json.loads(sanitize_claude_settings(raw))
+    assert out["env"]["DB_PASSWORD"] == "<redacted>"
+    assert out["env"]["HOST"] == "localhost"
