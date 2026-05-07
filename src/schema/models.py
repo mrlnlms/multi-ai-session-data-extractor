@@ -188,6 +188,42 @@ class Branch:
         return asdict(self)
 
 
+# === AgentMemory (Claude Code per-project, Codex global) ===
+
+VALID_MEMORY_KINDS = ("user", "feedback", "project", "reference", "index", "other")
+
+
+@dataclass
+class AgentMemory:
+    """Memory file gerada/lida pelo agente entre sessoes (Claude Code, Codex).
+
+    Vincula com Conversation via (source, project_path) — Claude Code tem
+    memory per-project; Codex tem memory global (project_path=NULL).
+    """
+    memory_id: str
+    source: str
+    project_path: Optional[str]
+    project_key: Optional[str]
+    file_name: str
+    name: Optional[str]
+    description: Optional[str]
+    kind: str
+    content: str
+    content_size: int
+    created_at: pd.Timestamp
+    updated_at: pd.Timestamp
+    is_preserved_missing: bool = False
+
+    def __post_init__(self):
+        if self.source not in VALID_SOURCES:
+            raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
+        if self.kind not in VALID_MEMORY_KINDS:
+            raise ValueError(f"kind '{self.kind}' invalido. Validos: {VALID_MEMORY_KINDS}")
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
 # === NotebookLM-specific dataclasses ===
 
 VALID_NOTE_KINDS = ("note", "brief")
@@ -357,3 +393,8 @@ def notebooklm_guide_questions_to_df(qs: list[NotebookLMGuideQuestion]) -> pd.Da
 def notebooklm_source_guides_to_df(guides: list[NotebookLMSourceGuide]) -> pd.DataFrame:
     cols = [f.name for f in fields(NotebookLMSourceGuide)]
     return _models_to_df(guides, cols)
+
+
+def agent_memories_to_df(items: list[AgentMemory]) -> pd.DataFrame:
+    cols = [f.name for f in fields(AgentMemory)]
+    return _models_to_df(items, cols)
