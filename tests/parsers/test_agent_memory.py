@@ -179,3 +179,21 @@ def test_parse_memories_empty_source_returns_empty(tmp_path):
 def test_parse_memories_unknown_source_raises():
     with pytest.raises(ValueError):
         parse_memories_for_source(Path("/tmp"), "unknown", set())
+
+
+def test_parse_memories_skips_unreadable_file_and_continues(tmp_path):
+    """Um arquivo .md corrompido nao aborta o batch — apenas loga warning e segue."""
+    raw_root = tmp_path / "Codex"
+    raw_root.mkdir()
+    mem = raw_root / "memories"
+    mem.mkdir()
+    # Arquivo valido
+    (mem / "good.md").write_text("---\ntype: user\n---\nbody")
+    # Arquivo com bytes nao-UTF8 (vai quebrar read_text com encoding utf-8)
+    (mem / "bad.md").write_bytes(b"\xff\xfe\x00invalid utf-8 bytes\xc0\xc1")
+
+    items = parse_memories_for_source(raw_root, "codex", set())
+    # bad.md eh skipped, good.md eh ingerido
+    file_names = {m.file_name for m in items}
+    assert "good.md" in file_names
+    assert "bad.md" not in file_names
