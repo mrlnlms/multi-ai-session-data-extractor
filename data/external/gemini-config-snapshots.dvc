@@ -1,0 +1,6 @@
+outs:
+- md5: ebeb58d388b106340f0924462c8fb9f3.dir
+  size: 1065
+  nfiles: 6
+  hash: md5
+  path: gemini-config-snapshots

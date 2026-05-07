@@ -1,0 +1,6 @@
+outs:
+- md5: 9d4cfe4b7c27a324bddc38c01e7f6eb3.dir
+  size: 7025542
+  nfiles: 935
+  hash: md5
+  path: claude-code-config-snapshots

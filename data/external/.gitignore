@@ -6,3 +6,6 @@
 /claude-ai-snapshots
 /notebooklm-snapshots
 /openai-gdpr-export
+/claude-code-config-snapshots
+/codex-config-snapshots
+/gemini-config-snapshots
