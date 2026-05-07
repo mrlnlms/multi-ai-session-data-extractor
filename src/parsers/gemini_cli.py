@@ -181,6 +181,7 @@ class GeminiCLIParser(BaseParser):
                 updated_at=updated_at,
                 message_count=len(entries_sorted),
                 model=None,
+                mode="cli",
                 project=project_name,
                 is_preserved_missing=True,
             ))
