@@ -31,6 +31,9 @@ from typing import Optional
 
 import pandas as pd
 
+from src.parsers.agent_memory import parse_memories_for_source
+from src.parsers.base import BaseParser
+
 _MIME_EXT = {
     "image/jpeg": ".jpg",
     "image/jpg": ".jpg",
@@ -38,9 +41,6 @@ _MIME_EXT = {
     "image/gif": ".gif",
     "image/webp": ".webp",
 }
-
-from src.parsers.agent_memory import parse_memories_for_source
-from src.parsers.base import BaseParser
 from src.schema.models import (
     AgentMemory,
     Branch,
@@ -99,6 +99,13 @@ class ClaudeCodeParser(BaseParser):
         Sessoes orfas (root sem JSONL proprio mas com subagents/ + session-meta)
         ainda sao processadas com stub parent — porem so quando a propria raiz
         nao tem nenhum JSONL apontando pra ela.
+
+        Args:
+            input_path: raw root, ex: data/raw/Claude Code/
+            home_memory_files: paths relativos atuais no HOME do CLI (formato
+                <encoded-cwd>/memory/<file>.md). Memorias em raw nao presentes
+                nesse set viram is_preserved_missing=True. None ou set vazio
+                marca todas as memorias como preserved.
         """
         input_path = Path(input_path)
         self._input_path = input_path
@@ -171,9 +178,7 @@ class ClaudeCodeParser(BaseParser):
 
         # Agent memory ingestion (Slice C — Task C4)
         mem_files = home_memory_files if home_memory_files is not None else set()
-        # Filter to only memory entries (matches paths returned by current_source_files)
-        mem_only = {f for f in mem_files if "/memory/" in f}
-        self.agent_memories = parse_memories_for_source(input_path, "claude_code", mem_only)
+        self.agent_memories = parse_memories_for_source(input_path, "claude_code", mem_files)
 
     def _build_chain_links(self, input_path: Path) -> dict[str, str]:
         """Identifica cadeias de compactacao varrendo o primeiro sessionId de

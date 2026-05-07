@@ -321,3 +321,26 @@ def test_claude_code_default_home_memory_files_none_treats_as_empty(tmp_path):
     parser.parse(raw)  # sem home_memory_files
     assert len(parser.agent_memories) == 1
     assert parser.agent_memories[0].is_preserved_missing is True
+
+
+def test_claude_code_memory_preserved_distinction(tmp_path):
+    """Quando home_memory_files contem o path de uma memoria, ela NAO eh preserved."""
+    raw = tmp_path / "Claude Code"
+    raw.mkdir()
+    proj = raw / "-Users-x-proj"
+    proj.mkdir()
+    mem = proj / "memory"
+    mem.mkdir()
+    (mem / "user_profile.md").write_text("---\ntype: user\n---\nbody")
+    (mem / "feedback_x.md").write_text("---\ntype: feedback\n---\nbody")
+
+    # home_memory_files contem so user_profile.md (feedback_x.md foi deletado do home)
+    home_files = {"-Users-x-proj/memory/user_profile.md"}
+
+    from src.parsers.claude_code import ClaudeCodeParser
+    parser = ClaudeCodeParser()
+    parser.parse(raw, home_memory_files=home_files)
+
+    by_name = {m.file_name: m for m in parser.agent_memories}
+    assert by_name["user_profile.md"].is_preserved_missing is False
+    assert by_name["feedback_x.md"].is_preserved_missing is True
