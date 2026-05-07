@@ -29,7 +29,7 @@ def _redact_env_dict(env: dict) -> dict:
 
 
 def sanitize_claude_settings(raw: str) -> Optional[str]:
-    """Redact ANTHROPIC_API_KEY + tokens em mcpServers[*].env.*."""
+    """Redact chaves secretas (KEY/SECRET/TOKEN/PASSWORD) em env e mcpServers[*].env."""
     try:
         obj = json.loads(raw)
     except json.JSONDecodeError as e:
@@ -40,7 +40,7 @@ def sanitize_claude_settings(raw: str) -> Optional[str]:
         obj["env"] = _redact_env_dict(obj["env"])
 
     if "mcpServers" in obj and isinstance(obj["mcpServers"], dict):
-        for server_name, server_cfg in obj["mcpServers"].items():
+        for _, server_cfg in obj["mcpServers"].items():
             if isinstance(server_cfg, dict) and isinstance(server_cfg.get("env"), dict):
                 server_cfg["env"] = _redact_env_dict(server_cfg["env"])
 
