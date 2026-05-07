@@ -42,6 +42,8 @@ TABLE_PKS: dict[str, list[str]] = {
     # 2 auxiliares Qwen/Claude.ai (filhas de project)
     "project_metadata": ["source", "project_id"],
     "project_docs":     ["source", "project_id", "doc_id"],
+    # 1 auxiliar Claude Code/Codex (memorias do agente)
+    "agent_memories":   ["source", "memory_id"],
 }
 
 # Ordenado por len(table) DESC pra match seguro:
