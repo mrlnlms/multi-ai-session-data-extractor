@@ -39,8 +39,10 @@ _MIME_EXT = {
     "image/webp": ".webp",
 }
 
+from src.parsers.agent_memory import parse_memories_for_source
 from src.parsers.base import BaseParser
 from src.schema.models import (
+    AgentMemory,
     Branch,
     Conversation,
     Message,
@@ -69,6 +71,7 @@ class ClaudeCodeParser(BaseParser):
         self._chain_links: dict[str, str] = {}
         self._conv_source_files: dict[str, set[str]] = {}
         self._input_path: Optional[Path] = None
+        self.agent_memories: list[AgentMemory] = []
 
     def reset(self):
         super().reset()
@@ -76,8 +79,9 @@ class ClaudeCodeParser(BaseParser):
         self._chain_links = {}
         self._conv_source_files = {}
         self._input_path = None
+        self.agent_memories = []
 
-    def parse(self, input_path: Path) -> None:
+    def parse(self, input_path: Path, home_memory_files: Optional[set[str]] = None) -> None:
         """Le sessoes JSONL de todos os projetos em input_path.
 
         input_path deve conter subdiretorios por projeto (formato encoded-cwd:
@@ -164,6 +168,12 @@ class ClaudeCodeParser(BaseParser):
         self._build_branches()
         from src.extractors.cli.preservation import mark_cli_preservation
         mark_cli_preservation(self)
+
+        # Agent memory ingestion (Slice C — Task C4)
+        mem_files = home_memory_files if home_memory_files is not None else set()
+        # Filter to only memory entries (matches paths returned by current_source_files)
+        mem_only = {f for f in mem_files if "/memory/" in f}
+        self.agent_memories = parse_memories_for_source(input_path, "claude_code", mem_only)
 
     def _build_chain_links(self, input_path: Path) -> dict[str, str]:
         """Identifica cadeias de compactacao varrendo o primeiro sessionId de

@@ -260,3 +260,64 @@ def test_claude_code_parse_files_only_root(tmp_path):
     assert len(parser.conversations) == 1
     assert parser.conversations[0].conversation_id == "session-001"
     assert parser.conversations[0].interaction_type == "human_ai"
+
+
+# === AgentMemory integration (Slice C — Task C4) ===
+
+def test_claude_code_parses_memory_files(tmp_path):
+    """Parser le memory/*.md por projeto e popula self.agent_memories."""
+    raw = tmp_path / "Claude Code"
+    raw.mkdir()
+    proj = raw / "-Users-x-proj"
+    proj.mkdir()
+    # session jsonl pra resolver cwd
+    sess = proj / "session-x.jsonl"
+    sess.write_text(
+        '{"type":"summary","sessionId":"x"}\n'
+        '{"type":"attachment","cwd":"/Users/x/proj"}\n'
+    )
+    mem = proj / "memory"
+    mem.mkdir()
+    (mem / "user_profile.md").write_text("---\ntype: user\nname: U\n---\nbody")
+    (mem / "MEMORY.md").write_text("# index")
+
+    from src.parsers.claude_code import ClaudeCodeParser
+    parser = ClaudeCodeParser()
+    parser.parse(raw, home_memory_files=set())  # set vazio → tudo preserved
+    assert len(parser.agent_memories) == 2
+    by_name = {m.file_name: m for m in parser.agent_memories}
+    assert by_name["user_profile.md"].kind == "user"
+    assert by_name["user_profile.md"].project_path == "/Users/x/proj"
+    assert by_name["MEMORY.md"].kind == "index"
+    assert all(m.is_preserved_missing for m in parser.agent_memories)
+
+
+def test_claude_code_no_memory_dir_skips_silently(tmp_path):
+    """Se project_dir nao tem memory/ subdir, parser nao quebra."""
+    raw = tmp_path / "Claude Code"
+    raw.mkdir()
+    proj = raw / "-Users-x-bare"
+    proj.mkdir()
+    (proj / "session.jsonl").write_text('{"type":"summary"}')
+
+    from src.parsers.claude_code import ClaudeCodeParser
+    parser = ClaudeCodeParser()
+    parser.parse(raw, home_memory_files=set())
+    assert parser.agent_memories == []
+
+
+def test_claude_code_default_home_memory_files_none_treats_as_empty(tmp_path):
+    """home_memory_files default (None) deve tratar como set vazio (todos preserved)."""
+    raw = tmp_path / "Claude Code"
+    raw.mkdir()
+    proj = raw / "-Users-x-proj"
+    proj.mkdir()
+    mem = proj / "memory"
+    mem.mkdir()
+    (mem / "feedback_x.md").write_text("---\ntype: feedback\n---\nbody")
+
+    from src.parsers.claude_code import ClaudeCodeParser
+    parser = ClaudeCodeParser()
+    parser.parse(raw)  # sem home_memory_files
+    assert len(parser.agent_memories) == 1
+    assert parser.agent_memories[0].is_preserved_missing is True
