@@ -84,3 +84,69 @@ def test_collect_gemini_files(tmp_path, monkeypatch):
     assert "trustedFolders.json" in rels
     assert "oauth_creds.json" not in rels
     assert "google_accounts.json" not in rels
+
+
+from src.extractors.cli.snapshot import snapshot_configs
+
+
+def _setup_minimal_home(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: home)
+    (home / ".claude").mkdir()
+    (home / ".claude" / "CLAUDE.md").write_text("instructions v1")
+    (home / ".claude" / "settings.json").write_text(json.dumps({"env": {"ANTHROPIC_API_KEY": "sk-xx"}}))
+    (home / ".codex").mkdir()
+    (home / ".codex" / "config.toml").write_text("[core]\nv=1")
+    (home / ".gemini").mkdir()
+    (home / ".gemini" / "settings.json").write_text("{}")
+    return home
+
+
+def test_snapshot_first_run_creates_dirs(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.extractors.cli.snapshot.EXTERNAL", tmp_path / "external")
+    home = _setup_minimal_home(tmp_path, monkeypatch)
+
+    snapshot_configs()
+
+    cc_root = tmp_path / "external" / "claude-code-config-snapshots"
+    assert cc_root.exists()
+    snapshot_dirs = list(cc_root.iterdir())
+    assert len(snapshot_dirs) == 1
+    snap = snapshot_dirs[0]
+    assert (snap / "CLAUDE.md").read_text() == "instructions v1"
+    settings = json.loads((snap / "settings.json").read_text())
+    assert settings["env"]["ANTHROPIC_API_KEY"] == "<redacted>"
+    meta = json.loads((snap / "_meta.json").read_text())
+    assert "captured_at" in meta
+    assert "content_hash" in meta
+
+
+def test_snapshot_idempotent_no_op_on_second_run(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.extractors.cli.snapshot.EXTERNAL", tmp_path / "external")
+    _setup_minimal_home(tmp_path, monkeypatch)
+
+    snapshot_configs()
+    cc_root = tmp_path / "external" / "claude-code-config-snapshots"
+    first_dirs = sorted(p.name for p in cc_root.iterdir())
+
+    snapshot_configs()  # no change in source
+    second_dirs = sorted(p.name for p in cc_root.iterdir())
+
+    assert first_dirs == second_dirs  # no new snapshot
+
+
+def test_snapshot_creates_new_when_content_changes(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.extractors.cli.snapshot.EXTERNAL", tmp_path / "external")
+    home = _setup_minimal_home(tmp_path, monkeypatch)
+
+    snapshot_configs()
+    cc_root = tmp_path / "external" / "claude-code-config-snapshots"
+    first = list(cc_root.iterdir())
+    assert len(first) == 1
+
+    (home / ".claude" / "CLAUDE.md").write_text("instructions v2")  # change
+    snapshot_configs()
+
+    second = list(cc_root.iterdir())
+    assert len(second) == 2
