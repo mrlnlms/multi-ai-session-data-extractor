@@ -1,8 +1,8 @@
 """Cópia incremental de dados CLI locais → data/raw/<source>/.
 
 Coleta:
-- Claude Code:  ~/.claude/projects/<encoded-cwd>/*.jsonl + */subagents/*.jsonl
-- Codex:        ~/.codex/sessions/<year>/<month>/<day>/rollout-*.jsonl
+- Claude Code:  ~/.claude/projects/<encoded-cwd>/*.jsonl + */subagents/*.jsonl + memory/*.md
+- Codex:        ~/.codex/sessions/<year>/<month>/<day>/rollout-*.jsonl + ~/.codex/memories/**/*.md
 - Gemini CLI:   ~/.gemini/tmp/<hash>/chats/session-*.json + .project_root
 
 Regras:
@@ -99,7 +99,45 @@ def copy_claude_code() -> dict[str, list[Path]]:
             elif sub_file.stat().st_mtime > dst_file.stat().st_mtime:
                 shutil.copy2(sub_file, dst_file)
                 updated_files.append(dst_file)
+        # Memory files
+        memory_dir = project_dir / "memory"
+        if memory_dir.is_dir():
+            for md in memory_dir.glob("*.md"):
+                dst_file = dst_project / "memory" / md.name
+                if not dst_file.exists():
+                    dst_file.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(md, dst_file)
+                    new_files.append(dst_file)
+                elif md.stat().st_mtime > dst_file.stat().st_mtime:
+                    shutil.copy2(md, dst_file)
+                    updated_files.append(dst_file)
 
+    return {"new": new_files, "updated": updated_files}
+
+
+def copy_codex_memories() -> dict[str, list[Path]]:
+    """Copia ~/.codex/memories/**/*.md → data/raw/Codex/memories/.
+
+    No-op se source nao existe ou esta vazio. Idempotente via mtime.
+    """
+    src_root = Path.home() / ".codex" / "memories"
+    dst_root = RAW / "Codex" / "memories"
+    new_files: list[Path] = []
+    updated_files: list[Path] = []
+    if not src_root.exists():
+        return {"new": [], "updated": []}
+    for src_file in src_root.rglob("*.md"):
+        if not src_file.is_file():
+            continue
+        rel = src_file.relative_to(src_root)
+        dst_file = dst_root / rel
+        dst_file.parent.mkdir(parents=True, exist_ok=True)
+        if not dst_file.exists():
+            shutil.copy2(src_file, dst_file)
+            new_files.append(dst_file)
+        elif src_file.stat().st_mtime > dst_file.stat().st_mtime:
+            shutil.copy2(src_file, dst_file)
+            updated_files.append(dst_file)
     return {"new": new_files, "updated": updated_files}
 
 
@@ -119,16 +157,28 @@ def current_source_files(source: str) -> set[str]:
     src = cfg["src"]
     if source == "claude_code":
         # Raiz: <encoded-cwd>/<id>.jsonl + subagents: <encoded-cwd>/<parent>/subagents/<sub>.jsonl
+        # Memory: <encoded-cwd>/memory/<file>.md
         return {
             str(p.relative_to(src))
             for p in src.glob("**/*.jsonl")
+        } | {
+            str(p.relative_to(src))
+            for p in src.glob("*/memory/*.md")
         }
     if source == "codex":
         # ~/.codex/sessions/<year>/<month>/<day>/rollout-*.jsonl
-        return {
-            str(p.relative_to(src))
-            for p in src.glob("**/rollout-*.jsonl")
+        sessions_root = src  # Path.home() / ".codex" / "sessions"
+        memories_root = Path.home() / ".codex" / "memories"
+        out = {
+            str(p.relative_to(sessions_root))
+            for p in sessions_root.glob("**/rollout-*.jsonl")
         }
+        if memories_root.exists():
+            out |= {
+                f"memories/{p.relative_to(memories_root)}"
+                for p in memories_root.glob("**/*.md")
+            }
+        return out
     if source == "gemini_cli":
         # ~/.gemini/tmp/<hash>/chats/session-*.json
         return {
@@ -144,6 +194,13 @@ def copy_source(source: str) -> dict[str, list[Path]]:
     label = cfg["label"]
     if source == "claude_code":
         result = copy_claude_code()
+    elif source == "codex":
+        sessions = _sync_tree(cfg["src"], cfg["dst"]) if cfg["src"].exists() else {"new": [], "updated": []}
+        memories = copy_codex_memories()
+        result = {
+            "new": sessions["new"] + memories["new"],
+            "updated": sessions["updated"] + memories["updated"],
+        }
     else:
         if not cfg["src"].exists():
             logger.warning(f"  {label}: fonte nao encontrada em {cfg['src']}")
