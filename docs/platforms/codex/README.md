@@ -15,6 +15,11 @@ Source: `codex`. Mode: `cli`. Local data — incremental copy from
 The CLI has no server. See `docs/platforms/claude-code/README.md` for
 the "preservation at the raw level via cli-copy" pattern.
 
+## Parquets gerados
+
+- `codex_conversations.parquet`, `codex_messages.parquet`, `codex_tool_events.parquet`, `codex_branches.parquet` — schema canonico v3
+- `codex_agent_memories.parquet` — le `data/raw/Codex/memories/**/*.md` (vazio hoje, schema valido pra populacao futura quando user comecar a usar Codex memory features)
+
 ## Where the real info lives
 
 - **Parser:** `src/parsers/codex.py`

@@ -166,7 +166,7 @@ def test_codex_branches_one_per_conv(tmp_path):
 
 
 def test_codex_write_parquets(tmp_path):
-    """v3: write_parquets gera 4 arquivos canonicos."""
+    """v3: write_parquets gera 5 arquivos canonicos."""
     raw = tmp_path / "raw"
     raw.mkdir()
     _write_session(raw)
@@ -179,10 +179,12 @@ def test_codex_write_parquets(tmp_path):
         "codex_messages.parquet",
         "codex_tool_events.parquet",
         "codex_branches.parquet",
+        "codex_agent_memories.parquet",
     }
     assert {p.name for p in out_dir.glob("*.parquet")} == expected
     assert stats["conversations"] == 1
     assert stats["branches"] == 1
+    assert stats["agent_memories"] == 0
 
 
 def test_codex_idempotent(tmp_path):

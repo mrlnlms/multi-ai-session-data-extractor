@@ -33,6 +33,7 @@ from src.schema.models import (
     Conversation,
     Message,
     ToolEvent,
+    agent_memories_to_df,
     branches_to_df,
     conversations_to_df,
     messages_to_df,
@@ -278,7 +279,7 @@ class CodexParser(BaseParser):
         return branches_to_df(self.branches)
 
     def write_parquets(self, output_dir: Path) -> dict[str, int]:
-        """Escreve 4 parquets canonicos. Idempotente."""
+        """Escreve 5 parquets canonicos. Idempotente."""
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         conversations_to_df(self.conversations).to_parquet(
@@ -289,9 +290,12 @@ class CodexParser(BaseParser):
             output_dir / "codex_tool_events.parquet", index=False)
         branches_to_df(self.branches).to_parquet(
             output_dir / "codex_branches.parquet", index=False)
+        agent_memories_to_df(self.agent_memories).to_parquet(
+            output_dir / "codex_agent_memories.parquet", index=False)
         return {
             "conversations": len(self.conversations),
             "messages": len(self.messages),
             "tool_events": len(self.events),
             "branches": len(self.branches),
+            "agent_memories": len(self.agent_memories),
         }
