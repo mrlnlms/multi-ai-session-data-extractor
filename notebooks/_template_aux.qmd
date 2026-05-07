@@ -113,6 +113,26 @@ AUX_CONFIG = {
             "created_at": "Date added",
         },
     },
+    "agent_memories": {
+        "title": "Agent Memory Files",
+        "id_col": "memory_id",
+        "desc": "Memory files generated/read by the agent across sessions (Claude Code per-project, Codex global). Each file has YAML frontmatter (`name`, `description`, `type`).",
+        "fields": {
+            "memory_id": "Unique ID (`source:project_key:file_name`)",
+            "source": "Source CLI (`claude_code` or `codex`)",
+            "project_path": "Decoded cwd (NULL for global Codex memories)",
+            "project_key": "Encoded-cwd raw, e.g. `-Users-x-proj`",
+            "file_name": "Markdown file name",
+            "name": "Frontmatter `name` field",
+            "description": "Frontmatter `description` field",
+            "kind": "user / feedback / project / reference / index / other",
+            "content": "Markdown content (frontmatter included)",
+            "content_size": "Bytes in content (UTF-8 encoded)",
+            "created_at": "File mtime (best effort)",
+            "updated_at": "File mtime",
+            "is_preserved_missing": "True if file was deleted from home but kept in raw",
+        },
+    },
 }
 ```
 
