@@ -149,3 +149,53 @@ def test_codex_multiple_sessions(tmp_path):
     parser = CodexParser()
     parser.parse(tmp_path)
     assert len(parser.conversations) == 2
+
+
+# === AgentMemory integration (Slice D — Task D1) ===
+
+def test_codex_parses_memory_files(tmp_path):
+    """Parser Codex le memories/*.md (global) e popula self.agent_memories."""
+    raw = tmp_path / "Codex"
+    raw.mkdir()
+    # No sessions today — Codex memories podem coexistir sem sessoes
+    mem = raw / "memories"
+    mem.mkdir()
+    (mem / "global.md").write_text("---\ntype: feedback\nname: G\n---\nbody")
+
+    from src.parsers.codex import CodexParser
+    parser = CodexParser()
+    parser.parse(raw, home_memory_files=set())  # set vazio → preserved
+    assert len(parser.agent_memories) == 1
+    m = parser.agent_memories[0]
+    assert m.kind == "feedback"
+    assert m.name == "G"
+    assert m.project_path is None
+    assert m.project_key is None
+    assert m.is_preserved_missing is True
+    assert m.memory_id == "codex::global.md"
+
+
+def test_codex_no_memory_dir_skips_silently(tmp_path):
+    """Sem memories/ subdir, parser nao quebra."""
+    raw = tmp_path / "Codex"
+    raw.mkdir()
+    # No memories dir at all
+    from src.parsers.codex import CodexParser
+    parser = CodexParser()
+    parser.parse(raw, home_memory_files=set())
+    assert parser.agent_memories == []
+
+
+def test_codex_default_home_memory_files_none_treats_as_empty(tmp_path):
+    """home_memory_files=None default treats as empty set (all preserved)."""
+    raw = tmp_path / "Codex"
+    raw.mkdir()
+    mem = raw / "memories"
+    mem.mkdir()
+    (mem / "x.md").write_text("---\ntype: project\n---\nbody")
+
+    from src.parsers.codex import CodexParser
+    parser = CodexParser()
+    parser.parse(raw)  # sem home_memory_files
+    assert len(parser.agent_memories) == 1
+    assert parser.agent_memories[0].is_preserved_missing is True
