@@ -60,19 +60,21 @@ class GeminiCLIParser(BaseParser):
         """Le sessoes JSON de todos os projetos em input_path.
 
         input_path = raiz (ex: data/raw/Gemini CLI/) com subdirs por projeto,
-        cada um com chats/*.json.
+        cada um com chats/*.json e opcionalmente logs.json.
         """
         input_path = Path(input_path)
         self._input_path = input_path
         for project_dir in sorted(input_path.iterdir()):
             if not project_dir.is_dir():
                 continue
-            chats_dir = project_dir / "chats"
-            if not chats_dir.exists():
-                continue
+            # Note: chats_dir pode nao existir se o workspace so tem logs.json (orphan-only)
             project_name = self._resolve_project_name(project_dir)
-            for session_file in sorted(chats_dir.glob("session-*.json")):
-                self._parse_session(session_file, project_name)
+            chats_dir = project_dir / "chats"
+            if chats_dir.exists():
+                for session_file in sorted(chats_dir.glob("session-*.json")):
+                    self._parse_session(session_file, project_name)
+            # logs.json orphan handling — corre depois de chats/ pra saber quais sids ja existem
+            self._ingest_orphans_from_logs(project_dir, project_name)
         self._build_branches()
         from src.extractors.cli.preservation import mark_cli_preservation
         mark_cli_preservation(self)
@@ -120,6 +122,80 @@ class GeminiCLIParser(BaseParser):
                 is_active=True,
                 created_at=conv.created_at if conv.created_at is not None else pd.Timestamp.now(tz="UTC"),
             ))
+
+    def _ingest_orphans_from_logs(self, project_dir: Path, project_name: str) -> None:
+        """Le logs.json e cria Conversations/Messages pra session_ids sem chats correspondente.
+
+        Schema do logs.json (lista de):
+          {sessionId, messageId, type, message, timestamp}
+
+        Apenas type='user' eh ingerido (logs.json so tem prompts do user, sem
+        respostas do agente). Sessions cujos session-*.json existem em chats/
+        sao ignoradas — chats/ eh fonte canonica.
+        """
+        logs_file = project_dir / "logs.json"
+        if not logs_file.exists():
+            return
+        try:
+            logs = json.loads(logs_file.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.warning(f"  {project_dir.name}: logs.json invalid — {e}")
+            return
+        if not isinstance(logs, list):
+            return
+
+        # Set de session_ids ja processados via chats/
+        chats_dir = project_dir / "chats"
+        existing_sids: set[str] = set()
+        if chats_dir.exists():
+            for sf in chats_dir.glob("session-*.json"):
+                try:
+                    existing_sids.add(json.loads(sf.read_text(encoding="utf-8")).get("sessionId"))
+                except Exception:
+                    pass
+
+        # Group entries by sessionId, filter type=user, skip se session ja existe
+        by_sid: dict[str, list[dict]] = {}
+        for entry in logs:
+            if not isinstance(entry, dict):
+                continue
+            sid = entry.get("sessionId")
+            if not sid or sid in existing_sids:
+                continue
+            if entry.get("type") != "user":
+                continue
+            by_sid.setdefault(sid, []).append(entry)
+
+        for sid, entries in by_sid.items():
+            entries_sorted = sorted(entries, key=lambda e: e.get("messageId", 0))
+            first_ts = entries_sorted[0].get("timestamp")
+            last_ts = entries_sorted[-1].get("timestamp")
+            created_at = self._ts(first_ts) if first_ts else pd.NaT
+            updated_at = self._ts(last_ts) if last_ts else created_at
+
+            self.conversations.append(Conversation(
+                conversation_id=sid,
+                source="gemini_cli",
+                title=None,
+                created_at=created_at,
+                updated_at=updated_at,
+                message_count=len(entries_sorted),
+                model=None,
+                project=project_name,
+                is_preserved_missing=True,
+            ))
+            for entry in entries_sorted:
+                ts = entry.get("timestamp")
+                self.messages.append(Message(
+                    message_id=f"{sid}_msg_{entry.get('messageId', 0)}",
+                    conversation_id=sid,
+                    source="gemini_cli",
+                    sequence=int(entry.get("messageId", 0)),
+                    role="user",
+                    content=entry.get("message", "") or "",
+                    model=None,
+                    created_at=self._ts(ts) if ts else pd.NaT,
+                ))
 
     def _parse_session(self, session_file: Path, project_name: str) -> None:
         try:
