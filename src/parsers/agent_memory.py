@@ -143,25 +143,33 @@ def parse_memories_for_source(
             for md in sorted(mem_dir.glob("*.md")):
                 rel = f"{project_dir.name}/memory/{md.name}"
                 preserved = rel not in home_files
-                items.append(parse_agent_memory_file(
-                    path=md,
-                    source=source,
-                    project_path=project_path,
-                    project_key=project_key,
-                    is_preserved_missing=preserved,
-                ))
+                try:
+                    items.append(parse_agent_memory_file(
+                        path=md,
+                        source=source,
+                        project_path=project_path,
+                        project_key=project_key,
+                        is_preserved_missing=preserved,
+                    ))
+                except Exception as e:
+                    logger.warning(f"agent_memory: failed to parse {md}: {e}")
+                    continue
     elif source == "codex":
         mem_dir = raw_root / "memories"
         if mem_dir.is_dir():
             for md in sorted(mem_dir.rglob("*.md")):
                 rel = f"memories/{md.relative_to(mem_dir)}"
                 preserved = rel not in home_files
-                items.append(parse_agent_memory_file(
-                    path=md,
-                    source=source,
-                    project_path=None,
-                    project_key=None,
-                    is_preserved_missing=preserved,
-                ))
+                try:
+                    items.append(parse_agent_memory_file(
+                        path=md,
+                        source=source,
+                        project_path=None,
+                        project_key=None,
+                        is_preserved_missing=preserved,
+                    ))
+                except Exception as e:
+                    logger.warning(f"agent_memory: failed to parse {md}: {e}")
+                    continue
 
     return items
