@@ -210,8 +210,8 @@ class AgentMemory:
     kind: str
     content: str
     content_size: int
-    created_at: pd.Timestamp
-    updated_at: pd.Timestamp
+    created_at: Optional[pd.Timestamp]
+    updated_at: Optional[pd.Timestamp]
     is_preserved_missing: bool = False
 
     def __post_init__(self):
