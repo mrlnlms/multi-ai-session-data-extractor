@@ -144,6 +144,19 @@ def test_gemini_cli_hash_project(tmp_path):
 
 # === Orphan handling (Slice B) ===
 
+@pytest.fixture
+def no_preservation_marking(monkeypatch):
+    """Desabilita mark_cli_preservation pra tests de orphan handling.
+
+    Orphan convs setam is_preserved_missing=True diretamente na ingestion;
+    chats-backed convs ficam com o default False. Isolamos esse step pra nao
+    depender do real ~/.gemini/tmp/ do usuario.
+    """
+    monkeypatch.setattr(
+        "src.extractors.cli.preservation.mark_cli_preservation",
+        lambda parser: 0,
+    )
+
 def _make_workspace(base: Path, workspace_name: str, sessions_with_chats: list[dict], orphan_logs: list[dict]) -> Path:
     """Helper: cria workspace estilo .gemini/tmp/<name>/ com chats/ e logs.json.
 
@@ -191,7 +204,7 @@ def _make_workspace(base: Path, workspace_name: str, sessions_with_chats: list[d
     return ws
 
 
-def test_orphan_session_in_logs_json_creates_preserved_conversation(tmp_path):
+def test_orphan_session_in_logs_json_creates_preserved_conversation(tmp_path, no_preservation_marking):
     raw = tmp_path / "Gemini CLI"
     raw.mkdir()
     sessions = [{
@@ -231,7 +244,7 @@ def test_orphan_session_in_logs_json_creates_preserved_conversation(tmp_path):
     assert "segunda mensagem perdida" in contents
 
 
-def test_no_logs_json_works_as_before(tmp_path):
+def test_no_logs_json_works_as_before(tmp_path, no_preservation_marking):
     raw = tmp_path / "Gemini CLI"
     raw.mkdir()
     sessions = [{
@@ -261,7 +274,7 @@ def test_no_logs_json_works_as_before(tmp_path):
     assert any(c.conversation_id == "cccccccc-1111-2222-3333-444444444444" for c in parser.conversations)
 
 
-def test_logs_json_session_with_existing_chats_is_ignored(tmp_path):
+def test_logs_json_session_with_existing_chats_is_ignored(tmp_path, no_preservation_marking):
     raw = tmp_path / "Gemini CLI"
     raw.mkdir()
     sid = "dddddddd-1111-2222-3333-444444444444"

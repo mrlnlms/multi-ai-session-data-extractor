@@ -11,6 +11,11 @@ Source: `gemini_cli`. Mode: `cli`. Local data — incremental copy from
   with dedup by `message_id`. See `src/parsers/gemini_cli.py:_parse_session`.
 - `thoughts` array → formatted `thinking`.
 - `toolCalls` correlated via status (`success`/`error`).
+- **`logs.json` orphan handling:** convs presentes em `logs.json` sem
+  `chats/session-*.json` correspondente viram Conversations com
+  `is_preserved_missing=True` + Messages role=user (preservation policy).
+  Sessions que existem em `chats/` sao ignoradas no `logs.json` — `chats/`
+  eh a fonte canonica.
 
 ## Why there is no `server-behavior.md`
 
