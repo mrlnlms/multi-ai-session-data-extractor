@@ -1,11 +1,12 @@
-"""Parse data/raw/Claude Code/ → 4 parquets canonicos.
+"""Parse data/raw/Claude Code/ → 5 parquets canonicos.
 
 Le todos JSONLs em data/raw/Claude Code/<encoded-cwd>/*.jsonl + subagents
-e gera 4 parquets em data/processed/Claude Code/:
+e gera 5 parquets em data/processed/Claude Code/:
 - claude_code_conversations.parquet
 - claude_code_messages.parquet
 - claude_code_tool_events.parquet
 - claude_code_branches.parquet
+- claude_code_agent_memories.parquet
 
 Idempotente — rodar 2x = mesmos bytes.
 
@@ -19,6 +20,7 @@ import logging
 import sys
 from pathlib import Path
 
+from src.extractors.cli.copy import current_source_files
 from src.parsers.claude_code import ClaudeCodeParser
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -37,7 +39,8 @@ def main() -> int:
 
     logger.info(f"Parsing {RAW_DIR}...")
     parser = ClaudeCodeParser()
-    parser.parse(RAW_DIR)
+    home_files = current_source_files("claude_code")
+    parser.parse(RAW_DIR, home_memory_files=home_files)
     stats = parser.write_parquets(PROCESSED_DIR)
 
     print()
