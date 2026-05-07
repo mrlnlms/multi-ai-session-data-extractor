@@ -25,8 +25,10 @@ from typing import Optional
 
 import pandas as pd
 
+from src.parsers.agent_memory import parse_memories_for_source
 from src.parsers.base import BaseParser
 from src.schema.models import (
+    AgentMemory,
     Branch,
     Conversation,
     Message,
@@ -47,17 +49,26 @@ class CodexParser(BaseParser):
     def __init__(self, account: Optional[str] = None):
         super().__init__(account=account)
         self.branches: list[Branch] = []
+        self.agent_memories: list[AgentMemory] = []
         self._conv_source_files: dict[str, set[str]] = {}
         self._input_path: Optional[Path] = None
 
     def reset(self):
         super().reset()
         self.branches = []
+        self.agent_memories = []
         self._conv_source_files = {}
         self._input_path = None
 
-    def parse(self, input_path: Path) -> None:
-        """Le todas sessoes em year/month/day/rollout-*.jsonl."""
+    def parse(self, input_path: Path, home_memory_files: Optional[set[str]] = None) -> None:
+        """Le todas sessoes em year/month/day/rollout-*.jsonl + memorias globais.
+
+        Args:
+            input_path: raw root, ex: data/raw/Codex/
+            home_memory_files: paths relativos atuais no HOME do CLI (`memories/<file>.md`).
+                Memorias em raw nao presentes nesse set viram is_preserved_missing=True.
+                None ou set vazio marca todas as memorias como preserved.
+        """
         input_path = Path(input_path)
         self._input_path = input_path
         for session_file in sorted(input_path.rglob("rollout-*.jsonl")):
@@ -65,6 +76,10 @@ class CodexParser(BaseParser):
         self._build_branches()
         from src.extractors.cli.preservation import mark_cli_preservation
         mark_cli_preservation(self)
+
+        # Agent memory ingestion (Slice D — Task D1)
+        mem_files = home_memory_files if home_memory_files is not None else set()
+        self.agent_memories = parse_memories_for_source(input_path, "codex", mem_files)
 
     def parse_files(self, files: list[Path]) -> None:
         """Processa apenas a lista de arquivos especificada (uso incremental)."""
