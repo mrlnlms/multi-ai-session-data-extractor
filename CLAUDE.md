@@ -85,6 +85,7 @@ manual-saves vs futuras fontes externas no mesmo parquet via UNION.
 | `deep-research-md/` | 208KB | 2 .md exportados manualmente (nao parsado) |
 | `notebooklm-snapshots/more-design-2026-03-30/` | 594MB | Captura legacy da conta extinta (parsed → account-3) |
 | `perplexity-orphan-threads/` | 56KB | 1 thread Perplexity deletada do servidor |
+| `grok-snapshots/2026-05-09/` | 10MB | Export oficial xAI; binarios copiados pra `data/raw/Grok/assets/` (resolve gap V1) |
 
 Padrao: snapshots via UI das plataformas vão pra `<plat>-snapshots/<date>/`,
 mantendo arquivos originais.
@@ -170,7 +171,8 @@ Permite recover total apos deletar plataforma + apagar `data/` localmente.
     data/external/notebooklm-snapshots data/external/openai-gdpr-export \
     data/external/claude-code-config-snapshots \
     data/external/codex-config-snapshots \
-    data/external/gemini-config-snapshots
+    data/external/gemini-config-snapshots \
+    data/external/grok-snapshots
 git add data/*.dvc data/external/*.dvc data/.gitignore data/external/.gitignore
 ~/.claude/scripts/commit.sh "data: snapshot apos <operacao>"
 .venv/bin/dvc push
@@ -223,7 +225,8 @@ com:
     data/external/notebooklm-snapshots data/external/openai-gdpr-export \
     data/external/claude-code-config-snapshots \
     data/external/codex-config-snapshots \
-    data/external/gemini-config-snapshots
+    data/external/gemini-config-snapshots \
+    data/external/grok-snapshots
 git add data/*.dvc data/external/*.dvc data/.gitignore data/external/.gitignore
 ~/.claude/scripts/commit.sh "data: snapshot apos <plat> sync (<stats>)"
 .venv/bin/dvc push   # blobs pro source-dvc no gdrive
