@@ -70,11 +70,15 @@ class GrokParser(BaseParser):
         super().__init__(account)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Grok")
         self.workspaces: list[dict] = []
+        self.assets: list[dict] = []
+        self.scheduled_tasks: dict = {}
         self.conversation_projects: list[ConversationProject] = []
 
     def reset(self):
         super().reset()
         self.workspaces = []
+        self.assets = []
+        self.scheduled_tasks = {}
         self.conversation_projects = []
 
     @property
@@ -110,6 +114,20 @@ class GrokParser(BaseParser):
                 self.workspaces = json.loads(ws_path.read_text(encoding="utf-8")) or []
             except Exception:
                 self.workspaces = []
+
+        assets_path = merged_root / "assets.json"
+        if assets_path.exists():
+            try:
+                self.assets = json.loads(assets_path.read_text(encoding="utf-8")) or []
+            except Exception:
+                self.assets = []
+
+        tasks_path = merged_root / "tasks.json"
+        if tasks_path.exists():
+            try:
+                self.scheduled_tasks = json.loads(tasks_path.read_text(encoding="utf-8")) or {}
+            except Exception:
+                self.scheduled_tasks = {}
 
     def _parse_envelope(self, envelope: dict) -> None:
         conv = (envelope.get("conversation_v2") or {}).get("conversation") or {}
@@ -314,6 +332,54 @@ class GrokParser(BaseParser):
     def conversation_projects_df(self) -> pd.DataFrame:
         return conversation_projects_to_df(self.conversation_projects)
 
+    def assets_df(self) -> pd.DataFrame:
+        if not self.assets:
+            return pd.DataFrame(columns=[
+                "asset_id", "mime_type", "name", "size_bytes",
+                "key", "file_source", "is_model_generated",
+                "is_root_asset_created_by_model", "is_latest", "is_deleted",
+                "shared_with_team", "is_public", "root_asset_id",
+                "inline_status", "summary", "preview_image_key",
+                "is_preserved_missing", "created_at", "last_use_time",
+            ])
+        rows = []
+        for a in self.assets:
+            rows.append({
+                "asset_id": a.get("assetId"),
+                "mime_type": a.get("mimeType") or "",
+                "name": a.get("name") or "",
+                "size_bytes": int(a.get("sizeBytes") or 0),
+                "key": a.get("key") or "",
+                "file_source": a.get("fileSource") or "",
+                "is_model_generated": bool(a.get("isModelGenerated", False)),
+                "is_root_asset_created_by_model": bool(a.get("isRootAssetCreatedByModel", False)),
+                "is_latest": bool(a.get("isLatest", False)),
+                "is_deleted": bool(a.get("isDeleted", False)),
+                "shared_with_team": bool(a.get("sharedWithTeam", False)),
+                "is_public": bool(a.get("isPublic", False)),
+                "root_asset_id": a.get("rootAssetId") or "",
+                "inline_status": a.get("inlineStatus") or "",
+                "summary": a.get("summary") or "",
+                "preview_image_key": a.get("previewImageKey") or "",
+                "is_preserved_missing": bool(a.get("_preserved_missing", False)),
+                "created_at": self._ts(a.get("createTime")),
+                "last_use_time": self._ts(a.get("lastUseTime")),
+            })
+        return pd.DataFrame(rows)
+
+    def scheduled_tasks_df(self) -> pd.DataFrame:
+        """Scheduled tasks (active + inactive). Schema preliminar inferido —
+        endpoint retornou tasks vazias no probe, parser tolera extras."""
+        all_tasks: list[dict] = []
+        for t in (self.scheduled_tasks.get("active") or []):
+            all_tasks.append({**t, "_status": "active"})
+        for t in (self.scheduled_tasks.get("inactive") or []):
+            all_tasks.append({**t, "_status": "inactive"})
+        if not all_tasks:
+            return pd.DataFrame()
+        # Mantem tudo como JSON-friendly: dict bruto + status flag
+        return pd.DataFrame(all_tasks)
+
     def project_metadata_df(self) -> pd.DataFrame:
         """Workspace (project) metadata. Schema alinhado com Qwen project_metadata
         (project_id, name, icon, custom_instruction, created_at, updated_at) +
@@ -369,3 +435,11 @@ class GrokParser(BaseParser):
         ws_df = self.project_metadata_df()
         if not ws_df.empty:
             ws_df.to_parquet(output_dir / f"{self.source_name}_project_metadata.parquet")
+
+        as_df = self.assets_df()
+        if not as_df.empty:
+            as_df.to_parquet(output_dir / f"{self.source_name}_assets.parquet")
+
+        tk_df = self.scheduled_tasks_df()
+        if not tk_df.empty:
+            tk_df.to_parquet(output_dir / f"{self.source_name}_scheduled_tasks.parquet")

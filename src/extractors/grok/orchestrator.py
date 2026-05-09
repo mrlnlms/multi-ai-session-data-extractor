@@ -12,7 +12,12 @@ from pathlib import Path
 
 from src.extractors.grok.auth import load_context
 from src.extractors.grok.api_client import GrokAPIClient
-from src.extractors.grok.discovery import discover, persist_discovery
+from src.extractors.grok.discovery import (
+    discover,
+    discover_assets,
+    discover_scheduled_tasks,
+    persist_discovery,
+)
 from src.extractors.grok.fetcher import fetch_conversations
 
 
@@ -110,6 +115,8 @@ async def run_export(
         await client.warmup()
 
         convs, workspaces = await discover(client)
+        assets = await discover_assets(client)
+        tasks = await discover_scheduled_tasks(client)
 
         # Fail-fast: queda drastica
         baseline = _get_max_known_discovery(output_dir)
@@ -125,6 +132,13 @@ async def run_export(
             print(f"Discovery OK: {curr} convs (baseline historico: {baseline})")
 
         persist_discovery(convs, workspaces, output_dir)
+        # Assets globais + scheduled tasks (independente das convs)
+        (output_dir / "assets.json").write_text(
+            json.dumps(assets, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        (output_dir / "tasks.json").write_text(
+            json.dumps(tasks, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
 
         today = started_at.strftime("%Y-%m-%d")
         conv_dir = output_dir / "conversations"
@@ -181,6 +195,9 @@ async def run_export(
                 "conversations_reused_incremental": reused,
                 "conversations_errors": len(errs),
                 "workspaces_discovered": len(workspaces),
+                "assets_discovered": len(assets),
+                "scheduled_tasks_active": len(tasks.get("active") or []),
+                "scheduled_tasks_inactive": len(tasks.get("inactive") or []),
             },
             "errors": {"conversations": errs[:50]},
         }

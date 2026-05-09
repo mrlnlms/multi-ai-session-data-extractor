@@ -45,6 +45,10 @@ class GrokReconcileReport:
     convs_total: int = 0
     workspaces_total: int = 0
     workspaces_preserved_missing: int = 0
+    assets_total: int = 0
+    assets_preserved_missing: int = 0
+    scheduled_tasks_active: int = 0
+    scheduled_tasks_inactive: int = 0
     features_refetched: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     aborted: bool = False
@@ -56,7 +60,9 @@ class GrokReconcileReport:
             f"{self.copied}={self.preserved_missing}preserved "
             f"(total={self.convs_total}), "
             f"workspaces={self.workspaces_total} "
-            f"({self.workspaces_preserved_missing} preserved)"
+            f"({self.workspaces_preserved_missing} preserved), "
+            f"assets={self.assets_total} ({self.assets_preserved_missing} preserved), "
+            f"tasks={self.scheduled_tasks_active}a/{self.scheduled_tasks_inactive}i"
         )
 
 
@@ -82,6 +88,25 @@ def _load_workspaces(raw_dir: Path) -> dict[str, dict]:
         for e in data
         if isinstance(e, dict) and e.get("workspaceId")
     }
+
+
+def _load_assets(raw_dir: Path) -> dict[str, dict]:
+    p = raw_dir / "assets.json"
+    if not p.exists():
+        return {}
+    data = json.loads(p.read_text(encoding="utf-8"))
+    return {
+        e["assetId"]: e
+        for e in data
+        if isinstance(e, dict) and e.get("assetId")
+    }
+
+
+def _load_tasks(raw_dir: Path) -> dict:
+    p = raw_dir / "tasks.json"
+    if not p.exists():
+        return {"active": [], "inactive": [], "unread_results": [], "unread_counts": [], "usage": {}}
+    return json.loads(p.read_text(encoding="utf-8"))
 
 
 def build_plan(
@@ -216,6 +241,35 @@ def run_reconciliation(
     report.workspaces_total = len(curr_ws)
     report.workspaces_preserved_missing = len(ws_preserved)
 
+    # Assets (cumulativo + preservation por assetId)
+    curr_assets = _load_assets(raw_dir)
+    prev_assets = _load_assets(previous_merged) if previous_merged else {}
+    assets_preserved = sorted(set(prev_assets.keys()) - set(curr_assets.keys()))
+    cumulative_assets = list(curr_assets.values())
+    for aid in assets_preserved:
+        if aid in prev_assets:
+            entry = dict(prev_assets[aid])
+            entry["_preserved_missing"] = True
+            cumulative_assets.append(entry)
+    if cumulative_assets:
+        (merged_output / "assets.json").write_text(
+            json.dumps(cumulative_assets, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    report.assets_total = len(curr_assets)
+    report.assets_preserved_missing = len(assets_preserved)
+
+    # Scheduled tasks (sobrescreve do raw atual; usage/contagem dinamica
+    # sem PK estavel — preservation por taskId quando disponivel)
+    tasks = _load_tasks(raw_dir)
+    if tasks.get("active") or tasks.get("inactive") or tasks.get("usage"):
+        (merged_output / "tasks.json").write_text(
+            json.dumps(tasks, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    report.scheduled_tasks_active = len(tasks.get("active") or [])
+    report.scheduled_tasks_inactive = len(tasks.get("inactive") or [])
+
     cumulative_disc = list(curr.values())
     for cid in plan.preserved_missing:
         if cid in prev:
@@ -252,6 +306,14 @@ def run_reconciliation(
             "total": report.workspaces_total,
             "preserved_missing": report.workspaces_preserved_missing,
         },
+        "assets": {
+            "total": report.assets_total,
+            "preserved_missing": report.assets_preserved_missing,
+        },
+        "scheduled_tasks": {
+            "active": report.scheduled_tasks_active,
+            "inactive": report.scheduled_tasks_inactive,
+        },
         "features_refetched": report.features_refetched,
     }
     (merged_output / "grok_merged_summary.json").write_text(
@@ -270,6 +332,10 @@ def run_reconciliation(
         "convs_preserved_missing": report.preserved_missing,
         "workspaces_total": report.workspaces_total,
         "workspaces_preserved_missing": report.workspaces_preserved_missing,
+        "assets_total": report.assets_total,
+        "assets_preserved_missing": report.assets_preserved_missing,
+        "scheduled_tasks_active": report.scheduled_tasks_active,
+        "scheduled_tasks_inactive": report.scheduled_tasks_inactive,
         "features_refetched": report.features_refetched,
         "warnings": report.warnings,
     }
@@ -293,6 +359,10 @@ def _write_last_reconcile_md(
         f"{report.copied} copied, {report.preserved_missing} preserved)\n"
         f"- **Workspaces:** {report.workspaces_total} ativos "
         f"({report.workspaces_preserved_missing} preserved)\n"
+        f"- **Assets:** {report.assets_total} ativos "
+        f"({report.assets_preserved_missing} preserved)\n"
+        f"- **Scheduled tasks:** {report.scheduled_tasks_active} active, "
+        f"{report.scheduled_tasks_inactive} inactive\n"
         f"- **Warnings:** {len(report.warnings)}\n\n"
         "Ver `reconcile_log.jsonl` pro historico completo.\n"
     )

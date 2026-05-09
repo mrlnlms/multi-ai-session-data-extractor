@@ -140,7 +140,7 @@ class GrokAPIClient:
     async def get_workspace(self, workspace_id: str) -> dict:
         return await self._fetch(f"/rest/workspaces/{workspace_id}")
 
-    async def list_assets(self, page_size: int = 60) -> list[dict]:
+    async def list_assets(self, page_size: int = 100) -> list[dict]:
         all_assets: list[dict] = []
         seen: set[str] = set()
         token: str | None = None
@@ -161,6 +161,27 @@ class GrokAPIClient:
             if not token or new == 0:
                 break
         return all_assets
+
+    async def list_scheduled_tasks(self) -> dict:
+        """Tasks (scheduled queries) ativas + inativas + usage.
+
+        Schema: {tasks: [...], unreadResults: [...], unreadCounts: [...],
+        taskUsage: {usage, limit, frequentUsage, frequentLimit, ...}} +
+        inactive_tasks: [...] (do endpoint /rest/tasks/inactive).
+        """
+        active = await self._fetch("/rest/tasks")
+        try:
+            inactive = await self._fetch("/rest/tasks/inactive")
+            inactive_list = inactive.get("tasks", []) or []
+        except Exception:
+            inactive_list = []
+        return {
+            "active": active.get("tasks", []) or [],
+            "inactive": inactive_list,
+            "unread_results": active.get("unreadResults", []) or [],
+            "unread_counts": active.get("unreadCounts", []) or [],
+            "usage": active.get("taskUsage") or {},
+        }
 
     async def fetch_full_conversation(self, conv_id: str) -> dict:
         """Agrega meta + tree + responses + files + share_links em um envelope."""
