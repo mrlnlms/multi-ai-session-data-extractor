@@ -1,11 +1,13 @@
-"""Sync Grok — captura + reconcile em uma rodada.
+"""Sync Grok — captura + assets + reconcile em uma rodada.
 
 Etapas:
-    1. Capture   -> data/raw/Grok/ (cumulativo)
-    2. Reconcile -> data/merged/Grok/ (cumulativo, com preservation)
+    1. Capture   -> data/raw/Grok/ (convs + workspaces + assets metadata + tasks)
+    2. Assets    -> binarios via assets.grok.com (skip-existing)
+    3. Reconcile -> data/merged/Grok/ (cumulativo, com preservation)
 
 Flags:
-    --no-reconcile  pula etapa 2
+    --no-binaries   pula etapa 2 (so metadata)
+    --no-reconcile  pula etapa 3
     --full          forca refetch full
     --smoke N       limita N convs
     --account NAME
@@ -18,10 +20,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import sys
 import time
 from pathlib import Path
 
+from src.extractors.grok.asset_downloader import download_assets
+from src.extractors.grok.auth import load_context
 from src.extractors.grok.orchestrator import BASE_DIR as RAW_DIR, run_export
 from src.reconcilers.grok import run_reconciliation
 
@@ -44,10 +49,11 @@ async def main(args: argparse.Namespace) -> int:
         print(f"  Capture seria escrita em: {RAW_DIR}")
         print(f"  Reconcile seria em:      {MERGED_DIR}")
         print(f"  Modo:                    {'full' if args.full else 'incremental'}")
-        print(f"  Etapa 2 (reconcile):     {'skipped' if args.no_reconcile else 'run'}")
+        print(f"  Etapa 2 (assets):        {'skipped' if args.no_binaries else 'run'}")
+        print(f"  Etapa 3 (reconcile):     {'skipped' if args.no_reconcile else 'run'}")
         return 0
 
-    _section("Etapa 1/2 — Capture")
+    _section("Etapa 1/3 — Capture")
     try:
         raw_dir = await run_export(
             full=args.full,
@@ -60,11 +66,32 @@ async def main(args: argparse.Namespace) -> int:
         return 1
     print(f"\nCapture OK em: {raw_dir}")
 
+    if not args.no_binaries:
+        _section("Etapa 2/3 — Assets")
+        try:
+            context = await load_context(account=args.account, headless=not args.headed)
+            try:
+                stats = await download_assets(context, raw_dir)
+            finally:
+                await context.close()
+            (raw_dir / "assets_log.json").write_text(
+                json.dumps(stats, ensure_ascii=False, indent=2, default=str),
+                encoding="utf-8",
+            )
+            print(f"  downloaded={stats['downloaded']} "
+                  f"skipped={stats['skipped']} "
+                  f"errors={len(stats['errors'])}")
+        except Exception as e:
+            print(f"\nERRO em assets: {e}")
+            return 1
+    else:
+        print("\n--no-binaries setado, pulando etapa 2.")
+
     if args.no_reconcile:
-        print("\n--no-reconcile setado, pulando etapa 2.")
+        print("\n--no-reconcile setado, pulando etapa 3.")
         return 0
 
-    _section("Etapa 2/2 — Reconcile")
+    _section("Etapa 3/3 — Reconcile")
     report = run_reconciliation(raw_dir, MERGED_DIR, full=args.full)
     print(report.summary())
     if report.aborted:
@@ -81,6 +108,7 @@ async def main(args: argparse.Namespace) -> int:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--no-binaries", action="store_true", help="Pula etapa 2 (assets)")
     ap.add_argument("--no-reconcile", action="store_true")
     ap.add_argument("--full", action="store_true")
     ap.add_argument("--smoke", type=int, default=None)

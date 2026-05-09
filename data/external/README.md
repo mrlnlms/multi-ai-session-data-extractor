@@ -50,23 +50,25 @@ Stats atuais (29 convs / 403 msgs / 70 tool_events):
 | Gemini | 2 | manual_copypaste (2) |
 | Qwen | 1 | manual_copypaste (1) |
 
-### grok-snapshots/ ✅ binarios usados (sem parser)
+### grok-snapshots/ ⏸ blob historico (pipeline usa API)
 
 Export oficial xAI Grok (zip baixado pelo user via UI). TTL 30 dias no
 storage do servidor. Estrutura por snapshot:
 
 - `prod-grok-backend.json` — convs/projects/tasks/media_posts (NAO usado;
-  extractor V1 via `/rest/app-chat/conversations_v2` retorna 36 campos por
+  extractor via `/rest/app-chat/conversations_v2` retorna 36 campos por
   response vs 7 do export — superior)
 - `prod-mc-auth-mgmt-api.json` — profile + sessions com IP/cidade/UA
   (preservado como blob, sem parser canonico)
 - `prod-mc-billing.json` — billing balance (vazio em free tier)
 - `prod-mc-asset-server/<asset_id>/content` × 44 + profile-picture.webp
-  — **binarios fisicos copiados pra `data/raw/Grok/assets/<id>.<ext>`**
-  (resolve gap V1 onde extractor so capturava metadata de assets).
-  Reconciler espelha pra `data/merged/Grok/assets/`. Parser populates
-  coluna `asset_path` em `grok_assets.parquet`.
+  — **redundante:** mesmos binarios baixados via API por
+  `src/extractors/grok/asset_downloader.py` em `https://assets.grok.com/
+  <key>` (sha256 bit-identical). Pipeline canonico nao depende deste
+  snapshot.
 
+Snapshot mantido apenas como blob historico pra recovery extremo
+(conta deletada -> sem acesso aos endpoints).
 Detalhes em [docs/platforms/grok/export-analysis.md](../../docs/platforms/grok/export-analysis.md).
 
 ### openai-gdpr-export/ ⏸ preservado (sem parser)

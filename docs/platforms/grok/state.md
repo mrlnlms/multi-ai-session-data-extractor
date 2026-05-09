@@ -3,8 +3,8 @@
 ## Pipeline
 
 - **Single cumulative folder:** `data/raw/Grok/` and `data/merged/Grok/`.
-- **Sync orchestrator (2 steps):** `scripts/grok-sync.py` (capture +
-  reconcile).
+- **Sync orchestrator (3 steps):** `scripts/grok-sync.py` (capture +
+  assets + reconcile).
 - **Headless capture** (Cloudflare did not block on smoke 2026-05-09).
 - **Auth:** persistent profile in `.storage/grok-profile-<account>/`
   (generated via `scripts/grok-login.py`). Login via grok.com (SSO da
@@ -71,17 +71,27 @@ schema sera enriquecido empiricamente quando aparecerem.
 
 Acesso na UI: avatar -> Tasks (`grok.com/tasks`).
 
-### Asset binarios — fechado via export oficial
+### Asset binarios — fechado via API
 
-Extractor V1 captura so metadata via `/rest/assets`. Asset binarios
-foram preenchidos via **export oficial** (`data/external/grok-snapshots/
-2026-05-09/`): 44 arquivos copiados pra `data/raw/Grok/assets/
-<asset_id>.<ext>` com mime_type → extensao. Parser populates coluna
-`asset_path` em `grok_assets.parquet` apontando pro merged.
+`src/extractors/grok/asset_downloader.py` baixa binarios via
+`https://assets.grok.com/<key>` (CDN dedicado, auth herdada via cookies
+do profile — same eTLD+1 que grok.com). O campo `key` da listagem
+`/rest/assets` ja vem com path completo `users/<uid>/<aid>/content`,
+basta concatenar com o base.
 
-Detalhes em [export-analysis.md](export-analysis.md). Pra renovar
-binarios: re-pedir export (TTL 30 dias) OU implementar
-asset_downloader via API V2 (gerar presigned URL via `key`, deferred).
+Smoke 2026-05-09: 44/44 baixados, sha256 + size **bit-identical** ao
+export oficial — confirma que API e export referenciam o mesmo storage.
+Total: 10.02MB.
+
+Naming local: `data/raw/Grok/assets/<asset_id>.<ext>` (mime → ext).
+Manifest: `data/raw/Grok/assets_manifest.json` ({asset_id: {url,
+relpath, size, mime}}). Reconciler espelha pra
+`data/merged/Grok/assets/`. Parser populates coluna `asset_path` em
+`grok_assets.parquet`.
+
+Pipeline 3 etapas (capture + assets + reconcile) torna export oficial
+redundante pros binarios — `data/external/grok-snapshots/` agora e
+**so blob historico** preservado pra recovery extremo.
 
 ### Not covered V1
 

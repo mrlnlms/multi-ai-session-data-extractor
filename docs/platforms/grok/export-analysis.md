@@ -2,6 +2,12 @@
 
 Snapshot: `data/external/grok-snapshots/2026-05-09/` (10MB extraido).
 
+> **Atualizacao 2026-05-09 (pos-asset_downloader):** asset binarios
+> agora vem da API via `https://assets.grok.com/<key>` (44/44
+> bit-identical ao export — sha256 + size). Export passa a ser **so
+> blob historico** preservado pra recovery; pipeline canonico nao
+> depende dele.
+
 ## Pacotes do export
 
 ```
@@ -70,22 +76,28 @@ API (via `load-responses`) retorna **36 campos** incluindo:
 xposts / image gen — export oficial nao tem nada disso. **Nao usar
 export pra responses.**
 
-### Assets binarios — EXPORT RESOLVE GAP V1
+### Assets binarios — fechado via API (export agora redundante)
 
 Export tem **44 arquivos fisicos** em
 `prod-mc-asset-server/<asset_id>/content` + 1 profile-picture.webp.
 
-Extractor V1 so tinha metadata via `/rest/assets`. Implementar
-asset_downloader via API exigiria gerar presigned URL a partir do
-campo `key` (storage path 87 chars) — nao mapeado.
+**Probe 2026-05-09 (pos-export-analysis):** descobri via inspecao do
+DOM que existe CDN dedicado `assets.grok.com`. URL determinístico:
+`https://assets.grok.com/<key>` onde `key` e o campo retornado pela
+listagem `/rest/assets` (formato `users/<uid>/<aid>/content`). Auth
+funciona via cookies do mesmo eTLD+1.
 
-**Acao tomada:** copiados 45 binarios pra `data/raw/Grok/assets/<asset_id>.<ext>`
-(com mime_type → extensao). Reconciler espelha pra
-`data/merged/Grok/assets/`. Parser populates coluna
-`asset_path` em `grok_assets.parquet` (relativo ao `data/`).
+`src/extractors/grok/asset_downloader.py` implementa download via
+`page.evaluate(fetch + base64)`. Sync agora roda 3 etapas:
+capture + assets + reconcile.
 
-**Cobertura:** 44/44 metadata da API casaram com binarios do export
-(todos `SELF_UPLOAD_FILE_SOURCE`, ambos os lados refletem mesmo estado).
+**Validacao:** 44 binarios baixados via API → sha256 + size
+bit-identical aos do export (10.02MB total em ambos). API e export
+referenciam o mesmo storage backend.
+
+**Resultado:** export deixa de ser usado pelo pipeline. `data/external/
+grok-snapshots/` permanece preservado **so como blob historico** pra
+recovery extremo (caso conta seja deletada e binarios sumam).
 
 ### Sessions/auth — preservado como blob
 
@@ -118,12 +130,17 @@ Ambos vazios na conta atual. `media_posts` parece ser entidade nova
 | `prod-grok-backend.json` | Preservado em `data/external/`, **nao parsado** (extractor V1 superior) |
 | `prod-mc-auth-mgmt-api.json` | Preservado como blob (sessions interessantes, sem parser) |
 | `prod-mc-billing.json` | Preservado (vazio mas estrutura) |
-| Asset binarios (44) | **Copiados pra `data/raw/Grok/assets/<id>.<ext>`** + parser populates `asset_path` |
-| Profile picture | Copiada pra `data/raw/Grok/assets/<original-name>.webp` |
+| Asset binarios (44) | ~~Copiados~~ **Baixados via API** (`assets.grok.com/<key>`); export redundante |
+| Profile picture | Preservada no snapshot; nao integrada ao raw (nao listada em `/rest/assets`) |
 
 ## Schedule de re-export
 
-Grok export tem TTL de 30 dias (visivel no path `ttl/30d/`). Pra manter
-binarios atualizados, re-export periodico necessario quando assets
-novos forem uploaded — ou implementar asset_downloader via API
-(deferred V2).
+**Nao necessario pro pipeline canonico.** asset_downloader via API
+mantem `data/raw/Grok/assets/` atualizado a cada `grok-sync.py` —
+asset novo aparece em `/rest/assets`, downloader pega.
+
+Re-export so faz sentido se quiser refrescar os blobs preservados
+em `data/external/grok-snapshots/`. TTL de 30 dias no servidor
+(visivel no path `ttl/30d/`) eh do storage do export-tool, nao
+afeta o storage real dos assets (que vive em `assets.grok.com`
+indefinidamente enquanto a conta existir).
