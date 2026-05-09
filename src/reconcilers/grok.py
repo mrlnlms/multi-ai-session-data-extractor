@@ -259,6 +259,28 @@ def run_reconciliation(
     report.assets_total = len(curr_assets)
     report.assets_preserved_missing = len(assets_preserved)
 
+    # Asset binarios (cumulativo, skip-existing) — espelha raw_dir/assets/
+    raw_assets_bin = raw_dir / "assets"
+    merged_assets_bin = merged_output / "assets"
+    if raw_assets_bin.exists():
+        merged_assets_bin.mkdir(parents=True, exist_ok=True)
+        for src_bin in raw_assets_bin.iterdir():
+            if not src_bin.is_file():
+                continue
+            dst_bin = merged_assets_bin / src_bin.name
+            if not dst_bin.exists():
+                shutil.copy2(src_bin, dst_bin)
+    if previous_merged and previous_merged != merged_output:
+        prev_bin = previous_merged / "assets"
+        if prev_bin.exists():
+            merged_assets_bin.mkdir(parents=True, exist_ok=True)
+            for src_bin in prev_bin.iterdir():
+                if not src_bin.is_file():
+                    continue
+                dst_bin = merged_assets_bin / src_bin.name
+                if not dst_bin.exists():
+                    shutil.copy2(src_bin, dst_bin)
+
     # Scheduled tasks (sobrescreve do raw atual; usage/contagem dinamica
     # sem PK estavel — preservation por taskId quando disponivel)
     tasks = _load_tasks(raw_dir)

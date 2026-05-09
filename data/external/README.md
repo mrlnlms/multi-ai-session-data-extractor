@@ -23,7 +23,9 @@ data/external/
 │   ├── 2026-03-26/
 │   ├── 2026-03-30/
 │   └── 2026-04-18/
-└── deep-research-md/                   # 2 exports manuais Deep Research em .md
+├── deep-research-md/                   # 2 exports manuais Deep Research em .md
+└── grok-snapshots/                     # exports oficiais xAI Grok
+    └── 2026-05-09/                     #   primeiro snapshot
 ```
 
 ## Categorias
@@ -47,6 +49,25 @@ Stats atuais (29 convs / 403 msgs / 70 tool_events):
 | Claude Code | 3 | manual_terminal_cc (3) |
 | Gemini | 2 | manual_copypaste (2) |
 | Qwen | 1 | manual_copypaste (1) |
+
+### grok-snapshots/ ✅ binarios usados (sem parser)
+
+Export oficial xAI Grok (zip baixado pelo user via UI). TTL 30 dias no
+storage do servidor. Estrutura por snapshot:
+
+- `prod-grok-backend.json` — convs/projects/tasks/media_posts (NAO usado;
+  extractor V1 via `/rest/app-chat/conversations_v2` retorna 36 campos por
+  response vs 7 do export — superior)
+- `prod-mc-auth-mgmt-api.json` — profile + sessions com IP/cidade/UA
+  (preservado como blob, sem parser canonico)
+- `prod-mc-billing.json` — billing balance (vazio em free tier)
+- `prod-mc-asset-server/<asset_id>/content` × 44 + profile-picture.webp
+  — **binarios fisicos copiados pra `data/raw/Grok/assets/<id>.<ext>`**
+  (resolve gap V1 onde extractor so capturava metadata de assets).
+  Reconciler espelha pra `data/merged/Grok/assets/`. Parser populates
+  coluna `asset_path` em `grok_assets.parquet`.
+
+Detalhes em [docs/platforms/grok/export-analysis.md](../../docs/platforms/grok/export-analysis.md).
 
 ### openai-gdpr-export/ ⏸ preservado (sem parser)
 
@@ -115,6 +136,7 @@ openai-gdpr-export/            1.0GB (extraídos + zip)
 chatgpt-extension-snapshot/     51MB
 claude-ai-snapshots/           360MB
 deep-research-md/              208KB
+grok-snapshots/                 10MB (binarios usados em data/raw/Grok/assets)
                               -------
                               ~1.4GB
 ```

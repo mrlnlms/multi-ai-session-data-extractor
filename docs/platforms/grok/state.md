@@ -71,13 +71,23 @@ schema sera enriquecido empiricamente quando aparecerem.
 
 Acesso na UI: avatar -> Tasks (`grok.com/tasks`).
 
+### Asset binarios — fechado via export oficial
+
+Extractor V1 captura so metadata via `/rest/assets`. Asset binarios
+foram preenchidos via **export oficial** (`data/external/grok-snapshots/
+2026-05-09/`): 44 arquivos copiados pra `data/raw/Grok/assets/
+<asset_id>.<ext>` com mime_type → extensao. Parser populates coluna
+`asset_path` em `grok_assets.parquet` apontando pro merged.
+
+Detalhes em [export-analysis.md](export-analysis.md). Pra renovar
+binarios: re-pedir export (TTL 30 dias) OU implementar
+asset_downloader via API V2 (gerar presigned URL via `key`, deferred).
+
 ### Not covered V1
 
 - **Branches:** `response_node.threads` (when `includeThreads=true`)
   may surface alternative paths in long convs. Smoke samples were
   linear — V1 ignores threads, all messages in `<conv_id>_main` branch.
-- **Asset binarios:** so metadata capturado. Download via `key` (storage
-  path 87 chars) deferred — analogo a chatgpt asset_downloader.
 - **Imagine (image generation):** paywall (SuperGrok). `generatedImageUrls`
   may surface free-tier renders if available — captured via ToolEvent
   but no asset download yet.

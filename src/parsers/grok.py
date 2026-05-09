@@ -340,12 +340,23 @@ class GrokParser(BaseParser):
                 "is_root_asset_created_by_model", "is_latest", "is_deleted",
                 "shared_with_team", "is_public", "root_asset_id",
                 "inline_status", "summary", "preview_image_key",
-                "is_preserved_missing", "created_at", "last_use_time",
+                "asset_path", "is_preserved_missing", "created_at", "last_use_time",
             ])
+        # Index binaries em merged/Grok/assets/ por asset_id (sem extensao)
+        bin_index: dict[str, str] = {}
+        bin_dir = self.merged_root / "assets"
+        if bin_dir.exists():
+            for f in bin_dir.iterdir():
+                if not f.is_file():
+                    continue
+                aid = f.stem  # tira extensao; profile-picture sem dash padrao fica como nome inteiro
+                bin_index[aid] = str(f.relative_to(self.merged_root.parent.parent))
+
         rows = []
         for a in self.assets:
+            aid = a.get("assetId")
             rows.append({
-                "asset_id": a.get("assetId"),
+                "asset_id": aid,
                 "mime_type": a.get("mimeType") or "",
                 "name": a.get("name") or "",
                 "size_bytes": int(a.get("sizeBytes") or 0),
@@ -361,6 +372,7 @@ class GrokParser(BaseParser):
                 "inline_status": a.get("inlineStatus") or "",
                 "summary": a.get("summary") or "",
                 "preview_image_key": a.get("previewImageKey") or "",
+                "asset_path": bin_index.get(aid) or "",
                 "is_preserved_missing": bool(a.get("_preserved_missing", False)),
                 "created_at": self._ts(a.get("createTime")),
                 "last_use_time": self._ts(a.get("lastUseTime")),
