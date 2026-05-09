@@ -1,0 +1,6 @@
+outs:
+- md5: 5522db8509b006a59f7448867dc65f2f.dir
+  size: 13670873
+  nfiles: 48
+  hash: md5
+  path: grok-snapshots
