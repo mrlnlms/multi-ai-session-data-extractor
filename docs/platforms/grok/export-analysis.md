@@ -8,6 +8,37 @@ Snapshot: `data/external/grok-snapshots/2026-05-09/` (10MB extraido).
 > blob historico** preservado pra recovery; pipeline canonico nao
 > depende dele.
 
+## TL;DR — parity API vs export
+
+**Se o export oficial deixasse de existir amanha, o que o pipeline
+canonico (extractor V1 via API) perderia?**
+
+| Categoria | Fonte canonica | Perda sem export |
+|---|---|---|
+| Convs metadata | API `/rest/app-chat/conversations_v2` | nenhuma — API tem **mais** campos uteis |
+| Messages / responses | API `/rest/app-chat/conversations/{id}/load-responses` | nenhuma — API retorna 36 campos vs 7 do export |
+| Tool events (search, RAG, xposts, image gen, citations) | API only | nenhuma — export nao tem |
+| Workspaces (projects) | API `/rest/workspaces` + `/rest/workspaces/{id}` | nenhuma — equivalente |
+| Asset metadata | API `/rest/assets` | nenhuma — API e fonte autoritativa |
+| **Asset binarios** | API `assets.grok.com/<key>` | **nenhuma — sha256 bit-identical com export** (44/44 validados 2026-05-09) |
+| Scheduled tasks | API `/rest/tasks` + `/rest/tasks/inactive` | nenhuma — equivalente (vazio em ambos na conta atual) |
+| Sessions com IP/cidade/UA | so export (`prod-mc-auth-mgmt-api.json`) | **perderia** — nenhum endpoint API mapeado retorna isso |
+| Profile picture .webp | so export | **perderia** — nao listada em `/rest/assets` |
+| Billing balance | so export (vazio em free tier) | irrelevante atualmente |
+| `media_posts` (entidade nova) | so export (campo existe, vazio) | irrelevante atualmente — schema desconhecido sem dados |
+
+**Veredicto:**
+
+- **Pros dados acionaveis** (convs, messages, tool events, assets,
+  workspaces): pipeline e **autossuficiente**, nao precisa do export.
+- **Perdas reais sem export:** apenas (a) historico de sessions com
+  IP/cidade/UA/signin (auditoria de acesso) e (b) profile picture do
+  user. Nenhum dos dois e critico pro proposito do projeto
+  (capturar conteudo de conversas com AI).
+- **Snapshot mantido** apenas pra recovery extremo (conta deletada
+  -> sem acesso aos endpoints) e auditoria de acesso futura, caso o
+  user queira analisar IPs/devices.
+
 ## Pacotes do export
 
 ```
