@@ -7,7 +7,7 @@ from typing import Optional
 import pandas as pd
 
 
-VALID_SOURCES = ("claude_ai", "chatgpt", "qwen", "claude_code", "deepseek", "perplexity", "gemini", "notebooklm", "codex", "gemini_cli")
+VALID_SOURCES = ("claude_ai", "chatgpt", "qwen", "claude_code", "deepseek", "perplexity", "gemini", "notebooklm", "codex", "gemini_cli", "grok")
 VALID_ROLES = ("user", "assistant", "system")
 VALID_MODES = ("chat", "search", "research", "copilot", "concise", "dalle", "cli")
 

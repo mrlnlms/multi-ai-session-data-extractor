@@ -1,0 +1,53 @@
+---
+title: "Grok — Data Profile"
+subtitle: "Descriptive catalog of canonical parser v3 parquets"
+source-title: "Grok"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
+
+import sys
+from pathlib import Path
+
+_this = Path.cwd()
+_project_root = _this if (_this / "src").exists() else _this.parent
+sys.path.insert(0, str(_project_root))
+
+import pandas as pd
+import duckdb
+from itables import init_notebook_mode
+init_notebook_mode(all_interactive=False)
+
+from src.parsers.quarto_helpers import (
+    fmt_pct, fmt_int, safe_int, show_df, show_md, plotly_bar,
+    has_col, has_view, table_count, setup_notebook,
+)
+
+SOURCE_KEY     = "grok"
+SOURCE_TITLE   = "Grok"
+SOURCE_COLOR   = "#1DA1F2"  # X / xAI blue
+MUTED          = "#D1D5DB"
+PROCESSED      = _project_root / "data" / "processed" / "Grok"
+TABLES         = ["conversations", "messages", "tool_events"]
+AUX_TABLES     = ["project_metadata", "conversation_projects"]
+ACCOUNT_FILTER = None
+
+con = duckdb.connect()
+_setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
+```
+
+> **About Grok:** parser v3 covering Grok web app (xAI). Sender `human`/
+> `assistant` mapped to canonical roles, models grok-3 / grok-4 / grok-4-auto,
+> ToolEvent emitted for webSearchResults / xposts / ragResults / connectorSearch
+> / generatedImageUrls / toolResponses. Projects (workspaces) with
+> `customPersonality` (instructions) + cross-ref to conversations via
+> `conversation_projects`. Imagine (image generation) is paywall-only and
+> not captured. Branches not detected in V1 — `response_node.threads` may
+> expose alternative paths in future.
+
+{{< include _template.qmd >}}
+
+{{< include _template_aux.qmd >}}
