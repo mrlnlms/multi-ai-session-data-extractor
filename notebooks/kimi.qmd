@@ -1,0 +1,56 @@
+---
+title: "Kimi — Data Profile"
+subtitle: "Descriptive catalog of canonical parser v3 parquets"
+source-title: "Kimi"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
+
+import sys
+from pathlib import Path
+
+_this = Path.cwd()
+_project_root = _this if (_this / "src").exists() else _this.parent
+sys.path.insert(0, str(_project_root))
+
+import pandas as pd
+import duckdb
+from itables import init_notebook_mode
+init_notebook_mode(all_interactive=False)
+
+from src.parsers.quarto_helpers import (
+    fmt_pct, fmt_int, safe_int, show_df, show_md, plotly_bar,
+    has_col, has_view, table_count, setup_notebook,
+)
+
+SOURCE_KEY     = "kimi"
+SOURCE_TITLE   = "Kimi"
+SOURCE_COLOR   = "#3DB39E"  # Kimi teal-green (Moonshot brand)
+MUTED          = "#D1D5DB"
+PROCESSED      = _project_root / "data" / "processed" / "Kimi"
+TABLES         = ["conversations", "messages", "tool_events", "branches"]
+AUX_TABLES     = ["project_metadata", "assets"]
+ACCOUNT_FILTER = None
+
+con = duckdb.connect()
+_setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
+```
+
+> **About Kimi:** parser v3 covering Kimi (Moonshot AI). Sender
+> `user`/`assistant`/`system` mapped to canonical roles, scenario
+> SCENARIO_K2D5 (K2.6 Instant default) → mode `chat`. Block-based
+> messages with text/tool/file kinds — ToolEvent emitted per
+> `block.tool` (web_search, fetch_urls, ipython, etc) preserving
+> `args` and `contents` (search result snippets inline). Files inline
+> in `chat.files[]` downloaded via signUrl (signed URLs from Moonshot
+> CDN). Skills (Slides/Docs/Deep Research/Sheets/Agent Swarm/Kimi
+> Code/Kimi Claw) treated as projects (custom modes). Branches V1: 1
+> per conv (no fork detection — DAG via parentId/childrenMessageIds
+> mapped but no multi-leaf inference yet).
+
+{{< include _template.qmd >}}
+
+{{< include _template_aux.qmd >}}

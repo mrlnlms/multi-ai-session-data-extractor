@@ -46,6 +46,7 @@ ou script novo**. Resumo:
 | NotebookLM | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ | ✅ | [notebooklm/state.md](docs/platforms/notebooklm/state.md) | multi-conta + account-3 legacy, 9 parquets |
 | Perplexity | ✅ | ✅ | ✅ (2 etapas) | ✅ | ✅ | [perplexity/state.md](docs/platforms/perplexity/state.md) | 82 convs, 4 spaces, 1 orphan |
 | Grok | ✅ | ✅ | ✅ (3 etapas) | ✅ | ✅ | [grok/state.md](docs/platforms/grok/state.md) | smoke: 6 convs / 1 workspace / 156 msgs / 62 tool events / 44 assets baixados via API (10MB) / 0 scheduled tasks |
+| Kimi | ✅ | ✅ | ✅ (3 etapas) | ✅ | ✅ | [kimi/state.md](docs/platforms/kimi/state.md) | smoke: 9 chats / 5 skills inst / 261 msgs / 82 tool events (web_search+fetch_urls+ipython) / 26 assets via signUrl (3.76MB) |
 
 **CLI (3 fontes adicionais — dado local em vez de captura web):**
 
@@ -303,9 +304,9 @@ Rodar via `scripts/unify-parquets.py` apos os parses individuais.
 
 **Quarto overview** le `data/unified/` direto. 4 qmds cross-plataforma:
 
-- `notebooks/00-overview.qmd` — todas as 11 sources (sem filtro)
-- `notebooks/00-overview-web.qmd` — 7 web (chatgpt, claude_ai, perplexity,
-  qwen, deepseek, gemini, grok)
+- `notebooks/00-overview.qmd` — todas as 12 sources (sem filtro)
+- `notebooks/00-overview-web.qmd` — 8 web (chatgpt, claude_ai, perplexity,
+  qwen, deepseek, gemini, grok, kimi)
 - `notebooks/00-overview-cli.qmd` — 3 CLIs (claude_code, codex, gemini_cli)
 - `notebooks/00-overview-rag.qmd` — NotebookLM
 

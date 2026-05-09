@@ -6,11 +6,7 @@ Open work items. Closed via shipped releases are removed from this list
 
 ## Future platforms
 
-### Kimi (Moonshot AI)
-
-Web chat at `kimi.com`. No known native export for full conversation
-history. Same pattern as Grok — browser-based capture with persistent
-profile and reverse-engineered internal API.
+(none right now — Grok and Kimi shipped 2026-05-09.)
 
 ## Operational
 
