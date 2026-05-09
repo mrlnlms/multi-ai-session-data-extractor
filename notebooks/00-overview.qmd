@@ -1,6 +1,6 @@
 ---
 title: "Cross-platform overview — Data Profile"
-subtitle: "Consolidated view of the 10 sources (7 web + 3 CLI) — no filter"
+subtitle: "Consolidated view of the 11 sources (7 web + 3 CLI) — no filter"
 jupyter: python3
 ---
 
@@ -27,7 +27,7 @@ from src.parsers.quarto_helpers import (
 
 # === Notebook config ===
 SUBSET_TITLE     = "Cross-platform (all)"
-SOURCES_FILTER   = None  # None = all 10 sources
+SOURCES_FILTER   = None  # None = all 11 sources
 UNIFIED_DIR      = _project_root / "data" / "unified"
 MUTED            = "#D1D5DB"
 
@@ -39,6 +39,7 @@ SOURCE_COLORS = {
     "qwen":        "#615CED",  # Qwen purple
     "deepseek":    "#3B82F6",  # DeepSeek blue
     "gemini":      "#4285F4",  # Google blue
+    "grok":        "#1DA1F2",  # X / xAI blue
     "notebooklm":  "#F4B400",  # Google yellow
     "claude_code": "#7C3AED",  # CC dark purple
     "codex":       "#374151",  # Codex gray

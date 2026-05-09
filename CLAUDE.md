@@ -45,6 +45,7 @@ ou script novo**. Resumo:
 | Gemini | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ | ✅ | [gemini/state.md](docs/platforms/gemini/state.md) | 2 contas, 4/4 CRUD validados |
 | NotebookLM | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ | ✅ | [notebooklm/state.md](docs/platforms/notebooklm/state.md) | multi-conta + account-3 legacy, 9 parquets |
 | Perplexity | ✅ | ✅ | ✅ (2 etapas) | ✅ | ✅ | [perplexity/state.md](docs/platforms/perplexity/state.md) | 82 convs, 4 spaces, 1 orphan |
+| Grok | ✅ | ✅ | ✅ (2 etapas) | ✅ | ✅ | [grok/state.md](docs/platforms/grok/state.md) | smoke: 6 convs / 1 workspace / 156 msgs / 62 tool events |
 
 **CLI (3 fontes adicionais — dado local em vez de captura web):**
 
@@ -299,9 +300,9 @@ Rodar via `scripts/unify-parquets.py` apos os parses individuais.
 
 **Quarto overview** le `data/unified/` direto. 4 qmds cross-plataforma:
 
-- `notebooks/00-overview.qmd` — todas as 10 sources (sem filtro)
-- `notebooks/00-overview-web.qmd` — 6 web (chatgpt, claude_ai, perplexity,
-  qwen, deepseek, gemini)
+- `notebooks/00-overview.qmd` — todas as 11 sources (sem filtro)
+- `notebooks/00-overview-web.qmd` — 7 web (chatgpt, claude_ai, perplexity,
+  qwen, deepseek, gemini, grok)
 - `notebooks/00-overview-cli.qmd` — 3 CLIs (claude_code, codex, gemini_cli)
 - `notebooks/00-overview-rag.qmd` — NotebookLM
 

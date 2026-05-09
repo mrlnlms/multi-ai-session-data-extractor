@@ -1,6 +1,6 @@
 ---
 title: "Web Chat Overview — Data Profile"
-subtitle: "Subset: 6 web platforms (ChatGPT, Claude.ai, Perplexity, Qwen, DeepSeek, Gemini)"
+subtitle: "Subset: 7 web platforms (ChatGPT, Claude.ai, Perplexity, Qwen, DeepSeek, Gemini, Grok)"
 jupyter: python3
 ---
 
@@ -25,8 +25,8 @@ from src.parsers.quarto_helpers import (
     has_col, has_view, table_count, setup_unified_views,
 )
 
-SUBSET_TITLE     = "Web Chat (6 platforms)"
-SOURCES_FILTER   = ["chatgpt", "claude_ai", "perplexity", "qwen", "deepseek", "gemini"]
+SUBSET_TITLE     = "Web Chat (7 platforms)"
+SOURCES_FILTER   = ["chatgpt", "claude_ai", "perplexity", "qwen", "deepseek", "gemini", "grok"]
 UNIFIED_DIR      = _project_root / "data" / "unified"
 MUTED            = "#D1D5DB"
 
@@ -37,6 +37,7 @@ SOURCE_COLORS = {
     "qwen":       "#615CED",
     "deepseek":   "#3B82F6",
     "gemini":     "#4285F4",
+    "grok":       "#1DA1F2",
 }
 
 con = duckdb.connect()
