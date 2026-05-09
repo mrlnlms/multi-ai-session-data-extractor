@@ -45,7 +45,7 @@ ou script novo**. Resumo:
 | Gemini | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ | ✅ | [gemini/state.md](docs/platforms/gemini/state.md) | 2 contas, 4/4 CRUD validados |
 | NotebookLM | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ | ✅ | [notebooklm/state.md](docs/platforms/notebooklm/state.md) | multi-conta + account-3 legacy, 9 parquets |
 | Perplexity | ✅ | ✅ | ✅ (2 etapas) | ✅ | ✅ | [perplexity/state.md](docs/platforms/perplexity/state.md) | 82 convs, 4 spaces, 1 orphan |
-| Grok | ✅ | ✅ | ✅ (2 etapas) | ✅ | ✅ | [grok/state.md](docs/platforms/grok/state.md) | smoke: 6 convs / 1 workspace / 156 msgs / 62 tool events / 44 assets / 0 scheduled tasks |
+| Grok | ✅ | ✅ | ✅ (3 etapas) | ✅ | ✅ | [grok/state.md](docs/platforms/grok/state.md) | smoke: 6 convs / 1 workspace / 156 msgs / 62 tool events / 44 assets baixados via API (10MB) / 0 scheduled tasks |
 
 **CLI (3 fontes adicionais — dado local em vez de captura web):**
 
