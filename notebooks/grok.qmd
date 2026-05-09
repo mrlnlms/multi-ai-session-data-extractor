@@ -32,7 +32,7 @@ SOURCE_COLOR   = "#1DA1F2"  # X / xAI blue
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Grok"
 TABLES         = ["conversations", "messages", "tool_events"]
-AUX_TABLES     = ["project_metadata", "conversation_projects"]
+AUX_TABLES     = ["project_metadata", "conversation_projects", "assets", "scheduled_tasks"]
 ACCOUNT_FILTER = None
 
 con = duckdb.connect()

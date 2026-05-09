@@ -20,6 +20,8 @@ workspaces.
 
 - 6 convs / 1 workspace / 1 conv-in-workspace.
 - 156 messages (78 user / 78 assistant) / 62 tool_events.
+- 44 assets (37 PNG, 4 PDF, 2 DOCX, 1 JPG; 10MB total, all uploads).
+- 0 scheduled tasks (active + inactive).
 
 ## Canonical parser
 
@@ -48,18 +50,39 @@ workspaces.
 - **Cross-ref conversation->workspace** via
   `grok_conversation_projects.parquet` (canonical mapping table).
 
+### Files (assets) — global per user
+
+`/rest/assets` retorna uploads do user + arquivos gerados pelo modelo.
+Capturados em `data/raw/Grok/assets.json` (cumulativo via reconciler com
+preservation por `assetId`). Parser emite `grok_assets.parquet`
+(asset_id, mime_type, name, size_bytes, key, file_source,
+is_model_generated, is_latest, is_deleted, etc).
+
+Acesso na UI: avatar (canto inferior esquerdo) -> Files
+(`grok.com/files`).
+
+### Tasks (scheduled queries) — shell pronto
+
+`/rest/tasks` + `/rest/tasks/inactive` retornam scheduled prompts
+recorrentes (active + inactive + usage quotas). Schema preliminar
+salvo em `tasks.json`; parser emite `grok_scheduled_tasks.parquet`
+quando ha pelo menos 1 task. Smoke 2026-05-09: 0 tasks na conta —
+schema sera enriquecido empiricamente quando aparecerem.
+
+Acesso na UI: avatar -> Tasks (`grok.com/tasks`).
+
 ### Not covered V1
 
 - **Branches:** `response_node.threads` (when `includeThreads=true`)
   may surface alternative paths in long convs. Smoke samples were
   linear — V1 ignores threads, all messages in `<conv_id>_main` branch.
+- **Asset binarios:** so metadata capturado. Download via `key` (storage
+  path 87 chars) deferred — analogo a chatgpt asset_downloader.
 - **Imagine (image generation):** paywall (SuperGrok). `generatedImageUrls`
   may surface free-tier renders if available — captured via ToolEvent
   but no asset download yet.
 - **Connectors content:** Drive/Gmail/Notion integrations referenced
   in `connectorSearchResults` are external — only metadata preserved.
-- **Tasks (scheduled queries):** Grok feature for recurring prompts —
-  metadata available via `/rest/tasks` but not parsed V1.
 
 ## Descriptive Quarto
 

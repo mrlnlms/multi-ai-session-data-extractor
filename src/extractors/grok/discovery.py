@@ -60,6 +60,22 @@ async def discover(client: GrokAPIClient) -> tuple[list[dict], list[dict]]:
     return convs, workspaces
 
 
+async def discover_assets(client: GrokAPIClient) -> list[dict]:
+    """Lista assets (Files na UI). Sao globais do user, nao por conv."""
+    print("Listando assets (Files)...")
+    assets = await client.list_assets()
+    print(f"  {len(assets)} assets")
+    return assets
+
+
+async def discover_scheduled_tasks(client: GrokAPIClient) -> dict:
+    """Lista scheduled tasks (Tasks na UI). Active + inactive + usage."""
+    print("Listando scheduled tasks...")
+    tasks = await client.list_scheduled_tasks()
+    print(f"  {len(tasks['active'])} active, {len(tasks['inactive'])} inactive")
+    return tasks
+
+
 def persist_discovery(
     conversations: list[dict], workspaces: list[dict], output_dir: Path
 ) -> None:
