@@ -58,6 +58,7 @@ class CaptureRun:
     fetch_succeeded: Optional[int]
     errors_count: int = 0
     mode: Optional[str] = None  # 'full' | 'incremental' | 'refetch_known' | None
+    account: Optional[str] = None  # multi-conta (Gemini/NotebookLM); None pra single
 
 
 @dataclass
@@ -203,6 +204,7 @@ def _load_capture_log(path: Path) -> list[CaptureRun]:
                         or totals.get("conversations_fetched")
                     ),
                     errors_count=errors_count,
+                    account=(str(d["account"]) if "account" in d and d["account"] is not None else None),
                 )
             )
     return runs
