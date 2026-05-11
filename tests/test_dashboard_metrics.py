@@ -70,6 +70,29 @@ def test_drop_flag_true_when_one_account_drops_in_multi():
     assert discovery_drop_flag(_state("Gemini", runs)) is True
 
 
+def test_load_capture_log_parses_notebooklm_schema(tmp_path):
+    """NotebookLM log usa `notebooks_discovered` (nao threads/conversations).
+    Pre-fix, _load_capture_log nao reconhecia o campo e discovery_total ficava
+    None — drop_flag nunca disparava pra NotebookLM mesmo com drop real.
+    """
+    import json as _json
+    from dashboard.data import _load_capture_log
+
+    log = tmp_path / "capture_log.jsonl"
+    log.write_text(_json.dumps({
+        "started_at": "2026-05-02T17:19:03+00:00",
+        "finished_at": "2026-05-02T17:23:20+00:00",
+        "account": "1",
+        "mode": "incremental",
+        "totals": {"notebooks_discovered": 94, "notebooks_fetched": 65},
+    }) + "\n")
+    runs = _load_capture_log(log)
+    assert len(runs) == 1
+    assert runs[0].discovery_total == 94
+    assert runs[0].fetch_succeeded == 65
+    assert runs[0].account == "1"
+
+
 def test_drop_flag_ignores_refetch_known_modes():
     """refetch_known/refetch_known_fallback nao representam discovery global."""
     runs = [

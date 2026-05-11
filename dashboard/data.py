@@ -192,16 +192,19 @@ def _load_capture_log(path: Path) -> list[CaptureRun]:
                         discovery.get("total")
                         or totals.get("threads_discovered")
                         or totals.get("conversations_discovered")
+                        or totals.get("notebooks_discovered")
                     ),
                     fetch_attempted=(
                         fetch.get("attempted")
                         or totals.get("threads_fetched")
                         or totals.get("conversations_fetched")
+                        or totals.get("notebooks_fetched")
                     ),
                     fetch_succeeded=(
                         fetch.get("succeeded")
                         or totals.get("threads_fetched")
                         or totals.get("conversations_fetched")
+                        or totals.get("notebooks_fetched")
                     ),
                     errors_count=errors_count,
                     account=(str(d["account"]) if "account" in d and d["account"] is not None else None),
