@@ -16,7 +16,7 @@ from dashboard.components import (
 )
 from dashboard.data import PlatformState, discover_platforms
 from dashboard.metrics import compute_merged_stats, discovery_drop_flag
-from dashboard.sync import run_sync, run_unify, sync_command
+from dashboard.sync import run_sync, run_sync_streaming, run_unify, sync_command
 
 
 @st.cache_data(show_spinner=False)
@@ -241,18 +241,23 @@ def _run_update_all(states: list[PlatformState]) -> None:
     st.warning("⚠️ Sync + unify in progress — don't close this tab.")
     progress = st.progress(0.0)
     for i, s in enumerate(targets):
-        with st.spinner(f"Sync {s.name}..."):
-            try:
-                result = run_sync(s.name)
-            except Exception as e:  # noqa: BLE001 — superficie de erro pro usuario
-                st.error(f"❌ {s.name}: {e}")
-                continue
-        if result.returncode != 0:
-            st.error(
-                f"❌ {s.name} failed (exit {result.returncode}). "
-                f"stderr: {(result.stderr or '')[-500:]}"
+        st.markdown(f"**{s.name}**")
+        live = st.empty()
+        live.text("starting...")
+        try:
+            rc, tail = run_sync_streaming(
+                s.name,
+                on_line=lambda l, _live=live: _live.code(l[-200:], language=None),
             )
+        except Exception as e:  # noqa: BLE001
+            st.error(f"❌ {s.name}: {e}")
+            progress.progress((i + 1) / len(targets))
+            continue
+        if rc != 0:
+            live.empty()
+            st.error(f"❌ {s.name} failed (exit {rc}). tail:\n```\n{tail[-800:]}\n```")
         else:
+            live.empty()
             st.success(f"✅ {s.name} ok")
         progress.progress((i + 1) / len(targets))
 
