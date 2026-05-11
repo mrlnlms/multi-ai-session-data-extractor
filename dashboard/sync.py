@@ -72,5 +72,18 @@ def _safe_env() -> dict[str, str]:
     return {k: v for k, v in os.environ.items()}
 
 
+def run_unify(capture_output: bool = True) -> subprocess.CompletedProcess:
+    """Roda scripts/unify-parquets.py — materializa data/unified/ a partir
+    de data/processed/<plat>/. Idempotente, sem args."""
+    cmd = [sys.executable, str(SCRIPTS_DIR / "unify-parquets.py")]
+    return subprocess.run(
+        cmd,
+        cwd=str(PROJECT_ROOT),
+        capture_output=capture_output,
+        text=True,
+        env={**_safe_env(), "PYTHONPATH": str(PROJECT_ROOT)},
+    )
+
+
 def quarto_installed() -> bool:
     return shutil.which("quarto") is not None
