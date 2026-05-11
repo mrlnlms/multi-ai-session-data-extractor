@@ -16,14 +16,18 @@ from src.extractors.chatgpt.discovery import discover_all
 from src.extractors.chatgpt.dom_voice import capture_voice_dom, detect_voice_candidates
 from src.extractors.chatgpt.fetcher import fetch_all
 from src.extractors.chatgpt.models import CaptureOptions, CaptureReport
+from src.extractors.chatgpt.refetch_known import refetch_known_via_page
 
 logger = logging.getLogger(__name__)
 
 
-# Aborta captura se discovery cair mais que isso vs maior valor historico ja visto.
-# Discovery flakey (/projects 404, DOM scrape parcial) e muito comum — sem essa
-# protecao, raw fica corrompido e contamina proxima base incremental.
-DISCOVERY_DROP_ABORT_THRESHOLD = 0.20
+# Quando discovery cai mais que isso vs maior valor historico, o orchestrator
+# nao confia no listing e cai pra refetch_known via /conversations/batch (caminho
+# que nao depende de discovery — pega pelos IDs ja salvos no raw cumulativo).
+# Threshold mantido pra evitar falso-fallback (oscilacoes pequenas sao normais).
+DISCOVERY_DROP_FALLBACK_THRESHOLD = 0.20
+# Alias retro-compat (codigo/testes antigos referenciam pelo nome velho)
+DISCOVERY_DROP_ABORT_THRESHOLD = DISCOVERY_DROP_FALLBACK_THRESHOLD
 
 
 def _get_max_known_discovery(raw_root: Path) -> int:
@@ -101,19 +105,36 @@ async def run_capture(output_dir: Path, options: CaptureOptions) -> CaptureRepor
         metas, project_names = await discover_all(client, page=page)
         report.discovery_counts = {"total": len(metas)}
 
-        # Fail-fast: aborta se discovery caiu muito vs maior valor historico ja visto.
-        # Sem isso, raw fica corrompido (snapshot incompleto vira base do proximo
-        # incremental, que entao refetcha tudo que reapareceu — confusao garantida).
+        # Discovery parcial vira fallback automatico pra refetch_known.
+        # /conversations listing as vezes retorna paginacao incompleta — em vez de
+        # confiar nesse listing reduzido (e marcar centenas como deletadas), cai
+        # pra refetch_known via /conversations/batch usando os IDs ja salvos no raw.
         baseline = _get_max_known_discovery(output_dir)
         if baseline > 0:
             drop = (baseline - len(metas)) / baseline
-            if drop > DISCOVERY_DROP_ABORT_THRESHOLD:
-                raise RuntimeError(
-                    f"Discovery suspeita: {len(metas)} convs vs {baseline} no historico "
-                    f"(queda {drop:.0%}, limite {DISCOVERY_DROP_ABORT_THRESHOLD:.0%}). "
-                    f"Provavel /projects 404 ou DOM scrape parcial — endpoints flakey. "
-                    f"Tente novamente em alguns minutos."
+            if drop > DISCOVERY_DROP_FALLBACK_THRESHOLD:
+                logger.warning(
+                    f"Discovery parcial: {len(metas)} convs vs {baseline} no historico "
+                    f"(queda {drop:.0%}). Caindo pra refetch_known via /conversations/batch."
                 )
+                stats = await refetch_known_via_page(page, output_dir)
+                report.discovery_counts = {"total": stats["total"]}
+                report.fetch_counts = {
+                    "attempted": stats["total"],
+                    "succeeded": stats["updated"],
+                    "total_discovered": stats["total"],
+                }
+                report.mode = "refetch_known_fallback"
+                if stats["errors"]:
+                    report.errors.append({
+                        "stage": "refetch_known_fallback",
+                        "count": stats["errors"],
+                    })
+                await context.close()
+                _finalize_report(report, started_at)
+                _append_capture_log(output_dir, report)
+                _write_last_capture_md(output_dir, report)
+                return report
             logger.info(f"Discovery OK: {len(metas)} convs (baseline historico: {baseline})")
 
         # Salva IDs da discovery (permite diff contra fetched pra achar falhas)
@@ -282,13 +303,23 @@ async def run_capture(output_dir: Path, options: CaptureOptions) -> CaptureRepor
         await context.close()
 
     _finalize_report(report, started_at)
+    _append_capture_log(output_dir, report)
+    try:
+        _write_last_capture_md(output_dir, report)
+    except Exception as md_exc:
+        logger.error(f"Falha gravando LAST_CAPTURE.md: {md_exc}")
 
-    # Append em capture_log.jsonl (1 linha por run, historico cumulativo)
+    return report
+
+
+def _append_capture_log(output_dir: Path, report: CaptureReport) -> None:
+    """Append 1 linha JSON em capture_log.jsonl com totals da run."""
     try:
         log_entry = {
             "run_started_at": report.run_started_at,
             "run_finished_at": report.run_finished_at,
             "duration_seconds": report.duration_seconds,
+            "mode": report.mode,
             "discovery": report.discovery_counts,
             "fetch": report.fetch_counts,
             "voice_pass": report.voice_pass_counts,
@@ -299,14 +330,6 @@ async def run_capture(output_dir: Path, options: CaptureOptions) -> CaptureRepor
             f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
     except Exception as log_exc:
         logger.error(f"Falha gravando capture_log.jsonl: {log_exc}")
-
-    # LAST_CAPTURE.md — snapshot human-readable, sobrescreve a cada run
-    try:
-        _write_last_capture_md(output_dir, report)
-    except Exception as md_exc:
-        logger.error(f"Falha gravando LAST_CAPTURE.md: {md_exc}")
-
-    return report
 
 
 def _write_last_capture_md(output_dir: Path, report: CaptureReport) -> None:

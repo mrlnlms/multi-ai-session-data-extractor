@@ -17,7 +17,37 @@ of `update_time`.
 ## `/projects` intermittent 404
 
 Caller has automatic fallback to `/gizmos/discovery/mine` -> DOM scrape.
-Fail-fast covers the case when all fallbacks fail together (rare).
+When all three fail together (or `/conversations` listing itself returns
+partial — see below), the orchestrator now falls back automatically to
+`refetch_known_via_page` instead of raising.
+
+## `/conversations` listing returns partial — autorecover (2026-05-11)
+
+Sometimes `/conversations` listing comes back with a fraction of the real
+conversation count (e.g. 157 vs 1168 baseline) — pagination glitch upstream
+or rate limiting at the listing endpoint. Validated empirically on
+2026-05-11: discovery returned 157, baseline was 1168 (87% drop).
+
+**Pre-fix behavior** (commit `7868ddb`, 2026-04-27): orchestrator raised
+`RuntimeError("Discovery suspeita...")`. The dashboard's "Update all"
+button turned red, the user had to manually run
+`scripts/chatgpt-refetch-known.py` from the terminal. The "fail-fast"
+narrative was invented in this project — not inherited from the parent
+project (`AI Interaction Analysis/`), where no such guard existed.
+
+**Post-fix behavior:** when discovery drops more than
+`DISCOVERY_DROP_FALLBACK_THRESHOLD` (20%) below the historical max, the
+orchestrator calls `refetch_known_via_page` automatically using the IDs
+already in `chatgpt_raw.json`. This path doesn't depend on listing.
+
+Trade-off: that run takes ~20min (1168 batches of 10 ≈ ~7s each) instead
+of the ~80s of an incremental sync. New conversations created since the
+last successful discovery are not picked up in this run — they show up in
+the next run when listing recovers. Acceptable cost: the alternative was
+red error + manual intervention.
+
+`capture_log.jsonl` records `mode: "refetch_known_fallback"` for these
+runs so the dashboard can distinguish them.
 
 ## `/conversations/batch` limit reduced to 10 (2026-05-11)
 

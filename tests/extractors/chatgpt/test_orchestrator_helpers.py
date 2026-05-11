@@ -12,8 +12,9 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.extractors.chatgpt.models import ConversationMeta
+from src.extractors.chatgpt.models import CaptureReport, ConversationMeta
 from src.extractors.chatgpt.orchestrator import (
+    _append_capture_log,
     _filter_incremental_targets,
     _find_last_capture,
     _get_max_known_discovery,
@@ -231,3 +232,35 @@ def test_filter_incremental_handles_missing_title_in_meta(tmp_path):
 
     # title=None nao dispara rename detection (poderia ser meta incompleta)
     assert targets == []
+
+
+def test_append_capture_log_records_mode_field(tmp_path):
+    """Log entry inclui `mode` (incremental | full | refetch_known_fallback)
+    pra dashboard distinguir tipo de run.
+    """
+    report = CaptureReport(
+        run_started_at="2026-05-11T20:00:00+00:00",
+        run_finished_at="2026-05-11T20:20:00+00:00",
+        duration_seconds=1200.0,
+        discovery_counts={"total": 1168},
+        fetch_counts={"attempted": 1168, "succeeded": 1168, "total_discovered": 1168},
+        mode="refetch_known_fallback",
+    )
+    _append_capture_log(tmp_path, report)
+    log_path = tmp_path / "capture_log.jsonl"
+    assert log_path.exists()
+    entry = json.loads(log_path.read_text().splitlines()[0])
+    assert entry["mode"] == "refetch_known_fallback"
+    assert entry["fetch"]["succeeded"] == 1168
+
+
+def test_append_capture_log_default_mode_incremental(tmp_path):
+    """Sem mode explicito, log entry sai como 'incremental' (default do report)."""
+    report = CaptureReport(
+        run_started_at="2026-05-11T20:00:00+00:00",
+        run_finished_at="2026-05-11T20:01:00+00:00",
+        duration_seconds=60.0,
+    )
+    _append_capture_log(tmp_path, report)
+    entry = json.loads((tmp_path / "capture_log.jsonl").read_text().splitlines()[0])
+    assert entry["mode"] == "incremental"

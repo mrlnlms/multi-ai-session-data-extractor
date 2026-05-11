@@ -147,9 +147,16 @@ outras**. Tabela cumulativa em `docs/cross-platform-features.md`.
    `skip_existing` nos downloaders. Binarios sao precious.
 2. **Preservation acima de tudo** — convs/sources deletadas no servidor
    viram `_preserved_missing` no merged.
-3. **Fail-fast contra discovery flakey** — `_get_max_known_discovery` com
-   threshold 20%; aborta antes do fetch se discovery atual <80% do maior
-   historico. Aplicado em todos extractors.
+3. **Discovery parcial vira fallback, nao erro** (ChatGPT, 2026-05-11) —
+   `_get_max_known_discovery` com threshold 20% **detecta** quando listing
+   upstream retorna parcial. ChatGPT entao cai pra `refetch_known_via_page`
+   (`/conversations/batch` pelos IDs salvos no raw cumulativo) — caminho que
+   nao depende de discovery. Custo do fallback: ~20min em vez de ~80s naquela
+   rodada, mas o "Update all" sempre fecha verde. As outras 6 plataformas
+   ainda tem o `RuntimeError` original — pendente generalizar quando houver
+   sintoma equivalente. Historia completa: o fail-fast foi inventado aqui em
+   2026-04-27 (commit 7868ddb), nao veio do projeto pai; o conserto cirurgico
+   transforma a detecao em fallback transparente em vez de erro.
 4. **Schema canonico eh fronteira** — `src/schema/models.py` define
    `Conversation`, `Message`, `ToolEvent`, `ConversationProject`, `Branch`.
    Extractors entregam raw/merged JSON; parsers entregam parquet nesse
