@@ -274,14 +274,31 @@ def compute_platform_metrics(state: PlatformState) -> PlatformMetrics:
 def discovery_drop_flag(state: PlatformState, threshold: float = 0.20) -> bool:
     """True se a discovery mais recente caiu mais que o threshold vs a maior historica.
 
-    Modos `refetch_known` sao ignorados — eles capturam um subset proposital
-    (ex: 1 conv que errou na run anterior), nao representam discovery do
-    listing global.
+    Segmenta por account em plataformas multi-conta (Gemini/NotebookLM tem
+    contas com volumes diferentes — comparar acc-1=46 vs acc-2=33 dispararia
+    falso positivo). Compara dentro de cada account isoladamente; basta uma
+    conta com drop real pra disparar o flag.
+
+    Modos `refetch_known`/`refetch_known_fallback` sao ignorados — eles
+    capturam um subset proposital (ex: 1 conv que errou na run anterior, ou
+    o ChatGPT caiu no fallback porque listing veio parcial), nao representam
+    discovery do listing global.
     """
-    full_runs = [r for r in state.capture_runs if r.mode != "refetch_known"]
-    totals = [r.discovery_total for r in full_runs if r.discovery_total]
-    if len(totals) < 2:
-        return False
-    max_known = max(totals)
-    latest = totals[-1]
-    return latest < max_known * (1 - threshold)
+    skip_modes = {"refetch_known", "refetch_known_fallback"}
+    full_runs = [r for r in state.capture_runs if r.mode not in skip_modes]
+
+    by_account: dict[Optional[str], list] = {}
+    for r in full_runs:
+        if r.discovery_total:
+            by_account.setdefault(r.account, []).append(r)
+
+    for account_runs in by_account.values():
+        if len(account_runs) < 2:
+            continue
+        account_runs.sort(key=lambda r: r.started_at or datetime.min.replace(tzinfo=timezone.utc))
+        totals = [r.discovery_total for r in account_runs]
+        max_known = max(totals)
+        latest = totals[-1]
+        if latest < max_known * (1 - threshold):
+            return True
+    return False
