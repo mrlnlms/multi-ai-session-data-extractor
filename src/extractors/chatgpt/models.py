@@ -67,6 +67,7 @@ class CaptureReport:
     fetch_counts: dict[str, int] = field(default_factory=dict)
     voice_pass_counts: dict[str, int] = field(default_factory=dict)
     errors: list[dict] = field(default_factory=list)
+    mode: str = "incremental"  # 'incremental' | 'full' | 'refetch_known_fallback'
 
     def summary(self) -> str:
         """Resumo humano pra imprimir no fim da run."""
