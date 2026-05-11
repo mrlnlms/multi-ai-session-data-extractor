@@ -10,7 +10,11 @@ Convs INDIVIDUAIS continuam acessiveis via /conversation/{id} ou batch.
 
 Uso:
   PYTHONPATH=. .venv/bin/python scripts/chatgpt-refetch-known.py [--account default]
-                                                                 [--batch-size 50]
+                                                                 [--batch-size 10]
+
+Nota: limite upstream do /conversations/batch eh 10 entries por request
+(validado via 422 "conversation_ids must contain at most 10 entries" em
+2026-05-11). Defaults antigos (50) viram 100% erros.
 """
 from __future__ import annotations
 
@@ -146,6 +150,6 @@ async def refetch(account: str, batch_size: int = 50) -> None:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--account", default="default")
-    ap.add_argument("--batch-size", type=int, default=50)
+    ap.add_argument("--batch-size", type=int, default=10)
     args = ap.parse_args()
     asyncio.run(refetch(args.account, args.batch_size))

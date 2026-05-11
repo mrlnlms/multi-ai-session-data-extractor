@@ -19,6 +19,17 @@ of `update_time`.
 Caller has automatic fallback to `/gizmos/discovery/mine` -> DOM scrape.
 Fail-fast covers the case when all fallbacks fail together (rare).
 
+## `/conversations/batch` limit reduced to 10 (2026-05-11)
+
+Endpoint used to accept batches of 50 conversation_ids; now caps at 10.
+Validated empirically: requests with 50 IDs return HTTP 422 with body
+`{"detail":[{"type":"value_error","loc":["body"],"msg":"Value error,
+conversation_ids must contain at most 10 entries"}]}`.
+
+`scripts/chatgpt-refetch-known.py` default updated 50 -> 10. The endpoint
+itself still works for state-only refresh — only the per-batch ceiling
+changed upstream.
+
 ## What does NOT need to be done (proposed and discarded on Apr/27)
 
 - Re-merge "from scratch" by sweeping `_backup-gpt/merged-*` — the reconciler
