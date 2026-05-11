@@ -48,6 +48,25 @@ server likely treats access as "interaction".
 
 No impact on the extractor (mitigated by semantic hash).
 
+### Asset URLs are presigned and regenerated per fetch (2026-05-11)
+
+`audios[0][N][6][2]` returns a `https://lh3.googleusercontent.com/notebooklm/AKXw...`
+URL that **regenerates on every fetch**, even when the underlying audio
+hasn't changed. Validated empirically: 3 of 5 random notebooks diverged
+on this position in 2 consecutive lite_fetches without any user action.
+
+**Impact (pre-fix):** the orchestrator's lite-fetch classifier called
+`_eq_lenient(lite["audios"], prev["audios"])`, the URL string compared
+char-by-char, divergence detected, and the notebook reclassified from
+`copy` to `fetch`. Result: **94/94 notebooks of account-1 re-fetched in
+full on every sync**, even with zero real changes — what should be a
+sub-2 minute incremental ran for ~6 minutes.
+
+**Fix:** `_is_googleusercontent_presigned` helper + early-return in
+`_eq_lenient` treating two presigned NotebookLM URLs as equivalent.
+Real audio changes are still detected via other positions (duration,
+size, state, type).
+
 ### Pin/Star: does not exist in NotebookLM
 
 Confirmed in the mobile app by user. NotebookLM has a minimalist UI — no
