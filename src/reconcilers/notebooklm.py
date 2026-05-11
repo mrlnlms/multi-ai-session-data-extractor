@@ -107,6 +107,18 @@ def _strip_timestamps(x):
     return x
 
 
+def _is_googleusercontent_presigned(s) -> bool:
+    """True se for URL presigned de asset NotebookLM (audio/video).
+
+    Server regenera essa URL a cada request — comparar string-equal causa
+    falso-DIFF mesmo quando o asset nao mudou. Validado 2026-05-11: 3 de 5
+    notebooks divergem em audios[0][N][6][2] mesmo sem mudanca real.
+    """
+    return isinstance(s, str) and s.startswith(
+        "https://lh3.googleusercontent.com/notebooklm/"
+    )
+
+
 def _eq_lenient(a, b) -> bool:
     """Comparacao recursiva tolerante a timestamps voláteis.
 
@@ -123,6 +135,8 @@ def _eq_lenient(a, b) -> bool:
         return True
     if a is None or b is None:
         return False
+    if _is_googleusercontent_presigned(a) and _is_googleusercontent_presigned(b):
+        return True
     if (isinstance(a, list) and isinstance(b, list)
             and len(a) == 2 and len(b) == 2
             and all(isinstance(x, int) for x in a)

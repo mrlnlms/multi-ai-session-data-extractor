@@ -57,6 +57,25 @@ def test_eq_lenient_real_diff_detected():
     assert _eq_lenient(a, b) is False
 
 
+def test_eq_lenient_googleusercontent_presigned_treated_equal():
+    """URLs presigned googleusercontent regeneram a cada request — comparar
+    string-equal causa falso-DIFF mesmo sem mudanca real do asset.
+
+    Validado 2026-05-11: 3 de 5 notebooks divergiam em audios[0][N][6][2]
+    (URL presigned do audio MP4) mesmo quando metadata/notes batiam SAME.
+    Resultado pre-fix: 94/94 notebooks classificados como fetch full.
+    """
+    a = "https://lh3.googleusercontent.com/notebooklm/AKXwDQHHPNCjLU0YRMDVqkm0tDv8jGn"
+    b = "https://lh3.googleusercontent.com/notebooklm/AKXwDQFFP90gq8P7613l5X-iANQ_nKy"
+    assert _eq_lenient(a, b) is True
+    # Strings normais com mesmo prefixo nao-presigned continuam comparando string-equal
+    assert _eq_lenient("https://example.com/x", "https://example.com/y") is False
+    # Estrutura nested com URL presigned no meio: bate
+    nested_a = {"audios": [["AAA", a]]}
+    nested_b = {"audios": [["AAA", b]]}
+    assert _eq_lenient(nested_a, nested_b) is True
+
+
 def test_eq_lenient_recursive_dicts():
     a = {"k1": [1777733000, 0], "k2": "value"}
     b = {"k1": [1777740000, 999], "k2": "value"}
