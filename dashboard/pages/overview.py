@@ -16,7 +16,7 @@ from dashboard.components import (
 )
 from dashboard.data import PlatformState, discover_platforms
 from dashboard.metrics import compute_merged_stats, discovery_drop_flag
-from dashboard.sync import run_sync, sync_command
+from dashboard.sync import run_sync, run_unify, sync_command
 
 
 @st.cache_data(show_spinner=False)
@@ -238,7 +238,7 @@ def _run_update_all(states: list[PlatformState]) -> None:
     if not targets:
         st.error("No sync available.")
         return
-    st.warning("⚠️ Sync in progress — don't close this tab.")
+    st.warning("⚠️ Sync + unify in progress — don't close this tab.")
     progress = st.progress(0.0)
     for i, s in enumerate(targets):
         with st.spinner(f"Sync {s.name}..."):
@@ -255,5 +255,20 @@ def _run_update_all(states: list[PlatformState]) -> None:
         else:
             st.success(f"✅ {s.name} ok")
         progress.progress((i + 1) / len(targets))
+
+    with st.spinner("Unify parquets (cross-platform)..."):
+        try:
+            unify_result = run_unify()
+        except Exception as e:  # noqa: BLE001
+            st.error(f"❌ unify: {e}")
+        else:
+            if unify_result.returncode != 0:
+                st.error(
+                    f"❌ unify failed (exit {unify_result.returncode}). "
+                    f"stderr: {(unify_result.stderr or '')[-500:]}"
+                )
+            else:
+                st.success("✅ unify ok")
+
     st.balloons()
     st.cache_data.clear()
