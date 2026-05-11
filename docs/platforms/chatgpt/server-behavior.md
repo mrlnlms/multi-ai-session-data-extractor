@@ -21,6 +21,33 @@ When all three fail together (or `/conversations` listing itself returns
 partial — see below), the orchestrator now falls back automatically to
 `refetch_known_via_page` instead of raising.
 
+## Headless mode is blocked — re-validated empirically (2026-05-11)
+
+The orchestrator runs `headless=False` because **both** the DOM scrape
+and the API path break in headless mode:
+
+1. **DOM scrape** (project discovery via nav menu): the "More" trigger
+   element doesn't respond to click in headless. `Locator.wait_for`
+   times out after 10s. Discovery returns partial because the project
+   path silently fails.
+
+2. **API path** (page.evaluate calling `/api/auth/session` for
+   accessToken): the endpoint returns Cloudflare challenge HTML
+   (`<html>...Just a moment...`) instead of JSON. The first
+   `JSON.parse` of the response throws SyntaxError, blocking even the
+   `refetch_known_via_page` fallback.
+
+This was tested 2026-05-11 by flipping `headless=True` for one run.
+Discovery returned 138 convs (worse than the 157 the headed run got
+the same day, both partial due to upstream listing flakiness), and
+the refetch_known fallback then failed at the first batch with
+`SyntaxError: Unexpected token '<', "<html><..."`.
+
+Note that `asset_downloader.py` runs `headless=True` successfully —
+it uses `context.request` (cookies inherited from a prior headed
+session) instead of `page.evaluate`. The browser-mediated path is
+what triggers the challenge.
+
 ## `/conversations` listing returns partial — autorecover (2026-05-11)
 
 Sometimes `/conversations` listing comes back with a fraction of the real

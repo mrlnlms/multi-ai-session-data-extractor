@@ -94,6 +94,14 @@ async def run_capture(output_dir: Path, options: CaptureOptions) -> CaptureRepor
     async with async_playwright() as p:
         context = await p.chromium.launch_persistent_context(
             str(profile_dir),
+            # headless=False eh necessario empiricamente (re-validado 2026-05-11):
+            # 1. DOM scrape headless: nav "More" menu nao responde a click
+            #    (Locator.wait_for timeout em headless).
+            # 2. API headless: /api/auth/session devolve HTML do Cloudflare
+            #    challenge ("Just a moment...") em vez do JSON com accessToken,
+            #    bloqueando ate o refetch_known via page.evaluate.
+            # Asset_downloader.py roda headless OK porque usa context.request
+            # (cookies herdados da sessao headed previa) — esse caminho passa.
             headless=False,
             args=["--disable-blink-features=AutomationControlled"],
         )
