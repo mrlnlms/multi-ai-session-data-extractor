@@ -244,6 +244,82 @@ class TestLockfile:
             if p.poll() is None:
                 p.kill()
 
+    def test_kill_process_tree_terminates_playwright_chromium(self, tmp_path):
+        """End-to-end com Playwright real: spawn chromium via Popen sub-Python,
+        valida que ele tem filhos (chromium workers), mata via _kill_process_tree,
+        confirma que todos descendentes morreram. Esse e o cenario real que
+        a sessao Streamlit enfrenta quando crasha mid-sync."""
+        import subprocess
+        import time
+        import psutil
+        from dashboard.sync import _kill_process_tree
+
+        # Subprocess que sobe Chromium e fica esperando — replica o que
+        # `<plat>-export.py` faz quando o orchestrator esta em run.
+        script = '''
+import asyncio
+from playwright.async_api import async_playwright
+async def main():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        ctx = await browser.new_context()
+        page = await ctx.new_page()
+        await page.goto("about:blank")
+        await asyncio.sleep(60)  # espera matar
+asyncio.run(main())
+'''
+        import sys
+        proc = subprocess.Popen(
+            [sys.executable, "-c", script],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        try:
+            # Espera Chromium subir (chromium-headless-shell + helpers)
+            time.sleep(3.0)
+            assert proc.poll() is None, "Python script morreu cedo"
+
+            # Confirma que tem filhos antes do kill — psutil walk recursivo
+            parent = psutil.Process(proc.pid)
+            children = parent.children(recursive=True)
+            assert len(children) > 0, (
+                f"Esperava ao menos 1 filho Chromium, achei {len(children)}"
+            )
+            child_pids = [c.pid for c in children]
+
+            # Mata a arvore
+            _kill_process_tree(proc.pid)
+
+            # Espera ate 5s pra SIGTERM propagar pelos descendentes
+            for _ in range(50):
+                if proc.poll() is not None:
+                    # Parent morreu — checa que filhos tambem morreram
+                    alive = [pid for pid in child_pids if psutil.pid_exists(pid)]
+                    if not alive:
+                        break
+                time.sleep(0.1)
+
+            # Validacao final
+            assert proc.poll() is not None, "Parent Python ainda vivo"
+            alive_children = [pid for pid in child_pids if psutil.pid_exists(pid)]
+            assert not alive_children, (
+                f"Chromium descendentes orfaos: {alive_children}"
+            )
+        finally:
+            if proc.poll() is None:
+                # Last resort cleanup
+                try:
+                    parent = psutil.Process(proc.pid)
+                    for c in parent.children(recursive=True):
+                        try:
+                            c.kill()
+                        except psutil.NoSuchProcess:
+                            pass
+                    parent.kill()
+                except psutil.NoSuchProcess:
+                    pass
+
 
 # ===================== Persist runs =====================
 

@@ -339,7 +339,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
             "step": s.name,
             "status": status,
             "detail": "" if rc == 0 else f"rc={rc}",
-            "tail": tail[-2000:],
+            "tail": tail[-10000:],
         })
         if rc == 0:
             any_sync_ok = True
@@ -400,7 +400,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
         st.error(f"❌ unify failed (rc={rc}). tail:\n```\n{unify_full_tail[-800:]}\n```")
         results.append({
             "stage": STAGE_KEYS[1], "step": "unify-parquets", "status": "failed",
-            "detail": f"rc={rc}", "tail": unify_full_tail[-2000:],
+            "detail": f"rc={rc}", "tail": unify_full_tail[-10000:],
         })
         _set_stage(1, "failed")
         _set_stage(2, "aborted")
@@ -472,7 +472,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
             st.error(f"❌ quarto render had failures: {q_summary}")
             results.append({
                 "stage": STAGE_KEYS[2], "step": "quarto-render", "status": "failed",
-                "detail": q_summary[:300], "tail": q_summary[-2000:],
+                "detail": q_summary[:300], "tail": q_summary[-10000:],
             })
             _set_stage(2, "failed")
             stage3_ok = False
@@ -534,7 +534,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
             st.error(f"❌ publish failed:\n```\n{pub_summary[-800:]}\n```")
             results.append({
                 "stage": STAGE_KEYS[3], "step": "publish", "status": "failed",
-                "detail": pub_summary[:200], "tail": pub_summary[-2000:],
+                "detail": pub_summary[:200], "tail": pub_summary[-10000:],
             })
             _set_stage(3, "failed")
         else:
