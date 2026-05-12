@@ -25,8 +25,8 @@ def _sidebar() -> None:
     st.sidebar.caption("**Environment**")
     st.sidebar.write(f"Quarto: {'✅ installed' if quarto_installed() else '➖ missing (Phase 3)'}")
     st.sidebar.caption(
-        "Logs: capture_log.jsonl in data/raw/&lt;plat&gt;, "
-        "reconcile_log.jsonl in data/merged/&lt;plat&gt;."
+        "Logs: `capture_log.jsonl` in `data/raw/<plat>/`, "
+        "`reconcile_log.jsonl` in `data/merged/<plat>/`."
     )
 
     st.sidebar.divider()
