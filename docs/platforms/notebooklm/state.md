@@ -87,6 +87,39 @@ Listing `update_time` is **volatile** — server periodically reindexes +
 accessing the notebook bumps it. Reconciler uses semantic hash (not
 timestamp) to decide refetch — behavior already mitigated by design.
 
+## Asset downloads — Range-chunked (mandatory, 2026-05-12)
+
+**Bug histórico** (custou horas em multiplas sessões): downloads de audios
+(.m4a) via `lh3.googleusercontent.com/notebooklm/{token}` davam timeout de
+5min, faziam o sync parecer travado / consumir RAM até congelar a maquina.
+
+**Causa raiz** (validada empiricamente via Playwright `context.request`):
+o backend desse host **trava a conexão se você pedir o arquivo inteiro
+de uma vez**, mas responde 206 Partial Content rápido pra Range pequeno.
+
+| Pedido | Resultado |
+|---|---|
+| `GET` sem header | TIMEOUT |
+| `GET Range: bytes=0-` | TIMEOUT |
+| `GET Range: bytes=0-{length-1}` (= full size) | TIMEOUT |
+| `GET Range: bytes=0-10MB` | 206 OK 2.6s |
+| `GET Range: bytes=0-5MB` | 206 OK 1.8s |
+| `GET Range: bytes=0-1MB` | 206 OK 1.4s |
+| `HEAD` | 200 OK 1-2s com content-length |
+
+**Fix em `src/extractors/notebooklm/api_client.py::download_asset`:** HEAD
+pra content-length, GET em chunks de 8MB com `Range: bytes={start}-{end}`
+explícito, concat dos bytes. Cada chunk responde 206; `resp.ok` cobre
+200/206. Audio de 16MB que travava → 7.2s.
+
+**Não tente "otimizar" de volta pra GET único** — o servidor rejeita.
+Comentário em `api_client.py` documenta os testes empíricos pra preservar
+a memória institucional do conserto.
+
+**Logging em `asset_downloader.py`:** progresso a cada 200 alvos + top 5
+erros + `flush=True` em todos os prints (essencial pra streaming do
+dashboard).
+
 ## Account-3 legacy (extinct snapshot)
 
 11 notebooks / 33 msgs / 27 outputs / 6 briefs via legacy parser

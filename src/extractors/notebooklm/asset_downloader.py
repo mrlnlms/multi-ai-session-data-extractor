@@ -326,7 +326,7 @@ async def download_assets(
                 fname = pages_dir / f"page_{i:03d}_{p.get('page_uuid', 'x')}.webp"
                 targets.append((p["url"], fname, "page"))
 
-    print(f"Encontrados {len(targets)} assets pra baixar")
+    print(f"Encontrados {len(targets)} assets pra baixar", flush=True)
 
     sem = asyncio.Semaphore(concurrency)
 
@@ -338,23 +338,44 @@ async def download_assets(
         "page": ("pages_downloaded", "pages_skipped"),
     }
 
+    progress = {"done": 0, "errors_logged": 0}
+    total = len(targets)
+
     async def _one(url: str, fname: Path, kind: str):
         fname.parent.mkdir(parents=True, exist_ok=True)
         dl_key, skip_key = KIND_STAT[kind]
         if skip_existing and fname.exists() and fname.stat().st_size > 0:
             stats[skip_key] += 1
-            return
-        async with sem:
-            try:
-                timeout = KIND_TIMEOUT[kind]
-                blob = await client.download_asset(url, timeout_ms=timeout)
-                if blob is None:
-                    stats["errors"].append((str(fname.name), f"{kind} HTTP error"))
-                    return
-                fname.write_bytes(blob)
-                stats[dl_key] += 1
-            except Exception as e:
-                stats["errors"].append((str(fname.name), f"{kind}: {str(e)[:150]}"))
+        else:
+            async with sem:
+                try:
+                    timeout = KIND_TIMEOUT[kind]
+                    blob = await client.download_asset(url, timeout_ms=timeout)
+                    if blob is None:
+                        msg = f"{kind} HTTP error"
+                        stats["errors"].append((str(fname.name), msg))
+                        if progress["errors_logged"] < 5:
+                            print(f"  ERR {fname.name}: {msg}", flush=True)
+                            progress["errors_logged"] += 1
+                    else:
+                        fname.write_bytes(blob)
+                        stats[dl_key] += 1
+                except Exception as e:
+                    msg = f"{kind}: {str(e)[:120]}"
+                    stats["errors"].append((str(fname.name), msg))
+                    if progress["errors_logged"] < 5:
+                        print(f"  ERR {fname.name}: {msg}", flush=True)
+                        progress["errors_logged"] += 1
+        progress["done"] += 1
+        if progress["done"] % 200 == 0 or progress["done"] == total:
+            print(
+                f"  progresso: {progress['done']}/{total} "
+                f"(audios dl={stats['audios_downloaded']} skip={stats['audios_skipped']}, "
+                f"videos dl={stats['videos_downloaded']} skip={stats['videos_skipped']}, "
+                f"pages dl={stats['pages_downloaded']} skip={stats['pages_skipped']}, "
+                f"errors={len(stats['errors'])})",
+                flush=True,
+            )
 
     await asyncio.gather(*(_one(u, f, k) for u, f, k in targets))
     return stats
