@@ -120,6 +120,42 @@ a memória institucional do conserto.
 erros + `flush=True` em todos os prints (essencial pra streaming do
 dashboard).
 
+### Linha do tempo real dos audios (acc-1, pra calibrar expectativa)
+
+| Data/hora | Audios baixados | Contexto |
+|---|---|---|
+| 2026-05-02 | 5 | primeiro sync — so 5 cabiam antes do timeout travar |
+| 2026-05-12 02:27-03:02 | 78 | rajada da sessao de debug do fix (travou em 03:02) |
+| 2026-05-12 03:12 | 13 | sessao seguinte completou os faltantes |
+| **total pos-fix** | **96 / 97** | de 97 no catalogo (1 audio sem URL targetavel) |
+
+acc-2: 11 pre-fix → 29 pos-fix (de 30 no catalogo; 1 com HTTP error
+real — URL morta upstream).
+
+**Pegadinha de leitura de log:** o counter `audios dl=N skip=M` mostra
+**apenas a rodada atual**. `skip=83` na sessao das 03:12 nao significava
+"83 audios historicos" — eram 5 originais + 78 da rajada da madrugada.
+Pra historico real, sempre `find ... -name "*.m4a" -mtime -1` + `stat`
+nos arquivos fisicos.
+
+### Custo dos proximos syncs (incremental por design)
+
+`skip_existing=True` no `asset_downloader.py` — audios ja baixados
+(arquivo existe + size > 0) sao **skip**. Discovery + reconcile rodam
+sempre; downloads sao incrementais.
+
+| Cenario | Custo (acc-1, 94 notebooks) |
+|---|---|
+| Nada novo (re-run) | ~30-60s total (discovery + reconcile + 1827 skips) |
+| 1 audio novo | ~5s extra (1 chunk de 8MB / connection) |
+| 10 audios novos | ~30s extra (8 paralelos, 3-5s cada) |
+| 100 audios novos | ~5min extra |
+
+**Audios novos em notebooks ja conhecidos** sao detectados normalmente —
+discovery refaz os 94 notebooks, parseia `gArtLc` (artifacts), e qualquer
+type=1 (audio) novo com URL vira target. **Nao requer captura "do zero"**
+nem invalidacao manual.
+
 ## Account-3 legacy (extinct snapshot)
 
 11 notebooks / 33 msgs / 27 outputs / 6 briefs via legacy parser
