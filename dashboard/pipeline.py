@@ -109,6 +109,28 @@ def persist_run(stage_status: list[str], results: list[dict], publish_after: boo
         pass
 
 
+def commit_msg_for_scope(scope: str) -> str:
+    """Mensagem de commit pro Stage 4 baseada no scope da run.
+
+    'all'              -> 'data: dashboard sync (all platforms, 2026-05-12)'
+    'platform:Gemini'  -> 'data: dashboard sync (Gemini, 2026-05-12)'
+    'cli:headless'     -> 'data: cli headless sync (2026-05-12)'
+
+    Usado pra evitar commits genericos identicos quando se roda varios
+    Update all / sync por plat no mesmo dia.
+    """
+    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if scope == "all":
+        return f"data: dashboard sync (all platforms, {date})"
+    if scope.startswith("platform:"):
+        plat = scope.split(":", 1)[1]
+        return f"data: dashboard sync ({plat}, {date})"
+    if scope.startswith("cli:"):
+        kind = scope.split(":", 1)[1]
+        return f"data: {kind} sync ({date})"
+    return f"data: pipeline sync ({scope}, {date})"
+
+
 def recent_runs(limit: int = 10) -> list[dict]:
     """Le ultimas N entries do .pipeline-runs.jsonl, mais recente primeiro."""
     if not RUNS_LOG.exists():
@@ -475,7 +497,9 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
                 _bar.progress(pct, text=f"publish: step {done} / {total}")
 
         try:
-            rc, pub_summary = run_publish_streaming(_pub_on_line)
+            rc, pub_summary = run_publish_streaming(
+                _pub_on_line, commit_msg=commit_msg_for_scope(scope)
+            )
         except Exception as e:  # noqa: BLE001
             rc, pub_summary = -1, f"exception: {e}"
         pub_bar.empty(); pub_box.empty()

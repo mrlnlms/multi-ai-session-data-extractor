@@ -173,6 +173,40 @@ class TestLockfile:
         assert _read_lock()["child_pids"] == [12346]
         release_pipeline_lock()
 
+    def test_acquire_writes_started_at(self, _isolate_lock):
+        from dashboard.sync import _read_lock, acquire_pipeline_lock, release_pipeline_lock
+
+        acquire_pipeline_lock()
+        data = _read_lock()
+        assert "started_at" in data
+        # Parsea sem erro
+        from datetime import datetime
+        datetime.fromisoformat(data["started_at"].replace("Z", "+00:00"))
+        release_pipeline_lock()
+
+    def test_acquire_error_includes_age_when_lock_alive(self, _isolate_lock):
+        from dashboard.sync import acquire_pipeline_lock, release_pipeline_lock
+
+        acquire_pipeline_lock()
+        err = acquire_pipeline_lock()
+        assert err is not None
+        # Idade aparece como "since Xs ago" / "since Xmin ago"
+        assert "since" in err
+        assert "ago" in err
+        release_pipeline_lock()
+
+    def test_acquire_error_without_started_at_omits_age(self, _isolate_lock):
+        """Lockfile legado (sem started_at) — erro nao quebra, so nao mostra idade."""
+        import json as _j
+        from dashboard.sync import acquire_pipeline_lock, release_pipeline_lock
+
+        _isolate_lock.write_text(_j.dumps({"parent_pid": os.getpid(), "child_pids": []}))
+        err = acquire_pipeline_lock()
+        assert err is not None
+        # Sem started_at, sem ", since "
+        assert "since" not in err
+        release_pipeline_lock()
+
     def test_stale_lock_kills_orphan_children(self, _isolate_lock):
         from dashboard.sync import acquire_pipeline_lock, release_pipeline_lock
 
@@ -245,6 +279,32 @@ class TestPersistRuns:
 
         # Sem chamar persist_run primeiro
         assert recent_runs() == []
+
+    def test_commit_msg_for_scope_all(self):
+        from dashboard.pipeline import commit_msg_for_scope
+
+        msg = commit_msg_for_scope("all")
+        assert msg.startswith("data: dashboard sync (all platforms, ")
+        assert msg.endswith(")")
+
+    def test_commit_msg_for_scope_platform(self):
+        from dashboard.pipeline import commit_msg_for_scope
+
+        assert "(NotebookLM, " in commit_msg_for_scope("platform:NotebookLM")
+        assert "(Claude.ai, " in commit_msg_for_scope("platform:Claude.ai")
+
+    def test_commit_msg_for_scope_cli_headless(self):
+        from dashboard.pipeline import commit_msg_for_scope
+
+        msg = commit_msg_for_scope("cli:headless")
+        assert msg.startswith("data: headless sync (")
+
+    def test_commit_msg_for_scope_unknown_fallback(self):
+        from dashboard.pipeline import commit_msg_for_scope
+
+        msg = commit_msg_for_scope("custom-scope")
+        assert "custom-scope" in msg
+        assert msg.startswith("data: pipeline sync")
 
     def test_recent_runs_handles_corrupt_lines(self, _isolate_runs_log):
         from dashboard.pipeline import recent_runs
