@@ -265,6 +265,109 @@ in `tests/parsers/test_quarto_helpers.py` (40 tests).
 
 ---
 
+## Dashboard pipeline — recovery quando algo quebra
+
+O dashboard Streamlit (`streamlit run dashboard.py`) roda o pipeline 4-stage:
+**Sync → Unify → Quarto → Publish (DVC + git)**. Gating aborta o que vem
+depois quando algo crítico falha — nada de commitar estado quebrado.
+
+### Comportamento de falha por stage
+
+| Stage falhou | O que o pipeline faz | O que você faz |
+|---|---|---|
+| **1 Sync** parcial (1+ plats) | Stages 2-4 rodam só com plats OK | Abrir página da plat afetada, "Run full pipeline (this platform)" |
+| **1 Sync** total (TODAS) | Aborta — stages 2-4 marcadas `aborted` | Verificar cookies/rede; possivelmente `<plat>-login.py` |
+| **2 Unify** | Stages 3-4 `aborted` | `PYTHONPATH=. .venv/bin/python scripts/unify-parquets.py` standalone pra ver erro |
+| **3 Quarto** | Stage 4 `aborted` (não publica estado quebrado) | `quarto render notebooks/<plat>.qmd` pra ver erro do qmd |
+| **4 Publish** | Para no sub-step que falhou | Idempotente — re-clicar "Update all" retoma. `dvc push` e `git push` são no-op se nada novo |
+
+### Lockfile stale (`Pipeline already running`)
+
+Se o Streamlit crashou no meio de uma rodada, o `.update-all.lock` fica.
+Acquire da próxima rodada **já detecta PID morto automaticamente** e
+mata processos filhos (Playwright/dvc/quarto) via `os.killpg`. Você não
+precisa fazer nada na maioria dos casos.
+
+Se quiser limpar manualmente:
+
+```bash
+# Inspecionar o que tá lá
+cat .update-all.lock                                                # JSON {parent_pid, child_pids}
+ps -p $(.venv/bin/python -c "import json; print(json.load(open('.update-all.lock'))['parent_pid'])") \
+    && echo "lock OWNER VIVO — NAO mexer" \
+    || rm .update-all.lock
+```
+
+### Subprocess órfão
+
+Subprocess do `_stream` rodam em novo process group (`start_new_session=True`)
+e ficam registrados no lockfile. Se o Streamlit fechar mid-run, a próxima
+execução mata os filhos via `os.killpg(pid, SIGTERM)`. Detached que escaparam
+do registro (raro) precisam de cleanup manual:
+
+```bash
+pkill -f "scripts/.*-sync.py"
+pkill -f "scripts/unify-parquets.py"
+pkill -f "playwright"
+```
+
+### Histórico de runs
+
+`.pipeline-runs.jsonl` (gitignored, append-only) guarda metadata de cada
+execução — sobrevive a restart do Streamlit. Visível em "Recent pipeline
+runs" no overview. Sem tails (só status + scope + timestamp). Pra ver
+todos:
+
+```bash
+cat .pipeline-runs.jsonl | jq -r '"\(.at) \(.scope) \(.stage_status)"'
+```
+
+---
+
+## CLI headless (cron / launchd)
+
+Pra rodar o pipeline sem Streamlit — útil pra agendar via cron/launchd:
+
+```bash
+# Default: 10 plats que rodam sem browser visivel (sem ChatGPT/Perplexity)
+PYTHONPATH=. .venv/bin/python scripts/headless-pipeline.py
+
+# Subset, sem publish
+PYTHONPATH=. .venv/bin/python scripts/headless-pipeline.py \
+    --plats=Claude.ai,Gemini --no-publish
+```
+
+Mesmo lockfile, mesmo gating, mesma persistência em `.pipeline-runs.jsonl`.
+Stage 3 também é incremental (renderiza só os qmds das plats sincronizadas
++ cross-overview).
+
+### Agendar com launchd (macOS)
+
+Template em `docs/operations/launchd-headless.plist.template`:
+
+```bash
+# 1. Copiar e ajustar o path absoluto
+sed "s|PROJECT_ROOT_ABS|$(pwd)|g" \
+    docs/operations/launchd-headless.plist.template \
+    > ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
+
+# 2. Ativar
+launchctl load ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
+launchctl list | grep multi-ai-pipeline
+
+# 3. Logs vao pra data/pipeline-runs/headless.{log,err.log}
+tail -f data/pipeline-runs/headless.log
+
+# Desativar:
+launchctl unload ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
+rm ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
+```
+
+Default agendado: **diário às 03:00**. Editar `StartCalendarInterval` no
+plist pra mudar.
+
+---
+
 ## Common symptoms and what they mean
 
 | Symptom | Meaning |

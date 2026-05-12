@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template launchd pra rodar o pipeline headless diariamente.
+
+  Setup:
+    1. Substituir TODOS os PROJECT_ROOT_ABS pelo path absoluto do seu repo.
+    2. Ajustar StartCalendarInterval pra horario desejado (default: 03:00).
+    3. Copiar pra ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
+    4. launchctl load ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
+    5. Confirmar: launchctl list | grep multi-ai-pipeline
+
+  Logs vao pra PROJECT_ROOT_ABS/data/pipeline-runs/*.log (gitignored).
+  Se ChatGPT/Perplexity nao estao em --plats, roda 100% unattended.
+
+  Pra desativar:
+    launchctl unload ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
+    rm ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.user.multi-ai-pipeline</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>PROJECT_ROOT_ABS/.venv/bin/python</string>
+        <string>PROJECT_ROOT_ABS/scripts/headless-pipeline.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>PROJECT_ROOT_ABS</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONPATH</key>
+        <string>PROJECT_ROOT_ABS</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <!-- Rodar diariamente as 03:00 local. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>PROJECT_ROOT_ABS/data/pipeline-runs/headless.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>PROJECT_ROOT_ABS/data/pipeline-runs/headless.err.log</string>
+
+    <!-- Mata o job se passar de 4h (timeout sanity). -->
+    <key>ExitTimeOut</key>
+    <integer>14400</integer>
+</dict>
+</plist>
