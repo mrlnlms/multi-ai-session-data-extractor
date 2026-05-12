@@ -22,7 +22,8 @@ from dashboard.metrics import (
     compute_project_sources_stats,
     discovery_drop_flag,
 )
-from dashboard.sync import has_sync_script, run_sync, sync_command
+from dashboard.pipeline import render_last_run_summary, run_full_pipeline
+from dashboard.sync import has_sync_script, sync_command
 
 
 @st.cache_data(show_spinner=False)
@@ -106,19 +107,21 @@ def render(state: PlatformState) -> None:
     st.title(f"{badge} {state.name}")
     st.caption(f"Status: {STATUS_LABEL.get(state.status(), state.status())}")
 
+    render_last_run_summary()
+
     if not state.has_data:
         st.info(
             f"No capture found for {state.name}. "
-            f"Use the button below to run the first sync."
+            f"Use the button below to run the first pipeline."
         )
-        _render_sync_button(state)
+        _render_pipeline_button(state)
         return
 
     _render_status_panel(state)
 
     st.divider()
     st.subheader("Actions")
-    _render_sync_button(state)
+    _render_pipeline_button(state)
     _render_quarto_section(state)
 
     st.divider()
@@ -159,7 +162,15 @@ def _render_status_panel(state: PlatformState) -> None:
         )
 
 
-def _render_sync_button(state: PlatformState) -> None:
+def _render_pipeline_button(state: PlatformState) -> None:
+    """Botao de pipeline completo (4 stages) escopado pra esta plataforma.
+
+    Mesmo fluxo do "Update all" do overview, mas com targets=[state]:
+    sync (so esta plat) -> unify (todas plats no processed/) -> quarto
+    (todos qmds) -> publish (DVC + git). Stages 2-4 nao sao filtraveis
+    porque sao agregados — voce nao pode "unificar so 1 plat" sem
+    quebrar `data/unified/`.
+    """
     cmd = sync_command(state.name)
     if cmd is None:
         st.info(
@@ -168,27 +179,41 @@ def _render_sync_button(state: PlatformState) -> None:
         )
         return
 
-    label = (
-        f"🔄 Sync {state.name}" if has_sync_script(state.name)
-        else f"🔄 Export {state.name} (no orchestrator yet)"
+    is_running = st.session_state.get("pipeline_running", False)
+    sync_label = (
+        f"🔄 Run full pipeline ({state.name})"
+        if has_sync_script(state.name)
+        else f"🔄 Run full pipeline ({state.name} — export only, no orchestrator)"
     )
-    if st.button(label, key=f"sync-{state.name}", type="primary"):
-        with st.spinner(f"Running {' '.join(cmd[-2:])}..."):
-            try:
-                result = run_sync(state.name)
-            except Exception as e:  # noqa: BLE001
-                st.error(f"❌ {e}")
-                return
-        if result.returncode != 0:
-            st.error(f"❌ Failed (exit {result.returncode}).")
-            with st.expander("stderr"):
-                st.code(result.stderr or "(empty)")
-        else:
-            st.success("✅ Sync complete")
-            with st.expander("stdout"):
-                st.code((result.stdout or "")[-3000:])
-            st.cache_data.clear()
-            st.rerun()
+
+    publish_key = f"platform_publish_{state.name}"
+    st.session_state.setdefault(publish_key, True)
+    btn_col, opt_col = st.columns([1, 3])
+    publish_after = opt_col.checkbox(
+        "Stage 4/4: Publish to DVC + git push",
+        key=publish_key,
+        disabled=is_running,
+        help=(
+            f"Pipeline = 4 stages: (1) sync **{state.name}** → (2) unify "
+            f"parquets (all plats in processed/) → (3) Quarto render (all qmds) "
+            f"→ (4) publish (dvc add → commit → push). Uncheck Stage 4 to "
+            f"dry-run without committing to DVC/git."
+        ),
+    )
+
+    if is_running:
+        btn_col.button(
+            "🔄 Running…", disabled=True, type="primary",
+            key=f"pipeline-running-{state.name}",
+        )
+        return
+
+    if btn_col.button(sync_label, key=f"pipeline-{state.name}", type="primary"):
+        st.session_state["pipeline_running"] = True
+        try:
+            run_full_pipeline([state], publish_after, scope=f"platform:{state.name}")
+        finally:
+            st.session_state["pipeline_running"] = False
 
 
 def _render_quarto_section(state: PlatformState) -> None:
