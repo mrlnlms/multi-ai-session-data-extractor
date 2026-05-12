@@ -149,16 +149,17 @@ outras**. Tabela cumulativa em `docs/cross-platform-features.md`.
    viram `_preserved_missing` no merged.
 3. **Discovery parcial vira fallback, nao erro** — `_get_max_known_discovery`
    com threshold 20% **detecta** quando listing upstream retorna parcial.
-   ChatGPT cai pra `refetch_known_via_page` (`/conversations/batch` pelos IDs
-   salvos no raw cumulativo) — caminho que nao depende de discovery. Custo:
-   ~20min em vez de ~80s naquela rodada, mas "Update all" sempre fecha verde.
-   **Plats sem fallback automatico ainda (Claude.ai, Gemini, NotebookLM, Qwen,
-   DeepSeek, Perplexity, Grok, Kimi):** se discovery drop > 20% acontecer,
-   orchestrator lanca `RuntimeError`. Mitigation manual: Claude.ai tem
-   `scripts/claude-refetch-known.py` (gap-fill, nao state-refresh); outras
-   exigem rodar `<plat>-sync.py --full` ou esperar proximo run estabilizar.
-   Generalizacao planejada — cada plat tem API proprio + adaptacao no
-   orchestrator (~1d/plat).
+   Cada plat tem `src/extractors/<plat>/refetch_known.py` que re-fetcha
+   por ID os convs ja conhecidos no raw cumulativo — caminho que nao depende
+   do listing. Quando drop detectado, orchestrator chama refetch_known em
+   vez de raise. Custo: ~20min em vez de ~80s, mas pipeline sempre fecha
+   verde. **Todas as 9 plats web cobertas** (ChatGPT, Claude.ai, Gemini,
+   NotebookLM, Qwen, DeepSeek, Perplexity, Grok, Kimi). Threshold mantido
+   em 0.20; `DISCOVERY_DROP_FALLBACK_THRESHOLD` (alias retro-compat:
+   `DISCOVERY_DROP_ABORT_THRESHOLD`). Plat-especifico: ChatGPT usa batch
+   (`/conversations/batch` de 10 IDs); demais fazem 1 call por conv.
+   NotebookLM reusa `fetch_notebook` (composto: metadata + guide + chat +
+   notes + artifacts).
 4. **Schema canonico eh fronteira** — `src/schema/models.py` define
    `Conversation`, `Message`, `ToolEvent`, `ConversationProject`, `Branch`.
    Extractors entregam raw/merged JSON; parsers entregam parquet nesse

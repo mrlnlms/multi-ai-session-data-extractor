@@ -14,6 +14,7 @@ from src.extractors.perplexity.auth import load_context
 from src.extractors.perplexity.api_client import PerplexityAPIClient
 from src.extractors.perplexity.discovery import discover, persist_discovery
 from src.extractors.perplexity.fetcher import fetch_threads
+from src.extractors.perplexity.refetch_known import refetch_known_perplexity
 from src.extractors.perplexity.spaces import discover_spaces, fetch_spaces
 from src.extractors.perplexity.artifact_downloader import download_artifacts
 from src.extractors.perplexity.asset_downloader import download_assets as download_thread_attachments
@@ -21,8 +22,13 @@ from src.extractors.perplexity.asset_downloader import download_assets as downlo
 
 BASE_DIR = Path("data/raw/Perplexity")
 
-# Aborta captura se discovery cair mais que isso vs maior valor historico.
-DISCOVERY_DROP_ABORT_THRESHOLD = 0.20
+# Quando discovery cai mais que isso vs maior valor historico, o orchestrator
+# nao confia no listing e cai pra refetch_known via /rest/thread/{uuid} (caminho
+# que nao depende de discovery — pega pelos UUIDs ja salvos no raw cumulativo).
+# Threshold mantido pra evitar falso-fallback (oscilacoes pequenas sao normais).
+DISCOVERY_DROP_FALLBACK_THRESHOLD = 0.20
+# Alias retro-compat (codigo/testes antigos referenciam pelo nome velho)
+DISCOVERY_DROP_ABORT_THRESHOLD = DISCOVERY_DROP_FALLBACK_THRESHOLD
 
 
 def _get_max_known_discovery(raw_root: Path) -> int:
@@ -102,21 +108,62 @@ async def run_export(
 
         threads = await discover(client, output_dir)
 
-        # Fail-fast: queda drastica vs baseline historico. Persistencia da
-        # discovery acontece SO depois do clear — escrever antes corrompe
-        # baseline incremental se abortar (mesmo bug 2 corrigido em qwen/
-        # deepseek/gemini/claude_ai).
+        # Discovery parcial vira fallback automatico pra refetch_known.
+        # /rest/thread/list_ask_threads as vezes retorna listing reduzido
+        # (Cloudflare challenge / sessao expirada / endpoint flakey) — em vez
+        # de confiar nesse listing e marcar centenas como deletadas, cai pra
+        # refetch_known via /rest/thread/{uuid} usando os UUIDs ja salvos.
+        # Persistencia da discovery acontece SO depois do clear — escrever
+        # antes corrompe baseline incremental se cair pro fallback (mesmo bug 2
+        # corrigido em qwen/deepseek/gemini/claude_ai).
         baseline = _get_max_known_discovery(output_dir)
         curr = len(threads)
         if baseline > 0:
             drop = (baseline - curr) / baseline
-            if drop > DISCOVERY_DROP_ABORT_THRESHOLD:
-                raise RuntimeError(
-                    f"Discovery suspeita: {curr} threads vs {baseline} no historico "
-                    f"(queda {drop:.0%}, limite {DISCOVERY_DROP_ABORT_THRESHOLD:.0%}). "
-                    f"Possivel Cloudflare challenge / sessao expirada / endpoint flakey. "
-                    f"Tente novamente."
+            if drop > DISCOVERY_DROP_FALLBACK_THRESHOLD:
+                print(
+                    f"Discovery parcial: {curr} threads vs {baseline} no historico "
+                    f"(queda {drop:.0%}). Caindo pra refetch_known via /rest/thread/{{uuid}}."
                 )
+                stats = await refetch_known_perplexity(client, output_dir)
+                log = {
+                    "started_at": started_at.isoformat(),
+                    "finished_at": datetime.now(timezone.utc).isoformat(),
+                    "mode": "refetch_known_fallback",
+                    "smoke_limit": smoke_limit,
+                    "headless": headless,
+                    "totals": {
+                        "threads_discovered": stats["total"],
+                        "threads_fetched": stats["updated"],
+                        "threads_reused_incremental": 0,
+                        "threads_errors": stats["errors"],
+                        "spaces_discovered": 0,
+                        "spaces_pinned": 0,
+                        "spaces_fetched": 0,
+                        "spaces_errors": 0,
+                        "assets_total": 0,
+                        "assets_pinned": 0,
+                        "assets_downloaded": 0,
+                        "assets_download_skipped": 0,
+                        "assets_download_failed": 0,
+                        "thread_attachments_downloaded": 0,
+                        "thread_attachments_skipped": 0,
+                        "thread_attachments_errors": 0,
+                    },
+                    "errors": {"threads": [], "spaces": []},
+                    "fallback_reason": (
+                        f"discovery_drop {drop:.0%} (curr={curr}, baseline={baseline})"
+                    ),
+                }
+                log_jsonl = output_dir / "capture_log.jsonl"
+                with open(log_jsonl, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(log, ensure_ascii=False) + "\n")
+                _write_last_capture_md(output_dir, log)
+                print()
+                print("=== SUMMARY (refetch_known_fallback) ===")
+                print(json.dumps(log["totals"], indent=2))
+                print(f"\nRaw em: {output_dir}")
+                return output_dir
             print(f"Discovery OK: {curr} threads (baseline historico: {baseline})")
 
         persist_discovery(threads, output_dir)

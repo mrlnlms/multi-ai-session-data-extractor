@@ -19,6 +19,7 @@ from src.extractors.claude_ai.auth import load_context
 from src.extractors.claude_ai.api_client import ClaudeAPIClient
 from src.extractors.claude_ai.discovery import discover, persist_discovery
 from src.extractors.claude_ai.fetcher import fetch_conversations, fetch_projects
+from src.extractors.claude_ai.refetch_known import refetch_known_claude_ai
 
 
 BASE_DIR = Path("data/raw/Claude.ai")
@@ -26,9 +27,14 @@ BASE_DIR = Path("data/raw/Claude.ai")
 logger = logging.getLogger(__name__)
 
 
-# Aborta captura se discovery cair mais que isso vs maior valor historico ja visto.
-# Discovery flakey (timeouts, sessao expirada parcial) pode contaminar incremental.
-DISCOVERY_DROP_ABORT_THRESHOLD = 0.20
+# Quando discovery cai mais que isso vs maior valor historico, o orchestrator
+# nao confia no listing e cai pra refetch_known via client.fetch_conversation
+# (caminho que nao depende de discovery — pega pelos IDs ja salvos no raw
+# cumulativo). Threshold mantido pra evitar falso-fallback (oscilacoes pequenas
+# sao normais).
+DISCOVERY_DROP_FALLBACK_THRESHOLD = 0.20
+# Alias retro-compat (codigo/testes antigos referenciam pelo nome velho)
+DISCOVERY_DROP_ABORT_THRESHOLD = DISCOVERY_DROP_FALLBACK_THRESHOLD
 
 
 def _get_max_known_discovery(raw_root: Path) -> int:
@@ -141,19 +147,66 @@ async def run_export(
         # Discovery
         disc = await discover(client, output_dir)
 
-        # Fail-fast: queda drastica vs baseline historico. Persistencia da
-        # discovery acontece SO depois do clear — escrever antes corrompe
-        # baseline incremental se abortar.
+        # Discovery parcial vira fallback automatico pra refetch_known.
+        # Em vez de confiar num listing reduzido (e marcar centenas como deletadas),
+        # cai pra refetch_known via client.fetch_conversation usando os IDs ja
+        # salvos no raw cumulativo. Persistencia da discovery NAO acontece nesse
+        # caminho — escrever um listing parcial corrompe baseline incremental.
         baseline = _get_max_known_discovery(output_dir)
         curr = len(disc["conversations"])
         if baseline > 0:
             drop = (baseline - curr) / baseline
-            if drop > DISCOVERY_DROP_ABORT_THRESHOLD:
-                raise RuntimeError(
-                    f"Discovery suspeita: {curr} convs vs {baseline} no historico "
-                    f"(queda {drop:.0%}, limite {DISCOVERY_DROP_ABORT_THRESHOLD:.0%}). "
-                    f"Possivel sessao expirada / endpoint flakey. Tente novamente."
+            if drop > DISCOVERY_DROP_FALLBACK_THRESHOLD:
+                logger.warning(
+                    f"Discovery parcial: {curr} convs vs {baseline} no historico "
+                    f"(queda {drop:.0%}). Caindo pra refetch_known via "
+                    f"client.fetch_conversation."
                 )
+                stats = await refetch_known_claude_ai(client, output_dir)
+
+                # Memory tentativa best-effort (igual ao fluxo normal)
+                memory_chars = 0
+                try:
+                    memory_text = await client.get_memory()
+                    memory_chars = len(memory_text)
+                    (output_dir / "claude_ai_memory.md").write_text(
+                        memory_text, encoding="utf-8"
+                    )
+                except Exception as e:
+                    print(f"Memory fetch falhou: {e}")
+
+                finished_at = datetime.now(timezone.utc)
+                log = {
+                    "started_at": started_at.isoformat(),
+                    "finished_at": finished_at.isoformat(),
+                    "org_id": org_id,
+                    "mode": "refetch_known_fallback",
+                    "smoke_limit": smoke_limit,
+                    "headless": headless,
+                    "totals": {
+                        "conversations_discovered": stats["total"],
+                        "conversations_fetched": stats["updated"],
+                        "conversations_skipped_existing": 0,
+                        "conversations_reused_incremental": 0,
+                        "conversations_errors": stats["errors"],
+                        "projects_discovered": 0,
+                        "projects_fetched": 0,
+                        "projects_skipped_existing": 0,
+                        "projects_reused_incremental": 0,
+                        "projects_errors": 0,
+                    },
+                    "errors": {"conversations": [], "projects": []},
+                }
+                log_jsonl = output_dir / "capture_log.jsonl"
+                with open(log_jsonl, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(log, ensure_ascii=False) + "\n")
+                _write_last_capture_md(output_dir, log)
+
+                print()
+                print("=== SUMMARY (refetch_known_fallback) ===")
+                print(json.dumps(log["totals"], indent=2))
+                print(f"\nRaw em: {output_dir}")
+                return output_dir
             print(f"Discovery OK: {curr} convs (baseline historico: {baseline})")
 
         persist_discovery(disc, output_dir)

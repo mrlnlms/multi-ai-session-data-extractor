@@ -26,10 +26,17 @@ from src.extractors.notebooklm.api_client import NotebookLMClient
 from src.extractors.notebooklm.batchexecute import load_session
 from src.extractors.notebooklm.discovery import discover, persist_discovery
 from src.extractors.notebooklm.fetcher import fetch_notebook, lite_fetch_notebook
+from src.extractors.notebooklm.refetch_known import refetch_known_notebooklm
 
 
 BASE_DIR = Path("data/raw/NotebookLM")
-DISCOVERY_DROP_ABORT_THRESHOLD = 0.20
+# Quando discovery (wXbhsf) cai mais que isso vs maior valor historico, o
+# orchestrator nao confia no listing e cai pra refetch_known via UUIDs ja
+# salvos no raw cumulativo — caminho que nao depende de discovery.
+# Threshold mantido pra evitar falso-fallback (oscilacoes pequenas sao normais).
+DISCOVERY_DROP_FALLBACK_THRESHOLD = 0.20
+# Alias retro-compat (codigo/testes antigos referenciam pelo nome velho)
+DISCOVERY_DROP_ABORT_THRESHOLD = DISCOVERY_DROP_FALLBACK_THRESHOLD
 
 
 def _account_dir(account: str) -> Path:
@@ -65,15 +72,19 @@ def _get_max_known_discovery(output_dir: Path) -> int:
 
 
 def _check_discovery_drop(current: int, baseline: int) -> tuple[bool, str | None]:
-    """Aborta se discovery atual cair >threshold vs baseline historico."""
+    """Sinaliza se discovery atual caiu >threshold vs baseline historico.
+
+    Retorna (dropped, reason). Quando dropped=True, o orchestrator cai pra
+    refetch_known em vez de abortar (analogo ao ChatGPT desde 2026-05-11).
+    """
     if baseline == 0:
         return (False, None)  # primeira run
     drop = (baseline - current) / baseline
-    if drop > DISCOVERY_DROP_ABORT_THRESHOLD:
+    if drop > DISCOVERY_DROP_FALLBACK_THRESHOLD:
         return (
             True,
-            f"Discovery caiu {drop:.0%} (atual={current}, baseline={baseline}). "
-            f"Threshold={DISCOVERY_DROP_ABORT_THRESHOLD:.0%}. ABORTANDO antes de salvar."
+            f"Discovery parcial: {current} notebooks vs {baseline} no historico "
+            f"(queda {drop:.0%}). Threshold={DISCOVERY_DROP_FALLBACK_THRESHOLD:.0%}."
         )
     return (False, None)
 
@@ -117,12 +128,44 @@ async def run_export(
         nbs_all = await discover(client)
         n_discovered = len(nbs_all)
 
-        # Fail-fast contra discovery flakey
+        # Discovery parcial vira fallback automatico pra refetch_known.
+        # wXbhsf as vezes retorna paginacao incompleta — em vez de abortar
+        # (e marcar notebooks como deletados), cai pra refetch dos UUIDs ja
+        # salvos no raw cumulativo. Cada notebook precisa de fetch COMPOSTO
+        # (metadata + guide + chat + notes + audios + mind_map + sources),
+        # logo reusa o fetch_notebook do fetcher original.
         baseline = _get_max_known_discovery(output_dir)
-        aborted, reason = _check_discovery_drop(n_discovered, baseline)
-        if aborted:
-            print(f"\nFAIL-FAST: {reason}")
-            raise RuntimeError(reason)
+        dropped, reason = _check_discovery_drop(n_discovered, baseline)
+        if dropped:
+            print(f"\n{reason} Caindo pra refetch_known via UUIDs salvos.")
+            stats = await refetch_known_notebooklm(client, output_dir)
+            log_entry = {
+                "started_at": started_at.isoformat(),
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "account": account,
+                "hl": ACCOUNT_LANG[account],
+                "mode": "refetch_known_fallback",
+                "totals": {
+                    "notebooks_discovered": stats["total"],
+                    "notebooks_fetched": stats["updated"],
+                    "notebooks_with_errors": stats["errors"],
+                    "sources_fetched_total": 0,
+                    "rpcs_ok_total": 0,
+                    "rpcs_empty_total": 0,
+                    "artifacts_individual_total": 0,
+                    "mind_maps_total": 0,
+                },
+                "errors_sample": [],
+            }
+            log_path = output_dir / "capture_log.jsonl"
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False, default=str) + "\n")
+            _write_last_capture_md(output_dir, log_entry)
+            print()
+            print("=== SUMMARY (refetch_known fallback) ===")
+            print(json.dumps(log_entry["totals"], indent=2))
+            print(f"\nRaw em: {output_dir}")
+            return output_dir
 
         # Aplica filtros (smoke / only_notebooks) APOS fail-fast
         nbs = nbs_all
