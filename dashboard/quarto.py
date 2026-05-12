@@ -209,6 +209,27 @@ def render_and_publish_qmd(qmd: Path) -> tuple[bool, Optional[str]]:
     return True, None
 
 
+def qmds_for_platform(platform: str) -> list[Path]:
+    """Lista de qmds da plat: consolidado + per-account/legacy quando existem.
+
+    Usado pelo Stage 3 incremental — sync de 1 plat re-renderiza so os
+    qmds dela + cross-overview (em vez de todos 22).
+    """
+    out: list[Path] = []
+    consolidated = qmd_path(platform)
+    if consolidated.exists():
+        out.append(consolidated)
+    for _, qmd in qmd_paths_per_account(platform):
+        out.append(qmd)
+    return out
+
+
+def overview_qmd_paths() -> list[Path]:
+    """Os 00-overview*.qmd cross-plataforma — sempre renderizar em qualquer
+    pipeline (agregam todas plats em data/unified/)."""
+    return [qmd for _, qmd in overview_qmds()]
+
+
 def overview_qmds() -> list[tuple[str, Path]]:
     """Retorna [(label, qmd_path)] dos overviews cross-plataforma existentes.
 
