@@ -13,12 +13,14 @@ Sync orchestrador (`scripts/gemini-sync.py`) itera ambas.
 Modo default: incremental (re-fetch so convs com created_at_secs != conhecido OR
 arquivo nao existe).
 
-Fail-fast: aborta se discovery cair >20% vs maior valor historico — protege
-contra batchexecute flakey (rpcid hash mudando, response 400, etc).
+Discovery parcial vira fallback automatico: se a contagem cair >20% vs maior
+valor historico, cai pra `refetch_known_gemini` (le UUIDs do `discovery_ids.json`
+antigo e refresca cada conv via hNvQHb — caminho que nao depende de discovery).
 """
 
 import asyncio
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -27,12 +29,21 @@ from src.extractors.gemini.api_client import GeminiAPIClient
 from src.extractors.gemini.batchexecute import load_session
 from src.extractors.gemini.discovery import discover, persist_discovery
 from src.extractors.gemini.fetcher import fetch_conversations
+from src.extractors.gemini.refetch_known import refetch_known_gemini
+
+
+logger = logging.getLogger(__name__)
 
 
 BASE_DIR = Path("data/raw/Gemini")
 
-# Aborta captura se discovery cair mais que isso vs maior valor historico.
-DISCOVERY_DROP_ABORT_THRESHOLD = 0.20
+# Quando discovery cai mais que isso vs maior valor historico, o orchestrator
+# nao confia no listing e cai pra refetch_known via hNvQHb (caminho que nao
+# depende de discovery — pega pelos UUIDs ja salvos no discovery_ids.json).
+# Threshold mantido pra evitar falso-fallback (oscilacoes pequenas sao normais).
+DISCOVERY_DROP_FALLBACK_THRESHOLD = 0.20
+# Alias retro-compat (codigo/testes antigos referenciam pelo nome velho)
+DISCOVERY_DROP_ABORT_THRESHOLD = DISCOVERY_DROP_FALLBACK_THRESHOLD
 
 
 def _account_dir(account: int) -> Path:
@@ -121,19 +132,46 @@ async def run_export(
 
         convs = await discover(client, output_dir)
 
-        # Fail-fast: queda drastica vs baseline historico. Persistencia da
-        # discovery acontece SO depois do clear — escrever antes corrompe
-        # baseline incremental se abortar.
+        # Discovery parcial vira fallback automatico pra refetch_known.
+        # MaZiqc as vezes retorna lista incompleta (rpcid hash mudando, 400, etc) —
+        # em vez de confiar nesse listing reduzido (e marcar centenas como deletadas),
+        # cai pra refetch_known via hNvQHb usando os UUIDs ja salvos no discovery_ids.
+        # Persistencia da discovery NAO acontece nesse caminho — preserva baseline.
         baseline = _get_max_known_discovery(output_dir)
         curr = len(convs)
         if baseline > 0:
             drop = (baseline - curr) / baseline
-            if drop > DISCOVERY_DROP_ABORT_THRESHOLD:
-                raise RuntimeError(
-                    f"Discovery suspeita: {curr} convs vs {baseline} no historico "
-                    f"(queda {drop:.0%}, limite {DISCOVERY_DROP_ABORT_THRESHOLD:.0%}). "
-                    f"Provavel rpcid MaZiqc/hNvQHb hash mudou — checar com probe."
+            if drop > DISCOVERY_DROP_FALLBACK_THRESHOLD:
+                logger.warning(
+                    f"Discovery parcial (account={account}): {curr} convs vs {baseline} "
+                    f"no historico (queda {drop:.0%}). Caindo pra refetch_known via hNvQHb."
                 )
+                stats = await refetch_known_gemini(client, output_dir)
+                log = {
+                    "started_at": started_at.isoformat(),
+                    "finished_at": datetime.now(timezone.utc).isoformat(),
+                    "account": account,
+                    "mode": "refetch_known_fallback",
+                    "smoke_limit": smoke_limit,
+                    "totals": {
+                        # Baseline conta — refetch cobriu todos os IDs conhecidos
+                        "conversations_discovered": stats["total"],
+                        "conversations_fetched": stats["updated"],
+                        "conversations_reused_incremental": 0,
+                        "conversations_errors": stats["errors"],
+                    },
+                    "errors": {"conversations": []},
+                    "discovery_partial": {"observed": curr, "baseline": baseline},
+                }
+                log_jsonl = output_dir / "capture_log.jsonl"
+                with open(log_jsonl, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(log, ensure_ascii=False) + "\n")
+                _write_last_capture_md(output_dir, log)
+                print()
+                print("=== SUMMARY (refetch_known_fallback) ===")
+                print(json.dumps(log["totals"], indent=2))
+                print(f"\nRaw em: {output_dir}")
+                return output_dir
             print(f"Discovery OK: {curr} convs (baseline historico: {baseline})")
 
         persist_discovery(convs, output_dir)

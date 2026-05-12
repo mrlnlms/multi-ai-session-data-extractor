@@ -19,6 +19,7 @@ from src.extractors.grok.discovery import (
     persist_discovery,
 )
 from src.extractors.grok.fetcher import fetch_conversations
+from src.extractors.grok.refetch_known import refetch_known_grok
 
 
 BASE_DIR = Path("data/raw/Grok")
@@ -26,8 +27,13 @@ BASE_DIR = Path("data/raw/Grok")
 logger = logging.getLogger(__name__)
 
 
-# Aborta captura se discovery cair mais que isso vs maior valor historico.
-DISCOVERY_DROP_ABORT_THRESHOLD = 0.20
+# Quando discovery cai mais que isso vs maior valor historico, o orchestrator
+# nao confia no listing e cai pra refetch_known (caminho que nao depende de
+# discovery — refetcha cada conv pelos IDs ja salvos no raw cumulativo).
+# Threshold mantido pra evitar falso-fallback (oscilacoes pequenas sao normais).
+DISCOVERY_DROP_FALLBACK_THRESHOLD = 0.20
+# Alias retro-compat (codigo/testes antigos referenciam pelo nome velho)
+DISCOVERY_DROP_ABORT_THRESHOLD = DISCOVERY_DROP_FALLBACK_THRESHOLD
 
 
 def _get_max_known_discovery(raw_root: Path) -> int:
@@ -118,17 +124,53 @@ async def run_export(
         assets = await discover_assets(client)
         tasks = await discover_scheduled_tasks(client)
 
-        # Fail-fast: queda drastica
+        # Discovery parcial vira fallback automatico pra refetch_known.
+        # Listing /rest/app-chat/conversations as vezes retorna paginacao incompleta —
+        # em vez de confiar nesse listing reduzido (e marcar centenas como deletadas),
+        # cai pra refetch_known usando os IDs ja salvos no raw cumulativo.
         baseline = _get_max_known_discovery(output_dir)
         curr = len(convs)
         if baseline > 0:
             drop = (baseline - curr) / baseline
-            if drop > DISCOVERY_DROP_ABORT_THRESHOLD:
-                raise RuntimeError(
-                    f"Discovery suspeita: {curr} convs vs {baseline} no historico "
-                    f"(queda {drop:.0%}, limite {DISCOVERY_DROP_ABORT_THRESHOLD:.0%}). "
-                    f"Tente novamente."
+            if drop > DISCOVERY_DROP_FALLBACK_THRESHOLD:
+                logger.warning(
+                    f"Discovery parcial: {curr} convs vs {baseline} no historico "
+                    f"(queda {drop:.0%}). Caindo pra refetch_known."
                 )
+                stats = await refetch_known_grok(client, output_dir)
+                # Assets + scheduled tasks ainda valem (independentes do listing)
+                (output_dir / "assets.json").write_text(
+                    json.dumps(assets, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+                (output_dir / "tasks.json").write_text(
+                    json.dumps(tasks, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+                log = {
+                    "started_at": started_at.isoformat(),
+                    "finished_at": datetime.now(timezone.utc).isoformat(),
+                    "mode": "refetch_known_fallback",
+                    "smoke_limit": smoke_limit,
+                    "totals": {
+                        "conversations_discovered": stats["total"],
+                        "conversations_fetched": stats["updated"],
+                        "conversations_reused_incremental": 0,
+                        "conversations_errors": stats["errors"],
+                        "workspaces_discovered": len(workspaces),
+                        "assets_discovered": len(assets),
+                        "scheduled_tasks_active": len(tasks.get("active") or []),
+                        "scheduled_tasks_inactive": len(tasks.get("inactive") or []),
+                    },
+                    "errors": {"conversations": []},
+                }
+                log_jsonl = output_dir / "capture_log.jsonl"
+                with open(log_jsonl, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(log, ensure_ascii=False) + "\n")
+                _write_last_capture_md(output_dir, log)
+                print()
+                print("=== SUMMARY (refetch_known_fallback) ===")
+                print(json.dumps(log["totals"], indent=2))
+                print(f"\nRaw em: {output_dir}")
+                return output_dir
             print(f"Discovery OK: {curr} convs (baseline historico: {baseline})")
 
         persist_discovery(convs, workspaces, output_dir)

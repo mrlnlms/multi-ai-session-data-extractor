@@ -14,6 +14,7 @@ from src.extractors.kimi.auth import load_context
 from src.extractors.kimi.api_client import KimiAPIClient
 from src.extractors.kimi.discovery import discover, persist_discovery
 from src.extractors.kimi.fetcher import fetch_conversations
+from src.extractors.kimi.refetch_known import refetch_known_kimi
 
 
 BASE_DIR = Path("data/raw/Kimi")
@@ -21,7 +22,14 @@ BASE_DIR = Path("data/raw/Kimi")
 logger = logging.getLogger(__name__)
 
 
-DISCOVERY_DROP_ABORT_THRESHOLD = 0.20
+# Quando discovery cai mais que isso vs maior valor historico, o orchestrator
+# nao confia no listing e cai pra refetch_known via fetch_full_chat por ID
+# (caminho que nao depende de discovery — pega pelos IDs ja salvos no raw
+# cumulativo). Threshold mantido pra evitar falso-fallback (oscilacoes pequenas
+# sao normais).
+DISCOVERY_DROP_FALLBACK_THRESHOLD = 0.20
+# Alias retro-compat (codigo/testes antigos referenciam pelo nome velho)
+DISCOVERY_DROP_ABORT_THRESHOLD = DISCOVERY_DROP_FALLBACK_THRESHOLD
 
 
 def _get_max_known_discovery(raw_root: Path) -> int:
@@ -106,16 +114,47 @@ async def run_export(
 
         chats, skills_official, skills_installed = await discover(client)
 
+        # Discovery parcial vira fallback automatico pra refetch_known.
+        # ListChats as vezes retorna paginacao incompleta — em vez de confiar
+        # nesse listing reduzido (e marcar centenas como deletadas), cai pra
+        # refetch_known via fetch_full_chat por ID usando os arquivos ja
+        # salvos no raw cumulativo.
+        # Persistencia da discovery acontece SO depois do clear/fallback —
+        # escrever antes corrompe baseline incremental no proximo run.
         baseline = _get_max_known_discovery(output_dir)
         curr = len(chats)
         if baseline > 0:
             drop = (baseline - curr) / baseline
-            if drop > DISCOVERY_DROP_ABORT_THRESHOLD:
-                raise RuntimeError(
-                    f"Discovery suspeita: {curr} chats vs {baseline} no historico "
-                    f"(queda {drop:.0%}, limite {DISCOVERY_DROP_ABORT_THRESHOLD:.0%}). "
-                    f"Tente novamente."
+            if drop > DISCOVERY_DROP_FALLBACK_THRESHOLD:
+                logger.warning(
+                    f"Discovery parcial: {curr} chats vs {baseline} no historico "
+                    f"(queda {drop:.0%}). Caindo pra refetch_known via fetch_full_chat."
                 )
+                stats = await refetch_known_kimi(client, output_dir)
+                log = {
+                    "started_at": started_at.isoformat(),
+                    "finished_at": datetime.now(timezone.utc).isoformat(),
+                    "mode": "refetch_known_fallback",
+                    "smoke_limit": smoke_limit,
+                    "totals": {
+                        "conversations_discovered": stats["total"],
+                        "conversations_fetched": stats["updated"],
+                        "conversations_reused_incremental": 0,
+                        "conversations_errors": stats["errors"],
+                        "skills_official": len(skills_official),
+                        "skills_installed": len(skills_installed),
+                    },
+                    "errors": {"conversations": []},
+                }
+                log_jsonl = output_dir / "capture_log.jsonl"
+                with open(log_jsonl, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(log, ensure_ascii=False) + "\n")
+                _write_last_capture_md(output_dir, log)
+                print()
+                print("=== SUMMARY (refetch_known_fallback) ===")
+                print(json.dumps(log["totals"], indent=2))
+                print(f"\nRaw em: {output_dir}")
+                return output_dir
             print(f"Discovery OK: {curr} chats (baseline historico: {baseline})")
 
         persist_discovery(chats, skills_official, skills_installed, output_dir)
