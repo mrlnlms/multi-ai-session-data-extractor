@@ -204,12 +204,45 @@ class NotebookLMClient:
     async def download_asset(self, url: str, timeout_ms: int = 120000) -> bytes | None:
         """Baixa binario (audio/page image) via fetch direto. Usa cookies do context.
 
-        URLs do tipo lh3.googleusercontent.com/notebooklm/{token} redirecionam 2x
-        ate chegar em googlevideo.com/videoplayback (audio) ou conteudo final.
-        Timeout 120s pra audios grandes.
+        URLs do tipo lh3.googleusercontent.com/notebooklm/{token} EXIGEM
+        chunked download via Range. Comportamento empirico validado 2026-05-12:
+
+          - GET sem header: TIMEOUT
+          - GET `Range: bytes=0-`: TIMEOUT
+          - GET `Range: bytes=0-{length-1}`: TIMEOUT (end == full size trava)
+          - GET `Range: bytes=0-10MB`: 206 OK 2.6s
+          - GET `Range: bytes=0-5MB`: 206 OK 1.8s
+          - GET `Range: bytes=0-1MB`: 206 OK 1.4s
+          - HEAD: 200 OK 1-2s com content-length
+
+        Implementacao: HEAD pra content-length, GET em chunks de 8MB com
+        Range explicito, concat. Cada chunk responde 206 Partial Content;
+        resp.ok=True pra 200/206.
         """
+        CHUNK = 8 * 1024 * 1024  # 8MB
+
         clean = url.replace("\\u003d", "=").replace("\\u0026", "&")
-        resp = await self.context.request.get(clean, timeout=timeout_ms)
-        if not resp.ok:
+        head = await self.context.request.head(clean, timeout=timeout_ms)
+        if not head.ok:
             return None
-        return await resp.body()
+        length_str = head.headers.get("content-length")
+        if not length_str:
+            return None
+        length = int(length_str)
+        if length <= 0:
+            return None
+
+        parts: list[bytes] = []
+        start = 0
+        while start < length:
+            end = min(start + CHUNK - 1, length - 1)
+            resp = await self.context.request.get(
+                clean,
+                headers={"Range": f"bytes={start}-{end}"},
+                timeout=timeout_ms,
+            )
+            if not resp.ok:
+                return None
+            parts.append(await resp.body())
+            start = end + 1
+        return b"".join(parts)

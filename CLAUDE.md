@@ -467,3 +467,12 @@ preserved_missing, fail-fast, hardlink, etc).
 - DOM scrape de projects as vezes pega 40 em vez de 47 — fail-fast cobre.
 - Discovery `/projects` 404a as vezes — fail-fast cobre via fallback
   `/gizmos/discovery/mine` -> DOM scrape.
+- **NotebookLM asset downloads precisam Range-chunked, NAO GET inteiro**
+  (2026-05-12). Host `lh3.googleusercontent.com/notebooklm/{token}` trava
+  a conexao se voce pedir o arquivo inteiro (audio de 16MB = timeout 5min
+  + RAM ate congelar a maquina); responde 206 rapido pra `Range: bytes=
+  0-{end}` com end < length. Fix em `api_client.py::download_asset`: HEAD
+  pra content-length + GET em chunks de 8MB. **Nao "otimize" de volta pra
+  GET unico** — comentario no codigo documenta a evidencia empirica.
+  Historia completa: `docs/platforms/notebooklm/state.md` secao "Asset
+  downloads — Range-chunked".
