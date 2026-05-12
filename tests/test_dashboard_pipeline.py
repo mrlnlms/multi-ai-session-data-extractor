@@ -306,6 +306,35 @@ class TestPersistRuns:
         assert "custom-scope" in msg
         assert msg.startswith("data: pipeline sync")
 
+    def test_rotation_truncates_after_max(self, _isolate_runs_log, monkeypatch):
+        """Quando ultrapassa MAX_RUNS_BEFORE_ROTATE, trunca pra KEEP_RUNS_AFTER_ROTATE."""
+        from dashboard import pipeline as pl
+        from dashboard.pipeline import persist_run, recent_runs
+
+        # Usa thresholds pequenos pra teste rapido
+        monkeypatch.setattr(pl, "MAX_RUNS_BEFORE_ROTATE", 10)
+        monkeypatch.setattr(pl, "KEEP_RUNS_AFTER_ROTATE", 5)
+
+        # Escreve 9 — ainda nao rotaciona
+        for i in range(9):
+            persist_run(["done"] * 4, [], True, scope=f"r-{i}")
+        with _isolate_runs_log.open() as f:
+            assert len(f.readlines()) == 9
+
+        # Escreve a 10a — ainda nao (threshold eh > 10)
+        persist_run(["done"] * 4, [], True, scope="r-9")
+        with _isolate_runs_log.open() as f:
+            assert len(f.readlines()) == 10
+
+        # 11a — ultrapassa, rotaciona pra 5
+        persist_run(["done"] * 4, [], True, scope="r-10")
+        with _isolate_runs_log.open() as f:
+            lines = f.readlines()
+        assert len(lines) == 5
+        # Mantem as ultimas (mais recentes)
+        scopes = [json.loads(l)["scope"] for l in lines]
+        assert scopes == ["r-6", "r-7", "r-8", "r-9", "r-10"]
+
     def test_recent_runs_handles_corrupt_lines(self, _isolate_runs_log):
         from dashboard.pipeline import recent_runs
 

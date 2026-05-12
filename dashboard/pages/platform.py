@@ -15,7 +15,7 @@ from dashboard.components import (
     relative_time,
 )
 from dashboard import quarto
-from dashboard.data import PlatformState, directory_size_bytes, load_platform_state
+from dashboard.data import PlatformState, directory_size_bytes
 from dashboard.metrics import (
     compute_merged_stats,
     compute_processed_stats,
