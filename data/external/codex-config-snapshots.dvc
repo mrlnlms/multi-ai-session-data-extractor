@@ -1,6 +1,6 @@
 outs:
-- md5: a6c234c342f8a539b8085692cea5c2b6.dir
-  size: 993548
-  nfiles: 109
+- md5: 230b0ba097e1544c25b354dffe4e5f15.dir
+  size: 1987541
+  nfiles: 218
   hash: md5
   path: codex-config-snapshots
