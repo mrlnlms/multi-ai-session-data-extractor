@@ -248,8 +248,11 @@ class TestLockfile:
         """End-to-end com Playwright real: spawn chromium via Popen sub-Python,
         valida que ele tem filhos (chromium workers), mata via _kill_process_tree,
         confirma que todos descendentes morreram. Esse e o cenario real que
-        a sessao Streamlit enfrenta quando crasha mid-sync."""
+        a sessao Streamlit enfrenta quando crasha mid-sync.
+
+        Skip se chromium nao esta instalado (CI sem `playwright install`)."""
         import subprocess
+        import sys
         import time
         import psutil
         from dashboard.sync import _kill_process_tree
@@ -268,17 +271,29 @@ async def main():
         await asyncio.sleep(60)  # espera matar
 asyncio.run(main())
 '''
-        import sys
+        # stderr=PIPE pra detectar "chromium nao instalado" e skipar
+        # (CI sem `playwright install chromium`).
         proc = subprocess.Popen(
             [sys.executable, "-c", script],
             start_new_session=True,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
         )
         try:
             # Espera Chromium subir (chromium-headless-shell + helpers)
             time.sleep(3.0)
-            assert proc.poll() is None, "Python script morreu cedo"
+            if proc.poll() is not None:
+                # Script morreu cedo. Le stderr pra distinguir 'chromium
+                # nao instalado' (skip) de bug real (fail).
+                try:
+                    _, stderr_bytes = proc.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    stderr_bytes = b""
+                stderr_text = stderr_bytes.decode("utf-8", errors="replace")
+                if "Executable doesn't exist" in stderr_text or "playwright install" in stderr_text.lower():
+                    pytest.skip("Playwright chromium not installed (run `playwright install chromium`)")
+                pytest.fail(f"Python script morreu cedo:\n{stderr_text[:1000]}")
 
             # Confirma que tem filhos antes do kill — psutil walk recursivo
             parent = psutil.Process(proc.pid)
