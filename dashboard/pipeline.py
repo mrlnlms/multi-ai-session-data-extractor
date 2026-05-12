@@ -16,13 +16,15 @@ isso depende do estado agregado, nao da plat sincronizada.
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 import streamlit as st
 
-from dashboard.data import PlatformState
+from dashboard.data import PROJECT_ROOT, PlatformState
 from dashboard.progress import parse_progress
 from dashboard.sync import (
     acquire_pipeline_lock,
@@ -34,6 +36,11 @@ from dashboard.sync import (
     run_unify_streaming,
     sync_command,
 )
+
+# Trilha persistente de runs — append-only jsonl, sobrevive a restart do
+# Streamlit. Sem tails (so metadata) pra nao inflar; tails ficam no
+# session_state ate o user clicar Dismiss.
+RUNS_LOG = PROJECT_ROOT / ".pipeline-runs.jsonl"
 
 
 STAGE_NAMES: list[str] = [
@@ -68,8 +75,9 @@ def _stages_markdown(status: list[str], current_idx: Optional[int]) -> str:
 
 def _save_summary(stage_status: list[str], results: list[dict], publish_after: bool, scope: str) -> None:
     """Persiste resumo da ultima execucao em session_state pra render
-    posterior. `scope` = 'all' | 'platform:<name>' identifica origem."""
-    st.session_state["pipeline_summary"] = {
+    posterior. `scope` = 'all' | 'platform:<name>' identifica origem.
+    Tambem grava em .pipeline-runs.jsonl pra historico."""
+    summary = {
         "at": datetime.now(timezone.utc).isoformat(),
         "stage_status": list(stage_status),
         "stage_names": list(STAGE_NAMES),
@@ -77,6 +85,66 @@ def _save_summary(stage_status: list[str], results: list[dict], publish_after: b
         "publish": publish_after,
         "scope": scope,
     }
+    st.session_state["pipeline_summary"] = summary
+    persist_run(stage_status, results, publish_after, scope)
+
+
+def persist_run(stage_status: list[str], results: list[dict], publish_after: bool, scope: str) -> None:
+    """Append entry no `.pipeline-runs.jsonl` com metadata da run. Sem tails
+    (estavam em session_state). Falha silenciosa — nao bloqueia pipeline."""
+    entry = {
+        "at": datetime.now(timezone.utc).isoformat(),
+        "scope": scope,
+        "stage_status": list(stage_status),
+        "publish": publish_after,
+        "results": [
+            {k: v for k, v in r.items() if k != "tail"}
+            for r in results
+        ],
+    }
+    try:
+        with RUNS_LOG.open("a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError:
+        pass
+
+
+def recent_runs(limit: int = 10) -> list[dict]:
+    """Le ultimas N entries do .pipeline-runs.jsonl, mais recente primeiro."""
+    if not RUNS_LOG.exists():
+        return []
+    entries: list[dict] = []
+    try:
+        with RUNS_LOG.open() as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        return []
+    return entries[-limit:][::-1]
+
+
+def render_recent_runs_section(limit: int = 10) -> None:
+    """Renderiza tabela das ultimas N runs (overview/platform). Skip se vazio."""
+    runs = recent_runs(limit)
+    if not runs:
+        return
+    st.subheader("Recent pipeline runs")
+    rows = []
+    for r in runs:
+        stages = " ".join(BADGES.get(s, "•") for s in r.get("stage_status", []))
+        rows.append({
+            "When": r.get("at", "")[:19].replace("T", " "),
+            "Scope": r.get("scope", ""),
+            "Stages": stages,
+            "Publish": "✓" if r.get("publish") else "—",
+        })
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
 
 def render_last_run_summary() -> None:
@@ -312,6 +380,11 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
     # =================== Stage 3/4 — Quarto render ===================
     st.markdown(f"### Stage 3/4 — {STAGE_NAMES[2]}")
     stage3_ok = True
+    # Filter incremental: sync de 1 plat re-renderiza so qmds dela + cross-
+    # overview. Update all (scope='all') re-renderiza tudo.
+    quarto_filter: Optional[list[str]] = (
+        [t.name for t in targets] if scope.startswith("platform:") else None
+    )
     if not quarto_installed():
         st.info("Quarto CLI not in PATH — skipping render. Install: `brew install quarto-cli`.")
         results.append({
@@ -321,6 +394,10 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
         _set_stage(2, "skipped")
     else:
         _set_stage(2, "running")
+        if quarto_filter:
+            st.caption(
+                f"Incremental: rendering qmds of `{', '.join(quarto_filter)}` + cross-overviews."
+            )
         q_bar = st.progress(0.0, text="quarto: starting…")
         q_box = st.empty()
         q_tail: list[str] = []
@@ -338,7 +415,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
                 _bar.progress(pct, text=f"quarto: {done} / {total} qmds ({int(pct*100)}%)")
 
         try:
-            rc, q_summary = run_quarto_streaming(_q_on_line)
+            rc, q_summary = run_quarto_streaming(_q_on_line, platforms_filter=quarto_filter)
         except Exception as e:  # noqa: BLE001
             rc, q_summary = -1, f"exception: {e}"
         q_bar.empty(); q_box.empty()

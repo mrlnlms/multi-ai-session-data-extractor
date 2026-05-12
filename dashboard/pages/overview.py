@@ -17,7 +17,11 @@ from dashboard.components import (
 )
 from dashboard.data import PlatformState, discover_platforms
 from dashboard.metrics import compute_merged_stats, discovery_drop_flag
-from dashboard.pipeline import render_last_run_summary, run_full_pipeline
+from dashboard.pipeline import (
+    render_last_run_summary,
+    render_recent_runs_section,
+    run_full_pipeline,
+)
 from dashboard.sync import sync_command
 
 
@@ -196,6 +200,9 @@ def render(states: list[PlatformState]) -> None:
 
     st.divider()
     _render_overview_qmds_section()
+
+    st.divider()
+    render_recent_runs_section()
 
     st.divider()
     st.subheader("Capture timeline")

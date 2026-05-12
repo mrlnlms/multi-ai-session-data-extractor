@@ -6,8 +6,10 @@ ainda nao tem sync orquestrador implementado: o botao mostra fallback
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -157,6 +159,11 @@ def _stream(
     Retorna (returncode, ultimas `tail_size` linhas concatenadas).
 
     - `stdin=DEVNULL` + env nao-interativa: nunca penduram em prompts.
+    - `start_new_session=True`: cria process group separado pra que cleanup
+      de subprocess orfao (quando Streamlit crasha mid-run) possa fazer
+      `os.killpg` em todo o grupo.
+    - PID do subprocess eh registrado no lockfile pra recovery na proxima
+      execucao (acquire detecta stale, mata orfaos antes de prosseguir).
     - `timeout` (segundos): mata o processo se exceder. Sem timeout = sem
       cap (perigoso pra subcomandos que podem hang silencioso).
     - `extra_env`: vars adicionais (ex: QUARTO_PYTHON pro `quarto render`).
@@ -173,16 +180,21 @@ def _stream(
         text=True,
         bufsize=1,
         env=env,
+        start_new_session=True,
     )
+    _register_child(proc.pid)
     timer: Optional[threading.Timer] = None
     timed_out = {"v": False}
     if timeout is not None:
         def _kill():
             timed_out["v"] = True
             try:
-                proc.kill()
-            except Exception:
-                pass
+                os.killpg(proc.pid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError, OSError):
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
         timer = threading.Timer(timeout, _kill)
         timer.start()
 
@@ -202,6 +214,7 @@ def _stream(
     finally:
         if timer is not None:
             timer.cancel()
+        _unregister_child(proc.pid)
     if timed_out["v"]:
         msg = f"TIMEOUT: process killed after {timeout}s"
         tail.append(msg)
@@ -216,44 +229,139 @@ def _stream(
 
 
 # ===================== Pipeline lock =====================
+#
+# Schema do .update-all.lock (JSON):
+#   {"parent_pid": <int>, "child_pids": [<int>, ...]}
+#
+# - parent_pid: processo Streamlit/CLI que segura o lock.
+# - child_pids: subprocess ativos abertos por `_stream`. Cada subprocess
+#   eh seu proprio process group leader (start_new_session=True), permitindo
+#   `os.killpg(pid, SIGTERM)` em cleanup.
+#
+# Lock stale (parent morto): `acquire_pipeline_lock` mata todos child_pids
+# remanescentes (processo Playwright/dvc/quarto que ficaram orfaos) antes
+# de prosseguir. Robustez contra crash do Streamlit ou fechamento da aba.
+#
+# Compat retroativa: lockfile antigo era so um int da PID — `_read_lock`
+# trata como `{"parent_pid": <int>, "child_pids": []}`.
+
+_lock_mutex = threading.Lock()
+
+
+def _read_lock() -> dict:
+    try:
+        text = LOCK_PATH.read_text().strip()
+    except OSError:
+        return {}
+    if not text:
+        return {}
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict) and "parent_pid" in data:
+            data.setdefault("child_pids", [])
+            return data
+    except json.JSONDecodeError:
+        pass
+    # Legacy: lockfile so um int
+    try:
+        return {"parent_pid": int(text), "child_pids": []}
+    except ValueError:
+        return {}
+
+
+def _write_lock(data: dict) -> None:
+    try:
+        LOCK_PATH.write_text(json.dumps(data))
+    except OSError:
+        pass
+
+
+def _register_child(pid: int) -> None:
+    """Append PID de subprocess ao lockfile. Chamado por `_stream`."""
+    with _lock_mutex:
+        data = _read_lock()
+        if not data:
+            return  # sem lock (rodando fora de pipeline) — ignora
+        children = data.get("child_pids", [])
+        if pid not in children:
+            children.append(pid)
+            data["child_pids"] = children
+            _write_lock(data)
+
+
+def _unregister_child(pid: int) -> None:
+    """Remove PID de subprocess do lockfile quando termina."""
+    with _lock_mutex:
+        data = _read_lock()
+        if not data:
+            return
+        children = data.get("child_pids", [])
+        if pid in children:
+            children.remove(pid)
+            data["child_pids"] = children
+            _write_lock(data)
+
+
+def _kill_orphan_children(pids: list[int]) -> None:
+    """Mata process groups orfaos restantes de uma run anterior crashada."""
+    for pid in pids:
+        try:
+            os.killpg(pid, signal.SIGTERM)
+            continue
+        except (ProcessLookupError, PermissionError, OSError):
+            pass
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except (ProcessLookupError, PermissionError, OSError):
+            pass
 
 
 def acquire_pipeline_lock() -> Optional[str]:
-    """Tenta adquirir lock pra rodar Update all. Retorna None em sucesso,
+    """Tenta adquirir lock pra rodar pipeline. Retorna None em sucesso,
     string de erro se outro processo ainda esta vivo.
 
-    Lock stale (PID morto) eh removido automaticamente — robusto contra
-    crash do Streamlit no meio do pipeline.
+    Lock stale (parent PID morto) eh removido automaticamente; child_pids
+    remanescentes (subprocess orfaos) sao morto via SIGTERM no process
+    group antes de adquirir.
     """
-    if LOCK_PATH.exists():
-        try:
-            old_pid = int(LOCK_PATH.read_text().strip())
-        except (OSError, ValueError):
-            old_pid = None
-        if old_pid is not None:
+    with _lock_mutex:
+        data = _read_lock()
+        if data:
+            parent_pid = data.get("parent_pid")
+            if parent_pid is not None:
+                try:
+                    os.kill(parent_pid, 0)
+                    return (
+                        f"Pipeline already running (PID {parent_pid}). "
+                        f"Wait or remove {LOCK_PATH.name} manually if stuck."
+                    )
+                except (ProcessLookupError, PermissionError):
+                    # Stale parent — mata orfaos antes de prosseguir.
+                    _kill_orphan_children(data.get("child_pids", []))
             try:
-                os.kill(old_pid, 0)
-                return f"Pipeline already running (PID {old_pid}). Wait or remove {LOCK_PATH.name} manually if stuck."
-            except (ProcessLookupError, PermissionError):
-                pass  # stale lock, prossegue
+                LOCK_PATH.unlink()
+            except OSError:
+                pass
         try:
-            LOCK_PATH.unlink()
-        except OSError:
-            pass
-    try:
-        LOCK_PATH.write_text(str(os.getpid()))
-    except OSError as e:
-        return f"Could not create lockfile {LOCK_PATH}: {e}"
+            _write_lock({"parent_pid": os.getpid(), "child_pids": []})
+        except OSError as e:
+            return f"Could not create lockfile {LOCK_PATH}: {e}"
     return None
 
 
 def release_pipeline_lock() -> None:
-    try:
-        LOCK_PATH.unlink()
-    except FileNotFoundError:
-        pass
-    except OSError:
-        pass
+    """Libera o lock. Mata children remanescentes (caso pipeline tenha
+    sido interrompido mid-run via exception) antes de remover o arquivo."""
+    with _lock_mutex:
+        data = _read_lock()
+        if data and data.get("parent_pid") == os.getpid():
+            _kill_orphan_children(data.get("child_pids", []))
+        try:
+            LOCK_PATH.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
 
 
 # ===================== DVC / git state =====================
@@ -421,23 +529,40 @@ def quarto_installed() -> bool:
     return shutil.which("quarto") is not None
 
 
-def discover_qmds() -> list[Path]:
-    """Lista notebooks Quarto pra renderizar (notebooks/*.qmd, excluindo
-    templates `_template*.qmd`). Ordenacao: overview qmds (00-*) primeiro,
-    depois per-source alfabetico."""
+def discover_qmds(platforms_filter: Optional[list[str]] = None) -> list[Path]:
+    """Lista notebooks Quarto pra renderizar.
+
+    - `platforms_filter=None`: todos `notebooks/*.qmd` (exceto _template).
+    - `platforms_filter=["NotebookLM"]`: so qmds dessa plat (consolidado +
+      per-account/legacy) + cross-overview (00-*.qmd). Stage 3 incremental
+      pra evitar re-render dos 22 qmds quando sync foi de 1 plat so.
+
+    Ordenacao: 00-* primeiro, resto alfabetico.
+    """
     notebooks_dir = PROJECT_ROOT / "notebooks"
     if not notebooks_dir.exists():
         return []
-    qmds = [p for p in notebooks_dir.glob("*.qmd") if not p.name.startswith("_")]
-    # 00-overview*.qmd primeiro, depois resto alfabetico
-    return sorted(qmds, key=lambda p: (not p.name.startswith("00-"), p.name))
+    if platforms_filter is None:
+        qmds = [p for p in notebooks_dir.glob("*.qmd") if not p.name.startswith("_")]
+        return sorted(qmds, key=lambda p: (not p.name.startswith("00-"), p.name))
+    # Filtrado: qmds das plats listadas + cross-overview
+    from dashboard.quarto import overview_qmd_paths, qmds_for_platform
+    selected: set[Path] = set()
+    for plat in platforms_filter:
+        selected.update(qmds_for_platform(plat))
+    selected.update(overview_qmd_paths())
+    return sorted(selected, key=lambda p: (not p.name.startswith("00-"), p.name))
 
 
 def run_quarto_streaming(
     on_line: Callable[[str], None],
     timeout_per_qmd: float = 900.0,
+    platforms_filter: Optional[list[str]] = None,
 ) -> tuple[int, str]:
-    """Renderiza todos qmds em notebooks/*.qmd (exceto templates).
+    """Renderiza notebooks/*.qmd (exceto templates).
+
+    `platforms_filter`: se setado, renderiza so qmds dessas plats + cross-
+    overview. None = todos qmds (default).
 
     Imprime markers `[i/N] rendering <name>` pra UI parsear progresso.
     Continua nos proximos qmds se um falhar; rc final reflete agregado.
@@ -446,7 +571,7 @@ def run_quarto_streaming(
         on_line("ERROR: quarto CLI not in PATH — `brew install quarto-cli`")
         return 1, "quarto not installed"
 
-    qmds = discover_qmds()
+    qmds = discover_qmds(platforms_filter=platforms_filter)
     if not qmds:
         on_line("WARNING: no qmds found in notebooks/")
         return 0, "no qmds"
