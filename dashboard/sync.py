@@ -188,13 +188,7 @@ def _stream(
     if timeout is not None:
         def _kill():
             timed_out["v"] = True
-            try:
-                os.killpg(proc.pid, signal.SIGTERM)
-            except (ProcessLookupError, PermissionError, OSError):
-                try:
-                    proc.kill()
-                except Exception:
-                    pass
+            _kill_process_tree(proc.pid)
         timer = threading.Timer(timeout, _kill)
         timer.start()
 
@@ -306,18 +300,54 @@ def _unregister_child(pid: int) -> None:
             _write_lock(data)
 
 
+def _kill_process_tree(pid: int) -> None:
+    """Mata o processo e TODOS descendentes via psutil — robusto contra
+    Chromium workers que migram pra process group proprio (escape de killpg).
+
+    Estrategia (em ordem):
+      1. psutil walk recursivo + SIGTERM em cada descendente + raiz
+      2. fallback killpg (cobre 95% dos casos sem psutil)
+      3. fallback os.kill simples (ultimo recurso)
+
+    Silent ProcessLookupError/PermissionError — esperado quando processos
+    ja morreram naturalmente.
+    """
+    try:
+        import psutil
+        try:
+            proc = psutil.Process(pid)
+            # children(recursive=True) usa syscall (ptree), independente de PGID
+            for child in proc.children(recursive=True):
+                try:
+                    child.terminate()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            try:
+                proc.terminate()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+            return
+        except psutil.NoSuchProcess:
+            return
+    except ImportError:
+        pass
+    # Fallback 1: killpg (cobre process group leaders)
+    try:
+        os.killpg(pid, signal.SIGTERM)
+        return
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+    # Fallback 2: kill simples
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+
+
 def _kill_orphan_children(pids: list[int]) -> None:
-    """Mata process groups orfaos restantes de uma run anterior crashada."""
+    """Mata processo + arvore de descendentes de cada PID orfao."""
     for pid in pids:
-        try:
-            os.killpg(pid, signal.SIGTERM)
-            continue
-        except (ProcessLookupError, PermissionError, OSError):
-            pass
-        try:
-            os.kill(pid, signal.SIGTERM)
-        except (ProcessLookupError, PermissionError, OSError):
-            pass
+        _kill_process_tree(pid)
 
 
 def _format_lock_age(started_at_iso: Optional[str]) -> str:

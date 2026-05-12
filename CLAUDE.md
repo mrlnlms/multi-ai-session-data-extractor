@@ -147,16 +147,18 @@ outras**. Tabela cumulativa em `docs/cross-platform-features.md`.
    `skip_existing` nos downloaders. Binarios sao precious.
 2. **Preservation acima de tudo** — convs/sources deletadas no servidor
    viram `_preserved_missing` no merged.
-3. **Discovery parcial vira fallback, nao erro** (ChatGPT, 2026-05-11) —
-   `_get_max_known_discovery` com threshold 20% **detecta** quando listing
-   upstream retorna parcial. ChatGPT entao cai pra `refetch_known_via_page`
-   (`/conversations/batch` pelos IDs salvos no raw cumulativo) — caminho que
-   nao depende de discovery. Custo do fallback: ~20min em vez de ~80s naquela
-   rodada, mas o "Update all" sempre fecha verde. As outras 6 plataformas
-   ainda tem o `RuntimeError` original — pendente generalizar quando houver
-   sintoma equivalente. Historia completa: o fail-fast foi inventado aqui em
-   2026-04-27 (commit 7868ddb), nao veio do projeto pai; o conserto cirurgico
-   transforma a detecao em fallback transparente em vez de erro.
+3. **Discovery parcial vira fallback, nao erro** — `_get_max_known_discovery`
+   com threshold 20% **detecta** quando listing upstream retorna parcial.
+   ChatGPT cai pra `refetch_known_via_page` (`/conversations/batch` pelos IDs
+   salvos no raw cumulativo) — caminho que nao depende de discovery. Custo:
+   ~20min em vez de ~80s naquela rodada, mas "Update all" sempre fecha verde.
+   **Plats sem fallback automatico ainda (Claude.ai, Gemini, NotebookLM, Qwen,
+   DeepSeek, Perplexity, Grok, Kimi):** se discovery drop > 20% acontecer,
+   orchestrator lanca `RuntimeError`. Mitigation manual: Claude.ai tem
+   `scripts/claude-refetch-known.py` (gap-fill, nao state-refresh); outras
+   exigem rodar `<plat>-sync.py --full` ou esperar proximo run estabilizar.
+   Generalizacao planejada — cada plat tem API proprio + adaptacao no
+   orchestrator (~1d/plat).
 4. **Schema canonico eh fronteira** — `src/schema/models.py` define
    `Conversation`, `Message`, `ToolEvent`, `ConversationProject`, `Branch`.
    Extractors entregam raw/merged JSON; parsers entregam parquet nesse

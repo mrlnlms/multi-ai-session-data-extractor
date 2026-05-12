@@ -31,7 +31,7 @@ from src.extractors.gemini.auth import load_context
 from src.extractors.gemini.api_client import GeminiAPIClient
 from src.extractors.gemini.batchexecute import load_session
 from src.extractors.gemini.asset_downloader import download_assets, extract_deep_research
-from src.extractors.gemini.orchestrator import BASE_DIR as RAW_BASE, run_export
+from src.extractors.gemini.orchestrator import run_export
 from src.reconcilers.gemini import run_reconciliation
 
 
