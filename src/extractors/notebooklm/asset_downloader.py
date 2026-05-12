@@ -367,7 +367,9 @@ async def download_assets(
                         print(f"  ERR {fname.name}: {msg}", flush=True)
                         progress["errors_logged"] += 1
         progress["done"] += 1
-        if progress["done"] % 200 == 0 or progress["done"] == total:
+        # Throttle baixo (a cada 10) pra dashboard ver progresso vivo;
+        # runs pequenos (poucos audios) nunca atingiriam 200 antes do final.
+        if progress["done"] % 10 == 0 or progress["done"] == total:
             print(
                 f"  progresso: {progress['done']}/{total} "
                 f"(audios dl={stats['audios_downloaded']} skip={stats['audios_skipped']}, "

@@ -16,6 +16,7 @@ from dashboard.components import (
 )
 from dashboard.data import PlatformState, discover_platforms
 from dashboard.metrics import compute_merged_stats, discovery_drop_flag
+from dashboard.progress import parse_progress
 from dashboard.sync import run_sync, run_sync_streaming, run_unify, sync_command
 
 
@@ -239,27 +240,38 @@ def _run_update_all(states: list[PlatformState]) -> None:
         st.error("No sync available.")
         return
     st.warning("⚠️ Sync + unify in progress — don't close this tab.")
-    progress = st.progress(0.0)
+    progress = st.progress(0.0, text="Overall 0 / {} platforms".format(len(targets)))
     for i, s in enumerate(targets):
         st.markdown(f"**{s.name}**")
-        live = st.empty()
-        live.text("starting...")
+        sub_bar = st.progress(0.0, text=f"{s.name}: starting…")
+        tail_box = st.empty()
+        recent: list[str] = []
+
+        def _on_line(line: str, _sub=sub_bar, _box=tail_box, _recent=recent, _name=s.name):
+            _recent.append(line)
+            del _recent[:-6]
+            _box.code("\n".join(_recent), language=None)
+            p = parse_progress(line)
+            if p is not None:
+                done, total = p
+                pct = min(done / total, 1.0)
+                _sub.progress(pct, text=f"{_name}: {done} / {total} ({int(pct*100)}%)")
+
         try:
-            rc, tail = run_sync_streaming(
-                s.name,
-                on_line=lambda l, _live=live: _live.code(l[-200:], language=None),
-            )
+            rc, tail = run_sync_streaming(s.name, on_line=_on_line)
         except Exception as e:  # noqa: BLE001
+            sub_bar.empty()
+            tail_box.empty()
             st.error(f"❌ {s.name}: {e}")
-            progress.progress((i + 1) / len(targets))
+            progress.progress((i + 1) / len(targets), text=f"Overall {i+1} / {len(targets)} platforms")
             continue
+        sub_bar.empty()
+        tail_box.empty()
         if rc != 0:
-            live.empty()
             st.error(f"❌ {s.name} failed (exit {rc}). tail:\n```\n{tail[-800:]}\n```")
         else:
-            live.empty()
             st.success(f"✅ {s.name} ok")
-        progress.progress((i + 1) / len(targets))
+        progress.progress((i + 1) / len(targets), text=f"Overall {i+1} / {len(targets)} platforms")
 
     with st.spinner("Unify parquets (cross-platform)..."):
         try:
