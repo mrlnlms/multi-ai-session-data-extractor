@@ -116,7 +116,7 @@ def _run(targets: list[str], publish_after: bool) -> int:
         status = "ok" if rc == 0 else "failed"
         results.append({
             "stage": STAGE_KEYS[0], "step": plat, "status": status,
-            "detail": "" if rc == 0 else f"rc={rc}", "tail": tail[-2000:],
+            "detail": "" if rc == 0 else f"rc={rc}", "tail": tail[-10000:],
         })
         if rc == 0:
             any_ok = True
@@ -152,7 +152,7 @@ def _run(targets: list[str], publish_after: bool) -> int:
             stage_status[3] = "aborted"
         results.append({
             "stage": STAGE_KEYS[1], "step": "unify-parquets", "status": "failed",
-            "detail": f"rc={rc}", "tail": unify_tail[-2000:],
+            "detail": f"rc={rc}", "tail": unify_tail[-10000:],
         })
         _log(f"=== Stage 2 failed (rc={rc}) — aborting ===")
         _persist()
@@ -189,7 +189,7 @@ def _run(targets: list[str], publish_after: bool) -> int:
             stage3_ok = False
             results.append({
                 "stage": STAGE_KEYS[2], "step": "quarto-render", "status": "failed",
-                "detail": q_summary[:300], "tail": q_summary[-2000:],
+                "detail": q_summary[:300], "tail": q_summary[-10000:],
             })
             _log(f"  FAIL: quarto ({q_summary})")
         else:
@@ -230,7 +230,7 @@ def _run(targets: list[str], publish_after: bool) -> int:
             stage_status[3] = "failed"
             results.append({
                 "stage": STAGE_KEYS[3], "step": "publish", "status": "failed",
-                "detail": pub_summary[:200], "tail": pub_summary[-2000:],
+                "detail": pub_summary[:200], "tail": pub_summary[-10000:],
             })
             _log(f"  FAIL: publish ({pub_summary[-400:]})")
             _persist()
