@@ -231,19 +231,23 @@ def _stream(
 # ===================== Pipeline lock =====================
 #
 # Schema do .update-all.lock (JSON):
-#   {"parent_pid": <int>, "child_pids": [<int>, ...]}
+#   {"parent_pid": <int>, "child_pids": [<int>, ...], "started_at": "<iso>"}
 #
 # - parent_pid: processo Streamlit/CLI que segura o lock.
 # - child_pids: subprocess ativos abertos por `_stream`. Cada subprocess
 #   eh seu proprio process group leader (start_new_session=True), permitindo
 #   `os.killpg(pid, SIGTERM)` em cleanup.
+# - started_at: timestamp ISO UTC de quando o lock foi adquirido. Permite
+#   `acquire_pipeline_lock` exibir idade do lock quando outro processo
+#   tenta adquirir e o atual ainda esta vivo ("Pipeline already running
+#   (PID X, since 12min ago)").
 #
 # Lock stale (parent morto): `acquire_pipeline_lock` mata todos child_pids
 # remanescentes (processo Playwright/dvc/quarto que ficaram orfaos) antes
 # de prosseguir. Robustez contra crash do Streamlit ou fechamento da aba.
 #
-# Compat retroativa: lockfile antigo era so um int da PID — `_read_lock`
-# trata como `{"parent_pid": <int>, "child_pids": []}`.
+# Compat retroativa: lockfile antigo era so um int da PID, ou JSON sem
+# started_at — `_read_lock` trata ambos.
 
 _lock_mutex = threading.Lock()
 
@@ -316,6 +320,23 @@ def _kill_orphan_children(pids: list[int]) -> None:
             pass
 
 
+def _format_lock_age(started_at_iso: Optional[str]) -> str:
+    """Idade humanamente legivel do lock (since X). Retorna '' se ausente/invalido."""
+    if not started_at_iso:
+        return ""
+    try:
+        started = datetime.fromisoformat(started_at_iso.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return ""
+    delta = datetime.now(timezone.utc) - started
+    secs = int(delta.total_seconds())
+    if secs < 60:
+        return f", since {secs}s ago"
+    if secs < 3600:
+        return f", since {secs // 60}min ago"
+    return f", since {secs // 3600}h{(secs % 3600) // 60}min ago"
+
+
 def acquire_pipeline_lock() -> Optional[str]:
     """Tenta adquirir lock pra rodar pipeline. Retorna None em sucesso,
     string de erro se outro processo ainda esta vivo.
@@ -331,8 +352,9 @@ def acquire_pipeline_lock() -> Optional[str]:
             if parent_pid is not None:
                 try:
                     os.kill(parent_pid, 0)
+                    age = _format_lock_age(data.get("started_at"))
                     return (
-                        f"Pipeline already running (PID {parent_pid}). "
+                        f"Pipeline already running (PID {parent_pid}{age}). "
                         f"Wait or remove {LOCK_PATH.name} manually if stuck."
                     )
                 except (ProcessLookupError, PermissionError):
@@ -343,7 +365,11 @@ def acquire_pipeline_lock() -> Optional[str]:
             except OSError:
                 pass
         try:
-            _write_lock({"parent_pid": os.getpid(), "child_pids": []})
+            _write_lock({
+                "parent_pid": os.getpid(),
+                "child_pids": [],
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            })
         except OSError as e:
             return f"Could not create lockfile {LOCK_PATH}: {e}"
     return None

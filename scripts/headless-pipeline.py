@@ -29,7 +29,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from dashboard.pipeline import persist_run
+from dashboard.pipeline import commit_msg_for_scope, persist_run
 from dashboard.sync import (
     acquire_pipeline_lock,
     quarto_installed,
@@ -223,7 +223,9 @@ def _run(targets: list[str], publish_after: bool) -> int:
     else:
         stage_status[3] = "running"
         try:
-            rc, pub_summary = run_publish_streaming(_log)
+            rc, pub_summary = run_publish_streaming(
+                _log, commit_msg=commit_msg_for_scope("cli:headless")
+            )
         except Exception as e:  # noqa: BLE001
             rc, pub_summary = -1, f"exception: {e}"
 
