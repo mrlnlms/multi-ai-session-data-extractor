@@ -1,9 +1,8 @@
 """Pagina inicial — visao cross-plataforma."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -12,10 +11,9 @@ import streamlit as st
 from dashboard.components import (
     STATUS_BADGES,
     format_datetime,
-    format_size,
     relative_time,
 )
-from dashboard.data import PlatformState, discover_platforms
+from dashboard.data import PlatformState
 from dashboard.metrics import compute_merged_stats, discovery_drop_flag
 from dashboard.pipeline import (
     render_last_run_summary,
@@ -220,7 +218,6 @@ def _render_overview_qmds_section() -> None:
         html_output_path_for_qmd,
         overview_qmds,
         render_and_publish_qmd,
-        streamlit_static_url_for_qmd,
     )
 
     qmds = overview_qmds()

@@ -35,6 +35,9 @@
     <dict>
         <key>PYTHONPATH</key>
         <string>PROJECT_ROOT_ABS</string>
+        <!-- PATH: /opt/homebrew/bin = Apple Silicon Homebrew (M1/M2/M3/M4).
+             Intel Macs: /usr/local/bin vem do Homebrew tambem; ordem mantida.
+             Se quarto/git/etc estao em outro lugar, ajuste aqui. -->
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     </dict>

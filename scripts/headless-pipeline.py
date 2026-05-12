@@ -27,9 +27,9 @@ from __future__ import annotations
 import argparse
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
-from dashboard.pipeline import commit_msg_for_scope, persist_run
+from dashboard.data import KNOWN_PLATFORMS
+from dashboard.pipeline import STAGE_KEYS, commit_msg_for_scope, persist_run
 from dashboard.sync import (
     acquire_pipeline_lock,
     quarto_installed,
@@ -42,13 +42,10 @@ from dashboard.sync import (
 )
 
 
-# Plats que rodam captura headless. ChatGPT/Perplexity ficam fora (Cloudflare
-# detecta headless e 403/challenge). CLIs sao locais (cli-copy.py).
-HEADLESS_DEFAULT = [
-    "Claude.ai", "Gemini", "NotebookLM", "Qwen", "DeepSeek",
-    "Grok", "Kimi",
-    "Claude Code", "Codex", "Gemini CLI",
-]
+# Plats que exigem browser visivel (Cloudflare detecta headless e 403/challenge).
+# Derivado de KNOWN_PLATFORMS pra evitar drift quando nova plat for adicionada.
+_HEADED_REQUIRED = {"ChatGPT", "Perplexity"}
+HEADLESS_DEFAULT = [p for p in KNOWN_PLATFORMS if p not in _HEADED_REQUIRED]
 
 
 def _log(line: str) -> None:
@@ -118,7 +115,7 @@ def _run(targets: list[str], publish_after: bool) -> int:
             rc, tail = -1, f"exception: {e}"
         status = "ok" if rc == 0 else "failed"
         results.append({
-            "stage": "1/4 Sync", "step": plat, "status": status,
+            "stage": STAGE_KEYS[0], "step": plat, "status": status,
             "detail": "" if rc == 0 else f"rc={rc}", "tail": tail[-2000:],
         })
         if rc == 0:
@@ -154,7 +151,7 @@ def _run(targets: list[str], publish_after: bool) -> int:
         if publish_after:
             stage_status[3] = "aborted"
         results.append({
-            "stage": "2/4 Unify", "step": "unify-parquets", "status": "failed",
+            "stage": STAGE_KEYS[1], "step": "unify-parquets", "status": "failed",
             "detail": f"rc={rc}", "tail": unify_tail[-2000:],
         })
         _log(f"=== Stage 2 failed (rc={rc}) — aborting ===")
@@ -163,7 +160,7 @@ def _run(targets: list[str], publish_after: bool) -> int:
 
     stage_status[1] = "done"
     results.append({
-        "stage": "2/4 Unify", "step": "unify-parquets", "status": "ok",
+        "stage": STAGE_KEYS[1], "step": "unify-parquets", "status": "ok",
         "detail": "", "tail": "",
     })
     _log("  ok: unify")
@@ -174,7 +171,7 @@ def _run(targets: list[str], publish_after: bool) -> int:
     if not quarto_installed():
         stage_status[2] = "skipped"
         results.append({
-            "stage": "3/4 Quarto", "step": "quarto-render", "status": "skipped",
+            "stage": STAGE_KEYS[2], "step": "quarto-render", "status": "skipped",
             "detail": "quarto CLI not installed", "tail": "",
         })
         _log("  skipped: quarto CLI not in PATH")
@@ -191,14 +188,14 @@ def _run(targets: list[str], publish_after: bool) -> int:
             stage_status[2] = "failed"
             stage3_ok = False
             results.append({
-                "stage": "3/4 Quarto", "step": "quarto-render", "status": "failed",
+                "stage": STAGE_KEYS[2], "step": "quarto-render", "status": "failed",
                 "detail": q_summary[:300], "tail": q_summary[-2000:],
             })
             _log(f"  FAIL: quarto ({q_summary})")
         else:
             stage_status[2] = "done"
             results.append({
-                "stage": "3/4 Quarto", "step": "quarto-render", "status": "ok",
+                "stage": STAGE_KEYS[2], "step": "quarto-render", "status": "ok",
                 "detail": q_summary, "tail": "",
             })
             _log(f"  ok: quarto ({q_summary})")
@@ -207,14 +204,14 @@ def _run(targets: list[str], publish_after: bool) -> int:
     _log("=== Stage 4/4 — Publish ===")
     if not publish_after:
         results.append({
-            "stage": "4/4 Publish", "step": "publish", "status": "skipped",
+            "stage": STAGE_KEYS[3], "step": "publish", "status": "skipped",
             "detail": "--no-publish", "tail": "",
         })
         _log("  skipped: --no-publish")
     elif not stage3_ok:
         stage_status[3] = "aborted"
         results.append({
-            "stage": "4/4 Publish", "step": "publish", "status": "aborted",
+            "stage": STAGE_KEYS[3], "step": "publish", "status": "aborted",
             "detail": "stage 3 quarto failed", "tail": "",
         })
         _log("  ABORTED: quarto failed, not publishing")
@@ -232,7 +229,7 @@ def _run(targets: list[str], publish_after: bool) -> int:
         if rc != 0:
             stage_status[3] = "failed"
             results.append({
-                "stage": "4/4 Publish", "step": "publish", "status": "failed",
+                "stage": STAGE_KEYS[3], "step": "publish", "status": "failed",
                 "detail": pub_summary[:200], "tail": pub_summary[-2000:],
             })
             _log(f"  FAIL: publish ({pub_summary[-400:]})")
@@ -240,7 +237,7 @@ def _run(targets: list[str], publish_after: bool) -> int:
             return 1
         stage_status[3] = "done"
         results.append({
-            "stage": "4/4 Publish", "step": "publish", "status": "ok",
+            "stage": STAGE_KEYS[3], "step": "publish", "status": "ok",
             "detail": pub_summary, "tail": "",
         })
         _log(f"  ok: publish ({pub_summary})")

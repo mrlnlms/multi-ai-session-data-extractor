@@ -39,8 +39,11 @@ from dashboard.sync import (
 
 # Trilha persistente de runs — append-only jsonl, sobrevive a restart do
 # Streamlit. Sem tails (so metadata) pra nao inflar; tails ficam no
-# session_state ate o user clicar Dismiss.
+# session_state ate o user clicar Dismiss. Rotation acionada quando passa
+# de MAX_RUNS_BEFORE_ROTATE entries — mantem ultimas KEEP_RUNS_AFTER_ROTATE.
 RUNS_LOG = PROJECT_ROOT / ".pipeline-runs.jsonl"
+MAX_RUNS_BEFORE_ROTATE = 1000
+KEEP_RUNS_AFTER_ROTATE = 500
 
 
 STAGE_NAMES: list[str] = [
@@ -48,6 +51,14 @@ STAGE_NAMES: list[str] = [
     "Unify parquets",
     "Quarto render",
     "Publish (DVC + git)",
+]
+
+# Keys curtas pra `results[i]["stage"]` — derivadas de STAGE_NAMES pra evitar
+# drift se renomear (ex: 'Sync platforms' -> 'Sync'). Renderiza igual no
+# summary expander e na trilha persistente.
+STAGE_KEYS: list[str] = [
+    f"{i+1}/{len(STAGE_NAMES)} {n.split()[0]}"
+    for i, n in enumerate(STAGE_NAMES)
 ]
 
 # Mapeamento centralizado pra evitar bugs de inconsistencia entre painel
@@ -105,6 +116,23 @@ def persist_run(stage_status: list[str], results: list[dict], publish_after: boo
     try:
         with RUNS_LOG.open("a") as f:
             f.write(json.dumps(entry) + "\n")
+        _maybe_rotate_runs_log()
+    except OSError:
+        pass
+
+
+def _maybe_rotate_runs_log() -> None:
+    """Trunca .pipeline-runs.jsonl quando ultrapassa MAX_RUNS_BEFORE_ROTATE,
+    mantendo as ultimas KEEP_RUNS_AFTER_ROTATE entries. Evita arquivo
+    crescendo indefinidamente em rodadas frequentes."""
+    try:
+        with RUNS_LOG.open() as f:
+            lines = f.readlines()
+        if len(lines) <= MAX_RUNS_BEFORE_ROTATE:
+            return
+        kept = lines[-KEEP_RUNS_AFTER_ROTATE:]
+        with RUNS_LOG.open("w") as f:
+            f.writelines(kept)
     except OSError:
         pass
 
@@ -309,7 +337,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
             "Status": "ok" if rc == 0 else f"failed (rc={rc})",
         })
         results.append({
-            "stage": "1/4 Sync",
+            "stage": STAGE_KEYS[0],
             "step": s.name,
             "status": status,
             "detail": "" if rc == 0 else f"rc={rc}",
@@ -342,7 +370,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
         if publish_after:
             _set_stage(3, "aborted")
             results.append({
-                "stage": "4/4 Publish", "step": "abort", "status": "aborted",
+                "stage": STAGE_KEYS[3], "step": "abort", "status": "aborted",
                 "detail": "all stage 1 platforms failed", "tail": "",
             })
         warning_box.empty()
@@ -373,19 +401,19 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
     if rc != 0:
         st.error(f"❌ unify failed (rc={rc}). tail:\n```\n{unify_full_tail[-800:]}\n```")
         results.append({
-            "stage": "2/4 Unify", "step": "unify-parquets", "status": "failed",
+            "stage": STAGE_KEYS[1], "step": "unify-parquets", "status": "failed",
             "detail": f"rc={rc}", "tail": unify_full_tail[-2000:],
         })
         _set_stage(1, "failed")
         _set_stage(2, "aborted")
         results.append({
-            "stage": "3/4 Quarto", "step": "quarto-render", "status": "aborted",
+            "stage": STAGE_KEYS[2], "step": "quarto-render", "status": "aborted",
             "detail": "stage 2 unify failed", "tail": "",
         })
         if publish_after:
             _set_stage(3, "aborted")
             results.append({
-                "stage": "4/4 Publish", "step": "publish", "status": "aborted",
+                "stage": STAGE_KEYS[3], "step": "publish", "status": "aborted",
                 "detail": "stage 2 unify failed", "tail": "",
             })
         warning_box.empty()
@@ -394,7 +422,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
 
     st.success("✅ unify ok")
     results.append({
-        "stage": "2/4 Unify", "step": "unify-parquets", "status": "ok",
+        "stage": STAGE_KEYS[1], "step": "unify-parquets", "status": "ok",
         "detail": "", "tail": "",
     })
     _set_stage(1, "done")
@@ -410,7 +438,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
     if not quarto_installed():
         st.info("Quarto CLI not in PATH — skipping render. Install: `brew install quarto-cli`.")
         results.append({
-            "stage": "3/4 Quarto", "step": "quarto-render", "status": "skipped",
+            "stage": STAGE_KEYS[2], "step": "quarto-render", "status": "skipped",
             "detail": "quarto CLI not installed", "tail": "",
         })
         _set_stage(2, "skipped")
@@ -445,7 +473,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
         if rc != 0:
             st.error(f"❌ quarto render had failures: {q_summary}")
             results.append({
-                "stage": "3/4 Quarto", "step": "quarto-render", "status": "failed",
+                "stage": STAGE_KEYS[2], "step": "quarto-render", "status": "failed",
                 "detail": q_summary[:300], "tail": q_summary[-2000:],
             })
             _set_stage(2, "failed")
@@ -453,7 +481,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
         else:
             st.success(f"✅ quarto ok — {q_summary}")
             results.append({
-                "stage": "3/4 Quarto", "step": "quarto-render", "status": "ok",
+                "stage": STAGE_KEYS[2], "step": "quarto-render", "status": "ok",
                 "detail": q_summary, "tail": "",
             })
             _set_stage(2, "done")
@@ -466,7 +494,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
             "new data via `dvc import` until you run it."
         )
         results.append({
-            "stage": "4/4 Publish", "step": "publish", "status": "skipped",
+            "stage": STAGE_KEYS[3], "step": "publish", "status": "skipped",
             "detail": "checkbox unchecked", "tail": "",
         })
     elif not stage3_ok:
@@ -474,7 +502,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
             "⏭️ Publish aborted — Quarto stage failed. Resolve quarto issues then re-run."
         )
         results.append({
-            "stage": "4/4 Publish", "step": "publish", "status": "aborted",
+            "stage": STAGE_KEYS[3], "step": "publish", "status": "aborted",
             "detail": "stage 3 quarto failed", "tail": "",
         })
         _set_stage(3, "aborted")
@@ -507,14 +535,14 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
         if rc != 0:
             st.error(f"❌ publish failed:\n```\n{pub_summary[-800:]}\n```")
             results.append({
-                "stage": "4/4 Publish", "step": "publish", "status": "failed",
+                "stage": STAGE_KEYS[3], "step": "publish", "status": "failed",
                 "detail": pub_summary[:200], "tail": pub_summary[-2000:],
             })
             _set_stage(3, "failed")
         else:
             st.success(f"✅ publish ok — {pub_summary}")
             results.append({
-                "stage": "4/4 Publish", "step": "publish", "status": "ok",
+                "stage": STAGE_KEYS[3], "step": "publish", "status": "ok",
                 "detail": pub_summary, "tail": "",
             })
             _set_stage(3, "done")
