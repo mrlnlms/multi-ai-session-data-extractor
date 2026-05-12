@@ -22,8 +22,6 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pandas as pd
-
 from src.parsers.manual.clippings_obsidian import ClippingsObsidianParser
 from src.parsers.manual.copypaste_web import CopypasteWebParser
 from src.parsers.manual.terminal_claude_code import TerminalClaudeCodeParser

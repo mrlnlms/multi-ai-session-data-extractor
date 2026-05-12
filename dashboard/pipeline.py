@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 
 import pandas as pd
@@ -34,7 +33,6 @@ from dashboard.sync import (
     run_quarto_streaming,
     run_sync_streaming,
     run_unify_streaming,
-    sync_command,
 )
 
 # Trilha persistente de runs — append-only jsonl, sobrevive a restart do

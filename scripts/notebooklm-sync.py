@@ -33,7 +33,7 @@ from src.extractors.notebooklm.batchexecute import load_session
 from src.extractors.notebooklm.asset_downloader import (
     download_assets, fetch_text_artifacts, save_notes_and_mindmaps,
 )
-from src.extractors.notebooklm.orchestrator import BASE_DIR as RAW_BASE, run_export
+from src.extractors.notebooklm.orchestrator import run_export
 from src.reconcilers.notebooklm import run_reconciliation
 
 

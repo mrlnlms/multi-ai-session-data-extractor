@@ -210,19 +210,39 @@ class TestLockfile:
     def test_stale_lock_kills_orphan_children(self, _isolate_lock):
         from dashboard.sync import acquire_pipeline_lock, release_pipeline_lock
 
-        # Simula crash com children registrados — PIDs fakes, killpg vira no-op
+        # Simula crash com children registrados — PIDs fakes. _kill_process_tree
+        # usa psutil; mockamos pra contar tentativas em cada PID orfao.
         _isolate_lock.write_text(
             json.dumps({"parent_pid": 999999, "child_pids": [888888, 777777]})
         )
-        with patch("dashboard.sync.os.killpg") as mock_killpg:
-            mock_killpg.side_effect = ProcessLookupError  # PIDs ja morreram
+        with patch("dashboard.sync._kill_process_tree") as mock_kill:
             err = acquire_pipeline_lock()
             assert err is None
-            # Tentou matar os dois
-            killed_pids = [call.args[0] for call in mock_killpg.call_args_list]
+            killed_pids = [call.args[0] for call in mock_kill.call_args_list]
             assert 888888 in killed_pids
             assert 777777 in killed_pids
         release_pipeline_lock()
+
+    def test_kill_process_tree_terminates_subprocess(self):
+        """End-to-end: psutil walk recursivo + SIGTERM no subprocess real."""
+        import subprocess
+        import time
+        from dashboard.sync import _kill_process_tree
+
+        p = subprocess.Popen(["sleep", "30"], start_new_session=True)
+        try:
+            time.sleep(0.1)
+            assert p.poll() is None  # Vivo
+            _kill_process_tree(p.pid)
+            # Espera ate 2s pra SIGTERM propagar
+            for _ in range(20):
+                if p.poll() is not None:
+                    break
+                time.sleep(0.1)
+            assert p.poll() is not None  # Morto
+        finally:
+            if p.poll() is None:
+                p.kill()
 
 
 # ===================== Persist runs =====================
