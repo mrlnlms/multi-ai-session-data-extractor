@@ -6,6 +6,7 @@ ainda nao tem sync orquestrador implementado: o botao mostra fallback
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -18,15 +19,16 @@ from dashboard.data import PROJECT_ROOT, SCRIPT_PREFIX
 
 # Env vars que impedem subprocess de prompter quando credentials faltam.
 # Sem isso, `git push` / `dvc push` podem pendurar pra sempre esperando
-# entrada de TTY que o Streamlit nao tem.
+# entrada de TTY que o Streamlit nao tem. NAO mexer em DISPLAY: Chromium
+# headed do ChatGPT/Perplexity herda essa env, e em Linux DISPLAY="" quebra.
 _NONINTERACTIVE_ENV = {
     "GIT_TERMINAL_PROMPT": "0",
     "GIT_ASKPASS": "/bin/true",
     "SSH_ASKPASS": "/bin/true",
-    "DISPLAY": "",
 }
 
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
+LOCK_PATH = PROJECT_ROOT / ".update-all.lock"
 
 # Pastas versionadas via DVC (espelha CLAUDE.md "Rotina pos-captura").
 # Atualizar AQUI quando adicionar plataforma com diretorio externo novo.
@@ -48,6 +50,10 @@ DVC_PATHS: list[str] = [
     "data/external/gemini-config-snapshots",
     "data/external/grok-snapshots",
 ]
+
+
+def _safe_env() -> dict[str, str]:
+    return dict(os.environ)
 
 
 def has_sync_script(platform: str) -> bool:
@@ -99,12 +105,6 @@ def run_sync(platform: str, capture_output: bool = True) -> subprocess.Completed
     )
 
 
-def _safe_env() -> dict[str, str]:
-    import os
-
-    return {k: v for k, v in os.environ.items()}
-
-
 def run_sync_streaming(
     platform: str,
     on_line,
@@ -126,7 +126,7 @@ def run_sync_streaming(
 
 def run_unify(capture_output: bool = True) -> subprocess.CompletedProcess:
     """Roda scripts/unify-parquets.py — materializa data/unified/ a partir
-    de data/processed/<plat>/. Idempotente, sem args."""
+    de data/processed/<plat>/. Idempotente, sem args. Bloqueante."""
     cmd = [sys.executable, str(SCRIPTS_DIR / "unify-parquets.py")]
     return subprocess.run(
         cmd,
@@ -135,6 +135,15 @@ def run_unify(capture_output: bool = True) -> subprocess.CompletedProcess:
         text=True,
         env={**_safe_env(), "PYTHONPATH": str(PROJECT_ROOT)},
     )
+
+
+def run_unify_streaming(
+    on_line: Callable[[str], None],
+    timeout: float = 30 * 60.0,
+) -> tuple[int, str]:
+    """Versao streaming do unify pro pipeline. UI uniforme com os outros stages."""
+    cmd = [sys.executable, str(SCRIPTS_DIR / "unify-parquets.py")]
+    return _stream(cmd, on_line, tail_size=30, timeout=timeout)
 
 
 def _stream(
@@ -206,22 +215,127 @@ def _stream(
     return proc.returncode, "\n".join(tail)
 
 
+# ===================== Pipeline lock =====================
+
+
+def acquire_pipeline_lock() -> Optional[str]:
+    """Tenta adquirir lock pra rodar Update all. Retorna None em sucesso,
+    string de erro se outro processo ainda esta vivo.
+
+    Lock stale (PID morto) eh removido automaticamente — robusto contra
+    crash do Streamlit no meio do pipeline.
+    """
+    if LOCK_PATH.exists():
+        try:
+            old_pid = int(LOCK_PATH.read_text().strip())
+        except (OSError, ValueError):
+            old_pid = None
+        if old_pid is not None:
+            try:
+                os.kill(old_pid, 0)
+                return f"Pipeline already running (PID {old_pid}). Wait or remove {LOCK_PATH.name} manually if stuck."
+            except (ProcessLookupError, PermissionError):
+                pass  # stale lock, prossegue
+        try:
+            LOCK_PATH.unlink()
+        except OSError:
+            pass
+    try:
+        LOCK_PATH.write_text(str(os.getpid()))
+    except OSError as e:
+        return f"Could not create lockfile {LOCK_PATH}: {e}"
+    return None
+
+
+def release_pipeline_lock() -> None:
+    try:
+        LOCK_PATH.unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
+
+
+# ===================== DVC / git state =====================
+
+
+def _dvc_working_dir_clean() -> bool:
+    """True se `dvc status` reporta working dir sincronizado com .dvc files.
+
+    Quando True, podemos pular `dvc add` (re-hash caro) + commit fantasma.
+    """
+    venv_dvc = PROJECT_ROOT / ".venv" / "bin" / "dvc"
+    if not venv_dvc.exists():
+        return False
+    try:
+        result = subprocess.run(
+            [str(venv_dvc), "status"],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env={**_safe_env(), **_NONINTERACTIVE_ENV},
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    if result.returncode != 0:
+        return False
+    # `dvc status` (working) imprime "Data and pipelines are up to date." quando limpo.
+    out = (result.stdout + result.stderr).lower()
+    return "up to date" in out
+
+
+def _git_commits_ahead() -> int:
+    """Numero de commits locais nao pushed pra upstream. 0 se nada a pushar."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-list", "--count", "@{u}..HEAD"],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return 0
+    if result.returncode != 0:
+        return 0
+    try:
+        return int(result.stdout.strip() or "0")
+    except ValueError:
+        return 0
+
+
+# ===================== Publish =====================
+
+
 def run_publish_streaming(
     on_line: Callable[[str], None],
     commit_msg: Optional[str] = None,
 ) -> tuple[int, str]:
-    """Pipeline pos-captura: dvc add -> git add -> commit (se houver
-    staged) -> dvc push -> git push. Para no primeiro erro.
+    """Pipeline pos-captura: pre-check -> dvc add -> git add -> commit ->
+    dvc push -> git push. Para no primeiro erro.
 
-    Imprime markers `[step/5]` pra UI parsear progresso. Retorna
-    (rc, mensagem). rc=0 quando tudo OK ou skip valido.
+    Pre-check evita commit fantasma `chore: refresh .dvc hashes` quando
+    nao ha captura nova. Se working dir DVC limpo E sem commits ahead,
+    retorna (0, 'nothing to publish'). Se so ha commits ahead, faz apenas
+    `dvc push` + `git push` (idempotentes).
+
+    Imprime markers `[step/N]` pra UI parsear progresso.
     """
     venv_dvc = PROJECT_ROOT / ".venv" / "bin" / "dvc"
     if not venv_dvc.exists():
         on_line(f"ERROR: {venv_dvc} not found. Setup .venv first.")
         return 1, "dvc binary missing"
 
-    existing_dvc_paths = [p for p in DVC_PATHS if (PROJECT_ROOT / p).exists()]
+    # Pre-check: evita commit fantasma quando nada mudou
+    on_line("[pre] checking dvc status + git ahead…")
+    dvc_clean = _dvc_working_dir_clean()
+    git_ahead = _git_commits_ahead()
+    on_line(f"[pre] dvc_clean={dvc_clean} git_commits_ahead={git_ahead}")
+
+    if dvc_clean and git_ahead == 0:
+        on_line("[skip] nothing to publish (dvc + git already in sync)")
+        return 0, "nothing to publish (dvc working dir clean, no commits ahead)"
 
     # Timeouts generosos por step. Re-hash de raw inteiro pode levar
     # tempo; upload pra gdrive idem. Sem timeout = risco de UI travada
@@ -229,6 +343,21 @@ def run_publish_streaming(
     T_ADD = 60 * 60       # dvc add — re-hash pode demorar
     T_GIT = 5 * 60        # git add / commit / push de .dvc files (texto pequeno)
     T_PUSH = 2 * 60 * 60  # dvc push — pode mandar GBs
+
+    if dvc_clean:
+        # Caso: previous run commitou mas push falhou. So executa pushes.
+        on_line(f"[1/2] dvc push — uploading any missing blobs (idempotent)")
+        rc, tail = _stream([str(venv_dvc), "push"], on_line, timeout=T_PUSH)
+        if rc != 0:
+            return rc, f"dvc push failed (rc={rc}):\n{tail}"
+        on_line(f"[2/2] git push — {git_ahead} commits ahead")
+        rc, tail = _stream(["git", "push"], on_line, timeout=T_GIT)
+        if rc != 0:
+            return rc, f"git push failed (rc={rc}):\n{tail}"
+        return 0, f"pushed {git_ahead} commits (no new dvc add needed)"
+
+    # Caso comum: dvc working dir mudou — pipeline completo.
+    existing_dvc_paths = [p for p in DVC_PATHS if (PROJECT_ROOT / p).exists()]
 
     # [1/5] dvc add
     on_line(f"[1/5] dvc add — {len(existing_dvc_paths)} paths")
