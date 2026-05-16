@@ -7,9 +7,12 @@ Roteamento simples via st.session_state["view"]: "overview" (default) ou
 """
 from __future__ import annotations
 
+import subprocess
+import webbrowser
+
 import streamlit as st
 
-from dashboard.data import discover_platforms, load_platform_state
+from dashboard.data import PROJECT_ROOT, discover_platforms, load_platform_state
 from dashboard.pages import overview, platform
 from dashboard.sync import quarto_installed
 
@@ -33,6 +36,42 @@ def _sidebar() -> None:
     if st.sidebar.button("🔁 Reload data"):
         st.cache_data.clear()
         st.rerun()
+
+    st.sidebar.divider()
+    st.sidebar.subheader("🔌 Servers")
+
+    # --- Quarto Server Control ---
+    try:
+        q_status_raw = subprocess.run(
+            ["./scripts/serve-qmds.sh", "status"],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            check=False
+        ).stdout
+        is_q_up = "rodando" in q_status_raw.lower()
+    except Exception:
+        is_q_up = False
+
+    q_col1, q_col2 = st.sidebar.columns([3, 1])
+    q_col1.write(f"Quarto: {'🟢' if is_q_up else '🔴'}")
+
+    if is_q_up:
+        if q_col2.button("🛑", help="Stop Quarto Server", key="stop_q"):
+            subprocess.run(["./scripts/serve-qmds.sh", "stop"], cwd=str(PROJECT_ROOT), check=False)
+            st.rerun()
+    else:
+        if q_col2.button("▶️", help="Start Quarto Server & Open", key="start_q"):
+            subprocess.run(["./scripts/serve-qmds.sh", "start"], cwd=str(PROJECT_ROOT), check=False)
+            webbrowser.open("http://localhost:8765/00-overview.html")
+            st.rerun()
+
+    # --- Streamlit Server Control ---
+    if st.sidebar.button("💀 Shutdown Dashboard", help="Stop this Streamlit server", use_container_width=True):
+        st.sidebar.warning("Shutting down...")
+        import os
+        import signal
+        os.kill(os.getpid(), signal.SIGINT)
 
 
 def main() -> None:
