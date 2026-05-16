@@ -1,0 +1,42 @@
+
+::: {.column-screen .nav-bar}
+[🏠 Home](00-overview.html) |
+[💬 ChatGPT](chatgpt.html) |
+[🧠 Claude](claude-ai.html) |
+[♊ Gemini](gemini.html) |
+[📓 NotebookLM](notebooklm.html) |
+[🔍 Perplexity](perplexity.html) |
+[🌊 Qwen](qwen.html) |
+[🐉 DeepSeek](deepseek.html) |
+[⌨️ Claude Code](claude-code.html) |
+[🤖 Codex](codex.html) |
+[📟 Gemini CLI](gemini-cli.html)
+:::
+
+<style>
+.nav-bar {
+    background: #f8f9fa;
+    padding: 12px 20px;
+    border-bottom: 1px solid #dee2e6;
+    margin-bottom: 25px;
+    font-size: 0.85em;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-family: var(--bs-font-sans-serif, system-ui, -apple-system, sans-serif);
+}
+.nav-bar a {
+    color: #495057;
+    text-decoration: none;
+    padding: 2px 8px;
+    border-radius: 4px;
+    transition: background 0.2s, color 0.2s;
+    white-space: nowrap;
+}
+.nav-bar a:hover {
+    background: rgba(116, 170, 156, 0.1);
+    color: #74AA9C;
+}
+</style>
