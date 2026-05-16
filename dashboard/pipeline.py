@@ -17,6 +17,8 @@ isso depende do estado agregado, nao da plat sincronizada.
 from __future__ import annotations
 
 import json
+import subprocess
+import webbrowser
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -483,6 +485,33 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
                 "detail": q_summary, "tail": "",
             })
             _set_stage(2, "done")
+
+            # Auto-open report in a new tab (intelligent routing)
+            try:
+                # 1. Start/Ensure server is up
+                subprocess.run(["./scripts/serve-qmds.sh", "start"], cwd=str(PROJECT_ROOT), check=False)
+                # 2. Determine target URL
+                url = _get_auto_open_url(scope)
+                # 3. Open in browser
+                webbrowser.open(url)
+            except Exception as e:
+                st.warning(f"⚠️ Quarto ok, but failed to auto-open browser: {e}")
+
+
+def _get_auto_open_url(scope: str) -> str:
+    """Retorna a URL do localhost:8765 baseada no escopo da run.
+    'all' -> 00-overview.html
+    'platform:ChatGPT' -> chatgpt.html
+    """
+    base_url = "http://localhost:8765"
+    if scope == "all":
+        return f"{base_url}/00-overview.html"
+    if scope.startswith("platform:"):
+        plat = scope.split(":", 1)[1]
+        # 'Claude.ai' -> 'claude-ai', 'Gemini CLI' -> 'gemini-cli'
+        slug = plat.lower().replace(".", "-").replace(" ", "-")
+        return f"{base_url}/{slug}.html"
+    return f"{base_url}/00-overview.html"
 
     # =================== Stage 4/4 — Publish (DVC + git) ===================
     st.markdown(f"### Stage 4/4 — {STAGE_NAMES[3]}")
