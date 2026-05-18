@@ -19,7 +19,7 @@ dvc[gdrive]==3.67.1
 
 # Dashboard pipeline subprocess cleanup — mata arvore de processos (chromium
 # workers que escapam de killpg quando Streamlit crasha mid-run).
-psutil>=5.9
+psutil>=7.2.2
 
 # Test
 pytest>=8.0
