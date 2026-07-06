@@ -47,12 +47,21 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_copy(src: Path, dst: Path) -> None:
+    """Copia via shutil.copy2 se nao forem o mesmo arquivo fisico."""
+    if src.exists() and dst.exists() and src.samefile(dst):
+        return
+    shutil.copy2(src, dst)
+
 
 
 DROP_THRESHOLD = 0.5  # current/previous <= 0.5 aborta
@@ -205,7 +214,7 @@ def run_reconciliation(
             s = previous_merged / "threads" / f"{uid}.json"
             d = merged_output / "threads" / f"{uid}.json"
             if s.exists() and not d.exists():
-                shutil.copy2(s, d)
+                _safe_copy(s, d)
 
     new_thread_ids = set(plan.threads_to_use) - set(prev_threads.keys())
     report.threads_added = len(new_thread_ids)
@@ -240,7 +249,7 @@ def run_reconciliation(
 
         # metadata
         if (src / "metadata.json").exists():
-            shutil.copy2(src / "metadata.json", dst / "metadata.json")
+            _safe_copy(src / "metadata.json", dst / "metadata.json")
 
         # threads_index — adicionar flags _orphan e _removed_from_space
         threads_in_space_path = src / "threads_index.json"
@@ -285,7 +294,7 @@ def run_reconciliation(
 
         # files
         if (src / "files.json").exists():
-            shutil.copy2(src / "files.json", dst / "files.json")
+            _safe_copy(src / "files.json", dst / "files.json")
 
         # pages — copia tudo
         src_pages = src / "pages"
@@ -296,7 +305,7 @@ def run_reconciliation(
                 if item.is_file():
                     target = dst_pages / item.name
                     if not target.exists():
-                        shutil.copy2(item, target)
+                        _safe_copy(item, target)
             report.pages_total += len([f for f in src_pages.iterdir() if f.is_file() and f.name != "_index.json"])
 
         # files counts pro report
@@ -344,7 +353,7 @@ def run_reconciliation(
         json.dumps(cumulative_spaces_index, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     if (curr_spaces_dir / "_pinned_raw.json").exists():
-        shutil.copy2(curr_spaces_dir / "_pinned_raw.json", merged_output / "spaces" / "_pinned_raw.json")
+        _safe_copy(curr_spaces_dir / "_pinned_raw.json", merged_output / "spaces" / "_pinned_raw.json")
 
     # ============================================================
     # 3. ASSETS (metadata + binarios cumulativos)
@@ -368,7 +377,7 @@ def run_reconciliation(
         json.dumps(cumulative_assets_index, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     if (curr_assets_dir / "_pinned_raw.json").exists():
-        shutil.copy2(curr_assets_dir / "_pinned_raw.json", merged_output / "assets" / "_pinned_raw.json")
+        _safe_copy(curr_assets_dir / "_pinned_raw.json", merged_output / "assets" / "_pinned_raw.json")
     report.assets_total = len(cumulative_assets_index)
 
     # Binarios — cumulativo, copia novos sem sobrescrever existentes
@@ -379,14 +388,14 @@ def run_reconciliation(
                 continue
             target = merged_output / "assets" / "files" / item.name
             if not target.exists():
-                shutil.copy2(item, target)
+                _safe_copy(item, target)
     if prev_assets_dir and (prev_assets_dir / "files").exists():
         for item in (prev_assets_dir / "files").iterdir():
             if not item.is_file():
                 continue
             target = merged_output / "assets" / "files" / item.name
             if not target.exists():
-                shutil.copy2(item, target)
+                _safe_copy(item, target)
     report.asset_binaries_total = len([
         f for f in (merged_output / "assets" / "files").iterdir()
         if f.is_file() and f.name != "_manifest.json"

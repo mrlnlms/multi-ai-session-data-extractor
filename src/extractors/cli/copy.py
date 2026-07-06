@@ -14,6 +14,7 @@ Regras:
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 from pathlib import Path
 
@@ -54,7 +55,10 @@ def _sync_tree(src: Path, dst: Path, glob_pattern: str = "**/*") -> dict[str, li
         dst_file = dst / rel
         dst_file.parent.mkdir(parents=True, exist_ok=True)
         if not dst_file.exists():
-            shutil.copy2(src_file, dst_file)
+            try:
+                os.link(src_file, dst_file)
+            except OSError:
+                shutil.copy2(src_file, dst_file)
             new_files.append(dst_file)
         elif src_file.stat().st_mtime > dst_file.stat().st_mtime:
             shutil.copy2(src_file, dst_file)
@@ -83,7 +87,10 @@ def copy_claude_code() -> dict[str, list[Path]]:
         for jsonl_file in project_dir.glob("*.jsonl"):
             dst_file = dst_project / jsonl_file.name
             if not dst_file.exists():
-                shutil.copy2(jsonl_file, dst_file)
+                try:
+                    os.link(jsonl_file, dst_file)
+                except OSError:
+                    shutil.copy2(jsonl_file, dst_file)
                 new_files.append(dst_file)
             elif jsonl_file.stat().st_mtime > dst_file.stat().st_mtime:
                 shutil.copy2(jsonl_file, dst_file)
@@ -94,7 +101,10 @@ def copy_claude_code() -> dict[str, list[Path]]:
             dst_file = dst_project / rel
             dst_file.parent.mkdir(parents=True, exist_ok=True)
             if not dst_file.exists():
-                shutil.copy2(sub_file, dst_file)
+                try:
+                    os.link(sub_file, dst_file)
+                except OSError:
+                    shutil.copy2(sub_file, dst_file)
                 new_files.append(dst_file)
             elif sub_file.stat().st_mtime > dst_file.stat().st_mtime:
                 shutil.copy2(sub_file, dst_file)
@@ -106,11 +116,15 @@ def copy_claude_code() -> dict[str, list[Path]]:
                 dst_file = dst_project / "memory" / md.name
                 if not dst_file.exists():
                     dst_file.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(md, dst_file)
+                    try:
+                        os.link(md, dst_file)
+                    except OSError:
+                        shutil.copy2(md, dst_file)
                     new_files.append(dst_file)
                 elif md.stat().st_mtime > dst_file.stat().st_mtime:
                     shutil.copy2(md, dst_file)
                     updated_files.append(dst_file)
+
 
     return {"new": new_files, "updated": updated_files}
 
@@ -133,7 +147,10 @@ def copy_codex_memories() -> dict[str, list[Path]]:
         dst_file = dst_root / rel
         dst_file.parent.mkdir(parents=True, exist_ok=True)
         if not dst_file.exists():
-            shutil.copy2(src_file, dst_file)
+            try:
+                os.link(src_file, dst_file)
+            except OSError:
+                shutil.copy2(src_file, dst_file)
             new_files.append(dst_file)
         elif src_file.stat().st_mtime > dst_file.stat().st_mtime:
             shutil.copy2(src_file, dst_file)

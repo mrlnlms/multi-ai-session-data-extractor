@@ -17,12 +17,31 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_copy(src: Path, dst: Path) -> None:
+    """Copia via shutil.copy2 se nao forem o mesmo arquivo fisico."""
+    if src.exists() and dst.exists() and src.samefile(dst):
+        return
+    shutil.copy2(src, dst)
+
+
+def _link_or_copy(src: Path, dst: Path) -> None:
+    """Tenta hardlink, cai de volta pra copia."""
+    if dst.exists():
+        return
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copy2(src, dst)
 
 
 FEATURES_VERSION = 1
@@ -185,7 +204,7 @@ def run_reconciliation(
                 obj["_preserved_missing"] = True
                 dst.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
             except Exception:
-                shutil.copy2(src, dst)
+                _safe_copy(src, dst)
 
     # Skills (sobrescreve do raw atual; pequeno e mutavel)
     skills = _load_skills(raw_dir)
@@ -205,8 +224,8 @@ def run_reconciliation(
             if not src_bin.is_file():
                 continue
             dst_bin = merged_assets / src_bin.name
-            if not dst_bin.exists():
-                shutil.copy2(src_bin, dst_bin)
+            _link_or_copy(src_bin, dst_bin)
+
     if previous_merged and previous_merged != merged_output:
         prev_bin = previous_merged / "assets"
         if prev_bin.exists():
@@ -215,12 +234,11 @@ def run_reconciliation(
                 if not src_bin.is_file():
                     continue
                 dst_bin = merged_assets / src_bin.name
-                if not dst_bin.exists():
-                    shutil.copy2(src_bin, dst_bin)
+                _link_or_copy(src_bin, dst_bin)
 
     raw_manifest = raw_dir / "assets_manifest.json"
     if raw_manifest.exists():
-        shutil.copy2(raw_manifest, merged_output / "assets_manifest.json")
+        _safe_copy(raw_manifest, merged_output / "assets_manifest.json")
 
     # Discovery cumulativo
     cumulative_disc = list(curr.values())
