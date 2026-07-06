@@ -329,6 +329,8 @@ def _kill_process_tree(pid: int) -> None:
             return
         except psutil.NoSuchProcess:
             return
+        except (psutil.AccessDenied, PermissionError, OSError):
+            pass
     except ImportError:
         pass
     # Fallback 1: killpg (cobre process group leaders)

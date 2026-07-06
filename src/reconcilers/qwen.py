@@ -18,12 +18,31 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_copy(src: Path, dst: Path) -> None:
+    """Copia via shutil.copy2 se nao forem o mesmo arquivo fisico."""
+    if src.exists() and dst.exists() and src.samefile(dst):
+        return
+    shutil.copy2(src, dst)
+
+
+def _link_or_copy(src: Path, dst: Path) -> None:
+    """Tenta hardlink, cai de volta pra copia."""
+    if dst.exists():
+        return
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copy2(src, dst)
 
 
 FEATURES_VERSION = 2  # bumpado pra layout pasta unica
@@ -200,7 +219,7 @@ def run_reconciliation(
                 obj["_preserved_missing"] = True
                 dst.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
             except Exception:
-                shutil.copy2(src, dst)
+                _safe_copy(src, dst)
 
     # ============================================================
     # PROJECTS (com preservation)
@@ -238,7 +257,7 @@ def run_reconciliation(
     # pra parser conseguir resolver asset_paths via lookup.
     raw_manifest = raw_dir / "assets_manifest.json"
     if raw_manifest.exists():
-        shutil.copy2(raw_manifest, merged_output / "assets_manifest.json")
+        _safe_copy(raw_manifest, merged_output / "assets_manifest.json")
 
     # ============================================================
     # DISCOVERY CUMULATIVO
@@ -315,17 +334,16 @@ def run_reconciliation(
 
 
 def _merge_dir(src: Path, dst: Path) -> None:
+    """Copia diretorio via hardlink com fallback."""
     if not src.exists():
         return
+    dst.mkdir(parents=True, exist_ok=True)
     for item in src.rglob("*"):
         if not item.is_file():
             continue
         rel = item.relative_to(src)
-        tgt = dst / rel
-        if tgt.exists():
-            continue
-        tgt.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(item, tgt)
+        target = dst / rel
+        _link_or_copy(item, target)
 
 
 def _write_last_reconcile_md(

@@ -497,6 +497,17 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
             except Exception as e:
                 st.warning(f"⚠️ Quarto ok, but failed to auto-open browser: {e}")
 
+    _run_publish_stage(
+        publish_after=publish_after,
+        stage3_ok=stage3_ok,
+        results=results,
+        set_stage=_set_stage,
+        scope=scope,
+    )
+
+    warning_box.empty()
+    _save_summary(stage_status, results, publish_after, scope)
+
 
 def _get_auto_open_url(scope: str) -> str:
     """Retorna a URL do localhost:8765 baseada no escopo da run.
@@ -513,6 +524,14 @@ def _get_auto_open_url(scope: str) -> str:
         return f"{base_url}/{slug}.html"
     return f"{base_url}/00-overview.html"
 
+
+def _run_publish_stage(
+    publish_after: bool,
+    stage3_ok: bool,
+    results: list[dict],
+    set_stage,
+    scope: str,
+) -> None:
     # =================== Stage 4/4 — Publish (DVC + git) ===================
     st.markdown(f"### Stage 4/4 — {STAGE_NAMES[3]}")
     if not publish_after:
@@ -532,9 +551,9 @@ def _get_auto_open_url(scope: str) -> str:
             "stage": STAGE_KEYS[3], "step": "publish", "status": "aborted",
             "detail": "stage 3 quarto failed", "tail": "",
         })
-        _set_stage(3, "aborted")
+        set_stage(3, "aborted")
     else:
-        _set_stage(3, "running")
+        set_stage(3, "running")
         pub_bar = st.progress(0.0, text="publish: starting…")
         pub_box = st.empty()
         pub_tail: list[str] = []
@@ -565,14 +584,11 @@ def _get_auto_open_url(scope: str) -> str:
                 "stage": STAGE_KEYS[3], "step": "publish", "status": "failed",
                 "detail": pub_summary[:200], "tail": pub_summary[-10000:],
             })
-            _set_stage(3, "failed")
+            set_stage(3, "failed")
         else:
             st.success(f"✅ publish ok — {pub_summary}")
             results.append({
                 "stage": STAGE_KEYS[3], "step": "publish", "status": "ok",
                 "detail": pub_summary, "tail": "",
             })
-            _set_stage(3, "done")
-
-    warning_box.empty()
-    _save_summary(stage_status, results, publish_after, scope)
+            set_stage(3, "done")
