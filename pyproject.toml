@@ -1,7 +1,7 @@
 [project]
 name = "multi-ai-session-data-extractor"
 version = "0.1.0"
-description = "Capture and preserve your own AI conversations locally before they vanish — 10 platforms, unified parquet schema, deletion-resilient."
+description = "Capture and preserve your own AI conversations locally before they vanish — 12 sources, unified parquet schema, deletion-resilient."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.12"
@@ -47,6 +47,7 @@ dependencies = [
     "playwright>=1.58",
     "pyarrow>=14.0",
     "python-dateutil>=2.9",
+    "pytz>=2024.1",
     "PyYAML>=6.0",
 ]
 
@@ -55,6 +56,12 @@ dashboard = [
     "streamlit>=1.30",
     "plotly>=5.0",
     "itables>=2.0",
+]
+reports = [
+    "ipykernel>=6.29",
+    "jupyter-core>=5.7",
+    "nbclient>=0.10",
+    "nbformat>=5.10",
 ]
 dev = [
     "pytest>=8.0",

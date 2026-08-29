@@ -102,8 +102,8 @@ def _run(targets: list[str], publish_after: bool) -> int:
     def _persist():
         persist_run(stage_status, results, publish_after, scope="cli:headless")
 
-    # =================== Stage 1/4 — Sync ===================
-    _log(f"=== Stage 1/4 — Sync ({len(targets)} plats) ===")
+    # =================== Stage 1/4 — Sync + parse ===================
+    _log(f"=== Stage 1/4 — Sync + parse ({len(targets)} plats) ===")
     stage_status[0] = "running"
     any_ok = False
     any_fail = False

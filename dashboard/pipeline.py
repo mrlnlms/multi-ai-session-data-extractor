@@ -1,4 +1,4 @@
-"""Pipeline 4-stage: sync (1+ plats) -> unify -> quarto -> publish.
+"""Pipeline 4-stage: sync + parse (1+ plats) -> unify -> quarto -> publish.
 
 Reusado por:
 - `pages/overview.py` — "Update all" com todas plataformas
@@ -47,7 +47,7 @@ KEEP_RUNS_AFTER_ROTATE = 500
 
 
 STAGE_NAMES: list[str] = [
-    "Sync platforms",
+    "Sync + parse platforms",
     "Unify parquets",
     "Quarto render",
     "Publish (DVC + git)",
@@ -294,9 +294,9 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
         current = idx if status == "running" else None
         stages_box.markdown(_stages_markdown(stage_status, current_idx=current))
 
-    # =================== Stage 1/4 — Sync platforms ===================
+    # =================== Stage 1/4 — Sync + parse platforms ===================
     stage1_title = (
-        f"### Stage 1/4 — Sync ({len(targets)} platform{'s' if len(targets) != 1 else ''})"
+        f"### Stage 1/4 — Sync + parse ({len(targets)} platform{'s' if len(targets) != 1 else ''})"
     )
     st.markdown(stage1_title)
     _set_stage(0, "running")

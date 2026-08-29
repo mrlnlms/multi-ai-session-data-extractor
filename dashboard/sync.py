@@ -1,8 +1,8 @@
 """Disparo de sync por plataforma via subprocess.
 
-ChatGPT tem orquestrador (chatgpt-sync.py). As outras 6 plataformas
-ainda nao tem sync orquestrador implementado: o botao mostra fallback
-"so login + export individual" pra deixar explicito.
+As 12 fontes conhecidas possuem orquestrador ``<source>-sync.py``. O fallback
+para ``<source>-export.py`` permanece para uma futura plataforma que ainda
+nao tenha sync completo.
 """
 from __future__ import annotations
 
@@ -31,6 +31,21 @@ _NONINTERACTIVE_ENV = {
 
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 LOCK_PATH = PROJECT_ROOT / ".update-all.lock"
+
+# As CLIs ja fazem copy + parse dentro do proprio sync. As fontes web fazem
+# capture + assets + reconcile e precisam do parser como passo separado antes
+# de qualquer unify.
+WEB_PLATFORMS = frozenset({
+    "ChatGPT",
+    "Claude.ai",
+    "Gemini",
+    "NotebookLM",
+    "Qwen",
+    "DeepSeek",
+    "Perplexity",
+    "Grok",
+    "Kimi",
+})
 
 # Pastas versionadas via DVC (espelha CLAUDE.md "Rotina pos-captura").
 # Atualizar AQUI quando adicionar plataforma com diretorio externo novo.
@@ -75,7 +90,7 @@ def has_export_script(platform: str) -> bool:
 def sync_command(platform: str) -> Optional[list[str]]:
     """Retorna o comando preferido pra capturar a plataforma.
 
-    Prefere o sync orquestrador (so ChatGPT por enquanto). Cai no export
+    Prefere o sync orquestrador. Cai no export
     standalone se nao houver sync. Retorna None se nem export existe.
     """
     prefix = SCRIPT_PREFIX.get(platform)
@@ -92,19 +107,46 @@ def sync_command(platform: str) -> Optional[list[str]]:
     return None
 
 
+def parse_command(platform: str) -> Optional[list[str]]:
+    """Return the mandatory post-sync parser command for a web platform."""
+    if platform not in WEB_PLATFORMS:
+        return None
+    prefix = SCRIPT_PREFIX.get(platform)
+    if not prefix:
+        return None
+    script = SCRIPTS_DIR / f"{prefix}-parse.py"
+    if not script.exists():
+        return None
+    return [sys.executable, str(script)]
+
+
 def run_sync(platform: str, capture_output: bool = True) -> subprocess.CompletedProcess:
-    """Executa sync da plataforma, bloqueante. Levanta se comando nao existe."""
+    """Run sync and, for web platforms, its mandatory parser."""
     cmd = sync_command(platform)
     if cmd is None:
         raise RuntimeError(f"No sync or export script found for {platform}")
     env_pythonpath = str(PROJECT_ROOT)
-    return subprocess.run(
+    sync_result = subprocess.run(
         cmd,
         cwd=str(PROJECT_ROOT),
         capture_output=capture_output,
         text=True,
         env={**_safe_env(), "PYTHONPATH": env_pythonpath},
     )
+    parser_cmd = parse_command(platform)
+    if sync_result.returncode != 0 or parser_cmd is None:
+        return sync_result
+    parse_result = subprocess.run(
+        parser_cmd,
+        cwd=str(PROJECT_ROOT),
+        capture_output=capture_output,
+        text=True,
+        env={**_safe_env(), "PYTHONPATH": env_pythonpath},
+    )
+    if capture_output:
+        parse_result.stdout = (sync_result.stdout or "") + (parse_result.stdout or "")
+        parse_result.stderr = (sync_result.stderr or "") + (parse_result.stderr or "")
+    return parse_result
 
 
 def run_sync_streaming(
@@ -113,7 +155,7 @@ def run_sync_streaming(
     tail_size: int = 30,
     timeout: Optional[float] = 3600.0,
 ) -> tuple[int, str]:
-    """Roda sync da plataforma com stdout streaming (line-by-line).
+    """Run sync and the mandatory web parser with streaming output.
 
     `on_line(str)` eh chamado pra cada linha do stdout (stderr merged).
     Retorna (returncode, ultimas tail_size linhas concatenadas) — util pra
@@ -123,7 +165,21 @@ def run_sync_streaming(
     cmd = sync_command(platform)
     if cmd is None:
         raise RuntimeError(f"No sync or export script found for {platform}")
-    return _stream(cmd, on_line, tail_size=tail_size, timeout=timeout)
+    rc, sync_tail = _stream(cmd, on_line, tail_size=tail_size, timeout=timeout)
+    if rc != 0:
+        return rc, sync_tail
+    parser_cmd = parse_command(platform)
+    if parser_cmd is None:
+        return rc, sync_tail
+    on_line(f"=== Parse {platform} -> data/processed ===")
+    rc, parse_tail = _stream(
+        parser_cmd,
+        on_line,
+        tail_size=tail_size,
+        timeout=timeout,
+    )
+    combined = "\n".join(part for part in (sync_tail, parse_tail) if part)
+    return rc, "\n".join(combined.splitlines()[-tail_size:])
 
 
 def run_unify(capture_output: bool = True) -> subprocess.CompletedProcess:

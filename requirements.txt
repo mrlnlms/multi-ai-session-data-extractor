@@ -4,6 +4,7 @@ pandas>=2.2
 playwright>=1.58
 pyarrow>=14.0
 python-dateutil>=2.9
+pytz>=2024.1
 PyYAML>=6.0
 
 # Dashboard (Fase 1)
@@ -13,9 +14,21 @@ plotly>=5.0
 # Quarto descritivo (Fase 3) — DuckDB sobre parquets, perf > pandas
 duckdb>=1.0
 itables>=2.0
+ipykernel>=6.29
+jupyter-core>=5.7
+nbclient>=0.10
+nbformat>=5.10
 
 # DVC (cofre completo dos dados em gdrive — runbook em docs/dvc-runbook.md)
 dvc[gdrive]==3.67.1
+# PyDrive2 1.21.x ainda exige cryptography<44/pyOpenSSL<=24.2.1, enquanto
+# asyncssh 2.24+ exige cryptography>=48. Fixar o conjunto compatível evita que
+# uma instalacao limpa resolva dependencias individualmente validas, mas
+# impossiveis em runtime no backend do Google Drive.
+PyDrive2==1.21.3
+pyOpenSSL==24.2.1
+cryptography>=41.0.5,<44
+asyncssh==2.21.1
 
 # Dashboard pipeline subprocess cleanup — mata arvore de processos (chromium
 # workers que escapam de killpg quando Streamlit crasha mid-run).
