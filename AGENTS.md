@@ -24,12 +24,12 @@ combina o snapshot DVC de 2026-05-16 com a camada local posterior de
 2026-05-19 e foi validada por caminho e SHA-256. O procedimento, os
 manifestos e os caminhos de rollback estao em `docs/RECOVERY.md`.
 
-O bloqueio temporario de coleta e processamento foi removido. O novo
-snapshot DVC existe no cache local e deve ser preservado remotamente antes da
-proxima coleta. Ate a migracao para Cloudflare R2, o Google Drive legado pode
-ser usado como remoto transitorio, mas somente apos `dvc status -c` e
-autorizacao explicita do usuario. Nunca executar `dvc gc` durante essa
-transicao.
+O bloqueio temporario de coleta e processamento foi removido. O snapshot DVC
+reconciliado foi enviado ao Google Drive em 2026-08-29 e `dvc status -c`
+confirmou que cache e remoto estao sincronizados. Ate a migracao para
+Cloudflare R2, o Google Drive legado pode ser usado como remoto transitorio,
+mas todo novo `dvc push` exige autorizacao explicita do usuario. Nunca executar
+`dvc gc` durante essa transicao.
 
 ## Principios de preservacao
 

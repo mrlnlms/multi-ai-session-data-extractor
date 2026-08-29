@@ -112,8 +112,11 @@ Em 2026-08-29, antes da promocao, a `data/` original foi clonada para:
 
 `/Users/mosx/Desktop/ia-data/pre-promotion-local-2026-08-29/data`
 
-Esse backup possui 12.655 arquivos e foi validado contra o manifesto local
-original. A arvore reconciliada foi entao promovida para este worktree.
+Esse backup possuia 12.655 arquivos e foi validado contra o manifesto local
+original. A arvore reconciliada foi entao promovida para este worktree. Depois
+do push DVC e da confirmacao de sincronismo remoto, esse diretorio e o checkout
+temporario `dvc-restore` foram removidos para liberar espaco. Seus manifestos
+de auditoria permanecem em `/Users/mosx/Desktop/ia-data/comparison`.
 
 Resultado final:
 
@@ -129,9 +132,10 @@ Resultado final:
 O novo snapshot DVC foi criado localmente para `raw`, `merged`, `processed`
 e `unified`; `dvc status` retorna `Data and pipelines are up to date`. Os 12
 ponteiros de `external` nao mudaram. Durante a recuperacao, nenhum `dvc push`,
-commit ou push Git foi executado. Encerrada a recuperacao, o Google Drive pode
-ser usado como remoto transitorio para preservar este baseline antes de uma
-nova coleta; a migracao definitiva do remoto sera tratada separadamente.
+commit ou push Git foi executado. Depois do encerramento, 2.396 objetos do
+baseline reconciliado foram enviados ao Google Drive e `dvc status -c`
+confirmou que cache e remoto estavam em sincronia. O Drive permanece como
+remoto transitorio; a migracao definitiva sera tratada separadamente.
 
 Manifestos, ledger e relatorios de validacao ficam em:
 

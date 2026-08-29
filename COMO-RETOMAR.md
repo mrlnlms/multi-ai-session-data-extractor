@@ -5,8 +5,9 @@ Baixou do Google Drive? Segue o passo a passo pra cada projeto voltar a funciona
 > **Atualizacao de 2026-08-29:** a recuperacao do extractor foi concluida e a
 > arvore reconciliada foi promovida. Consulte `docs/RECOVERY.md` para a trilha
 > de auditoria e os caminhos de rollback. Antes de uma nova coleta, confirme o
-> remoto com `dvc status -c` e preserve o snapshot. O Google Drive continua
-> apenas como remoto transitorio ate a migracao planejada para R2.
+> remoto com `dvc status -c` e preserve o snapshot. O baseline reconciliado
+> foi enviado e verificado em 2026-08-29. O Google Drive continua apenas como
+> remoto transitorio ate a migracao planejada para R2.
 
 ---
 
