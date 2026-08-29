@@ -5,7 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Capture and archive your own sessions across AI platforms
-(ChatGPT, Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity)
+(ChatGPT, Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity,
+Grok, Kimi)
 plus command-line tools (Claude Code, Codex, Gemini CLI).
 Data is preserved locally in canonical format (parquet),
 even if you delete it from the server.
@@ -16,7 +17,7 @@ even if you delete it from the server.
 > scraping data from other users or for bypassing terms of use —
 > and should not be used that way.
 
-![Streamlit dashboard showing all 10 sources with green status, total counts, and cross-platform views](docs/img/quickstart-01-hero.png)
+![Streamlit dashboard showing all sources with status, total counts, and cross-platform views](docs/img/quickstart-01-hero.png)
 
 ## The problem
 
@@ -33,12 +34,12 @@ This project solves that by capturing everything locally:
 - Voice messages (transcripts), thinking blocks (reasoning), tool calls
 - Chats deleted on the server — preserved locally forever
 
-Output in **parquet** (unified schema across all 10 sources), ready
+Output in **parquet** (unified schema across all 12 sources), ready
 for analysis in pandas/DuckDB/Quarto/whatever you prefer.
 
 ## Current status
 
-All 10 sources work end-to-end — capture, consolidation,
+All 12 sources have implemented capture/copy, consolidation where applicable,
 canonical parsing, and descriptive visualization (Quarto):
 
 | Source | Type | Coverage |
@@ -50,12 +51,15 @@ canonical parsing, and descriptive visualization (Quarto):
 | **DeepSeek** | web | R1 reasoning (thinking in ~31% of msgs), token usage |
 | **Gemini** | web | multi-account (2 Google accounts), 8 models |
 | **NotebookLM** | web | multi-account (3), 9 output types (audio, video, slide deck, etc.) |
+| **Grok** | web | conversations, workspaces, tool events, assets, scheduled tasks |
+| **Kimi** | web | chats, installed skills, tool events, signed asset downloads |
 | **Claude Code** | CLI | local sessions (`~/.claude/projects/`), subagents |
 | **Codex** | CLI | local sessions (`~/.codex/sessions/`), exact latency per tool call |
 | **Gemini CLI** | CLI | local sessions (`~/.gemini/tmp/`) |
 
-**514 tests passing.** Known limitations and gaps documented in
-[docs/LIMITATIONS.md](docs/LIMITATIONS.md).
+The automated test suite covers extractors, reconcilers, parsers, the
+canonical schema, dashboard, and unification. Known limitations and gaps are
+documented in [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 
 ## Quickstart
 
@@ -76,10 +80,11 @@ Login (once per platform — opens a browser, you log in manually, close):
 python scripts/chatgpt-login.py
 ```
 
-Sync (capture + consolidation + parquet in 1 command):
+Sync web data (capture + consolidation), then parse it:
 
 ```bash
 python scripts/chatgpt-sync.py
+python scripts/chatgpt-parse.py
 ```
 
 Result:
@@ -108,8 +113,8 @@ extractor → reconciler → parser → unify
 3. **Parser** converts the raw JSON into parquet with a unified schema:
    `Conversation`, `Message`, `ToolEvent`, `Branch` (and a few auxiliaries
    per platform — `ProjectDoc`, `NotebookLMOutput`, etc.).
-4. **Unify** consolidates the parquets from the 10 sources into a single
-   `data/unified/` with 11 parquet files (4 canonical + 7 auxiliaries),
+4. **Unify** consolidates the parquets from the 12 sources into a single
+   `data/unified/` with 13 parquet files (4 canonical + 9 auxiliaries),
    ready for cross-platform analysis.
 
 Full schema in `src/schema/models.py`. Glossary of project terms in
@@ -131,11 +136,12 @@ For ChatGPT/Perplexity: expected behavior.
 
 ## Commands per platform
 
-Each platform has 2-3 scripts in `scripts/`. Pattern:
+Each web platform has 2-4 scripts in `scripts/`. Pattern:
 
 ```bash
 python scripts/<plat>-login.py    # once — manual login in the browser
 python scripts/<plat>-sync.py     # capture + consolidation
+python scripts/<plat>-parse.py    # merged -> canonical parquet
 ```
 
 Consistent flags across all syncs:
@@ -173,7 +179,7 @@ QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/chatgpt.qmd
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview.qmd
 ```
 
-![Cross-platform Quarto data profile — cumulative growth chart by platform and activity heatmap (hour × day) consolidating all 10 sources](docs/img/quickstart-03-quarto.png)
+![Cross-platform Quarto data profile — cumulative growth chart by platform and activity heatmap (hour × day) consolidating all sources](docs/img/quickstart-03-quarto.png)
 
 To view the generated HTMLs locally:
 
@@ -184,7 +190,7 @@ To view the generated HTMLs locally:
 ## Tests
 
 ```bash
-PYTHONPATH=. .venv/bin/pytest                    # everything (514 tests, ~3s)
+PYTHONPATH=. .venv/bin/pytest                    # everything
 PYTHONPATH=. .venv/bin/pytest tests/parsers/     # parsers only
 ```
 
@@ -211,10 +217,9 @@ PYTHONPATH=. .venv/bin/pytest tests/parsers/     # parsers only
 3. **The canonical schema is the boundary.** Parsers deliver parquet in
    a unified schema; analysis consumes parquet. No platform
    particularities leak into the analysis stage.
-4. **Abort early in suspicious cases.** If the initial listing drops
-   >20% versus history, the extractor aborts before writing
-   (protection against partial captures that would contaminate the
-   next run).
+4. **Fall back safely in suspicious cases.** If the initial listing drops
+   >20% versus history, the extractor refetches previously known records by
+   ID instead of trusting a partial listing.
 
 ## License
 

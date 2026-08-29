@@ -9,8 +9,8 @@ plataformas + apagar `data/` localmente.
 
 - Versiona pastas grandes (`data/raw/`, `data/merged/`, `data/processed/`,
   `data/unified/`, `data/external/<subdirs>`) como "git pra dados".
-- Arquivos reais ficam no Google Drive (pasta `ai-interaction-dvc`,
-  compartilhada com o projeto pai `~/Desktop/AI Interaction Analysis/`).
+- Arquivos reais ficam no Google Drive, no cofre
+  `ai-interaction-source-dvc`, separado do cofre do projeto pai.
 - No git ficam so os ponteiros `.dvc` (arquivos pequenos com hash MD5).
 - Cada commit do git captura o estado dos dados naquele momento — `git
   checkout` + `dvc checkout` volta no tempo.
@@ -31,14 +31,14 @@ plataformas + apagar `data/` localmente.
 `data/external/README.md` continua git-tracked normalmente — ele documenta
 as subpastas, nao eh dado pessoal.
 
-## Credenciais (compartilhadas com o projeto pai)
+## Credenciais
 
-- **Remote:** Google Drive, pasta `ai-interaction-dvc` (ID: `101HMnOKvRYPZ6qQQu9iqCDcyWr_qx8fo`)
+- **Remote:** Google Drive, pasta `ai-interaction-source-dvc` (ID: `101HMnOKvRYPZ6qQQu9iqCDcyWr_qx8fo`)
 - **Autenticacao:** OAuth Client em `console.cloud.google.com` (projeto `ai-interaction-dvc`)
 - **Client ID:** no `.dvc/config` (commitado no git — nao eh secreto)
 - **Client Secret:** no `.dvc/config.local` (gitignored — nao commitado)
-- **Token cacheado em:** `~/Library/Caches/pydrive2fs/` (compartilhado entre
-  filho e pai; renovavel automaticamente, expira a cada ~6 meses)
+- **Token cacheado em:** `~/Library/Caches/pydrive2fs/` (cache local do
+  cliente DVC; renovavel automaticamente, expira a cada ~6 meses)
 
 ## Comandos do dia-a-dia
 
@@ -111,9 +111,9 @@ estourar:
 
 E **muito** importante: rodar com `--all-branches --all-tags --all-commits`
 pra preservar historico. Sem essas flags, gc apaga tudo que nao eh
-referenciado pelos ponteiros do commit atual. Repos do filho e do pai
-compartilham o mesmo remote — gc roda no contexto de **um repo so**, nao
-conhece os ponteiros do outro. Cuidado redobrado.
+referenciado pelos ponteiros do commit atual. O cofre deste projeto e
+separado do cofre do pai, mas GC ainda pode apagar o historico nao
+referenciado deste repositorio. Cuidado redobrado.
 
 ## Situacoes problematicas
 
@@ -124,8 +124,7 @@ rm -rf ~/Library/Caches/pydrive2fs/
 .venv/bin/dvc push   # ou pull — abre browser pra reautenticar
 ```
 
-Mesma conta gmail. Renova token automaticamente. Vale tambem pro pai (cache
-compartilhado).
+Mesma conta gmail. Renova token automaticamente.
 
 ### "Apaguei data/<algo> sem querer"
 
@@ -139,7 +138,7 @@ compartilhado).
 
 1. Token expirou → veja item acima
 2. Email saiu da test users list: https://console.cloud.google.com/auth/audience?project=ai-interaction-dvc
-3. Pasta `ai-interaction-dvc` no Drive mudou de owner ou foi deletada
+3. Pasta `ai-interaction-source-dvc` no Drive mudou de owner ou foi deletada
 
 ### "Quero migrar pra outra Google Account"
 
@@ -164,18 +163,12 @@ rm -rf ~/Library/Caches/pydrive2fs/
 
 ## Co-existencia com o projeto pai
 
-Filho e pai compartilham o **mesmo remote gdrive** (`101HMno...`). Como DVC
-eh content-addressed:
+Filho e pai usam cofres DVC separados. O filho e a casa canonica de `raw`,
+`merged`, `processed`, `unified` e `external`; o pai importa `processed` e
+`unified` por revisao Git+DVC e versiona seus derivados em outro remote.
 
-- Blobs identicos (ex: parquets canonicos que o pai gerou no passado e que
-  batem com hash do filho atual) **nao sao re-uploadados** — DVC pula.
-- Blobs diferentes coexistem no mesmo bucket sem conflito.
-- `.dvc` files de cada projeto ficam em repos git distintos, sem se
-  misturar.
-
-**Cuidado com `dvc gc`:** rodar no pai pode apagar blobs que so o filho
-referencia, e vice-versa. Por isso a recomendacao de **nao rodar gc**
-casualmente.
+**Cuidado com `dvc gc`:** mesmo com cofres separados, nao rodar GC
+casualmente; o historico de capturas deste projeto e parte do acervo.
 
 O pai consome os canonicos do filho via `dvc import-url`:
 

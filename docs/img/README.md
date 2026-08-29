@@ -21,6 +21,6 @@ in case we ever want to extract a sync GIF later.
 
 ## Final 3 images
 
-1. **`quickstart-01-hero.png`** — Streamlit dashboard home, all 10 sources green, KPIs + table + cross-platform views + capture timeline. Dark mode, EN.
+1. **`quickstart-01-hero.png`** — Streamlit dashboard home, source status, KPIs + table + cross-platform views + capture timeline. Dark mode, EN.
 2. **`quickstart-02-platform.png`** — Platform drill-down (ChatGPT) with status panel, captured content metrics, monthly creation chart, models/projects/preserved expanders, project sources, history. Dark mode, EN.
 3. **`quickstart-03-quarto.png`** — Cross-platform Quarto data profile (`00-overview.qmd`) showing cumulative growth by platform + activity heatmap. Light mode, EN.

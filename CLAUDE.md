@@ -1,9 +1,14 @@
-# CLAUDE.md — contexto pra agentes que abrirem este projeto
+# CLAUDE.md — compatibilidade e contexto historico para Claude Code
+
+As instrucoes canonicas atuais estao em `AGENTS.md`. Leia esse arquivo
+primeiro. Este documento preserva detalhes historicos e empiricos que ainda
+sao uteis, mas numeros de corpus devem ser tratados como snapshots datados.
 
 ## O que e este projeto
 
-Captura completa e cumulativa de sessoes de AI multi-plataforma (ChatGPT,
-Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity). Output em raw
+Captura completa e cumulativa de sessoes de AI em 9 plataformas web
+(ChatGPT, Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity, Grok,
+Kimi) e 3 CLIs. Output em raw
 JSON + binarios + parquet canonico. Pensado pra **capturar uma vez, deletar
 do servidor, manter local como fonte primaria**.
 
@@ -15,13 +20,13 @@ Toda vez que adicionar/promover plataforma (sync, parser v3, Quarto), **a
 UI do dashboard Streamlit precisa refletir**. Nao basta criar arquivos —
 abrir o dashboard e validar:
 
-- `KNOWN_PLATFORMS` em `dashboard/data.py` lista a plataforma (ja lista as 7)
+- `KNOWN_PLATFORMS` em `dashboard/data.py` lista as 12 fontes
 - Tabela cross-plataforma do overview mostra os 4 status verdes (capture +
   reconcile + parser + Quarto)
 - Botao "Ver dados detalhados" aparece quando `notebooks/<source>.qmd` existe
 - Counters batem com `LAST_CAPTURE.md` + `LAST_RECONCILE.md` + jsonls
 
-Caminho default: `streamlit run dashboard/app.py`. Se nao reflete
+Caminho default: `PYTHONPATH=. streamlit run dashboard.py`. Se nao reflete
 automaticamente, eh bug do dashboard — corrige antes de declarar plataforma
 "shipped".
 
@@ -94,7 +99,8 @@ README em `data/external/README.md`.
 
 ## Limpeza de raws 2026-05-03
 
-Pai foi de 25G → 4.4G; filho 11G; 0 missing em todas as 10 sources.
+Pai foi de 25G → 4.4G; filho 11G; 0 missing nas fontes validadas naquele
+snapshot historico.
 Detalhes + cross-val table em `docs/local/housekeeping/cleanup-2026-05-03.md`
 (gitignored).
 
@@ -115,7 +121,7 @@ Marcos arquiteturais 2026-05-04 — todos shipped:
 1. **`notebooks/00-overview.qmd`** — visao consolidada cross-plataforma via
    DuckDB UNION ALL. 4 qmds (geral, web, cli, rag), template
    `_template_overview.qmd`, `data/unified/` materializado via
-   `scripts/unify-parquets.py` (11 parquets).
+   `scripts/unify-parquets.py` (13 parquets no estado atual).
 2. **DVC pipeline filho-pai** — filho versiona pipeline completo (raw +
    merged + processed + unified + external) via gdrive em
    `ai-interaction-source-dvc`. Pai consome `processed/` e `unified/` via
@@ -124,8 +130,7 @@ Marcos arquiteturais 2026-05-04 — todos shipped:
 3. **Publicacao opensource** — repo publico, README/SETUP/CONTRIBUTING/CI/
    badges/LICENSE, secao DVC opcional pra contributors em `docs/SETUP.md`.
 
-Trabalho aberto pos-2026-05-04: ver [docs/ROADMAP.md](docs/ROADMAP.md)
-(future platforms: Grok, Kimi; operacional: ChatGPT capture-delete cycle).
+Trabalho aberto pos-2026-05-04: ver [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Cross-feature checks (pin, archive, voice, share)
 
@@ -212,7 +217,9 @@ Sem isso o pai nao enxerga os dados novos via `dvc import`.
 ```bash
 # (a) Captura — varia por plataforma
 PYTHONPATH=. .venv/bin/python scripts/<plat>-sync.py
-# (b) Materializa o cross-platform
+# (b) Parsers web sao uma etapa explicita; syncs CLI ja fazem parse
+PYTHONPATH=. .venv/bin/python scripts/<plat>-parse.py
+# (c) Materializa o cross-platform
 PYTHONPATH=. .venv/bin/python scripts/unify-parquets.py
 ```
 
@@ -295,7 +302,7 @@ notebooks/
 ├── 00-overview.qmd, ...      # 4 qmds cross-plataforma (geral/web/cli/rag)
 └── _output/                  # (gitignored) HTML rendirizado, ~40MB cada
 
-tests/  (514 testes — TODOS devem passar antes de qualquer merge)
+tests/  (suite completa deve passar antes de qualquer merge)
 data/
 ├── raw/                      # (gitignored) saida dos extractors
 ├── merged/                   # (gitignored) saida dos reconcilers
@@ -308,7 +315,7 @@ data/
 
 ## Overview cross-platform (2026-05-04)
 
-`data/unified/` materializa 11 parquets consolidados a partir de
+`data/unified/` materializa 13 parquets consolidados a partir de
 `data/processed/<Source>/`. Concat + dedup PK composta. Idempotente.
 Rodar via `scripts/unify-parquets.py` apos os parses individuais.
 
@@ -420,7 +427,7 @@ QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/chatgpt.qmd
 PYTHONPATH=. .venv/bin/pytest tests/parsers/test_quarto_helpers.py -v
 
 # Suite completa
-PYTHONPATH=. .venv/bin/pytest tests/  # 514 testes, ~3s
+PYTHONPATH=. .venv/bin/pytest tests/
 ```
 
 Comandos por plataforma estao em `docs/platforms/<plat>/state.md`.

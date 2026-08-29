@@ -77,7 +77,7 @@ Recommended starting with 1 platform to validate:
 python scripts/chatgpt-sync.py
 ```
 
-Sync runs everything in sequence:
+The standalone web sync runs capture, asset download, and reconcile:
 
 1. **Capture** — downloads via the internal API, saves to `data/raw/ChatGPT/`.
 2. **Asset download** — images (DALL-E, uploads), project files,
@@ -85,13 +85,18 @@ Sync runs everything in sequence:
 3. **Reconcile** — consolidates with the previous capture in
    `data/merged/ChatGPT/`. Conversations that disappeared from the server
    end up with `is_preserved_missing=True`.
-4. **Parse** (manual, does not run automatically) — converts to parquet:
+When running a web sync script directly, run its parser afterward to convert
+the reconciled data to parquet:
 
 ```bash
 python scripts/chatgpt-parse.py
 ```
 
 This generates 4-6 parquets in `data/processed/ChatGPT/` in the canonical schema.
+
+The dashboard and headless pipeline perform this parser step automatically
+after each successful web sync and before unification. CLI sync scripts already
+include their parser step.
 
 Repeat sync for other platforms. Then consolidate everything into a
 single cross-platform set:
@@ -100,7 +105,7 @@ single cross-platform set:
 python scripts/unify-parquets.py
 ```
 
-This generates 11 parquets in `data/unified/`.
+This generates 13 parquets in `data/unified/`.
 
 ## Multi-account (Gemini, NotebookLM)
 

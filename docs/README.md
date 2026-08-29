@@ -24,7 +24,7 @@ Project documentation, organized by topic.
 
 ## Cross-platform overview
 
-`data/unified/` materializes 11 consolidated parquets from the 10 sources via
+`data/unified/` materializes 13 consolidated parquets from the 12 sources via
 `scripts/unify-parquets.py`. 4 qmds in `notebooks/00-overview*.qmd`
 (general, web, cli, rag) consume the unified set with different filters.
 Full entry in [glossary.md](glossary.md) section "data/unified/".
@@ -52,3 +52,8 @@ have only `README.md` (they're derived from local files, no server).
 
 - [dashboard/manual.md](dashboard/manual.md) — features manual
   + operation (local Streamlit, single-user, read-only).
+
+## Recovery
+
+- [RECOVERY.md](RECOVERY.md) — safe reconciliation of the July 2026 local
+  backup with the older, more complete DVC snapshot.

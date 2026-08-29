@@ -193,13 +193,13 @@ Cumulative history, append-only — one line per run. Cannot be reconstructed af
 
 ## `data/unified/` — consolidated cross-platform parquets
 
-Output of `scripts/unify-parquets.py`. 11 parquets that concatenate the 10
+Output of `scripts/unify-parquets.py`. 13 parquets that concatenate the 12
 sources × extractor + manual saves into a cross-platform view:
 
 - 4 canonical: `conversations`, `messages`, `tool_events`, `branches`
-- 7 auxiliary: `sources`, `notes`, `outputs`, `guide_questions`,
-  `source_guides` (NotebookLM), `project_metadata`, `project_docs`
-  (Qwen + Claude.ai)
+- 9 auxiliary: `sources`, `notes`, `outputs`, `guide_questions`,
+  `source_guides` (NotebookLM), `project_metadata`, `project_docs`,
+  `conversation_projects`, and `agent_memories`
 
 **Strategy:** concat with `pd.concat` + dedup by composite PK
 `[source, conversation_id, ...]` (or `[source, project_id, ...]` for the
@@ -208,7 +208,7 @@ project auxiliaries), `keep='last'`. Defense against internal dups
 
 **Decision:** this project materializes `data/unified/` in-house; external
 consumer pipelines (qualitative analysis, etc.) read via `dvc import-url`
-from those 11 parquets. This project is the canonical data home; consumers
+from those 13 parquets. This project is the canonical data home; consumers
 are read-only.
 
 **Idempotent:** running it 1x or 100x produces byte-for-byte identical files.

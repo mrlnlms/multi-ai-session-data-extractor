@@ -1,6 +1,6 @@
 ---
 title: "Cross-platform overview — Data Profile"
-subtitle: "Consolidated view of the 12 sources (7 web + 3 CLI) — no filter"
+subtitle: "Consolidated view of the 12 sources (9 web + 3 CLI) — no filter"
 jupyter: python3
 ---
 

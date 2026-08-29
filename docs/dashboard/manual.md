@@ -128,13 +128,17 @@ Above it: red 🚨 alert if there is a discovery drop in the logs.
 
 ### Sync button
 
+Web sync scripts stop after reconcile when invoked directly. The dashboard
+pipeline invokes the corresponding parser after every successful web sync and
+before `unify`, so processed and unified parquets are refreshed in the same
+run. CLI sync scripts already include parsing.
+
 For each platform:
 
-- If `<plat>-sync.py` exists (all 7 platforms today): label `🔄 Sync <Name>`, runs
+- If `<plat>-sync.py` exists (all 12 sources today): label `🔄 Sync <Name>`, runs
   `chatgpt-sync.py --no-voice-pass` (or equivalent)
-- If only `<plat>-export.py` exists (Claude.ai, Gemini, NotebookLM, Qwen,
-  DeepSeek, Perplexity): label `🔄 Export <Name> (no orchestrator yet)`,
-  runs the standalone export
+- If a future platform has only `<plat>-export.py`: label
+  `🔄 Export <Name> (no orchestrator yet)` and run the standalone export
 - Neither exists: caption explaining the script is missing
 
 Behavior on execution:
@@ -252,7 +256,7 @@ But it also scans `data/raw/` and `data/merged/`. The final list is
 
 ## 8. What does **not** yet exist
 
-V3 parsers, descriptive Quarto, and sync orchestrator for the 7 platforms are
+V3 parsers, descriptive Quarto, and sync orchestrators for the 12 sources are
 shipped. What remains out of scope for the dashboard (by design):
 
 - **Models per conv**: today we count `model_slug` per message (fine
@@ -263,7 +267,7 @@ shipped. What remains out of scope for the dashboard (by design):
   "100% preserved projects" in project_sources, but has no cross
   visualization of orphaned chats from deleted projects.
 - **Aggregated cross-platform view**: overview has cross KPIs but no
-  side-by-side comparison (e.g., temporal distribution of all 7 simultaneously).
+  side-by-side comparison (e.g., temporal distribution of all sources).
   Belongs in `notebooks/00-overview.qmd` (backlog).
 - **Interpretive analysis** — sentiment, clustering, topic detection. By
   design this lives in external pipelines (this project only produces parquets).

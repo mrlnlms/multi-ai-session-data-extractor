@@ -1,8 +1,13 @@
 # Operations — common terminal commands
 
-To run the pipeline for the 7 platforms on your own, without depending on me.
+To run the pipeline for the 12 sources on your own.
 ChatGPT serves as the living reference — the others follow the same pattern
 with small per-platform adaptations.
+
+> **Recovery completed (2026-08-29):** the reconciled tree was promoted and
+> validated. Before the first new collection, preserve that baseline in the
+> configured DVC remote as described in [RECOVERY.md](RECOVERY.md). The
+> commands below document normal post-recovery operation.
 
 ---
 
@@ -20,6 +25,8 @@ The examples below use `.venv/bin/python` for clarity.
 
 Each platform has its own orchestrator (`<plat>-sync.py`). Capture +
 reconcile + (assets, when applicable) in one run. Incremental by default.
+For web platforms, run the matching `<plat>-parse.py` after sync and before
+unify. The three CLI syncs already include parsing.
 
 ### ChatGPT
 
@@ -235,8 +242,8 @@ Output in `notebooks/_output/<plat>.html` (gitignored, ~40MB self-contained,
 PYTHONPATH=. .venv/bin/python scripts/unify-parquets.py
 
 # Render the 4 overviews
-QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview.qmd      # all 10 sources
-QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview-web.qmd  # 6 web
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview.qmd      # all 12 sources
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview-web.qmd  # 9 web
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview-cli.qmd  # 3 CLIs
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview-rag.qmd  # NotebookLM
 ```
@@ -268,7 +275,7 @@ in `tests/parsers/test_quarto_helpers.py` (40 tests).
 ## Dashboard pipeline — recovery quando algo quebra
 
 O dashboard Streamlit (`streamlit run dashboard.py`) roda o pipeline 4-stage:
-**Sync → Unify → Quarto → Publish (DVC + git)**. Gating aborta o que vem
+**Sync + parse → Unify → Quarto → Publish (DVC + git)**. Gating aborta o que vem
 depois quando algo crítico falha — nada de commitar estado quebrado.
 
 ### Comportamento de falha por stage

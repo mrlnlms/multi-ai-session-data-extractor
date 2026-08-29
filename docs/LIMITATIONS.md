@@ -163,14 +163,14 @@ These validations require a Pro Max account and remain open until someone tests:
 
 ## Test coverage
 
-- **514 tests passing.** Covers parsers (all 10), the canonical schema,
-  notebook helpers, unify, **reconcilers for all 7 web platforms**
+- **Automated test suite.** Covers parsers for all 12 sources, the canonical schema,
+  notebook helpers, unify, **reconcilers for all 9 web platforms**
   (smoke tests with fixtures: build_plan + run_reconciliation +
-  preservation + idempotency), **pure functions of the 6 web extractors**
+  preservation + idempotency), **pure functions of the web extractors**
   (parsing, dedup, discovery baseline, target_path, ext_from_url).
 - **CI runs on Ubuntu + macOS x Python 3.12/3.13** (4 unit
   combinations) + integration smoke (Quarto render + Playwright import + Streamlit
-  healthcheck + 10 platform imports).
+  healthcheck + source import smoke tests).
 - **Extractors' HTTP/auth/Playwright without unit tests.** The logic
   is validated empirically in real syncs. Mocking Playwright/httpx is
   expensive (~20h of setup + fragile when the platform changes). If worth it,
