@@ -11,6 +11,7 @@
 [⌨️ Claude Code](claude-code.html) |
 [🤖 Codex](codex.html) |
 [📟 Gemini CLI](gemini-cli.html)
+[🪐 Antigravity CLI](antigravity-cli.html)
 :::
 
 <style>

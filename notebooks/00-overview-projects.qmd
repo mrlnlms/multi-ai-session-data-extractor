@@ -52,11 +52,12 @@ SOURCE_LABEL = {
     "claude_code": "Claude Code",
     "codex":       "Codex",
     "gemini_cli":  "Gemini CLI",
+    "antigravity_cli": "Antigravity CLI",
 }
 
 # Classification: which platforms expose a project concept natively
 PROJECT_NATIVE = {"chatgpt", "claude_ai", "qwen", "perplexity"}
-PROJECT_CLI    = {"claude_code", "codex", "gemini_cli"}
+PROJECT_CLI    = {"claude_code", "codex", "gemini_cli", "antigravity_cli"}
 PROJECT_NONE   = {"deepseek", "gemini", "notebooklm"}
 
 con = duckdb.connect()
@@ -83,7 +84,7 @@ Three buckets, by platform behaviour:
 | Bucket | Platforms | What `project*` means |
 |---|---|---|
 | **Native project**       | ChatGPT, Claude.ai, Qwen, Perplexity (spaces) | Manual user grouping inside the platform |
-| **CLI working directory**| Claude Code, Codex, Gemini CLI                | `cwd` of the session (file path) |
+| **CLI working directory**| Claude Code, Codex, Gemini CLI, Antigravity CLI | `cwd` of the session (file path) |
 | **No concept**           | DeepSeek, Gemini, NotebookLM                  | Always NULL by design |
 
 ## 1. Coverage by platform
@@ -353,7 +354,7 @@ SELECT
     MIN(created_at) AS first_conv,
     MAX(created_at) AS last_conv
 FROM conversations
-WHERE source IN ('claude_code','codex','gemini_cli')
+WHERE source IN ('claude_code','codex','gemini_cli','antigravity_cli')
   AND project IS NOT NULL
 GROUP BY source, project
 ORDER BY n_convs DESC

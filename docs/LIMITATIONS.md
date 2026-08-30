@@ -161,9 +161,20 @@ These validations require a Pro Max account and remain open until someone tests:
   `session-<timestamp>-<sid>.json` files for the same session. The parser
   consolidates via `sessionId` with dedup by `message_id`.
 
+### Antigravity CLI
+
+- **Two local storage generations.** Legacy `.pb` containers are opaque and
+  current SQLite containers hold undocumented Protobuf payloads. Both are
+  preserved in raw; canonical parsing uses the readable JSONL trajectories in
+  `brain/<id>/.system_generated/logs/transcript.jsonl`.
+- **Opaque legacy containers.** When no readable trajectory exists, the
+  canonical output contains a zero-message Conversation stub. It is not a
+  claim that the conversation was empty; it makes the preserved-but-not-yet-
+  decodable artifact visible without fabricating content.
+
 ## Test coverage
 
-- **Automated test suite.** Covers parsers for all 12 sources, the canonical schema,
+- **Automated test suite.** Covers parsers for all 13 sources, the canonical schema,
   notebook helpers, unify, **reconcilers for all 9 web platforms**
   (smoke tests with fixtures: build_plan + run_reconciliation +
   preservation + idempotency), **pure functions of the web extractors**

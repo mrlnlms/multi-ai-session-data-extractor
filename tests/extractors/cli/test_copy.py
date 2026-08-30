@@ -1,7 +1,9 @@
 """Tests pra cli-copy memory/* extension (C3)."""
 import pytest
+import sqlite3
 from pathlib import Path
 from src.extractors.cli.copy import (
+    copy_antigravity_cli,
     copy_codex_memories,
     copy_claude_code,
     current_source_files,
@@ -104,3 +106,35 @@ def test_current_source_files_claude_code_includes_memory(tmp_path, monkeypatch)
     result = current_source_files("claude_code")
     assert "-Users-x-proj/session.jsonl" in result
     assert "-Users-x-proj/memory/MEMORY.md" in result
+
+
+def test_copy_antigravity_cli_copies_selected_conversation_artifacts(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    source = tmp_path / ".gemini" / "antigravity-cli"
+    destination = tmp_path / "raw" / "Antigravity CLI"
+    monkeypatch.setitem(SOURCES, "antigravity_cli", {
+        "src": source, "dst": destination, "label": "Antigravity CLI",
+    })
+    conversations = source / "conversations"
+    conversations.mkdir(parents=True)
+    db = conversations / "conv.db"
+    with sqlite3.connect(db) as con:
+        con.execute("CREATE TABLE steps (id INTEGER)")
+    (conversations / "legacy.pb").write_bytes(b"legacy")
+    transcript = source / "brain" / "conv" / ".system_generated" / "logs"
+    transcript.mkdir(parents=True)
+    (transcript / "transcript.jsonl").write_text('{"type":"USER_INPUT"}\n')
+    (source / "cache").mkdir()
+    (source / "cache" / "conversation_metadata.json").write_text("{}")
+
+    result = copy_antigravity_cli()
+    assert len(result["new"]) == 4
+    assert (destination / "conversations" / "conv.db").exists()
+    assert (destination / "conversations" / "legacy.pb").read_bytes() == b"legacy"
+    assert (destination / "brain" / "conv" / ".system_generated" / "logs" / "transcript.jsonl").exists()
+    assert not (destination / "settings.json").exists()
+
+    current = current_source_files("antigravity_cli")
+    assert "conversations/conv.db" in current
+    assert "conversations/legacy.pb" in current
+    assert "brain/conv/.system_generated/logs/transcript.jsonl" in current

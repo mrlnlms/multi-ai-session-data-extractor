@@ -13,7 +13,7 @@ def test_parse_command_exists_for_every_web_platform():
 
 
 def test_parse_command_is_none_for_cli_platforms():
-    for platform in ("Claude Code", "Codex", "Gemini CLI"):
+    for platform in ("Claude Code", "Codex", "Gemini CLI", "Antigravity CLI"):
         assert sync.parse_command(platform) is None
 
 

@@ -27,7 +27,7 @@ def mark_cli_preservation(parser: Any) -> int:
     Args:
         parser: instancia de CLI parser que populou `self._conv_source_files`
             durante o parse. Espera-se que `parser.source_name` seja
-            'claude_code', 'codex' ou 'gemini_cli'.
+            'claude_code', 'codex', 'gemini_cli' ou 'antigravity_cli'.
 
     Returns: numero de conversations marcadas.
 

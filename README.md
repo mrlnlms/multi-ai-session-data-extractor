@@ -7,7 +7,7 @@
 Capture and archive your own sessions across AI platforms
 (ChatGPT, Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity,
 Grok, Kimi)
-plus command-line tools (Claude Code, Codex, Gemini CLI).
+plus command-line tools (Claude Code, Codex, Gemini CLI, Antigravity CLI).
 Data is preserved locally in canonical format (parquet),
 even if you delete it from the server.
 
@@ -34,12 +34,12 @@ This project solves that by capturing everything locally:
 - Voice messages (transcripts), thinking blocks (reasoning), tool calls
 - Chats deleted on the server — preserved locally forever
 
-Output in **parquet** (unified schema across all 12 sources), ready
+Output in **parquet** (unified schema across all 13 sources), ready
 for analysis in pandas/DuckDB/Quarto/whatever you prefer.
 
 ## Current status
 
-All 12 sources have implemented capture/copy, consolidation where applicable,
+All 13 sources have implemented capture/copy, consolidation where applicable,
 canonical parsing, and descriptive visualization (Quarto):
 
 | Source | Type | Coverage |
@@ -56,6 +56,7 @@ canonical parsing, and descriptive visualization (Quarto):
 | **Claude Code** | CLI | local sessions (`~/.claude/projects/`), subagents |
 | **Codex** | CLI | local sessions (`~/.codex/sessions/`), exact latency per tool call |
 | **Gemini CLI** | CLI | local sessions (`~/.gemini/tmp/`) |
+| **Antigravity CLI** | CLI | local trajectories (`~/.gemini/antigravity-cli/brain/`) |
 
 The automated test suite covers extractors, reconcilers, parsers, the
 canonical schema, dashboard, and unification. Known limitations and gaps are
@@ -113,7 +114,7 @@ extractor → reconciler → parser → unify
 3. **Parser** converts the raw JSON into parquet with a unified schema:
    `Conversation`, `Message`, `ToolEvent`, `Branch` (and a few auxiliaries
    per platform — `ProjectDoc`, `NotebookLMOutput`, etc.).
-4. **Unify** consolidates the parquets from the 12 sources into a single
+4. **Unify** consolidates the parquets from the 13 sources into a single
    `data/unified/` with 13 parquet files (4 canonical + 9 auxiliaries),
    ready for cross-platform analysis.
 

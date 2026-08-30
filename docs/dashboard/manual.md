@@ -135,7 +135,7 @@ run. CLI sync scripts already include parsing.
 
 For each platform:
 
-- If `<plat>-sync.py` exists (all 12 sources today): label `🔄 Sync <Name>`, runs
+- If `<plat>-sync.py` exists (all 13 sources today): label `🔄 Sync <Name>`, runs
   `chatgpt-sync.py --no-voice-pass` (or equivalent)
 - If a future platform has only `<plat>-export.py`: label
   `🔄 Export <Name> (no orchestrator yet)` and run the standalone export
@@ -256,7 +256,7 @@ But it also scans `data/raw/` and `data/merged/`. The final list is
 
 ## 8. What does **not** yet exist
 
-V3 parsers, descriptive Quarto, and sync orchestrators for the 12 sources are
+V3 parsers, descriptive Quarto, and sync orchestrators for the 13 sources are
 shipped. What remains out of scope for the dashboard (by design):
 
 - **Models per conv**: today we count `model_slug` per message (fine

@@ -1,6 +1,6 @@
 ---
 title: "CLI Overview — Data Profile"
-subtitle: "Subset: 3 CLI sources (Claude Code, Codex, Gemini CLI)"
+subtitle: "Subset: 4 CLI sources (Claude Code, Codex, Gemini CLI, Antigravity CLI)"
 jupyter: python3
 ---
 
@@ -26,7 +26,7 @@ from src.parsers.quarto_helpers import (
 )
 
 SUBSET_TITLE     = "CLI (3 local sources)"
-SOURCES_FILTER   = ["claude_code", "codex", "gemini_cli"]
+SOURCES_FILTER   = ["claude_code", "codex", "gemini_cli", "antigravity_cli"]
 UNIFIED_DIR      = _project_root / "data" / "unified"
 MUTED            = "#D1D5DB"
 

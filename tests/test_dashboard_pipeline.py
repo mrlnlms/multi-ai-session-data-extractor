@@ -508,6 +508,7 @@ class TestPublishStage:
 
         assert _get_auto_open_url("platform:Claude.ai") == "http://localhost:8765/claude-ai.html"
         assert _get_auto_open_url("platform:Gemini CLI") == "http://localhost:8765/gemini-cli.html"
+        assert _get_auto_open_url("platform:Antigravity CLI") == "http://localhost:8765/antigravity-cli.html"
 
     def test_publish_stage_calls_dvc_publish_when_enabled(self, monkeypatch):
         from dashboard import pipeline as pl

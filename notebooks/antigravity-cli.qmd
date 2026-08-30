@@ -1,0 +1,47 @@
+---
+title: "Antigravity CLI — Data Profile"
+subtitle: "Descriptive catalog of canonical parser v3 parquets (local CLI)"
+source-title: "Antigravity CLI"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+#| code-summary: "Setup — paths, DuckDB connection, helpers"
+
+import sys
+from pathlib import Path
+
+_this = Path.cwd()
+_project_root = _this if (_this / "src").exists() else _this.parent
+sys.path.insert(0, str(_project_root))
+
+import pandas as pd
+import duckdb
+from itables import init_notebook_mode
+init_notebook_mode(all_interactive=False)
+
+from src.parsers.quarto_helpers import (
+    fmt_pct, fmt_int, safe_int, show_df, show_md, plotly_bar,
+    has_col, has_view, table_count, setup_notebook,
+)
+
+SOURCE_KEY     = "antigravity_cli"
+SOURCE_TITLE   = "Antigravity CLI"
+SOURCE_COLOR   = "#7C3AED"
+MUTED          = "#D1D5DB"
+PROCESSED      = _project_root / "data" / "processed" / "Antigravity CLI"
+TABLES         = ["conversations", "messages", "tool_events", "branches"]
+AUX_TABLES     = []
+ACCOUNT_FILTER = None
+
+con = duckdb.connect()
+_setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
+```
+
+> **About Antigravity CLI:** parquets are captured from
+> `~/.gemini/antigravity-cli/`. Readable JSONL trajectories provide messages,
+> thinking and tool activity. SQLite and legacy `.pb` containers are preserved
+> raw; opaque legacy containers appear as zero-message conversations.
+
+{{< include _template.qmd >}}

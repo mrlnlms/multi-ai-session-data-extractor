@@ -1,6 +1,6 @@
 ---
 title: "Cross-platform overview — Data Profile"
-subtitle: "Consolidated view of the 12 sources (9 web + 3 CLI) — no filter"
+subtitle: "Consolidated view of the 13 sources (9 web + 4 CLI) — no filter"
 jupyter: python3
 ---
 
@@ -27,7 +27,7 @@ from src.parsers.quarto_helpers import (
 
 # === Notebook config ===
 SUBSET_TITLE     = "Cross-platform (all)"
-SOURCES_FILTER   = None  # None = all 12 sources
+SOURCES_FILTER   = None  # None = all 13 sources
 UNIFIED_DIR      = _project_root / "data" / "unified"
 MUTED            = "#D1D5DB"
 
@@ -45,6 +45,7 @@ SOURCE_COLORS = {
     "claude_code": "#7C3AED",  # CC dark purple
     "codex":       "#374151",  # Codex gray
     "gemini_cli":  "#1A56DB",  # Gemini CLI dark blue
+    "antigravity_cli": "#7C3AED",  # Antigravity violet
 }
 
 con = duckdb.connect()

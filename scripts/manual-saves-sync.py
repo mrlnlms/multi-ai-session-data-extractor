@@ -53,6 +53,7 @@ SOURCE_TO_FOLDER = {
     "claude_code": "Claude Code",
     "codex": "Codex",
     "gemini_cli": "Gemini CLI",
+    "antigravity_cli": "Antigravity CLI",
 }
 
 

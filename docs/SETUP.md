@@ -65,7 +65,8 @@ python scripts/qwen-login.py
 4. The profile is preserved and subsequent syncs do not ask for login
    again (until the cookie expires — usually months).
 
-**CLIs (Claude Code, Codex, Gemini CLI):** no login needed. Data
+**CLIs (Claude Code, Codex, Gemini CLI, Antigravity CLI):** no login needed for
+the collector. Data
 is copied directly from the local directory
 (`~/.claude/projects/`, `~/.codex/sessions/`, `~/.gemini/tmp/`).
 

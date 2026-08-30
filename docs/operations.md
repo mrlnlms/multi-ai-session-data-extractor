@@ -1,6 +1,6 @@
 # Operations — common terminal commands
 
-To run the pipeline for the 12 sources on your own.
+To run the pipeline for the 13 sources on your own.
 ChatGPT serves as the living reference — the others follow the same pattern
 with small per-platform adaptations.
 
@@ -26,7 +26,7 @@ The examples below use `.venv/bin/python` for clarity.
 Each platform has its own orchestrator (`<plat>-sync.py`). Capture +
 reconcile + (assets, when applicable) in one run. Incremental by default.
 For web platforms, run the matching `<plat>-parse.py` after sync and before
-unify. The three CLI syncs already include parsing.
+unify. The four CLI syncs already include parsing.
 
 ### ChatGPT
 
@@ -78,6 +78,17 @@ Multi-account (3 accounts: account-1 en, account-2 pt-BR, account-3 legacy more.
 PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py             # both web accounts
 PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py --account 1 # only account-1
 ```
+
+### Antigravity CLI
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/antigravity-cli-sync.py
+```
+
+Antigravity keeps readable trajectories in `~/.gemini/antigravity-cli/brain/`
+and conversation containers in `conversations/`. The sync preserves both;
+the parser reads `transcript.jsonl` and represents legacy opaque containers as
+zero-message conversations until a supported decoder exists.
 
 ---
 
@@ -215,10 +226,11 @@ QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/perplexity.qmd
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/qwen.qmd
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/deepseek.qmd
 
-# CLIs (3) — local data, no web capture
+# CLIs (4) — local data, no web capture
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/claude-code.qmd
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/codex.qmd
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/gemini-cli.qmd
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/antigravity-cli.qmd
 
 # Gemini multi-account (consolidated + 2 per-account)
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/gemini.qmd
@@ -242,9 +254,9 @@ Output in `notebooks/_output/<plat>.html` (gitignored, ~40MB self-contained,
 PYTHONPATH=. .venv/bin/python scripts/unify-parquets.py
 
 # Render the 4 overviews
-QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview.qmd      # all 12 sources
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview.qmd      # all 13 sources
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview-web.qmd  # 9 web
-QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview-cli.qmd  # 3 CLIs
+QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview-cli.qmd  # 4 CLIs
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview-rag.qmd  # NotebookLM
 ```
 
