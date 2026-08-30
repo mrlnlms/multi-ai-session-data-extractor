@@ -4,6 +4,15 @@ Initial CRUD diff over **2 snapshots** (1 from the parent project + 1
 current), 2026-04-24 → 2026-05-01. Later supplemented by a **live UI CRUD
 battery** (see dedicated section below).
 
+## Incremental revalidation — 2026-08-30
+
+The persistent browser profile alone did not prove authentication: its
+`userToken` was present but had a null value until interactive login renewed
+it. After a minimal API validation, the established list and history contracts
+remained valid. Discovery listed 82 sessions; three new session bodies were
+fetched with zero errors, while one historical session absent from the listing
+remained preserved locally.
+
 | Snapshot | Sessions |
 |---|---|
 | DeepSeek Data/2026-04-24T16-03 | 78 |

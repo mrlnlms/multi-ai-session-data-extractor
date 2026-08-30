@@ -6,18 +6,30 @@
 - **Sync orchestrator (2 steps):** `scripts/deepseek-sync.py` (capture +
   reconcile).
 - **Headless capture.**
-- **Auth:** persistent profile in `.storage/deepseek-profile-<account>/`
-  (generated via `scripts/deepseek-login.py`).
+- **Auth:** default persistent profile in `.storage/deepseek-profile-default/`
+  (generated via `scripts/deepseek-login.py`). A profile can remain present
+  after its `userToken` expires, so validate a minimal API request first.
 
 ## Coverage
 
 Chat sessions captured. Reconciler v3 (FEATURES_VERSION=2): no
 projects (DeepSeek does not expose them).
 
-### Reference volume
+### Latest validated collection — 2026-08-30
 
-- 79 chat_sessions.
-- 722 messages / 20 tool_events / 271 branches.
+- The profile's stored token had expired and was renewed by interactive login;
+  a minimal API list request then confirmed authorization before capture.
+- Incremental discovery found 82 current sessions. Three new sessions were
+  fetched, 79 were reused, and there were no fetch errors.
+- Reconciliation retained the 82 current sessions plus 1 preserved-missing
+  historical session (83 total).
+- The parser produced 83 conversations, 732 messages, 20 tool events, and
+  275 branches; unified parquets were regenerated.
+
+### Historical reference volume
+
+- 79 chat sessions at the original validation point.
+- 722 messages / 20 tool events / 271 branches.
 
 ## Canonical parser
 
