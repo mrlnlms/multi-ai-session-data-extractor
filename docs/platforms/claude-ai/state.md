@@ -6,8 +6,10 @@
 - **Sync orchestrator (3 steps):** `scripts/claude-sync.py` (capture +
   assets + reconcile).
 - **Headless capture** (no Cloudflare challenge at runtime).
-- **Auth:** persistent profile in `.storage/claude-ai-profile-<account>/`
-  (generated via `scripts/claude-login.py`).
+- **Auth:** the default persistent profile is
+  `.storage/claude-ai-profile-default/` (generated via
+  `scripts/claude-login.py --profile default`). Other profile names follow
+  `.storage/claude-ai-profile-<name>/`.
 
 ## Coverage
 
@@ -21,11 +23,25 @@ Reconciler v3 (FEATURES_VERSION=2): full preservation (convs +
 projects), idempotent. Output: `data/merged/Claude.ai/conversations/<uuid>.json`
 + `projects/<uuid>.json` + `assets/`.
 
-### Reference volume
+### Latest validated collection — 2026-08-30
 
-- ~835 conversations + ~83 projects.
-- ~24.5k messages / ~16k tool_events / ~1.16k branches.
-- ~546 project_docs (~23M chars of inline content).
+- API session was renewed and validated against the conversation-list endpoint
+  before capture. Merely opening a persistent context is not sufficient: an
+  expired session can still load the browser while the API returns
+  `account_session_invalid`.
+- Incremental discovery found 918 conversations and 5 live projects; 65
+  conversations and 1 project were fetched, with zero fetch errors.
+- Reconciliation added 63 conversations, updated 2, copied 853, and preserved
+  2 conversations absent from the current server listing. It retained 84
+  projects, including 79 previously preserved records.
+- The parser produced 920 conversations, 26,081 messages, 17,634 tool events,
+  1,253 branches, and 84 projects. The unified parquets were regenerated.
+
+### Historical reference volume
+
+- ~835 conversations + ~83 projects at the original validation point.
+- ~24.5k messages / ~16k tool events / ~1.16k branches.
+- ~546 project docs (~23M chars of inline content).
 
 ## Canonical parser v3.1
 
