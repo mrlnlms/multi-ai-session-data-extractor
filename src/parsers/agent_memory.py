@@ -21,10 +21,31 @@ logger = logging.getLogger(__name__)
 
 
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
+_FRONTMATTER_SCALAR_RE = re.compile(
+    r"^\s*(type|name|description)\s*:\s*(\S.*?)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _extract_frontmatter_scalars(fm_text: str) -> dict[str, str]:
+    """Best-effort extraction for malformed YAML frontmatter.
+
+    Agent memory files are often written as free text. A colon in an
+    unquoted ``name`` or ``description`` makes otherwise useful frontmatter
+    invalid YAML. On that specific failure path, retain only the three scalar
+    fields the schema understands. Nested values and empty/ambiguous lines are
+    deliberately ignored.
+    """
+    fields: dict[str, str] = {}
+    for line in fm_text.splitlines():
+        match = _FRONTMATTER_SCALAR_RE.match(line)
+        if match:
+            fields[match.group(1).lower()] = match.group(2)
+    return fields
 
 
 def parse_frontmatter(content: str) -> tuple[dict, str]:
-    """Retorna (dict_frontmatter, body). Frontmatter vazia/invalida -> ({}, content)."""
+    """Retorna (dict_frontmatter, body), com fallback seguro para YAML invalido."""
     m = _FRONTMATTER_RE.match(content)
     if not m:
         return {}, content
@@ -35,7 +56,14 @@ def parse_frontmatter(content: str) -> tuple[dict, str]:
             return {}, content
         return fm, body
     except yaml.YAMLError as e:
-        logger.warning(f"frontmatter parse failed: {e}")
+        fallback = _extract_frontmatter_scalars(fm_text)
+        if fallback:
+            logger.info(
+                "frontmatter YAML invalid; salvaged scalar metadata fields: %s",
+                ", ".join(sorted(fallback)),
+            )
+            return fallback, body
+        logger.warning("frontmatter parse failed without recoverable metadata: %s", e)
         return {}, content
 
 

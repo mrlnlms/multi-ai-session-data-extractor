@@ -31,13 +31,30 @@ def test_frontmatter_missing_returns_empty():
     assert body == content
 
 
-def test_frontmatter_malformed_returns_empty():
+def test_frontmatter_malformed_salvages_simple_scalar_metadata():
+    content = """---
+type: feedback
+name: Preference: concise responses
+description: Uses colons: safely retained as text
+---
+body"""
+    fm, body = parse_frontmatter(content)
+    assert fm == {
+        "type": "feedback",
+        "name": "Preference: concise responses",
+        "description": "Uses colons: safely retained as text",
+    }
+    assert body == "body"
+
+
+def test_frontmatter_malformed_without_simple_fields_returns_empty():
     content = """---
 not valid: yaml: too: many: colons:
 ---
 body"""
     fm, body = parse_frontmatter(content)
     assert fm == {}
+    assert body == content
 
 
 # --- single file parse ---
