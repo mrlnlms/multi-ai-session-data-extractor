@@ -9,7 +9,32 @@ from src.extractors.notebooklm.fetcher import (
     _extract_source_uuids,
     _extract_mind_map_uuid,
 )
-from src.extractors.notebooklm.orchestrator import _get_max_known_discovery
+from src.extractors.notebooklm.orchestrator import _get_max_known_discovery, _lite_metadata_equal
+
+
+def test_lite_metadata_masks_only_observed_volatile_source_fields():
+    previous = [[None, [["source", None, None, None, None, None, "url-a", [None, None, None, [["derived-a", "derived-b"]]]]]]]
+    current = [[None, [["source", None, None, None, None, None, "url-b", [None, None, None, [["derived-c", "derived-d"]]]]]]]
+    assert _lite_metadata_equal(previous, current) is True
+
+
+def test_lite_metadata_keeps_real_source_change_detectable():
+    previous = [[None, [["source-a", None, None, None, None, None, "url-a", [None, None, None, [["a", "b"]]]]]]]
+    current = [[None, [["source-b", None, None, None, None, None, "url-b", [None, None, None, [["c", "d"]]]]]]]
+    assert _lite_metadata_equal(previous, current) is False
+
+
+def test_lite_metadata_masks_later_sources_after_a_malformed_one():
+    """Uma fonte curta não pode impedir a normalização das seguintes."""
+    previous = [[None, [
+        ["short"],
+        ["source", None, None, None, None, None, "url-a", [None, None, None, [["derived-a", "derived-b"]]]],
+    ]]]
+    current = [[None, [
+        ["short"],
+        ["source", None, None, None, None, None, "url-b", [None, None, None, [["derived-c", "derived-d"]]]],
+    ]]]
+    assert _lite_metadata_equal(previous, current) is True
 
 
 class TestExtractSourceUuids:

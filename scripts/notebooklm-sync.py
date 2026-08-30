@@ -57,13 +57,17 @@ async def _run_assets(raw_dir: Path, account: str) -> dict:
         nm_stats = save_notes_and_mindmaps(raw_dir)
         # Online: binarios
         stats = await download_assets(client, raw_dir)
+        download_errors = list(stats.get("errors", []))
         # Online: text artifacts (types 2/4/7/9 via v9rmvd)
         text_stats = await fetch_text_artifacts(client, raw_dir)
         # Merge
         stats.update(nm_stats)
         stats.update(text_stats)
-        stats["errors"].extend(nm_stats.get("errors", []))
-        stats["errors"].extend(text_stats.get("errors", []))
+        stats["errors"] = (
+            download_errors
+            + list(nm_stats.get("errors", []))
+            + list(text_stats.get("errors", []))
+        )
     finally:
         await context.close()
 

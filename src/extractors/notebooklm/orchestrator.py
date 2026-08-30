@@ -18,6 +18,7 @@ das outras 6 plataformas. Saida: data/raw/NotebookLM/account-{N}/.
 
 import asyncio
 import json
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -37,6 +38,42 @@ BASE_DIR = Path("data/raw/NotebookLM")
 DISCOVERY_DROP_FALLBACK_THRESHOLD = 0.20
 # Alias retro-compat (codigo/testes antigos referenciam pelo nome velho)
 DISCOVERY_DROP_ABORT_THRESHOLD = DISCOVERY_DROP_FALLBACK_THRESHOLD
+
+
+def _lite_metadata_equal(previous: object, current: object) -> bool:
+    """Compare lite metadata while masking empirically volatile source fields.
+
+    NotebookLM regenerates one source URL and two derived text fields inside
+    ``metadata[0][1][*]`` even when no user-visible notebook content changed.
+    This masking is deliberately limited to the lite-fetch classifier; the
+    reconciler still compares complete captured bodies for preservation.
+    """
+    from src.reconcilers.notebooklm import _eq_lenient
+
+    def normalize(value: object) -> object:
+        value = deepcopy(value)
+        try:
+            sources = value[0][1]
+        except (IndexError, TypeError):
+            return value
+        if not isinstance(sources, list):
+            return value
+        for source in sources:
+            if not isinstance(source, list):
+                continue
+            if len(source) > 6:
+                source[6] = "_volatile_source_url"
+            try:
+                derived = source[7][3][0]
+            except (IndexError, TypeError):
+                continue
+            if isinstance(derived, list):
+                for index in (0, 1):
+                    if len(derived) > index:
+                        derived[index] = "_volatile_derived_text"
+        return value
+
+    return _eq_lenient(normalize(previous), normalize(current))
 
 
 def _account_dir(account: str) -> Path:
@@ -203,17 +240,29 @@ async def run_export(
                     prev = json.loads(prev_path.read_text(encoding="utf-8"))
                 except Exception:
                     return ("fetch", nb)
-                same_meta = _eq_lenient(lite["metadata"], prev.get("metadata"))
+                same_meta = _lite_metadata_equal(lite["metadata"], prev.get("metadata"))
                 same_notes = _eq_lenient(lite["notes"], prev.get("notes"))
                 same_audios = _eq_lenient(lite["audios"], prev.get("audios"))
-                if same_meta and same_notes and same_audios:
-                    return ("copy", nb)
-                return ("fetch", nb)
+                reasons = []
+                if not same_meta:
+                    reasons.append("metadata")
+                if not same_notes:
+                    reasons.append("notes")
+                if not same_audios:
+                    reasons.append("audios")
+                return ("copy" if not reasons else "fetch", nb, reasons)
 
             classifications = await asyncio.gather(*(_classify(nb) for nb in nbs))
-            to_fetch = [nb for action, nb in classifications if action == "fetch"]
-            to_copy_nbs = [nb for action, nb in classifications if action == "copy"]
+            to_fetch = [nb for action, nb, _ in classifications if action == "fetch"]
+            to_copy_nbs = [nb for action, nb, _ in classifications if action == "copy"]
+            reason_counts = {
+                reason: sum(reason in reasons for _, _, reasons in classifications)
+                for reason in ("metadata", "notes", "audios")
+            }
             print(f"  resultado: {len(to_fetch)} fetch, {len(to_copy_nbs)} copy in-place (sem alteracao)")
+            print("  gatilhos de fetch: " + ", ".join(
+                f"{reason}={count}" for reason, count in reason_counts.items()
+            ))
         else:
             to_fetch = list(nbs)
 

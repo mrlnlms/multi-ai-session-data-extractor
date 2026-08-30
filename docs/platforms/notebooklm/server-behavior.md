@@ -67,6 +67,21 @@ sub-2 minute incremental ran for ~6 minutes.
 Real audio changes are still detected via other positions (duration,
 size, state, type).
 
+### Lite metadata also contains regenerated source fields (2026-08-30)
+
+The lightweight `rLM1Ne` metadata response regenerates, per source, its
+download URL and two server-derived text fields even when the notebook has no
+user-visible change. Those values are therefore not suitable incremental
+signals. The lite classifier masks only these observed fields before its
+comparison; the full reconciler remains unchanged and continues to compare
+the preserved captured content.
+
+A controlled account-2 run without UI interaction validated the boundary:
+after the per-source masking (including a guard so a short/malformed source
+does not prevent later sources from being normalized), the classifier returned
+0 fetch and 53 in-place copies, and reconciliation returned 0 updates and 53
+copies. Real source identity fields are deliberately not masked.
+
 ### Pin/Star: does not exist in NotebookLM
 
 Confirmed in the mobile app by user. NotebookLM has a minimalist UI — no

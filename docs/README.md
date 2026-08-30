@@ -17,6 +17,8 @@ Project documentation, organized by topic.
   data profile template, etc.).
 - **[operations.md](operations.md)** — common terminal commands (sync
   per platform, Quarto render, smoke tests, symptoms → cause).
+- **[WEB_COLLECTION_HANDOFF.md](WEB_COLLECTION_HANDOFF.md)** — operational
+  runbook and handoff contract for refreshing web sources safely.
 - **[data-storage-inventory.md](data-storage-inventory.md)** — storage
   baseline after recovery: DVC logical/cache sizes, largest consumers and
   Drive versus R2 considerations.
@@ -47,6 +49,8 @@ have only `README.md` (they're derived from local files, no server).
 | **NotebookLM** | web (multi-account) | [state](platforms/notebooklm/state.md) · [server-behavior](platforms/notebooklm/server-behavior.md) |
 | **Perplexity** | web | [state](platforms/perplexity/state.md) |
 | **Qwen** | web | [state](platforms/qwen/state.md) · [server-behavior](platforms/qwen/server-behavior.md) |
+| **Grok** | web | [state](platforms/grok/state.md) · [server-behavior](platforms/grok/server-behavior.md) |
+| **Kimi** | web | [state](platforms/kimi/state.md) · [server-behavior](platforms/kimi/server-behavior.md) |
 | **Claude Code** | CLI | [README](platforms/claude-code/README.md) |
 | **Codex** | CLI | [README](platforms/codex/README.md) |
 | **Gemini CLI** | CLI | [README](platforms/gemini-cli/README.md) |

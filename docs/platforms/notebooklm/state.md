@@ -164,8 +164,55 @@ nem invalidacao manual.
 `data/external/notebooklm-snapshots/<source>/`. Quarto:
 `notebooks/notebooklm-legacy.qmd`.
 
+## Operational observation — 2026-08-30
+
+An incremental run for **account-1** completed capture, assets, and
+reconciliation. Capture reported 129 discovered notebooks, 128 composite
+fetches, and zero notebook RPC errors. Asset processing completed with 1,826
+page images downloaded, 2,217 existing page images skipped, and no recorded
+asset errors. Reconciliation reported 32 added, 96 updated, 1 copied, and 1
+preserved-missing notebook. The parser was not run in that collection session.
+
+These fetches must **not** be interpreted as 128 newly created notebooks:
+they are the result of the lite-fetch classifier deciding that the current
+metadata, notes, or artifact response differed from the previous raw body.
+At the time of observation, the cumulative raw directory contained 256 JSON
+files while current `discovery_ids.json` contained 129 entries. Structural
+inspection showed 130 files in the current schema (129 in discovery plus 1
+preserved record) and 126 legacy-schema records (`notebook_uuid`,
+`mind_map_uuid`, `raw`). Do not clean either population to make counts match.
+
+Before a rerun, compare the three lite-fetch inputs (`rLM1Ne`, `cFji9`, and
+`gArtLc`) for a small sampled set against the prior raw body, with special
+attention to volatile/presigned values. Confirm the account identity through a
+non-secret local profile-preferences mapping: account-1 is
+`hello.marlonlemes@gmail.com`; account-2 is `marloonlemes@gmail.com`.
+
+### Diagnostic outcome — 2026-08-30
+
+A controlled incremental validation on account-2 (no UI interaction between
+runs) identified volatile source fields inside the lite `rLM1Ne` metadata:
+one regenerated URL and two derived text fields per source. The classifier now
+masks only those fields, while retaining source identity and all full-body
+reconciliation checks. The validated no-op run discovered 53 notebooks and
+classified all as copies (`0 fetch`); reconciliation reported `added=0`,
+`updated=0`, `copied=53`, and `preserved_missing=2`.
+
+The same run found five binary assets whose upstream URLs returned HTTP errors.
+They were recorded in `assets_log.json`; no existing asset or historical raw
+record was removed or overwritten. A validation on account-1 then captured 30
+note differences and reconciled them as updates; its immediate repeat without
+UI interaction classified all 129 notebooks as copies and reconciled
+`updated=0`, confirming those differences did not recur as an unstable
+lite-fetch signal. The account-1 asset pass recorded 64 upstream HTTP errors,
+also without removal or overwrite. The NotebookLM parser then completed with
+185 conversations, 156 messages, 1,706 sources, 174 notes, 648 outputs, and
+468 guide questions across the two live accounts.
+
 ## Related documents
 
+- `lite-fetch-regression-2026-08-30.md` — diagnosis, narrow fix, validation,
+  and future-change protocol for the lite-fetch regression.
 - `docs/platforms/notebooklm/server-behavior.md` — upstream behavior.
 
 ## Commands
