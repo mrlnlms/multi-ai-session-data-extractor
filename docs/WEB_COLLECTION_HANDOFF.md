@@ -32,12 +32,12 @@ expire.
 | NotebookLM | **success** — accounts 1 and 2 reconciled and parsed; unified regenerated | Do not reopen the lite-fetch regression unless a no-UI incremental run again produces fetches. Read its `state.md` and `server-behavior.md` first. Account 3 remains a preserved legacy snapshot. |
 | Grok | **success** — synced, parsed, and included in unified | No rerun needed in this collection unless the user requests a fresher capture. |
 | ChatGPT | **success** — headed incremental discovery, reconcile and parser completed | No rerun needed unless fresher capture is requested. Contract changes are documented in its platform state/server behavior. |
-| Claude.ai | `blocked_login` | Renew the local session through its documented login path. |
-| Gemini | `blocked_login` for both live accounts | Renew the local sessions; do not treat a missing XSRF/session value as an extractor defect. |
-| Qwen | `blocked_login` | Renew the local session. |
-| DeepSeek | `blocked_login` | Renew the local session. |
+| Claude.ai | **success** — session renewed; incremental sync, reconcile, parser, and unified update completed | No rerun needed unless fresher capture is requested. Validate the API list endpoint after any future login; loading a browser context alone is not proof of authorization. |
+| Gemini | **success** — both accounts renewed; incremental sync, reconcile, parser, and unified update completed | No rerun needed unless fresher capture is requested. Some image URLs are ephemeral; keep prior assets and record availability failures without downgrading the capture. |
+| Qwen | **success** — session renewed; incremental sync, assets, reconcile, parser, and unified update completed | No rerun needed unless fresher capture is requested. Close Chrome completely after interactive login so the profile lock is released. |
+| DeepSeek | **success** — session renewed; incremental sync, reconcile, parser, and unified update completed | No rerun needed unless fresher capture is requested. Validate a minimal API request after login; a present profile can hold an expired token. |
 | Perplexity | **success** — incremental sync, reconcile and parser completed | No rerun needed unless fresher capture is requested. |
-| Kimi | `blocked_login` | Renew the local session. |
+| Kimi | **success** — migrated and captured at `kimi.ai`; sync, assets, reconcile, parser, and unified update completed | No rerun needed unless fresher capture is requested. The current evidence supports an origin-only change; keep `/apiv2` contracts unchanged unless a controlled comparison contradicts it. |
 
 NotebookLM regression resolution: `rLM1Ne` lite metadata regenerates a
 per-source URL and two server-derived text fields. The classifier masks only
