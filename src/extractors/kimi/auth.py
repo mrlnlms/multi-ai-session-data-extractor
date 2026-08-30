@@ -17,7 +17,7 @@ from pathlib import Path
 from playwright.async_api import async_playwright, BrowserContext
 
 
-HOME_URL = "https://www.kimi.com/"
+HOME_URL = "https://kimi.ai/"
 
 
 def get_profile_dir(account: str = "default") -> Path:
@@ -29,7 +29,7 @@ async def login(account: str = "default") -> None:
     profile_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Abrindo browser (Kimi, profile={account})...")
-    print("Faca login em kimi.com e feche o browser quando terminar.")
+    print("Faca login em kimi.ai e feche o browser quando terminar.")
 
     async with async_playwright() as p:
         context = await p.chromium.launch_persistent_context(

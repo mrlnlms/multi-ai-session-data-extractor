@@ -10,6 +10,31 @@
   (generated via `scripts/kimi-login.py`). Cookies + Bearer token from
   `localStorage.access_token` (~563 chars JWT-like). Cookies-only = 401.
   Token loaded via `page.evaluate(localStorage.getItem)` em cada captura.
+  Since 2026-08-30, the login and runtime origin is `https://kimi.ai/`
+  (Google SSO remains supported).
+
+### Origin migration — controlled validation 2026-08-30
+
+The user reported the public move from `www.kimi.com` to `kimi.ai`. A
+read-only comparison in the authenticated profile confirmed the minimal
+compatible change: `access_token` remained available and a `POST` to the
+existing `/apiv2/kimi.chat.v1.ChatService/ListChats` endpoint on the new
+origin returned HTTP 200 with the same `{chats, nextPageToken}` envelope.
+Only the home-origin constants were updated; the discovery, fetch, asset, and
+reconciliation contract was not rewritten.
+
+### Latest validated collection — 2026-08-30
+
+- On `kimi.ai`, incremental discovery listed 51 chats, 50 official skills, and
+  4 installed skills. Forty new chat bodies were fetched and 11 reused, with
+  zero fetch errors.
+- Reconciliation added 40 chats and copied 11 (51 total), with no current
+  server-missing records.
+- The isolated asset pass downloaded 51 files, reused 28 existing files, and
+  recorded 1 unavailable URL without affecting conversations.
+- The canonical parser produced 51 conversations, 1,288 messages, 226 tool
+  events, 51 branches, and 4 installed skills; unified parquets were
+  regenerated.
 
 ## Coverage
 

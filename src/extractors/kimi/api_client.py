@@ -15,7 +15,7 @@ import json
 from playwright.async_api import BrowserContext, Page
 
 
-HOME_URL = "https://www.kimi.com/"
+HOME_URL = "https://kimi.ai/"
 API_BASE = "/apiv2"
 
 

@@ -17,8 +17,8 @@ investigar (provavelmente endpoint que aceita `refresh_token`).
 
 ## URL pattern
 
-- Home: `https://www.kimi.com/`
-- Chat: `https://www.kimi.com/chat/<chat_id>` (UUID 36)
+- Home: `https://kimi.ai/` (revalidated 2026-08-30)
+- Chat: `https://kimi.ai/chat/<chat_id>` (UUID 36)
 
 ## API style
 

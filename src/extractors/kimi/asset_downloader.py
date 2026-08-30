@@ -20,7 +20,7 @@ from pathlib import Path
 from playwright.async_api import BrowserContext
 
 
-HOME_URL = "https://www.kimi.com/"
+HOME_URL = "https://kimi.ai/"
 
 MIME_EXT = {
     "image/png": ".png",
