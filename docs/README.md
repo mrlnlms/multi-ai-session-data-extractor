@@ -17,6 +17,9 @@ Project documentation, organized by topic.
   data profile template, etc.).
 - **[operations.md](operations.md)** — common terminal commands (sync
   per platform, Quarto render, smoke tests, symptoms → cause).
+- **[data-storage-inventory.md](data-storage-inventory.md)** — storage
+  baseline after recovery: DVC logical/cache sizes, largest consumers and
+  Drive versus R2 considerations.
 - **[serve-qmds.md](serve-qmds.md)** — `scripts/serve-qmds.sh` cheatsheet
   (start/stop local server for the data profiles).
 - **[cross-platform-features.md](cross-platform-features.md)** — pin,
