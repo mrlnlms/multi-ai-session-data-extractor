@@ -70,6 +70,9 @@ class ChatGPTAPIClient:
             from urllib.parse import urlencode
 
             url = f"{url}?{urlencode(params)}"
+        effective_headers = dict(headers or {})
+        if json is not None:
+            effective_headers.setdefault("Content-Type", "application/json")
         result = await self._page.evaluate(
             """async ({url, method, headers, body, timeoutMs, metadataOnly}) => {
                 const controller = new AbortController();
@@ -114,7 +117,7 @@ class ChatGPTAPIClient:
             {
                 "url": url,
                 "method": method,
-                "headers": headers or {},
+                "headers": effective_headers,
                 "body": _json.dumps(json) if json is not None else None,
                 "timeoutMs": REQUEST_TIMEOUT_MS,
                 "metadataOnly": metadata_only,

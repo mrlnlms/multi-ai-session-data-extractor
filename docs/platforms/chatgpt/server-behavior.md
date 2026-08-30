@@ -115,8 +115,17 @@ changed upstream.
 During the validated incremental run, all four POST calls to
 `/conversations/batch` returned HTTP 422, including a final one-ID batch.
 The fetcher fell back to the singular endpoint and completed all 31 targets.
-Treat batch as an optimization only: a 422 is not capture failure while the
-per-conversation fallback succeeds.
+Root cause: the page-backed transport serialized the JSON body but omitted
+`Content-Type: application/json`. This was fixed and then validated with a
+one-ID batch returning a complete mapping. Treat the singular fallback as a
+preservation safeguard, not as the expected path.
+
+### Asset availability (2026-08-30)
+
+Of 560 asset pointers, 552 local binaries were preserved by `skip_existing`
+and eight upstream downloads failed. These failures did not prevent raw,
+reconcile or parse; downloads are intentionally non-destructive and a future
+incremental run may retry only the still-missing binaries.
 
 ### Reconciler timestamp compatibility (2026-08-30)
 

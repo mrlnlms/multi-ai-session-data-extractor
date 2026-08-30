@@ -78,6 +78,21 @@ async def test_page_backed_client_uses_browser_fetch(mock_request_context, mocke
     assert mock_page.evaluate.await_count == 2
     mock_request_context.get.assert_not_called()
 
+
+async def test_page_backed_post_sets_json_content_type(mock_request_context, mocker):
+    mocker.stopall()
+    mock_page = mocker.AsyncMock()
+    mock_page.evaluate.side_effect = [
+        {"status": 200, "ok": True, "text": '{"accessToken": "page-token"}'},
+        {"status": 200, "ok": True, "text": '{}'},
+    ]
+    client = ChatGPTAPIClient(mock_request_context, page=mock_page)
+
+    await client._request_with_retry("POST", "https://example.com/batch", json={"ids": ["a"]})
+
+    request_args = mock_page.evaluate.await_args_list[1].args[1]
+    assert request_args["headers"]["Content-Type"] == "application/json"
+
 async def test_list_conversations_returns_metas(mock_request_context, mock_api_response):
     """list_conversations retorna lista de ConversationMeta do fixture."""
     mock_request_context.get.return_value = mock_api_response(
