@@ -6,18 +6,34 @@
 - **Sync orchestrator (2 steps):** `scripts/qwen-sync.py` (capture +
   reconcile).
 - **Headless capture.**
-- **Auth:** persistent profile in `.storage/qwen-profile-<account>/`
-  (generated via `scripts/qwen-login.py`).
+- **Auth:** default persistent profile in `.storage/qwen-profile-default/`
+  (generated via `scripts/qwen-login.py`). The token may expire even when the
+  profile still opens; validate a minimal API list request before a sync.
 
 ## Coverage
 
 Chats + projects + project files captured. Reconciler v3
 (FEATURES_VERSION=2): full preservation for convs + projects.
 
-### Reference volume
+### Latest validated collection — 2026-08-30
 
-- 115 chats / 3 projects / 4 project files.
-- 1,799 messages / 9 tool_events / 133 branches.
+- The previous token was expired; after interactive login, a one-page API read
+  confirmed the renewed authorization before capture.
+- Incremental discovery found 144 current chats, 6 projects, and 15 project
+  files. No conversation bodies required refetch and there were no fetch
+  errors.
+- Reconciliation retained 144 current chats plus 1 preserved-missing record
+  (145 total); all 6 current projects were retained.
+- Assets: 15 downloaded, 355 existing assets skipped, and 5 URLs unavailable
+  upstream. Conversation preservation and parsing were unaffected.
+- The parser produced 145 conversations, 2,157 messages, 9 tool events,
+  175 branches, 6 projects, and 15 project docs; the unified parquets were
+  regenerated.
+
+### Historical reference volume
+
+- 115 chats / 3 projects / 4 project files at the original validation point.
+- 1,799 messages / 9 tool events / 133 branches.
 
 ## Canonical parser
 

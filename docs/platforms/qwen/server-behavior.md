@@ -3,6 +3,19 @@
 Mirror of `ChatGPT server behavior` in CLAUDE.md. CRUD diff over
 **4 snapshots** (3 from the parent project + 1 current), 2026-04-24 → 2026-05-01.
 
+## Incremental revalidation — 2026-08-30
+
+The session profile alone was not proof of authorization: the API returned
+`unauthorized` with an expired-token detail until an interactive login renewed
+the token. After a minimal API validation, the established discovery contract
+remained valid: 144 chats, 6 projects, and 15 project files were listed with
+no conversation-fetch errors. One previously captured conversation was absent
+from the listing and preserved locally by reconciliation.
+
+Asset URLs remain time-limited: 15 assets were newly downloaded, 355 existing
+files were reused, and 5 URLs were unavailable. This did not affect discovery,
+conversation bodies, or the preserved local asset corpus.
+
 | Snapshot | Chats |
 |---|---|
 | Qwen Data/2026-04-24T16-10 | 109 |
