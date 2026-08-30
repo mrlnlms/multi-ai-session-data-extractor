@@ -24,10 +24,19 @@ Output in `data/merged/Perplexity/perplexity_merged_summary.json` +
 
 ### Reference volume
 
-- 82 conversations (~41 copilot + ~37 concise + 4 research/pages).
-- 374 messages.
-- 2312 tool_events (2134 search_result + 168 media_reference + 9 asset_generation).
-- 81 branches.
+- 90 conversations.
+- 434 messages.
+- 2436 tool_events.
+- 90 branches.
+
+### Last validated incremental run — 2026-08-30
+
+Headed capture completed with 82 threads discovered, 3 fetched and 79 reused;
+the three spaces were also fetched. Reconciliation added 3 threads, updated
+none, and preserved one server-missing space. The parser then completed before
+the unified parquets were regenerated. This is a healthy green state: dashboard
+status must additionally require a fresh processed parquet, not merely a
+recent capture timestamp.
 
 ## Canonical parser
 

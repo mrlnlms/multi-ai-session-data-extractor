@@ -133,6 +133,14 @@ class PlatformState:
         ref = self.last_capture.started_at if self.last_capture else None
         if ref is None:
             return "gray"
+        # Uma captura recente com erros nao deve aparecer como totalmente
+        # saudavel; a data por si so nao prova que o pipeline ficou verde.
+        if self.last_capture and self.last_capture.errors_count:
+            return "yellow"
+        parquet = self.conversations_parquet_path
+        inputs = [p for p in (self.raw_dir, self.merged_dir) if p and p.exists()]
+        if parquet is None or (inputs and parquet.stat().st_mtime < max(p.stat().st_mtime for p in inputs)):
+            return "yellow"
         now = now or datetime.now(timezone.utc)
         delta = (now - ref).total_seconds()
         if delta < 86400 * 7:

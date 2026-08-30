@@ -36,7 +36,7 @@ expire.
 | Gemini | `blocked_login` for both live accounts | Renew the local sessions; do not treat a missing XSRF/session value as an extractor defect. |
 | Qwen | `blocked_login` | Renew the local session. |
 | DeepSeek | `blocked_login` | Renew the local session. |
-| Perplexity | `blocked_login` / upstream HTTP denial | Renew the local session and verify access before changing extractor logic. |
+| Perplexity | **success** — incremental sync, reconcile and parser completed | No rerun needed unless fresher capture is requested. |
 | Kimi | `blocked_login` | Renew the local session. |
 
 NotebookLM regression resolution: `rLM1Ne` lite metadata regenerates a
