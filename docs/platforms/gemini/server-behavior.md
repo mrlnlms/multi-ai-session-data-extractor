@@ -3,6 +3,19 @@
 Initial probe on 2026-05-02 over **80 convs** (47 account-1 + 33 account-2)
 captured via batchexecute (rpcids `MaZiqc` list + `hNvQHb` fetch).
 
+## Incremental revalidation — 2026-08-30
+
+Both persistent profiles were reauthenticated and the same discovery/fetch
+contracts remained valid. Account 1 listed 50 conversations (16 fetched, 34
+reused) and account 2 listed 34 (all reused), with no conversation-fetch
+errors. The reconciler retained 15 and 2 previously captured conversations,
+respectively, that were absent from the current listings.
+
+Some Google-hosted image URLs are ephemeral: account 1 downloaded 114 newly
+available assets, skipped 54 existing assets, and received HTTP 403 for 73
+URLs. Treat those failures as upstream asset availability, not as a failed
+conversation discovery or a reason to discard the existing asset corpus.
+
 ## Volume and coverage
 
 | Account | Convs | Images dl | Deep Research | Total assets |

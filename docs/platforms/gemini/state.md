@@ -17,10 +17,26 @@
 Conversations + assistant messages + tool events + images
 (lh3.googleusercontent.com) + extracted Deep Research markdown reports.
 
-### Reference volume
+### Latest validated collection — 2026-08-30
 
-- 47 + 33 = 80 convs / 560 msgs / 889 tool_events.
-- 215 images downloaded + 18 Deep Research markdown reports.
+- Accounts 1 and 2 reauthenticated, then collected incrementally.
+- Discovery: account 1 found 50 conversations (16 fetched, 34 reused);
+  account 2 found 34 (all reused); neither had fetch errors.
+- Reconciliation preserved records no longer listed by Gemini: 15 in account 1
+  and 2 in account 2. The merged corpus now parses to 101 conversations,
+  758 messages, and 1,742 tool events.
+- Account 1 asset download saved 114 new assets and skipped 54 existing ones;
+  73 image URLs returned HTTP 403 and remain unavailable upstream. Account 2
+  assets were left unchanged during this run after its incremental capture.
+- `scripts/gemini-reconcile.py` is again usable with the current
+  `data/raw/Gemini/account-{N}` layout. It supports `--full`; there are no
+  Gemini-specific feature-refetch flags.
+
+### Historical reference volume
+
+- 47 + 33 = 80 conversations / 560 messages / 889 tool events at the original
+  2026-05 validation point.
+- 215 images downloaded + 18 Deep Research markdown reports at that point.
 - 8 detected models (2.5 Flash, 3 Pro, Nano Banana, 3 Flash Thinking,
   etc).
 
