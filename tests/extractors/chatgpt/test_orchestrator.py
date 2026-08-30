@@ -50,7 +50,7 @@ async def test_run_capture_produces_raw_file(tmp_path, mocker):
     mock_client_inst = mocker.AsyncMock()
     mock_client_inst.fetch_memories.return_value = "# Memories\n\n- fact 1"
     mock_client_inst.fetch_instructions.return_value = {"about_user": "dev"}
-    mocker.patch(
+    mock_client_cls = mocker.patch(
         "src.extractors.chatgpt.orchestrator.ChatGPTAPIClient",
         return_value=mock_client_inst,
     )
@@ -71,3 +71,9 @@ async def test_run_capture_produces_raw_file(tmp_path, mocker):
     assert (output_dir / "capture_log.jsonl").exists()
     assert (output_dir / "LAST_CAPTURE.md").exists()
     assert report.discovery_counts["total"] == 1
+    mock_page.goto.assert_awaited_once_with(
+        "https://chatgpt.com/",
+        wait_until="domcontentloaded",
+        timeout=60_000,
+    )
+    mock_client_cls.assert_called_once_with(mock_context.request, page=mock_page)

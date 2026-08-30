@@ -106,7 +106,15 @@ async def run_capture(output_dir: Path, options: CaptureOptions) -> CaptureRepor
             args=["--disable-blink-features=AutomationControlled"],
         )
         page = await context.new_page()
-        client = ChatGPTAPIClient(context.request)
+        # Establish the visible authenticated session before API discovery.
+        # Besides making the headed run observable, this lets Cloudflare finish
+        # its browser-side checks instead of leaving the window at about:blank.
+        await page.goto(
+            "https://chatgpt.com/",
+            wait_until="domcontentloaded",
+            timeout=60_000,
+        )
+        client = ChatGPTAPIClient(context.request, page=page)
 
         # Discovery
         logger.info("Discovery...")

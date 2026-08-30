@@ -1,6 +1,7 @@
 """Testes do ChatGPTAPIClient."""
 
 import pytest
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from src.extractors.chatgpt.api_client import ChatGPTAPIClient
 from tests.extractors.chatgpt.conftest import load_fixture
@@ -51,6 +52,32 @@ async def test_request_429_gives_up_after_max_retries(mock_request_context, mock
         await client._request_with_retry("GET", "https://example.com/foo")
 
 
+async def test_auth_timeout_fails_with_actionable_error(mock_request_context, mocker):
+    # The suite normally bypasses the token endpoint; restore the real method
+    # here to cover the timeout at the actual first network boundary.
+    mocker.stopall()
+    mock_request_context.get.side_effect = PlaywrightTimeoutError("timed out")
+    client = ChatGPTAPIClient(mock_request_context)
+
+    with pytest.raises(RuntimeError, match="Timeout apos"):
+        await client._get_token()
+
+
+async def test_page_backed_client_uses_browser_fetch(mock_request_context, mocker):
+    mocker.stopall()
+    mock_page = mocker.AsyncMock()
+    mock_page.evaluate.side_effect = [
+        {"status": 200, "ok": True, "text": '{"accessToken": "page-token"}'},
+        {"status": 200, "ok": True, "text": '{"ok": true}'},
+    ]
+    client = ChatGPTAPIClient(mock_request_context, page=mock_page)
+
+    result = await client._request_with_retry("GET", "https://example.com/foo")
+
+    assert result == {"ok": True}
+    assert mock_page.evaluate.await_count == 2
+    mock_request_context.get.assert_not_called()
+
 async def test_list_conversations_returns_metas(mock_request_context, mock_api_response):
     """list_conversations retorna lista de ConversationMeta do fixture."""
     mock_request_context.get.return_value = mock_api_response(
@@ -66,6 +93,14 @@ async def test_list_conversations_returns_metas(mock_request_context, mock_api_r
     assert metas[0].archived is False
     assert metas[0].project_id is None
     assert metas[1].project_id == "g-p-xyz"
+    assert mock_request_context.get.call_args.kwargs["params"] == {
+        "offset": 0,
+        "limit": 100,
+        "order": "updated",
+        "is_archived": "false",
+        "is_starred": "false",
+        "hide_snorlax": "true",
+    }
 
 
 async def test_fetch_conversation_returns_full_raw(mock_request_context, mock_api_response):
@@ -84,6 +119,7 @@ async def test_fetch_conversation_returns_full_raw(mock_request_context, mock_ap
         "https://chatgpt.com/backend-api/conversation/conv-simple-id",
         params=None,
         headers={"Authorization": "Bearer test-token"},
+        timeout=60_000,
     )
 
 
@@ -149,8 +185,16 @@ async def test_list_archived(mock_request_context, mock_api_response):
     assert metas[0].archived is True
     mock_request_context.get.assert_called_with(
         "https://chatgpt.com/backend-api/conversations",
-        params={"offset": 0, "limit": 100, "is_archived": "true"},
+        params={
+            "offset": 0,
+            "limit": 100,
+            "order": "updated",
+            "is_archived": "true",
+            "is_starred": "false",
+            "hide_snorlax": "true",
+        },
         headers={"Authorization": "Bearer test-token"},
+        timeout=60_000,
     )
 
 
@@ -176,21 +220,45 @@ async def test_fetch_instructions(mock_request_context, mock_api_response):
 
 
 async def test_list_projects_via_api_success(mock_request_context, mock_api_response):
-    """Se /projects retornar 200, usa esse resultado direto."""
+    """O indice atual da sidebar fornece projetos sem depender do DOM."""
     mock_request_context.get.return_value = mock_api_response(
         status=200,
-        json_data={"projects": [{"id": "g-p-1", "name": "Studies"}]}
+        json_data={
+            "items": [{"gizmo": {"id": "g-p-1", "display": {"name": "Studies"}}}],
+            "cursor": None,
+        },
     )
     client = ChatGPTAPIClient(mock_request_context)
     projects = await client.list_projects()
     assert len(projects) == 1
     assert projects[0].id == "g-p-1"
-    assert projects[0].discovered_via == "projects_api"
+    assert projects[0].discovered_via == "snorlax_sidebar"
+
+
+async def test_list_projects_snorlax_paginates(mock_request_context, mock_api_response):
+    mock_request_context.get.side_effect = [
+        mock_api_response(status=200, json_data={
+            "items": [{"gizmo": {"id": "g-p-1", "display": {"name": "One"}}}],
+            "cursor": "next-page",
+        }),
+        mock_api_response(status=200, json_data={
+            "items": [{"gizmo": {"id": "g-p-2", "display": {"name": "Two"}}}],
+            "cursor": None,
+        }),
+    ]
+    client = ChatGPTAPIClient(mock_request_context)
+
+    projects = await client.list_projects()
+
+    assert [project.id for project in projects] == ["g-p-1", "g-p-2"]
+    assert mock_request_context.get.call_count == 2
+    assert mock_request_context.get.call_args_list[1].kwargs["params"] == {"cursor": "next-page"}
 
 
 async def test_list_projects_404_fallback_to_gizmos(mock_request_context, mock_api_response):
-    """Se /projects 404, tenta /gizmos/discovery/mine."""
+    """Se o indice atual e /projects falham, tenta o legado gizmos/discovery."""
     mock_request_context.get.side_effect = [
+        mock_api_response(status=404, ok=False),  # /gizmos/snorlax/sidebar
         mock_api_response(status=404, ok=False),  # /projects
         mock_api_response(status=200, json_data={"items": [{"resource": {"gizmo": {"id": "g-p-2", "display": {"name": "Work"}}}}]}),  # /gizmos/discovery/mine
     ]
@@ -202,10 +270,28 @@ async def test_list_projects_404_fallback_to_gizmos(mock_request_context, mock_a
 
 
 async def test_list_projects_both_404_returns_empty(mock_request_context, mock_api_response):
-    """Se /projects E /gizmos 404, retorna lista vazia (caller faz DOM fallback)."""
-    mock_request_context.get.return_value = mock_api_response(status=404, ok=False)
+    """Se todos os indices falham, caller pode usar o fallback DOM."""
+    mock_request_context.get.side_effect = [
+        mock_api_response(status=404, ok=False),
+        mock_api_response(status=404, ok=False),
+        mock_api_response(status=404, ok=False),
+    ]
     client = ChatGPTAPIClient(mock_request_context)
     projects = await client.list_projects()
+    assert projects == []
+
+
+async def test_list_projects_405_uses_dom_fallback(mock_request_context, mock_api_response):
+    """Mudanca atual do backend: endpoints legados podem responder 405."""
+    mock_request_context.get.side_effect = [
+        mock_api_response(status=405, ok=False),
+        mock_api_response(status=405, ok=False),
+        mock_api_response(status=405, ok=False),
+    ]
+    client = ChatGPTAPIClient(mock_request_context)
+
+    projects = await client.list_projects()
+
     assert projects == []
 
 

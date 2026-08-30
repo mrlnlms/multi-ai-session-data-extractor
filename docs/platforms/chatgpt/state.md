@@ -5,8 +5,8 @@
 - **Single cumulative folder:** `data/raw/ChatGPT/` and `data/merged/ChatGPT/`.
 - **Sync orchestrator (4 steps):** `scripts/chatgpt-sync.py` — capture +
   assets + project_sources + reconcile.
-- **Capture:** **headed** (Cloudflare detects headless). Includes DOM scrape
-  of projects + voice pass + auth via cookies.
+- **Capture:** **headed** (Cloudflare detects headless). Project discovery is
+  API-first via the sidebar index; DOM is a compatibility fallback only.
 - **Auth:** persistent profile in `.storage/chatgpt-profile-<account>/`
   (generated via `scripts/chatgpt-login.py`).
 - **Fail-fast against flakey discovery** — `_get_max_known_discovery` recursive
@@ -26,7 +26,7 @@
 
 ## Reference volume
 
-- 1171 cumulative conversations (1168 active + 3 preserved_missing).
+- 1207 cumulative conversations (1204 server-discovered + 3 preserved_missing).
 - `LAST_RECONCILE.md` and `reconcile_log.jsonl` updated on every run.
 
 ## Canonical parser
@@ -47,8 +47,8 @@ messages.parquet, tool_events.parquet, branches.parquet.
 
 ### Typical volume
 
-1171 convs / 17,583 msgs / 3109 tool_events / 1369 branches. Byte-for-byte
-idempotent.
+1207 convs / 18,922 msgs / 3201 tool_events. Byte-for-byte idempotent after
+the source's volatile server fields are normalized by the pipeline.
 
 ## Descriptive Quarto
 

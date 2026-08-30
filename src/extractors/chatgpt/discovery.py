@@ -7,15 +7,125 @@ Dedupe no final por conversation_id.
 import asyncio
 import logging
 import re
+from urllib.parse import unquote, urlparse
 
 from src.extractors.chatgpt.api_client import ChatGPTAPIClient
 from src.extractors.chatgpt.models import ConversationMeta, ProjectMeta
 
 logger = logging.getLogger(__name__)
 
+# Page-backed discovery normalizes the metadata inside the browser before it
+# crosses the Playwright bridge, so the established 100-item pagination stays
+# safe and efficient.
 PAGE_SIZE = 100
 PROJECT_PAGE_SLEEP_SECONDS = 0.5  # matches migrate.js rate limit
 PROJECT_ID_RE = re.compile(r"g-p-[a-f0-9]+")
+PROJECT_HOME_ROUTE_RE = re.compile(r"/g/(g-p-[^/]+)/project(?:/|$)")
+
+
+async def _expand_projects_section(page) -> bool:
+    """Expande o botao atual ``Show more`` da secao Projects, se presente.
+
+    O layout atual mantem apenas alguns projetos visiveis inicialmente e usa
+    esse botao (separado do menu legado ``More``) para materializar o restante
+    da lista. A ausencia do botao e normal quando todos ja estao expostos ou
+    em layouts anteriores.
+    """
+    trigger = page.get_by_role("button", name=re.compile(r"^show more$", re.I))
+    try:
+        if await trigger.count() == 0:
+            return False
+        await trigger.first.click(timeout=5_000)
+        # A lista e materializada em lotes (observado: 20 -> 40 -> 49), entao
+        # esperamos a contagem de botoes estabilizar em vez de usar um atraso
+        # fixo dependente do carregamento da pagina.
+        buttons = page.get_by_label("Open project home", exact=True)
+        previous_count = -1
+        stable_checks = 0
+        for attempt in range(16):
+            current_count = await buttons.count()
+            if current_count == previous_count:
+                stable_checks += 1
+            else:
+                stable_checks = 0
+                previous_count = current_count
+            # A primeira pausa entre lotes pode durar alguns segundos; nao
+            # aceite estabilidade antes da janela minima de 3 s.
+            if attempt >= 6 and stable_checks >= 2:
+                break
+            await page.wait_for_timeout(500)
+        logger.info(
+            f"  Projects: lista expandida pelo botao Show more ({previous_count} botoes)"
+        )
+        return True
+    except Exception as exc:
+        logger.warning(f"Show more de Projects falhou: {exc}")
+        return False
+
+
+def _project_meta_from_home_url(url: str) -> ProjectMeta | None:
+    """Converte a rota aberta pelo botao ``Open project home`` em metadata."""
+    match = PROJECT_HOME_ROUTE_RE.search(urlparse(url).path)
+    if not match:
+        return None
+    route_slug = unquote(match.group(1))
+    id_match = PROJECT_ID_RE.match(route_slug)
+    if not id_match:
+        return None
+    project_id = id_match.group()
+    name = route_slug.removeprefix(project_id).removeprefix("-").replace("-", " ")
+    return ProjectMeta(
+        id=project_id,
+        name=name or "(unknown)",
+        discovered_via="dom_navigation",
+    )
+
+
+async def _discover_projects_via_project_homes(
+    page, projects: list[ProjectMeta], known_ids: set[str]
+) -> None:
+    """Enumera o layout atual de Projects navegando pelos botoes da sidebar.
+
+    A interface de 2026-08 mostra os projetos como botoes sem href ou ID no
+    DOM. Cada ``Open project home`` leva a uma rota que contem ``g-p-...``.
+    A volta para a home recolhe a lista; por isso a reexpansao e feita a cada
+    iteracao. Erro em um projeto nao impede os demais.
+    """
+    buttons = page.get_by_label("Open project home", exact=True)
+    button_count = await buttons.count()
+    if button_count == 0:
+        return
+
+    logger.info(f"  Projects: enumerando {button_count} botoes pela navegacao da UI")
+    for index in range(button_count):
+        try:
+            # Depois da primeira volta, a sidebar retorna aos 7 iniciais.
+            # Reabre a lista completa antes de selecionar o mesmo indice.
+            if index:
+                await page.goto(
+                    "https://chatgpt.com/", wait_until="domcontentloaded", timeout=30_000
+                )
+                await page.wait_for_timeout(500)
+                await _expand_projects_section(page)
+
+            buttons = page.get_by_label("Open project home", exact=True)
+            if await buttons.count() <= index:
+                logger.warning(
+                    f"Projects UI exibiu menos botoes que o esperado no indice {index}; parando"
+                )
+                break
+            await buttons.nth(index).click(timeout=10_000)
+            await page.wait_for_url(PROJECT_HOME_ROUTE_RE, timeout=15_000)
+            meta = _project_meta_from_home_url(page.url)
+            if meta is None:
+                logger.warning("Projects UI abriu uma rota sem ID reconhecivel")
+            elif meta.id not in known_ids:
+                projects.append(meta)
+                known_ids.add(meta.id)
+            if (index + 1) % 10 == 0 or index + 1 == button_count:
+                logger.info(f"  Projects UI: {index + 1}/{button_count} verificados")
+        except Exception as exc:
+            logger.warning(f"Projects UI falhou no botao {index + 1}/{button_count}: {exc}")
 
 
 async def discover_all(
@@ -65,8 +175,10 @@ async def discover_all(
             projects.append(ProjectMeta(id=pid, name="(unknown)", discovered_via="conversation_scan"))
             known_ids.add(pid)
 
-    # Métodos 4 + 5: requerem page Playwright navigated em chatgpt.com
-    if page is not None:
+    # Métodos DOM/NextData sao fallback apenas quando as APIs e o scan de
+    # conversas nao forneceram projects. No layout atual, a API Snorlax e a
+    # fonte autoritativa; nao navegamos a UI desnecessariamente.
+    if page is not None and not projects:
         try:
             await page.goto("https://chatgpt.com/", wait_until="domcontentloaded", timeout=30000)
             # ChatGPT nunca fica "networkidle" (websocket ativo) — esperamos o nav + damos tempo
@@ -116,7 +228,13 @@ async def discover_all(
                 if not scrolled_any:
                     break
 
-            # 4c: Abrir dropdown "More" da secao Projects (Radix menu com aria-haspopup)
+            # 4c: Layout atual: "Show more" pertence a Projects e revela a
+            # lista completa antes dos seletores DOM. Nao confundir com o
+            # menu global legado "More" abaixo.
+            await _expand_projects_section(page)
+            await _discover_projects_via_project_homes(page, projects, known_ids)
+
+            # 4d: Layout legado: abre dropdown "More" da secao Projects (Radix menu)
             # Descobrimento via debug: o botao "More" fica dentro de <li> na secao Projects,
             # trigger e o div com aria-haspopup="menu". Precisa click REAL (pointer events),
             # click() via JS so dispara focus — Radix nao abre o menu.

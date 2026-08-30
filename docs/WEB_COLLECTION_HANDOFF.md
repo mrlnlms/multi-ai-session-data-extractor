@@ -31,7 +31,7 @@ expire.
 |---|---|---|
 | NotebookLM | **success** — accounts 1 and 2 reconciled and parsed; unified regenerated | Do not reopen the lite-fetch regression unless a no-UI incremental run again produces fetches. Read its `state.md` and `server-behavior.md` first. Account 3 remains a preserved legacy snapshot. |
 | Grok | **success** — synced, parsed, and included in unified | No rerun needed in this collection unless the user requests a fresher capture. |
-| ChatGPT | `blocked_login` | User completes the documented headed/Cloudflare login, then run its normal incremental path. |
+| ChatGPT | **success** — headed incremental discovery, reconcile and parser completed | No rerun needed unless fresher capture is requested. Contract changes are documented in its platform state/server behavior. |
 | Claude.ai | `blocked_login` | Renew the local session through its documented login path. |
 | Gemini | `blocked_login` for both live accounts | Renew the local sessions; do not treat a missing XSRF/session value as an extractor defect. |
 | Qwen | `blocked_login` | Renew the local session. |

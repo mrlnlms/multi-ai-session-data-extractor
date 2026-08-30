@@ -9,6 +9,8 @@ import json as _json
 import logging
 from typing import Any
 
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
 from src.extractors.chatgpt.models import ConversationMeta, ProjectMeta
 
 logger = logging.getLogger(__name__)
@@ -20,19 +22,109 @@ TOKEN_URL = "https://chatgpt.com/api/auth/session"
 RATE_LIMIT_WAIT_SECONDS = 30
 MAX_RETRIES_429 = 3
 BACKOFF_MULTIPLIER = 2
+REQUEST_TIMEOUT_MS = 60_000
+
+
+class _PageResponse:
+    """Small APIResponse-compatible wrapper for browser-page fetches."""
+
+    def __init__(self, status: int, ok: bool, text: str):
+        self.status = status
+        self.ok = ok
+        self._text = text
+
+    async def json(self) -> dict | list:
+        return _json.loads(self._text)
 
 
 class ChatGPTAPIClient:
     """Client pras APIs internas do ChatGPT via Playwright request context."""
 
-    def __init__(self, request_context):
+    def __init__(self, request_context, *, page=None):
         """
         Args:
             request_context: instancia de playwright.async_api.APIRequestContext
                              (geralmente vem de browser_context.request).
         """
         self._ctx = request_context
+        self._page = page
         self._cached_token: str | None = None
+
+    async def _page_fetch(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        json: Any = None,
+        params: dict | None = None,
+        metadata_only: bool = False,
+    ) -> _PageResponse:
+        """Run an authenticated fetch inside the visible browser page.
+
+        The browser context's APIRequestContext can hang before its first
+        response on current ChatGPT sessions. Page fetch preserves the same
+        cookies and Cloudflare state while keeping the request in-browser.
+        """
+        if params:
+            from urllib.parse import urlencode
+
+            url = f"{url}?{urlencode(params)}"
+        result = await self._page.evaluate(
+            """async ({url, method, headers, body, timeoutMs, metadataOnly}) => {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), timeoutMs);
+                try {
+                    const response = await fetch(url, {
+                        method,
+                        headers,
+                        body,
+                        credentials: "include",
+                        signal: controller.signal,
+                    });
+                    const text = await response.text();
+                    if (metadataOnly && response.ok) {
+                        try {
+                            const payload = JSON.parse(text);
+                            const items = (payload.items || []).map((item) => ({
+                                id: item.id,
+                                conversation_id: item.conversation_id,
+                                title: item.title,
+                                create_time: item.create_time,
+                                update_time: item.update_time,
+                                gizmo_id: item.gizmo_id,
+                                is_archived: item.is_archived,
+                            }));
+                            return {status: response.status, ok: response.ok, text: JSON.stringify({items})};
+                        } catch (_) {
+                            return {status: response.status, ok: false, text: ""};
+                        }
+                    }
+                    return {
+                        status: response.status,
+                        ok: response.ok,
+                        text,
+                    };
+                } catch (error) {
+                    return {error: error.name};
+                } finally {
+                    clearTimeout(timer);
+                }
+            }""",
+            {
+                "url": url,
+                "method": method,
+                "headers": headers or {},
+                "body": _json.dumps(json) if json is not None else None,
+                "timeoutMs": REQUEST_TIMEOUT_MS,
+                "metadataOnly": metadata_only,
+            },
+        )
+        if result.get("error"):
+            raise RuntimeError(
+                f"Timeout ou erro de rede em {method} {url}: {result['error']}"
+            )
+        return _PageResponse(result["status"], result["ok"], result["text"])
 
     async def _get_token(self) -> str:
         """Busca accessToken via /api/auth/session (cacheado).
@@ -42,7 +134,16 @@ class ChatGPTAPIClient:
         """
         if self._cached_token:
             return self._cached_token
-        response = await self._ctx.get(TOKEN_URL)
+        if self._page is not None:
+            response = await self._page_fetch("GET", TOKEN_URL)
+        else:
+            try:
+                response = await self._ctx.get(TOKEN_URL, timeout=REQUEST_TIMEOUT_MS)
+            except PlaywrightTimeoutError as exc:
+                raise RuntimeError(
+                    f"Timeout apos {REQUEST_TIMEOUT_MS // 1000}s ao autenticar em {TOKEN_URL}. "
+                    "Confirme a sessao headed do ChatGPT e tente novamente."
+                ) from exc
         if not response.ok:
             raise RuntimeError(
                 f"Falha autenticacao em {TOKEN_URL} (HTTP {response.status}). "
@@ -78,23 +179,47 @@ class ChatGPTAPIClient:
         wait_seconds = RATE_LIMIT_WAIT_SECONDS
 
         while True:
-            if method == "GET":
-                response = await self._ctx.get(url, params=params, headers=headers)
-            elif method == "POST":
-                # Playwright APIRequestContext.post: `data=dict` vira form-encoded.
-                # Pra JSON proper (com content-type application/json), usar `data=`
-                # com STRING (json.dumps) ou parametro `multipart=False` + headers
-                # explicitos. Forma mais confiavel: dump pra string e header.
-                if json is not None:
-                    response = await self._ctx.post(
+            try:
+                if self._page is not None:
+                    response = await self._page_fetch(
+                        method,
                         url,
-                        data=_json.dumps(json),
-                        headers={**headers, "Content-Type": "application/json"},
+                        headers=headers,
+                        json=json,
+                        params=params,
                     )
+                elif method == "GET":
+                    response = await self._ctx.get(
+                        url,
+                        params=params,
+                        headers=headers,
+                        timeout=REQUEST_TIMEOUT_MS,
+                    )
+                elif method == "POST":
+                    # Playwright APIRequestContext.post: `data=dict` vira form-encoded.
+                    # Pra JSON proper (com content-type application/json), usar `data=`
+                    # com STRING (json.dumps) ou parametro `multipart=False` + headers
+                    # explicitos. Forma mais confiavel: dump pra string e header.
+                    if json is not None:
+                        response = await self._ctx.post(
+                            url,
+                            data=_json.dumps(json),
+                            headers={**headers, "Content-Type": "application/json"},
+                            timeout=REQUEST_TIMEOUT_MS,
+                        )
+                    else:
+                        response = await self._ctx.post(
+                            url,
+                            headers=headers,
+                            timeout=REQUEST_TIMEOUT_MS,
+                        )
                 else:
-                    response = await self._ctx.post(url, headers=headers)
-            else:
-                raise ValueError(f"Metodo HTTP nao suportado: {method}")
+                    raise ValueError(f"Metodo HTTP nao suportado: {method}")
+            except PlaywrightTimeoutError as exc:
+                raise RuntimeError(
+                    f"Timeout apos {REQUEST_TIMEOUT_MS // 1000}s em {method} {url}. "
+                    "Confirme a sessao headed do ChatGPT e tente novamente."
+                ) from exc
 
             # NOTA: `response.ok` e property em Playwright APIResponse (confirmado em Task 0.1).
             if response.ok:
@@ -125,11 +250,35 @@ class ChatGPTAPIClient:
     async def list_conversations(
         self, offset: int = 0, limit: int = 100
     ) -> list[ConversationMeta]:
-        """Lista convs paginadas do endpoint principal (main, nao archived)."""
+        """Lista a sidebar principal com os filtros observados na UI.
+
+        Sem esses filtros, o backend pode misturar fontes da sidebar e nao
+        encerrar a paginacao por ``offset`` de forma confiavel.
+        """
         url = f"{BASE_URL}/conversations"
-        data = await self._request_with_retry(
-            "GET", url, params={"offset": offset, "limit": limit}
-        )
+        params = {
+            "offset": offset,
+            "limit": limit,
+            "order": "updated",
+            "is_archived": "false",
+            "is_starred": "false",
+            "hide_snorlax": "true",
+        }
+        if self._page is not None:
+            token = await self._get_token()
+            response = await self._page_fetch(
+                "GET", url,
+                params=params,
+                headers={"Authorization": f"Bearer {token}"},
+                metadata_only=True,
+            )
+            if not response.ok:
+                raise RuntimeError(f"HTTP {response.status} em GET {url}")
+            data = await response.json()
+        else:
+            data = await self._request_with_retry(
+                "GET", url, params=params
+            )
         items = data.get("items", [])
         return [_meta_from_api_item(item) for item in items]
 
@@ -190,12 +339,32 @@ class ChatGPTAPIClient:
     async def list_archived(
         self, offset: int = 0, limit: int = 100
     ) -> list[ConversationMeta]:
-        """Lista convs arquivadas."""
+        """Lista convs arquivadas com o mesmo contrato da sidebar."""
         url = f"{BASE_URL}/conversations"
-        data = await self._request_with_retry(
-            "GET", url,
-            params={"offset": offset, "limit": limit, "is_archived": "true"},
-        )
+        params = {
+            "offset": offset,
+            "limit": limit,
+            "order": "updated",
+            "is_archived": "true",
+            "is_starred": "false",
+            "hide_snorlax": "true",
+        }
+        if self._page is not None:
+            token = await self._get_token()
+            response = await self._page_fetch(
+                "GET", url,
+                params=params,
+                headers={"Authorization": f"Bearer {token}"},
+                metadata_only=True,
+            )
+            if not response.ok:
+                raise RuntimeError(f"HTTP {response.status} em GET {url}")
+            data = await response.json()
+        else:
+            data = await self._request_with_retry(
+                "GET", url,
+                params=params,
+            )
         return [_meta_from_api_item(item) for item in data.get("items", [])]
 
     async def list_shared(
@@ -209,9 +378,21 @@ class ChatGPTAPIClient:
         single dele retorna 404 e a conv vira duplicata fantasma.
         """
         url = f"{BASE_URL}/shared_conversations"
-        data = await self._request_with_retry(
-            "GET", url, params={"offset": offset, "limit": limit}
-        )
+        if self._page is not None:
+            token = await self._get_token()
+            response = await self._page_fetch(
+                "GET", url,
+                params={"offset": offset, "limit": limit},
+                headers={"Authorization": f"Bearer {token}"},
+                metadata_only=True,
+            )
+            if not response.ok:
+                raise RuntimeError(f"HTTP {response.status} em GET {url}")
+            data = await response.json()
+        else:
+            data = await self._request_with_retry(
+                "GET", url, params={"offset": offset, "limit": limit}
+            )
         return [_meta_from_shared_item(item) for item in data.get("items", [])]
 
     async def list_pinned_gizmos(self) -> list[dict]:
@@ -249,14 +430,47 @@ class ChatGPTAPIClient:
 
 
     async def list_projects(self) -> list[ProjectMeta]:
-        """Lista projetos via API endpoints. DOM e NEXT_DATA fallback vivem em discovery.py.
+        """Lista projetos pelo indice paginado que alimenta a sidebar atual.
 
         Tenta:
-          1. /backend-api/projects
-          2. /backend-api/gizmos/discovery/mine
-        Retorna [] se ambos falham — caller (discovery.py) faz cascade com DOM.
+          1. /backend-api/gizmos/snorlax/sidebar (contrato observado 2026-08-30)
+          2. endpoints legados, somente como compatibilidade
+
+        O indice Snorlax retorna ``{items: [{gizmo: ...}], cursor}`` quando
+        chamado sem parametros e pagina por cursor. Ele e a fonte que a UI usa
+        para a secao Projects; evita depender de ``Show more`` e de DOM.
         """
-        # Tentativa 1: /projects
+        # Tentativa 1: indice atual da sidebar, com paginacao por cursor.
+        try:
+            projects: list[ProjectMeta] = []
+            seen_cursors: set[str] = set()
+            cursor: str | None = None
+            while True:
+                params = {"cursor": cursor} if cursor else None
+                data = await self._request_with_retry(
+                    "GET", f"{BASE_URL}/gizmos/snorlax/sidebar", params=params
+                )
+                for item in data.get("items", []):
+                    gizmo = item.get("gizmo", {})
+                    project_id = gizmo.get("id", "")
+                    if not project_id.startswith("g-p-"):
+                        continue
+                    display = gizmo.get("display") or {}
+                    projects.append(ProjectMeta(
+                        id=project_id,
+                        name=display.get("name") or gizmo.get("name") or "(unknown)",
+                        discovered_via="snorlax_sidebar",
+                    ))
+                cursor = data.get("cursor")
+                if not cursor or cursor in seen_cursors:
+                    return projects
+                seen_cursors.add(cursor)
+        except RuntimeError as exc:
+            if not any(f"HTTP {status}" in str(exc) for status in (404, 405)):
+                raise
+            logger.info("/gizmos/snorlax/sidebar indisponivel (404/405), usando compatibilidade")
+
+        # Tentativa 2: /projects (legado)
         try:
             data = await self._request_with_retry("GET", f"{BASE_URL}/projects")
             return [
@@ -264,11 +478,11 @@ class ChatGPTAPIClient:
                 for p in data.get("projects", [])
             ]
         except RuntimeError as exc:
-            if "HTTP 404" not in str(exc):
+            if not any(f"HTTP {status}" in str(exc) for status in (404, 405)):
                 raise
-            logger.info("/projects retornou 404, fallback pra /gizmos/discovery/mine")
+            logger.info("/projects indisponivel (404/405), fallback pra /gizmos/discovery/mine")
 
-        # Tentativa 2: /gizmos/discovery/mine
+        # Tentativa 3: /gizmos/discovery/mine (legado)
         try:
             data = await self._request_with_retry(
                 "GET", f"{BASE_URL}/gizmos/discovery/mine"
@@ -283,9 +497,9 @@ class ChatGPTAPIClient:
                 if item.get("resource", {}).get("gizmo", {}).get("id", "").startswith("g-p-")
             ]
         except RuntimeError as exc:
-            if "HTTP 404" not in str(exc):
+            if not any(f"HTTP {status}" in str(exc) for status in (404, 405)):
                 raise
-            logger.info("/gizmos/discovery/mine retornou 404 — caller faz DOM fallback")
+            logger.info("/gizmos/discovery/mine indisponivel (404/405) — caller faz DOM fallback")
 
         return []
 

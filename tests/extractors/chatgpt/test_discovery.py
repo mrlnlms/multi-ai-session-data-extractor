@@ -2,8 +2,57 @@
 
 import pytest
 
-from src.extractors.chatgpt.discovery import discover_all
+from src.extractors.chatgpt.discovery import (
+    _expand_projects_section,
+    _project_meta_from_home_url,
+    discover_all,
+)
 from src.extractors.chatgpt.models import ConversationMeta, ProjectMeta
+
+
+async def test_expand_projects_section_clicks_current_show_more(mocker):
+    page = mocker.Mock()
+    trigger = mocker.Mock()
+    trigger.count = mocker.AsyncMock(return_value=1)
+    trigger.first = mocker.AsyncMock()
+    project_buttons = mocker.Mock()
+    project_buttons.count = mocker.AsyncMock(
+        side_effect=[20, 40, 49, 49, 49, 49, 49]
+    )
+    page.get_by_role.return_value = trigger
+    page.get_by_label.return_value = project_buttons
+    page.wait_for_timeout = mocker.AsyncMock()
+
+    assert await _expand_projects_section(page) is True
+
+    page.get_by_role.assert_called_once()
+    trigger.first.click.assert_awaited_once_with(timeout=5_000)
+    assert page.wait_for_timeout.await_count == 6
+
+
+async def test_expand_projects_section_is_noop_without_show_more(mocker):
+    page = mocker.Mock()
+    trigger = mocker.Mock()
+    trigger.count = mocker.AsyncMock(return_value=0)
+    page.get_by_role.return_value = trigger
+
+    assert await _expand_projects_section(page) is False
+
+
+def test_project_meta_from_current_project_home_url():
+    meta = _project_meta_from_home_url(
+        "https://chatgpt.com/g/g-p-69f0ce46f2dc8191beb21ab316b6c97d-projeto-de-teste/project"
+    )
+
+    assert meta == ProjectMeta(
+        id="g-p-69f0ce46f2dc8191beb21ab316b6c97d",
+        name="projeto de teste",
+        discovered_via="dom_navigation",
+    )
+
+
+def test_project_meta_ignores_non_project_route():
+    assert _project_meta_from_home_url("https://chatgpt.com/c/example") is None
 
 
 async def test_discover_all_combines_sources_deduplicated(mocker):
@@ -31,6 +80,9 @@ async def test_discover_all_combines_sources_deduplicated(mocker):
     assert sorted(ids) == ["a", "b", "c"]  # b nao duplicou
     assert len(metas) == 3
     assert project_names == {}  # sem projects nesse cenario
+    mock_client.list_conversations.assert_awaited_once_with(offset=0, limit=100)
+    mock_client.list_archived.assert_awaited_once_with(offset=0, limit=100)
+    mock_client.list_shared.assert_awaited_once_with(offset=0, limit=100)
 
 
 async def test_discover_all_fetches_project_conversations(mocker):

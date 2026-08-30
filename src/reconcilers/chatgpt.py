@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.reconcilers.models import Plan, ReconcileReport
@@ -14,6 +14,21 @@ logger = logging.getLogger(__name__)
 # Excluidos da comparacao de enrichment no build_plan pra nao forcar to_use desnecessario.
 # Adicionar futuros _capture_timing, _retry_count, etc aqui se surgirem.
 OPERATIONAL_ENRICHMENT = {"_last_seen_in_server"}
+
+
+def _timestamp(value) -> float:
+    """Normaliza epoch numerico e ISO-8601 historico para comparacao segura."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            try:
+                return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+            except ValueError:
+                pass
+    return 0.0
 
 
 def build_plan(current_raw: dict, previous_merged: dict | None) -> Plan:
@@ -41,8 +56,8 @@ def build_plan(current_raw: dict, previous_merged: dict | None) -> Plan:
             continue
         curr = current_convs[cid]
         prev = previous_convs[cid]
-        curr_ut = curr.get("update_time", 0.0)
-        prev_ut = prev.get("update_time", 0.0)
+        curr_ut = _timestamp(curr.get("update_time"))
+        prev_ut = _timestamp(prev.get("update_time"))
         # Enrichment semantico (_project_name, _project_id, _archived, ...) e injetado
         # pelo orchestrator sem alterar update_time do servidor. Comparar campos _*
         # (excluindo operacionais) garante idempotencia do reconcile e propagacao
