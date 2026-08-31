@@ -2,9 +2,9 @@
 
 ## Contexto
 
-Este projeto captura e preserva sessoes de IA de 12 fontes: 9 plataformas
+Este projeto captura e preserva sessoes de IA de 13 fontes: 9 plataformas
 web (ChatGPT, Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity,
-Grok e Kimi) e 3 CLIs (Claude Code, Codex e Gemini CLI).
+Grok e Kimi) e 4 CLIs (Claude Code, Codex, Gemini CLI e Antigravity CLI).
 
 O fluxo canonico e:
 
@@ -45,7 +45,7 @@ mas todo novo `dvc push` exige autorizacao explicita do usuario. Nunca executar
   reconcile e nao chamam o parser quando executados diretamente. O pipeline
   do dashboard/headless executa automaticamente o `<source>-parse.py` depois
   de cada sync web bem-sucedido e antes de `scripts/unify-parquets.py`.
-- Os syncs das 3 CLIs ja fazem copy + parse.
+- Os syncs das 4 CLIs ja fazem copy + parse.
 - `data/unified/` possui atualmente 13 parquets: 4 canonicos e 9 auxiliares.
 - Mudancas de schema unificado devem ser coordenadas com o projeto consumidor
   `AI Interaction Analysis` antes de publicar os dados.

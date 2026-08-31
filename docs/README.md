@@ -2,6 +2,17 @@
 
 Project documentation, organized by topic.
 
+## Product direction
+
+- **[PERSONAL_AI_ARCHIVE.md](PERSONAL_AI_ARCHIVE.md)** — validated product
+  vision for operation, archive/reader and assisted curation; not an
+  implementation spec.
+- **[ROADMAP.md](ROADMAP.md)** — current priorities, operational work and the
+  recommended reading map for humans and agents.
+- **[data-identity-and-reader-fidelity.md](data-identity-and-reader-fidelity.md)**
+  — audit and future contract for stable references, CLI events and faithful
+  conversation rendering.
+
 ## Universal — recommended reading before touching the code
 
 - **[SETUP.md](SETUP.md)** — detailed guide from zero (installation, login
@@ -49,7 +60,7 @@ have only `README.md` (they're derived from local files, no server).
 | **NotebookLM** | web (multi-account) | [state](platforms/notebooklm/state.md) · [server-behavior](platforms/notebooklm/server-behavior.md) |
 | **Perplexity** | web | [state](platforms/perplexity/state.md) |
 | **Qwen** | web | [state](platforms/qwen/state.md) · [server-behavior](platforms/qwen/server-behavior.md) |
-| **Grok** | web | [state](platforms/grok/state.md) · [server-behavior](platforms/grok/server-behavior.md) |
+| **Grok** | web | [state](platforms/grok/state.md) · [recon](platforms/grok/recon.md) · [export analysis](platforms/grok/export-analysis.md) |
 | **Kimi** | web | [state](platforms/kimi/state.md) · [server-behavior](platforms/kimi/server-behavior.md) |
 | **Claude Code** | CLI | [README](platforms/claude-code/README.md) |
 | **Codex** | CLI | [README](platforms/codex/README.md) |

@@ -5,7 +5,7 @@ decisions. It intentionally links to the evidence and technical detail rather
 than duplicating it here. Shipped work belongs in `git log`; platform-specific
 behavior belongs in its own documentation.
 
-**Last reviewed:** 2026-08-30.
+**Last reviewed:** 2026-08-31.
 
 ## Current operational state
 
@@ -19,13 +19,33 @@ behavior belongs in its own documentation.
 The Google Drive remote is transitional. Every new `dvc push` still requires
 explicit user authorization.
 
+## Product evolution reading map
+
+This is the short index for humans and agents working on the archive product.
+Read only the documents required by the question at hand; platform-specific
+behavior remains in each platform's own documentation.
+
+| Question | Authoritative document | Role |
+|---|---|---|
+| What product is this becoming, and what remains deliberately open? | [PERSONAL_AI_ARCHIVE.md](PERSONAL_AI_ARCHIVE.md) | Product vision; not a spec. |
+| What is the current priority and what work is operationally pending? | This roadmap | Ordering and status. |
+| How should IDs, references and non-message events be interpreted? | [data-identity-and-reader-fidelity.md](data-identity-and-reader-fidelity.md) | Technical record for the reader and future curation. |
+| What is the canonical capture and processing contract? | [AGENTS.md](../AGENTS.md) and [`src/schema/models.py`](../src/schema/models.py) | Agent instructions and observable schema. |
+| What does a particular source currently capture or miss? | [`platforms/`](platforms/) and [LIMITATIONS.md](LIMITATIONS.md) | Per-source evidence and known gaps. |
+| How is the existing dashboard operated? | [dashboard/manual.md](dashboard/manual.md) | Current operational UI. |
+| Where is the complete documentation index? | [README.md](README.md) | Documentation catalog. |
+
+Future designs and specs should be linked from this map when created, rather
+than being discoverable only by filename or Git history.
+
 ## Strategic direction — personal AI archive
 
 The project is evolving from an extractor plus analytical dashboard into a
-local-first, read-only archive of personal AI interactions. This direction
-does not weaken the preservation contract: `raw` retains capture evidence,
-`merged` retains reconciled history, and the Parquets remain the analytical
-interface.
+local-first archive of personal AI interactions. The captured archive remains
+read-only; operational and curatorial state lives in a separate mutable layer.
+This direction does not weaken the preservation contract: `raw` retains
+capture evidence, `merged` retains reconciled history, and the Parquets remain
+the analytical interface.
 
 The intended recovery contract is:
 
@@ -90,7 +110,13 @@ all current remote storage.
 
 ### Archive reader product
 
-**Status:** planned, after the data-store recovery contract is settled.
+**Status:** next product exploration. It does not need to wait for the storage
+remote or asset-vault decisions.
+
+The reader is currently the clearest product gap: collection and analytical
+access exist, but the preserved messages themselves cannot be inspected
+comfortably. It also becomes a feedback surface for finding capture, parser,
+schema and presentation gaps that remain invisible in aggregate dashboards.
 
 Build a local-first, read-only interface distinct from the operational
 Streamlit dashboard:
@@ -98,13 +124,32 @@ Streamlit dashboard:
 - conversation list, source filters and search in a sidebar;
 - selected conversation rendered as a chat timeline;
 - branches, citations and tool events shown as contextual details;
-- assets rendered through the asset manifest; and
+- assets rendered from current references and, later, through the asset
+  manifest; and
 - source-specific metadata available without exposing the personal archive to
   a public backend.
 
-The initial MVP should read the existing unified Parquets through a local API
-and DuckDB. It does not need to wait for the asset-vault refactor; the manifest
-becomes the later bridge for rich media rendering.
+The first design should start from the existing unified Parquets and preserve a
+path to rich media through the future asset manifest. CLI timelines need
+explicit treatment for thinking, tool calls/results, trajectory steps and
+events without canonical messages. The relevant identity and fidelity findings
+are recorded in
+[data-identity-and-reader-fidelity.md](data-identity-and-reader-fidelity.md).
+
+### Product fronts and current emphasis
+
+This is an order for product exploration, not a requirement to finish one
+front completely before touching another:
+
+| Front | Current emphasis | Why |
+|---|---|---|
+| Archive and reader | First | Closes the immediate visibility gap and reveals fidelity issues in real conversations. |
+| Operation and health | Second | Evolves the existing Streamlit capabilities for accounts, logins, runs and diagnostics. |
+| Assisted curation | Third and iterative | Depends on reading context and on durable references, while reusing work from `AI Interaction Analysis`. |
+
+Parser and schema refinements should be made incrementally when the reader
+provides concrete evidence. A full anticipatory rewrite of all sources is not a
+prerequisite.
 
 ## Decisions requiring explicit direction
 
@@ -160,5 +205,5 @@ updated when the item is investigated or closed.
 
 ## Future platforms
 
-None currently. All 12 planned sources are shipped; Grok and Kimi completed
-the last platform expansion on 2026-05-09.
+None currently prioritized. The unified set covers 13 sources: the original
+platform expansion through Grok and Kimi plus the later Antigravity CLI source.
