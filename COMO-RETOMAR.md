@@ -44,7 +44,9 @@ pip install -r requirements.txt
 ## Notas
 
 - Os `.venv` foram removidos antes do backup (recria com os comandos acima)
-- A reconciliacao do extractor foi concluida em 2026-08-29; os backups e
-  manifestos permanecem em `/Users/mosx/Desktop/ia-data`
+- A reconciliacao do extractor foi concluida em 2026-08-29. Os backups
+  temporarios e manifestos locais foram descartados em 2026-08-31, apos uma
+  restauracao limpa do cache em `.dvc/cache` e confirmacao de sincronismo com
+  o remoto. O resumo da auditoria permanece em `docs/RECOVERY.md` e no Git.
 - Se precisar do DVC depois pra versionamento: `pip install 'dvc[gdrive]'`
 - Backup feito em **6 de julho de 2026**

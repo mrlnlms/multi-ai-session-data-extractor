@@ -115,8 +115,11 @@ Em 2026-08-29, antes da promocao, a `data/` original foi clonada para:
 Esse backup possuia 12.655 arquivos e foi validado contra o manifesto local
 original. A arvore reconciliada foi entao promovida para este worktree. Depois
 do push DVC e da confirmacao de sincronismo remoto, esse diretorio e o checkout
-temporario `dvc-restore` foram removidos para liberar espaco. Seus manifestos
-de auditoria permanecem em `/Users/mosx/Desktop/ia-data/comparison`.
+temporario `dvc-restore` foram removidos para liberar espaco. Os manifestos de
+auditoria permaneceram temporariamente em `ia-data/comparison`; em 2026-08-31,
+depois de uma restauracao limpa do cache em `.dvc/cache` e nova confirmacao de
+sincronismo com o remoto, tambem foram removidos. Os resultados essenciais
+permanecem neste documento e no historico Git.
 
 Resultado final:
 
@@ -137,6 +140,7 @@ baseline reconciliado foram enviados ao Google Drive e `dvc status -c`
 confirmou que cache e remoto estavam em sincronia. O Drive permanece como
 remoto transitorio; a migracao definitiva sera tratada separadamente.
 
-Manifestos, ledger e relatorios de validacao ficam em:
-
-`/Users/mosx/Desktop/ia-data/comparison`
+Os manifestos, ledger e relatorios de validacao originais foram descartados na
+limpeza local de 2026-08-31, depois de confirmada a restauracao integral do
+estado atual a partir do remoto. O cache DVC ativo fica em `.dvc/cache`, dentro
+deste projeto; nao ha dependencia de diretorio externo.
