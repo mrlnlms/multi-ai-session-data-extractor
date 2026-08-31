@@ -30,6 +30,7 @@ behavior remains in each platform's own documentation.
 | What product is this becoming, and what remains deliberately open? | [PERSONAL_AI_ARCHIVE.md](PERSONAL_AI_ARCHIVE.md) | Product vision; not a spec. |
 | What is the current priority and what work is operationally pending? | This roadmap | Ordering and status. |
 | How should IDs, references and non-message events be interpreted? | [data-identity-and-reader-fidelity.md](data-identity-and-reader-fidelity.md) | Technical record for the reader and future curation. |
+| How might account instances, application packaging and local authentication fit together? | [account-instances-and-application-architecture.md](account-instances-and-application-architecture.md) | Paused architectural exploration with explicit open decisions; not an implementation spec. |
 | What is the canonical capture and processing contract? | [AGENTS.md](../AGENTS.md) and [`src/schema/models.py`](../src/schema/models.py) | Agent instructions and observable schema. |
 | What does a particular source currently capture or miss? | [`platforms/`](platforms/) and [LIMITATIONS.md](LIMITATIONS.md) | Per-source evidence and known gaps. |
 | How is the existing dashboard operated? | [dashboard/manual.md](dashboard/manual.md) | Current operational UI. |

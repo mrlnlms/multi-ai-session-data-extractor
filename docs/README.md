@@ -12,6 +12,9 @@ Project documentation, organized by topic.
 - **[data-identity-and-reader-fidelity.md](data-identity-and-reader-fidelity.md)**
   — audit and future contract for stable references, CLI events and faithful
   conversation rendering.
+- **[account-instances-and-application-architecture.md](account-instances-and-application-architecture.md)**
+  — paused architectural exploration of multi-account instances, application
+  packaging/security and the consumer snapshot boundary; decisions remain open.
 
 ## Universal — recommended reading before touching the code
 
