@@ -39,6 +39,19 @@ mas todo novo `dvc push` exige autorizacao explicita do usuario. Nunca executar
 4. O schema em `src/schema/models.py` e a fronteira entre captura e analise.
 5. Dados pessoais ficam fora do Git; `data/` e `.storage/` exigem cuidado.
 
+## Acervo privado
+
+`private/` e um symlink versionado para o workbench privado do proprietario,
+fora deste checkout e sincronizado separadamente. Ele e a casa de documentos
+de bancada, planos, probes, handoffs, midias-fonte e outros artefatos
+duraveis que nao pertencem ao projeto publicavel. O Git registra somente o
+symlink; nunca adicionar seu conteudo ao indice.
+
+Nao criar novo material em `docs/local/`: a pasta legada sera curada e
+migrada gradualmente para `private/`. `data/`, `.dvc/cache/`, `.storage/` e
+artefatos renderizados continuam tendo seus proprios contratos de DVC ou de
+estado local; nao devem ser movidos para o workbench privado por conveniencia.
+
 ## Pipeline e validacao
 
 - Os scripts `<source>-sync.py` das fontes web fazem captura + assets +

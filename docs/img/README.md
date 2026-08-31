@@ -14,11 +14,6 @@
 > - **Sync GIF** — dashboard only shows a spinner during sync (not compelling); terminal sync looks generic. Hero + README text cover the narrative.
 > - **Data tree (terminal)** — replaced with platform drill-down screenshot to keep visual consistency with the dashboard hero.
 
-## Source video
-
-`sync-recording-source-2026-04-29.mov` (1394×958, 60fps, ~4min50s) — kept
-in case we ever want to extract a sync GIF later.
-
 ## Final 3 images
 
 1. **`quickstart-01-hero.png`** — Streamlit dashboard home, source status, KPIs + table + cross-platform views + capture timeline. Dark mode, EN.
