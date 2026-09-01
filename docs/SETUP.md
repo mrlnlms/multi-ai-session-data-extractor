@@ -27,8 +27,8 @@ cd multi-ai-session-data-extractor
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install the package in editable mode + dev dependencies
-pip install -e ".[dev]"
+# Install the complete project environment
+pip install -r requirements.txt
 
 # Install the Chromium browser for Playwright (~200MB)
 playwright install chromium

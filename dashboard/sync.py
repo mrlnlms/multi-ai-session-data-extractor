@@ -1,6 +1,6 @@
 """Disparo de sync por plataforma via subprocess.
 
-As 12 fontes conhecidas possuem orquestrador ``<source>-sync.py``. O fallback
+As 13 fontes conhecidas possuem orquestrador ``<source>-sync.py``. O fallback
 para ``<source>-export.py`` permanece para uma futura plataforma que ainda
 nao tenha sync completo.
 """

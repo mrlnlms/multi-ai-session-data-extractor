@@ -17,20 +17,6 @@ de alterar um extractor, reconciler ou parser. `CLAUDE.md` preserva contexto
 historico e instrucoes detalhadas para Claude Code; em caso de divergencia,
 este `AGENTS.md` e o estado observavel no codigo/dados prevalecem.
 
-## Estado da recuperacao
-
-A reconciliacao do backup foi concluida em 2026-08-29. A arvore promovida
-combina o snapshot DVC de 2026-05-16 com a camada local posterior de
-2026-05-19 e foi validada por caminho e SHA-256. O procedimento, os
-manifestos e os caminhos de rollback estao em `docs/RECOVERY.md`.
-
-O bloqueio temporario de coleta e processamento foi removido. O snapshot DVC
-reconciliado foi enviado ao Google Drive em 2026-08-29 e `dvc status -c`
-confirmou que cache e remoto estao sincronizados. Ate a migracao para
-Cloudflare R2, o Google Drive legado pode ser usado como remoto transitorio,
-mas todo novo `dvc push` exige autorizacao explicita do usuario. Nunca executar
-`dvc gc` durante essa transicao.
-
 ## Principios de preservacao
 
 1. Capturar uma vez, nunca rebaixar: downloaders pulam binarios existentes.
@@ -59,15 +45,21 @@ estado local; nao devem ser movidos para o workbench privado por conveniencia.
   do dashboard/headless executa automaticamente o `<source>-parse.py` depois
   de cada sync web bem-sucedido e antes de `scripts/unify-parquets.py`.
 - Os syncs das 4 CLIs ja fazem copy + parse.
-- `data/unified/` possui atualmente 13 parquets: 4 canonicos e 9 auxiliares.
 - Mudancas de schema unificado devem ser coordenadas com o projeto consumidor
   `AI Interaction Analysis` antes de publicar os dados.
 - Toda plataforma promovida deve aparecer em `dashboard/data.py`, no dashboard
   Streamlit e nos relatorios Quarto. O dashboard e iniciado por
-  `PYTHONPATH=. streamlit run dashboard.py`.
+  `PYTHONPATH=. .venv/bin/streamlit run dashboard.py`.
 - Nao declarar uma pipeline verde se o parquet for anterior ao raw/merged.
 - Rodar a suite de testes antes de merge; nao manter contagem fixa de testes
   na documentacao, pois parametrizacoes alteram esse numero.
+
+## Seguranca DVC
+
+Enquanto o Google Drive for o remoto transitorio, nunca executar `dvc gc`.
+Nao executar `dvc push` nem acionar o estagio Publish sem autorizacao explicita
+do usuario. Uma execucao deliberada do dashboard com Publish marcado e uma
+autorizacao valida do operador.
 
 ## Convencoes
 

@@ -71,7 +71,7 @@ git clone <repo>
 cd multi-ai-session-data-extractor
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -r requirements.txt
 playwright install chromium
 ```
 
