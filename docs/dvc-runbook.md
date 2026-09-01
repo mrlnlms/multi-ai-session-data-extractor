@@ -1,194 +1,165 @@
-# DVC Runbook — Cofre completo dos dados em Google Drive
+# DVC Runbook — cofre operacional da base atual
 
-Guia operacional do DVC neste projeto. **Este projeto eh o cofre canonico
-da pipeline de captura** (raw → merged → processed → unified + external).
-Versionamento via DVC permite restore total mesmo apos deletar tudo nas
-plataformas + apagar `data/` localmente.
+Este projeto e o pai/fonte canonica de captura: produz `raw`, `merged`,
+Parquets processados e Parquets unificados. O Google Drive e o remoto DVC
+operacional que guarda a **base canonica atual** quando ela nao cabe no Mac.
+O projeto filho/consumidor `AI Interaction Analysis` le os Parquets publicados
+daqui.
 
-## O que o DVC faz aqui
+O DVC foi escolhido para armazenar muitos arquivos incrementais, deduplicados
+e verificaveis sem transforma-los em um arquivo gigante. O historico Git dos
+ponteiros existe, mas reter cada versao historica dos dados nao e um requisito
+do produto: uma limpeza pode tornar revisoes antigas de dados irrecuperaveis.
 
-- Versiona pastas grandes (`data/raw/`, `data/merged/`, `data/processed/`,
-  `data/unified/`, `data/external/<subdirs>`) como "git pra dados".
-- Arquivos reais ficam no Google Drive, no cofre
-  `ai-interaction-source-dvc`, separado do cofre do projeto pai.
-- No git ficam so os ponteiros `.dvc` (arquivos pequenos com hash MD5).
-- Cada commit do git captura o estado dos dados naquele momento — `git
-  checkout` + `dvc checkout` volta no tempo.
-- Modo **content-addressed**: nunca sobrescreve, nunca apaga. Deleções no
-  local nao propagam pro Drive.
+## O que fica em cada lugar
 
-## Pastas trackeadas
-
-| Pasta | Conteudo | Por que track |
+| Camada | Conteudo | Contrato |
 |---|---|---|
-| `data/raw/` | Saida bruta dos extractors (JSON + binarios) | Recover apos deletar plataforma; principio "capturar uma vez" |
-| `data/merged/` | Saida dos reconcilers (JSON cumulativo + preserved_missing) | Recover sem precisar re-rodar reconcile pesado |
-| `data/processed/` | Parquets canonicos per-source | Interface read-only pro consumer (pai) via `dvc import-url` |
-| `data/unified/` | Parquets cross-platform (UNION ALL via DuckDB) | Idem, mais 4 qmds cross-plat consumindo |
-| `data/external/manual-saves/` | Inputs pros parsers manuais (clippings_obsidian, copypaste_web, terminal_cc) | Inputs ativos do pipeline |
-| `data/external/<demais subdirs>` | Snapshots UI + GDPR exports + thread orphans | Preservacao historica fora do pipeline |
+| Git | Codigo, documentacao e ponteiros `.dvc` | Historico do projeto e receita da base atual. |
+| Google Drive / DVC | Objetos da base atual | Cofre recuperavel dos dados grandes. |
+| `data/` | Checkout local dos dados | Descartavel depois de uma publicacao verificada. |
+| `.dvc/cache/` | Cache local DVC | Descartavel e recriavel por `dvc pull`. |
+| `private/` | Symlink para o workbench privado | Documentos e configuracoes duraveis fora do Git. |
+| `.storage/` | Perfis de navegador e sessao | Estado local; exige novo login apos maquina limpa. |
 
-`data/external/README.md` continua git-tracked normalmente — ele documenta
-as subpastas, nao eh dado pessoal.
+Uma copia manual antiga do checkout no Drive nao e a fonte de verdade. O
+remoto DVC e. O incidente que reconciliou uma dessas copias com o DVC esta em
+[RECOVERY.md](RECOVERY.md) somente como registro historico concluido.
 
-## Credenciais
+## Pastas rastreadas
 
-- **Remote:** Google Drive, pasta `ai-interaction-source-dvc` (ID: `101HMnOKvRYPZ6qQQu9iqCDcyWr_qx8fo`)
-- **Autenticacao:** OAuth Client em `console.cloud.google.com` (projeto `ai-interaction-dvc`)
-- **Client ID:** no `.dvc/config` (commitado no git — nao eh secreto)
-- **Client Secret:** no `.dvc/config.local` (gitignored — nao commitado)
-- **Token cacheado em:** `~/Library/Caches/pydrive2fs/` (cache local do
-  cliente DVC; renovavel automaticamente, expira a cada ~6 meses)
+| Pasta | Conteudo | Papel |
+|---|---|---|
+| `data/raw/` | Captura bruta e binarios | Evidencia primaria; downloaders preservam binarios existentes. |
+| `data/merged/` | Reconciliacao cumulativa | Mantem registros `preserved_missing`. |
+| `data/processed/` | Parquets canonicos por fonte | Interface de leitura para analises. |
+| `data/unified/` | Parquets cross-platform | Contrato de dados para o consumidor. |
+| `data/external/` | Inputs manuais e snapshots preservados | Evidencia ou entradas ativas fora da captura regular. |
 
-## Comandos do dia-a-dia
+O conteudo dessas pastas nao vai para Git diretamente: os arquivos `.dvc` sao
+os ponteiros versionados. `data/external/README.md` continua documentacao
+publica comum.
 
-Pre-requisito: `.venv` ativado ou usar `.venv/bin/dvc` direto.
+## Credenciais e setup
 
-### Apos rodar extractor / reconciler / parser
+- O remoto e a pasta Google Drive `ai-interaction-source-dvc`.
+- `.dvc/config` e compartilhada; `.dvc/config.local` contem o segredo OAuth e
+  nao pode entrar no Git.
+- O backup privado dessa configuracao e a instalacao em maquina nova ficam em
+  `private/COMO-RETOMAR.md`.
+- O cache de token do cliente DVC pode ser renovado por OAuth; ele nao e uma
+  copia dos dados.
+
+## Ciclo normal de atualizacao
+
+Depois de uma coleta validada, o fluxo da fonte e:
+
+```text
+sync/copy -> reconcile -> parse -> unify -> dvc add -> commit -> dvc push -> git push
+```
+
+As fontes web executadas diretamente precisam de parse explicito; os syncs
+das CLIs ja fazem copy + parse. O dashboard pode executar esse fluxo e o seu
+estagio Publish publica o estado que o consumidor podera ler.
+
+Antes de publicar uma mudanca de schema em `data/unified/`, coordenar o
+contrato com `AI Interaction Analysis`.
 
 ```bash
-# Captura mudancas (rapido — DVC usa cache de hash por inode+mtime)
+# Conferir se working tree, cache e remoto estao coerentes
+.venv/bin/dvc status
+.venv/bin/dvc status --cloud
+
+# Depois de sync + parse + unify, atualizar ponteiros DVC
 .venv/bin/dvc add data/raw data/merged data/processed data/unified \
     data/external/manual-saves data/external/deep-research-md \
     data/external/perplexity-orphan-threads data/external/deepseek-snapshots \
     data/external/chatgpt-extension-snapshot data/external/claude-ai-snapshots \
-    data/external/notebooklm-snapshots data/external/openai-gdpr-export
-
-# Commit dos ponteiros via script obrigatorio do projeto
+    data/external/notebooklm-snapshots data/external/openai-gdpr-export \
+    data/external/claude-code-config-snapshots \
+    data/external/codex-config-snapshots \
+    data/external/gemini-config-snapshots \
+    data/external/grok-snapshots
 git add data/*.dvc data/external/*.dvc data/.gitignore data/external/.gitignore
-~/.claude/scripts/commit.sh "data: snapshot apos <operacao>"
-
-# Upload dos deltas pro Drive (so blobs novos sobem; content-addressed)
+git commit -m "data: snapshot apos <operacao>"
 .venv/bin/dvc push
+git push
 ```
 
-### Conferir estado
+`dvc push` e `git push` sao escrita externa: um agente so os executa com
+autorizacao explicita do usuario. Para o operador, fazem parte normal de uma
+publicacao deliberada; marcar Publish no dashboard e uma autorizacao clara.
+
+## Recuperar a base atual em outra maquina
+
+O cenario suportado e apagar `data/` localmente para liberar espaco e, mais
+tarde, reconstruir a base atual:
 
 ```bash
-.venv/bin/dvc status              # local vs cache
-.venv/bin/dvc status --cloud      # local vs remote
-.venv/bin/dvc remote list
-```
-
-### Recover total (cenario primario do cofre)
-
-Cenario: deletei tudo nas plataformas + apaguei `data/` localmente. Quero
-voltar ao estado de qualquer commit.
-
-```bash
-# Volta o ponteiro git pro commit desejado (ou main pro estado atual)
-git checkout main
-
-# DVC restaura todas as pastas a partir do remote
+git clone <repositorio>
+cd multi-ai-session-data-extractor
+# criar/reparar o symlink private conforme private/COMO-RETOMAR.md
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/playwright install chromium
 .venv/bin/dvc pull
 ```
 
-Primeira pull em maquina nova abre browser pra OAuth (mesma conta gmail).
+O primeiro `dvc pull` pode pedir OAuth. Perfis em `.storage/` nao sao parte
+do restore: faca login novamente nas plataformas quando for coletar.
 
-### Voltar no tempo (snapshot historico)
+## Gerenciar espaco com DVC GC
 
-```bash
-git log -- data/raw.dvc                # commits que mexeram em raw
-git checkout <commit-hash>             # volta o ponteiro
-.venv/bin/dvc checkout                 # DVC monta data/raw daquele commit
-```
+`dvc gc` nao e parte da coleta. Ele e uma operacao deliberada de retencao que
+remove do cache e, com `--cloud`, do Drive os objetos que nao devem mais ser
+mantidos. Este projeto retem a base canonica atual, nao todas as versoes dos
+dados apontadas pelo historico Git.
 
-Voltar pro presente:
-```bash
-git checkout main && .venv/bin/dvc checkout
-```
+Antes de uma limpeza:
 
-### Garbage collection (NAO RODAR sem necessidade)
-
-Pelo principio "capturar uma vez, nunca rebaixar", **nao rode `dvc gc` por
-default** — historico das capturas eh precious. Se algum dia o Drive
-estourar:
+1. concluir e validar a coleta atual;
+2. fazer `dvc add`, commit, `dvc push` e `git push` desse estado;
+3. confirmar `dvc status --cloud` sem diferencas relevantes;
+4. rodar a simulacao e revisar seu resultado com o proprietario.
 
 ```bash
-# Ver o que seria apagado, sem apagar
-.venv/bin/dvc gc --cloud --all-branches --all-tags --all-commits --dry-run
+# Protege o estado atual do worktree e mostra o que seria removido localmente
+# e no Drive. Nao use --all-commits: ele preservaria o historico que este
+# projeto deliberadamente nao retem.
+.venv/bin/dvc gc --workspace --cloud --dry
 ```
 
-E **muito** importante: rodar com `--all-branches --all-tags --all-commits`
-pra preservar historico. Sem essas flags, gc apaga tudo que nao eh
-referenciado pelos ponteiros do commit atual. O cofre deste projeto e
-separado do cofre do pai, mas GC ainda pode apagar o historico nao
-referenciado deste repositorio. Cuidado redobrado.
+Somente com aprovacao explicita, repetir o comando sem `--dry`. O DVC pedira
+confirmacao interativa. Nunca use `--force` por conveniencia.
 
-## Situacoes problematicas
+**Impacto assumido:** depois disso, `git checkout <commit-antigo>` pode
+continuar mostrando o codigo e os ponteiros antigos, mas `dvc pull` daquele
+estado pode falhar porque seus blobs foram descartados. A base atual e o
+consumidor que a le continuam preservados.
 
-### Token expirou (`invalid_grant: Token has been expired or revoked`)
+## Problemas comuns
+
+### Token expirou
+
+Reautentique pelo fluxo descrito em `private/COMO-RETOMAR.md`; nao registre
+segredos, token ou o conteudo de `.dvc/config.local` em Git.
+
+### `data/` ou cache local sumiu
 
 ```bash
-rm -rf ~/Library/Caches/pydrive2fs/
-.venv/bin/dvc push   # ou pull — abre browser pra reautenticar
+.venv/bin/dvc pull
 ```
 
-Mesma conta gmail. Renova token automaticamente.
+Isso restaura a base canonica atual do Drive. Nao limpe ou reescreva dados
+locais apenas para fazer o DVC “bater”; investigue primeiro `dvc status`.
 
-### "Apaguei data/<algo> sem querer"
+## Limites com o projeto consumidor
 
-```bash
-.venv/bin/dvc checkout   # restaura tudo a partir do cache local
-# se cache local tambem foi embora:
-.venv/bin/dvc pull       # baixa do Drive
-```
+Os cofres DVC sao separados. Uma limpeza neste remoto nao remove blobs do
+remoto usado pelo `AI Interaction Analysis`; ela apenas pode retirar a
+capacidade de restaurar revisoes antigas **desta** fonte. O consumidor deve
+atualizar para uma revisao publicada atual quando precisar de dados novos.
 
-### "dvc push falhou com erro 403"
-
-1. Token expirou → veja item acima
-2. Email saiu da test users list: https://console.cloud.google.com/auth/audience?project=ai-interaction-dvc
-3. Pasta `ai-interaction-source-dvc` no Drive mudou de owner ou foi deletada
-
-### "Quero migrar pra outra Google Account"
-
-```bash
-# Desautoriza OAuth na conta antiga: https://myaccount.google.com/permissions
-rm -rf ~/Library/Caches/pydrive2fs/
-.venv/bin/dvc push   # OAuth com a nova conta
-```
-
-## Arquivos importantes
-
-| Arquivo | Vai pro git? | Por que |
-|---|---|---|
-| `.dvc/config` | SIM | Config compartilhada — URL do remote, client_id |
-| `.dvc/config.local` | NAO (gitignored) | Contem `gdrive_client_secret` |
-| `.dvc/cache/` | NAO (gitignored) | Cache local dos blobs |
-| `.dvcignore` | SIM | Padroes que DVC ignora |
-| `data/*.dvc` | SIM | Ponteiros (hash + size + paths) |
-| `data/external/*.dvc` | SIM | Idem, granular por subpasta |
-| `data/.gitignore` + `data/external/.gitignore` | SIM | Geram pelo DVC, dizem pro git ignorar pastas trackadas |
-| Conteudo de `data/raw/`, `data/merged/`, etc | NAO | Versionado via DVC |
-
-## Co-existencia com o projeto pai
-
-Filho e pai usam cofres DVC separados. O filho e a casa canonica de `raw`,
-`merged`, `processed`, `unified` e `external`; o pai importa `processed` e
-`unified` por revisao Git+DVC e versiona seus derivados em outro remote.
-
-**Cuidado com `dvc gc`:** mesmo com cofres separados, nao rodar GC
-casualmente; o historico de capturas deste projeto e parte do acervo.
-
-O pai consome os canonicos do filho via `dvc import-url`:
-
-```bash
-# No pai
-dvc import-url <url-do-filho-no-github> data/processed/ -o data/canonical/
-dvc import-url <url-do-filho-no-github> data/unified/ -o data/canonical-unified/
-```
-
-(Comando exato sera firmado quando a migracao do pai for executada.)
-
-## Quando NAO usar DVC
-
-- Anotacoes temporarias → `local/` (gitignored)
-- HTML rendirizado pelo Quarto → `notebooks/_output/` (gitignored)
-- Logs → fora de `data/`
-
-## Referencias
-
-- Docs DVC: https://dvc.org/doc
-- Pasta Drive: https://drive.google.com/drive/folders/101HMnOKvRYPZ6qQQu9iqCDcyWr_qx8fo
-- Projeto Google Cloud: `ai-interaction-dvc`
-- Runbook do pai (referencia historica): `~/Desktop/AI Interaction Analysis/docs/dvc-runbook.md`
+Alternativas ao Google Drive podem ser pesquisadas no futuro para evitar a
+poluicao visual de objetos hashados, mas nao ha migracao ativa. Ate que uma
+alternativa seja comprovadamente viavel, o Drive e o remoto operacional.

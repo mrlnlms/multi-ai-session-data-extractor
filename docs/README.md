@@ -75,7 +75,7 @@ have only `README.md` (they're derived from local files, no server).
 - [dashboard/manual.md](dashboard/manual.md) — features manual
   + operation (local Streamlit, single-user, read-only).
 
-## Recovery
+## Registro historico
 
-- [RECOVERY.md](RECOVERY.md) — safe reconciliation of the July 2026 local
-  backup with the older, more complete DVC snapshot.
+- [RECOVERY.md](RECOVERY.md) — reconciliation completed in August 2026;
+  historical audit record, not a current operational procedure.

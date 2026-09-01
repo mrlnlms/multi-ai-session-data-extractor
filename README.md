@@ -201,7 +201,7 @@ PYTHONPATH=. .venv/bin/pytest tests/parsers/     # parsers only
 - [docs/SETUP.md](docs/SETUP.md) — detailed setup, first login,
   troubleshooting, optional DVC backup
 - [docs/dvc-runbook.md](docs/dvc-runbook.md) — DVC operational guide
-  (versioned vault for full recovery after deletion)
+  (canonical-current data vault and local recovery)
 - [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — known gaps and limitations
 - [docs/operations.md](docs/operations.md) — common commands per platform
 - [docs/glossary.md](docs/glossary.md) — project terms

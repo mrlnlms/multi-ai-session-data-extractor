@@ -1,6 +1,6 @@
 # DeepSeek — server behavior (empirically validated)
 
-Initial CRUD diff over **2 snapshots** (1 from the parent project + 1
+Initial CRUD diff over **2 snapshots** (1 from the former analysis project + 1
 current), 2026-04-24 → 2026-05-01. Later supplemented by a **live UI CRUD
 battery** (see dedicated section below).
 

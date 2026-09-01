@@ -11,13 +11,13 @@ behavior belongs in its own documentation.
 
 | Item | Status | Evidence | Next safe action |
 |---|---|---|---|
-| Reconciliation recovery | Complete (2026-08-29) | [RECOVERY.md](RECOVERY.md) | Treat the promoted tree as canonical. |
-| DVC Google Drive remote | In sync, rechecked 2026-08-30 | [AGENTS.md](../AGENTS.md) and [RECOVERY.md](RECOVERY.md) | Run `.venv/bin/dvc status -c -r gdrive_remote` before a material new collection or storage operation. |
+| Recovery de 2026-08 | Complete, historical | [RECOVERY.md](RECOVERY.md) | Treat it as the audit record of a resolved incident, not as a daily runbook. |
+| DVC Google Drive remote | Active operational remote | [dvc-runbook.md](dvc-runbook.md) | Use it to publish and recover the canonical current dataset. |
 | Capture and processing | Unblocked | [AGENTS.md](../AGENTS.md) | Run the normal sync → parse → unify pipeline when updating a source. |
-| DVC garbage collection | Prohibited during the transition | [AGENTS.md](../AGENTS.md) | Do not run `dvc gc`. |
+| DVC garbage collection | Deliberate storage maintenance | [dvc-runbook.md](dvc-runbook.md) | Simulate, review and explicitly authorize it after a validated publication. |
 
-The Google Drive remote is transitional. Every new `dvc push` still requires
-explicit user authorization.
+Google Drive remains the active remote while alternatives are researched. This
+is not an active migration or a freeze of the normal capture/publish workflow.
 
 ## Product evolution reading map
 
@@ -59,8 +59,9 @@ Browser profiles and cookies in `.storage/` are deliberately outside that
 contract and require a new login after a clean-machine restore. A clean restore
 must be demonstrated before retiring any previous remote.
 
-The target is a **single** object-storage remote, not a permanent Drive + R2
-arrangement. Drive remains only during a future migration and validation.
+If a future alternative proves viable, the target is a **single** object
+remote, not a permanent Drive + R2 arrangement. Until then, Drive remains the
+canonical operational remote.
 
 ### Storage design work
 
@@ -156,7 +157,7 @@ prerequisite.
 
 | Decision | Why it is not automatic | Evidence | First step once chosen |
 |---|---|---|---|
-| Choose the single DVC object remote | It changes storage provider, cost, request limits and the recovery contract. R2 is paid above 10 GB; Oracle is a candidate but needs a request-count proof of concept. | [data-storage-inventory.md](data-storage-inventory.md) and [storage design work](#storage-design-work) | Approve a non-destructive Oracle proof of concept, or choose another provider. |
+| Evaluate an alternative DVC object remote | It changes storage provider, cost, request limits and the recovery contract. Previous options did not meet the practical cost and retention requirements. | [data-storage-inventory.md](data-storage-inventory.md) and [storage design work](#storage-design-work) | Reopen research only when a viable alternative exists; Drive remains operational meanwhile. |
 | Change the unified schema or publish changed unified data | The consumer project must coordinate on schema changes. | [AGENTS.md](../AGENTS.md) | Agree the contract with `AI Interaction Analysis` before publishing. |
 | Automate deletion of conversations upstream | A selection bug could irreversibly delete the wrong server-side conversations. | [ChatGPT capture-delete cycle](#chatgpt-capture-delete-cycle) | Keep this manual unless a future need justifies automation. |
 

@@ -172,7 +172,7 @@ def render(states: list[PlatformState]) -> None:
         disabled=is_running,
         help="Pipeline = 4 stages: (1) sync per platform → (2) unify parquets → "
              "(3) Quarto render → (4) publish (dvc add → git add → commit → dvc push → "
-             "git push). Stage 4 is what `pai` project consumes via `dvc import`. "
+             "git push). Stage 4 publishes the data consumed by AI Interaction Analysis. "
              "Uncheck if you want to dry-run sync without pushing.",
     )
     if is_running:

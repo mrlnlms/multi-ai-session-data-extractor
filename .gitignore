@@ -44,11 +44,6 @@ static/quarto/
 # Backups
 *.bak
 
-# Local scratch
-local/
-.tmp/
-.recovery/
-
 # Local-only docs (planos internos, journeys, housekeeping, superpowers).
 # Conteudo util pra contributor externo foi extraido pros docs publicos
 # (CONTRIBUTING.md, LIMITATIONS.md, docs/probes/).

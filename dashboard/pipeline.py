@@ -537,7 +537,7 @@ def _run_publish_stage(
     st.markdown(f"### Stage 4/4 — {STAGE_NAMES[3]}")
     if not publish_after:
         st.info(
-            "Publish skipped (checkbox unchecked). Pai project won't see "
+            "Publish skipped (checkbox unchecked). The consumer project won't see "
             "new data via `dvc import` until you run it."
         )
         results.append({

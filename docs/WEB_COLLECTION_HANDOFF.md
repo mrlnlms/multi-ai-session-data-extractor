@@ -58,7 +58,9 @@ Before changing or running a platform:
 3. Inspect `git status --short`. Preserve unrelated changes.
 4. Do not delete, reset, or make raw/merged data “match”. Existing files
    represent preserved history, including server-deleted conversations.
-5. Do not run `dvc gc`. A `dvc push` requires explicit user authorization.
+5. Do not run `dvc gc` as part of collection work. It is separate, deliberate
+   storage maintenance under `docs/dvc-runbook.md`. A `dvc push` requires
+   explicit user authorization.
 6. Do not commit or push unless the user asks. Never expose cookie, token,
    message, or asset contents in the report.
 

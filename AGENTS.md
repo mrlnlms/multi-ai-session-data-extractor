@@ -13,9 +13,10 @@ extractor/copy -> raw -> reconciler -> merged -> parser -> processed -> unify ->
 ```
 
 Leia tambem `README.md`, `docs/README.md` e o `state.md` da plataforma antes
-de alterar um extractor, reconciler ou parser. `CLAUDE.md` preserva contexto
-historico e instrucoes detalhadas para Claude Code; em caso de divergencia,
-este `AGENTS.md` e o estado observavel no codigo/dados prevalecem.
+de alterar um extractor, reconciler ou parser. `CLAUDE.md` contem o guia
+autonomo equivalente para Claude Code. As regras compartilhadas devem ficar
+alinhadas; o estado observavel no codigo e nos dados prevalece sobre texto
+historico.
 
 ## Principios de preservacao
 
@@ -45,8 +46,10 @@ estado local; nao devem ser movidos para o workbench privado por conveniencia.
   do dashboard/headless executa automaticamente o `<source>-parse.py` depois
   de cada sync web bem-sucedido e antes de `scripts/unify-parquets.py`.
 - Os syncs das 4 CLIs ja fazem copy + parse.
-- Mudancas de schema unificado devem ser coordenadas com o projeto consumidor
-  `AI Interaction Analysis` antes de publicar os dados.
+- Este projeto e o pai/fonte canonica de captura. O projeto filho/consumidor
+  `AI Interaction Analysis` le os Parquets unificados publicados daqui.
+  Mudancas de schema unificado devem ser coordenadas com ele antes da
+  publicacao.
 - Toda plataforma promovida deve aparecer em `dashboard/data.py`, no dashboard
   Streamlit e nos relatorios Quarto. O dashboard e iniciado por
   `PYTHONPATH=. .venv/bin/streamlit run dashboard.py`.
@@ -54,12 +57,24 @@ estado local; nao devem ser movidos para o workbench privado por conveniencia.
 - Rodar a suite de testes antes de merge; nao manter contagem fixa de testes
   na documentacao, pois parametrizacoes alteram esse numero.
 
-## Seguranca DVC
+## DVC e retencao
 
-Enquanto o Google Drive for o remoto transitorio, nunca executar `dvc gc`.
-Nao executar `dvc push` nem acionar o estagio Publish sem autorizacao explicita
-do usuario. Uma execucao deliberada do dashboard com Publish marcado e uma
-autorizacao valida do operador.
+O Google Drive e o remoto DVC operacional da base canonica atual. O DVC e
+usado para armazenar, deduplicar e recuperar os dados grandes sem mante-los no
+Mac; a retencao de cada revisao historica dos dados nao e um requisito do
+produto.
+
+- `dvc push` faz parte normal da publicacao de uma atualizacao validada. Um
+  agente so pode executa-lo com autorizacao explicita do usuario; uma execucao
+  deliberada do dashboard com Publish marcado e uma autorizacao valida do
+  operador.
+- `dvc gc` e manutencao deliberada de espaco, nunca uma etapa automatica. Ele
+  pode tornar revisoes antigas de dados irrecuperaveis, embora o historico do
+  codigo continue no Git. Antes de qualquer limpeza: confirmar que o estado
+  canonico atual esta commitado e enviado, executar primeiro em modo seco e
+  obter autorizacao explicita do usuario para a exclusao.
+- Uma alternativa ao Drive continua sendo pesquisa futura, nao uma migracao ou
+  bloqueio operacional em andamento.
 
 ## Convencoes
 

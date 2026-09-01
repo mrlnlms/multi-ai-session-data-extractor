@@ -48,7 +48,7 @@ WEB_PLATFORMS = frozenset({
     "Kimi",
 })
 
-# Pastas versionadas via DVC (espelha CLAUDE.md "Rotina pos-captura").
+# Pastas versionadas via DVC; manter alinhadas a docs/dvc-runbook.md.
 # Atualizar AQUI quando adicionar plataforma com diretorio externo novo.
 DVC_PATHS: list[str] = [
     "data/raw",

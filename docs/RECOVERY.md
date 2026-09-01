@@ -1,7 +1,9 @@
 # Recuperacao segura do backup de julho de 2026 — concluida
 
-> **Status:** concluida em 2026-08-29. Este documento permanece como trilha
-> de auditoria e guia de rollback.
+> **Status:** concluida em 2026-08-29. Este documento e uma trilha de
+> auditoria de um incidente resolvido, nao um guia da operacao diaria.
+> As proibicoes e precaucoes abaixo valiam somente durante a recuperacao;
+> a politica DVC atual esta em [dvc-runbook.md](dvc-runbook.md).
 
 ## Situacao
 
@@ -137,8 +139,9 @@ e `unified`; `dvc status` retorna `Data and pipelines are up to date`. Os 12
 ponteiros de `external` nao mudaram. Durante a recuperacao, nenhum `dvc push`,
 commit ou push Git foi executado. Depois do encerramento, 2.396 objetos do
 baseline reconciliado foram enviados ao Google Drive e `dvc status -c`
-confirmou que cache e remoto estavam em sincronia. O Drive permanece como
-remoto transitorio; a migracao definitiva sera tratada separadamente.
+confirmou que cache e remoto estavam em sincronia. Naquele momento, uma
+possivel alternativa ao Drive ainda estava em estudo; o Drive segue como o
+remoto operacional conforme o runbook atual.
 
 Os manifestos, ledger e relatorios de validacao originais foram descartados na
 limpeza local de 2026-08-31, depois de confirmada a restauracao integral do

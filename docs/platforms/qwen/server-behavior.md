@@ -1,7 +1,7 @@
 # Qwen — server behavior (empirically validated)
 
-Mirror of `ChatGPT server behavior` in CLAUDE.md. CRUD diff over
-**4 snapshots** (3 from the parent project + 1 current), 2026-04-24 → 2026-05-01.
+CRUD diff over **4 historical snapshots** (3 from the former analysis project
+and 1 current), 2026-04-24 → 2026-05-01.
 
 ## Incremental revalidation — 2026-08-30
 

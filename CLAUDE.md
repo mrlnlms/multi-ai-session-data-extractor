@@ -1,488 +1,131 @@
-# CLAUDE.md — compatibilidade e contexto historico para Claude Code
+# CLAUDE.md — guia operacional para Claude Code
 
-As instrucoes canonicas atuais estao em `AGENTS.md`. Leia esse arquivo
-primeiro. Este documento preserva detalhes historicos e empiricos que ainda
-sao uteis, mas numeros de corpus devem ser tratados como snapshots datados.
+## Projeto
 
-## O que e este projeto
+Este projeto e a fonte canonica de captura e preservacao de sessoes de IA:
+9 plataformas web (ChatGPT, Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek,
+Perplexity, Grok e Kimi) e 4 CLIs (Claude Code, Codex, Gemini CLI e
+Antigravity CLI).
 
-Captura completa e cumulativa de sessoes de AI em 9 plataformas web
-(ChatGPT, Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity, Grok,
-Kimi) e 3 CLIs. Output em raw
-JSON + binarios + parquet canonico. Pensado pra **capturar uma vez, deletar
-do servidor, manter local como fonte primaria**.
+Fluxo canonico:
 
-Ver `README.md` pra setup e uso.
-
-## SEMPRE refletir na UI do dashboard (Streamlit)
-
-Toda vez que adicionar/promover plataforma (sync, parser v3, Quarto), **a
-UI do dashboard Streamlit precisa refletir**. Nao basta criar arquivos —
-abrir o dashboard e validar:
-
-- `KNOWN_PLATFORMS` em `dashboard/data.py` lista as 12 fontes
-- Tabela cross-plataforma do overview mostra os 4 status verdes (capture +
-  reconcile + parser + Quarto)
-- Botao "Ver dados detalhados" aparece quando `notebooks/<source>.qmd` existe
-- Counters batem com `LAST_CAPTURE.md` + `LAST_RECONCILE.md` + jsonls
-
-Caminho default: `PYTHONPATH=. streamlit run dashboard.py`. Se nao reflete
-automaticamente, eh bug do dashboard — corrige antes de declarar plataforma
-"shipped".
-
-**Sintoma de que esqueci disso:** declarei plataforma pronta sem ter aberto
-o dashboard. Furo: `notebooks/<source>.qmd` rendiriza, parquets estao em
-`data/processed/<Source>/`, mas a tabela do dashboard ainda mostra ❌.
-Resolver antes de fechar.
-
-## Status
-
-Ciclo end-to-end por plataforma documentado em
-`docs/platforms/<plat>/state.md` — **conferir la antes de propor refatoracao
-ou script novo**. Resumo:
-
-| Plataforma | Capture | Reconcile | Sync | Parser v3 | Quarto | state.md | Notas |
-|---|---|---|---|---|---|---|---|
-| ChatGPT | ✅ | ✅ | ✅ (4 etapas) | ✅ | ✅ | [chatgpt/state.md](docs/platforms/chatgpt/state.md) | 1171 convs, 6 CRUD validados |
-| Claude.ai | ✅ | ✅ | ✅ (3 etapas) | ✅ | ✅ | [claude-ai/state.md](docs/platforms/claude-ai/state.md) | 24k msgs / 16k events, MCP, project_docs |
-| Qwen | ✅ | ✅ | ✅ (2 etapas) | ✅ | ✅ | [qwen/state.md](docs/platforms/qwen/state.md) | 3/4 CRUD validados (archive eh no-op upstream) |
-| DeepSeek | ✅ | ✅ | ✅ (2 etapas) | ✅ | ✅ | [deepseek/state.md](docs/platforms/deepseek/state.md) | 3/3 CRUD validados, R1 thinking 31% |
-| Gemini | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ | ✅ | [gemini/state.md](docs/platforms/gemini/state.md) | 2 contas, 4/4 CRUD validados |
-| NotebookLM | ✅ | ✅ | ✅ (3 etapas multi-conta) | ✅ | ✅ | [notebooklm/state.md](docs/platforms/notebooklm/state.md) | multi-conta + account-3 legacy, 9 parquets |
-| Perplexity | ✅ | ✅ | ✅ (2 etapas) | ✅ | ✅ | [perplexity/state.md](docs/platforms/perplexity/state.md) | 82 convs, 4 spaces, 1 orphan |
-| Grok | ✅ | ✅ | ✅ (3 etapas) | ✅ | ✅ | [grok/state.md](docs/platforms/grok/state.md) | smoke: 6 convs / 1 workspace / 156 msgs / 62 tool events / 44 assets baixados via API (10MB) / 0 scheduled tasks |
-| Kimi | ✅ | ✅ | ✅ (3 etapas) | ✅ | ✅ | [kimi/state.md](docs/platforms/kimi/state.md) | smoke: 9 chats / 5 skills inst / 261 msgs / 82 tool events (web_search+fetch_urls+ipython) / 26 assets via signUrl (3.76MB) |
-
-**CLI (3 fontes adicionais — dado local em vez de captura web):**
-
-| CLI | Source | Copy script | Parser v3 | Status |
-|---|---|---|---|---|
-| Claude Code | claude_code | `cli-copy.py --source claude_code` | ✅ | 3742 convs / 136k msgs / 78k tool_events (corpus de exemplo) |
-| Codex | codex | `cli-copy.py --source codex` | ✅ | 112 convs / 2.6k msgs / 6.1k tool_events (corpus de exemplo) |
-| Gemini CLI | gemini_cli | `cli-copy.py --source gemini_cli` | ✅ | 12 convs / 181 msgs / 84 tool_events (corpus de exemplo) |
-
-**Manual saves** (parser via `scripts/manual-saves-sync.py` — re-mapeiam
-source pra plataforma original):
-
-| Parser | source destino | capture_method | Convs |
-|---|---|---|---|
-| `clippings_obsidian` | chatgpt (20), claude_ai (1) | `manual_clipping_obsidian` | 21 |
-| `copypaste_web` | chatgpt (1), claude_ai (1), gemini (2), qwen (1) | `manual_copypaste` | 5 |
-| `terminal_claude_code` | claude_code (3) | `manual_terminal_cc` | 3 |
-
-Total: 29 convs / 403 msgs / 70 tool_events. Output em
-`<source>_manual_<table>.parquet` em cada `data/processed/<Plataforma>/`.
-Quartos fazem UNION via `setup_views_with_manual()` em
-`src/parsers/quarto_helpers.py`.
-
-**Schema v3.2 (2026-05-03):** `Conversation.capture_method` (default
-`'extractor'`, manuais sobrescrevem). Permite distinguir extractor vs
-manual-saves vs futuras fontes externas no mesmo parquet via UNION.
-
-**External preservado (`data/external/`, ~2.0GB total — sem parser canonico):**
-
-| Categoria | Tamanho | Conteudo |
-|---|---|---|
-| `manual-saves/` | 1.8MB | Inputs ativos pros 3 parsers manuais (parsavel) |
-| `openai-gdpr-export/` | 626M | Exports GDPR oficiais OpenAI (2 snapshots) |
-| `chatgpt-extension-snapshot/2026-03-27/` | 51MB | conversations.json + memories.md + instructions.json |
-| `claude-ai-snapshots/` | 360MB | snapshots brutos pre-extractor |
-| `deepseek-snapshots/2026-03-27/` | 3.2MB | UI export pre-extractor |
-| `deep-research-md/` | 208KB | 2 .md exportados manualmente (nao parsado) |
-| `notebooklm-snapshots/more-design-2026-03-30/` | 594MB | Captura legacy da conta extinta (parsed → account-3) |
-| `perplexity-orphan-threads/` | 56KB | 1 thread Perplexity deletada do servidor |
-| `grok-snapshots/2026-05-09/` | 10MB | Export oficial xAI; binarios copiados pra `data/raw/Grok/assets/` (resolve gap V1) |
-
-Padrao: snapshots via UI das plataformas vão pra `<plat>-snapshots/<date>/`,
-mantendo arquivos originais.
-README em `data/external/README.md`.
-
-## Limpeza de raws 2026-05-03
-
-Pai foi de 25G → 4.4G; filho 11G; 0 missing nas fontes validadas naquele
-snapshot historico.
-Detalhes + cross-val table em `docs/local/housekeeping/cleanup-2026-05-03.md`
-(gitignored).
-
-## TODOs com probe pendente
-
-**Zero TODOs reais pendentes** (validado 2026-05-04). Os 4 originais foram
-todos resolvidos ou re-enquadrados apos validacao empirica:
-
-- ChatGPT Pass 2 voice DOM: 127/131 voice msgs ja tem texto via Pass 1 — nao vale ativar.
-- NotebookLM `extract_chat_turns`: 0/143 notebooks tem chat populado — nao eh bug, eh estado dos dados.
-- Gemini Search/grounding citations: **fechado 2026-05-04** (commit 6a84c8a) — 416 search results em 9 messages.
-- NotebookLM mind map tree: **fechado 2026-05-04** (commit 00f47af) — 75/141 mind maps com tree completa.
-
-## Backlog principal
-
-Marcos arquiteturais 2026-05-04 — todos shipped:
-
-1. **`notebooks/00-overview.qmd`** — visao consolidada cross-plataforma via
-   DuckDB UNION ALL. 4 qmds (geral, web, cli, rag), template
-   `_template_overview.qmd`, `data/unified/` materializado via
-   `scripts/unify-parquets.py` (13 parquets no estado atual).
-2. **DVC pipeline filho-pai** — filho versiona pipeline completo (raw +
-   merged + processed + unified + external) via gdrive em
-   `ai-interaction-source-dvc`. Pai consome `processed/` e `unified/` via
-   `dvc import` do GitHub e versiona derivados em `ai-interaction-analysis-dvc`
-   (cofres separados desde 2026-05-04). Runbook: `docs/dvc-runbook.md`.
-3. **Publicacao opensource** — repo publico, README/SETUP/CONTRIBUTING/CI/
-   badges/LICENSE, secao DVC opcional pra contributors em `docs/SETUP.md`.
-
-Trabalho aberto pos-2026-05-04: ver [docs/ROADMAP.md](docs/ROADMAP.md).
-
-## Cross-feature checks (pin, archive, voice, share)
-
-Quando descobrir feature nova numa plataforma, **checar empiricamente nas
-outras**. Tabela cumulativa em `docs/cross-platform-features.md`.
-
-## Comportamento do servidor por plataforma
-
-- ChatGPT: `docs/platforms/chatgpt/server-behavior.md`
-- Qwen: `docs/platforms/qwen/server-behavior.md`
-- DeepSeek: `docs/platforms/deepseek/server-behavior.md`
-- Gemini: `docs/platforms/gemini/server-behavior.md`
-- NotebookLM: `docs/platforms/notebooklm/server-behavior.md`
-- Perplexity: `docs/platforms/perplexity/state.md` (seção "Comportamento do servidor")
-
-## Princípios inegociaveis (decisoes ja tomadas — nao questionar sem motivo forte)
-
-1. **Capturar uma vez, nunca rebaixar** — pasta unica cumulativa +
-   `skip_existing` nos downloaders. Binarios sao precious.
-2. **Preservation acima de tudo** — convs/sources deletadas no servidor
-   viram `_preserved_missing` no merged.
-3. **Discovery parcial vira fallback, nao erro** — `_get_max_known_discovery`
-   com threshold 20% **detecta** quando listing upstream retorna parcial.
-   Cada plat tem `src/extractors/<plat>/refetch_known.py` que re-fetcha
-   por ID os convs ja conhecidos no raw cumulativo — caminho que nao depende
-   do listing. Quando drop detectado, orchestrator chama refetch_known em
-   vez de raise. Custo: ~20min em vez de ~80s, mas pipeline sempre fecha
-   verde. **Todas as 9 plats web cobertas** (ChatGPT, Claude.ai, Gemini,
-   NotebookLM, Qwen, DeepSeek, Perplexity, Grok, Kimi). Threshold mantido
-   em 0.20; `DISCOVERY_DROP_FALLBACK_THRESHOLD` (alias retro-compat:
-   `DISCOVERY_DROP_ABORT_THRESHOLD`). Plat-especifico: ChatGPT usa batch
-   (`/conversations/batch` de 10 IDs); demais fazem 1 call por conv.
-   NotebookLM reusa `fetch_notebook` (composto: metadata + guide + chat +
-   notes + artifacts).
-4. **Schema canonico eh fronteira** — `src/schema/models.py` define
-   `Conversation`, `Message`, `ToolEvent`, `ConversationProject`, `Branch`.
-   Extractors entregam raw/merged JSON; parsers entregam parquet nesse
-   schema; analise consome parquet read-only.
-
-## DVC — cofre completo dos dados
-
-Filho eh o cofre canonico: `data/raw/` + `data/merged/` + `data/processed/`
-+ `data/unified/` + `data/external/<subdirs>` versionados em gdrive
-(pasta `ai-interaction-source-dvc`, ID `101HMnOKvRYPZ6qQQu9iqCDcyWr_qx8fo`).
-Permite recover total apos deletar plataforma + apagar `data/` localmente.
-
-**Apos rodar extractor / reconciler / parser, sempre:**
-
-```bash
-.venv/bin/dvc add data/raw data/merged data/processed data/unified \
-    data/external/manual-saves data/external/deep-research-md \
-    data/external/perplexity-orphan-threads data/external/deepseek-snapshots \
-    data/external/chatgpt-extension-snapshot data/external/claude-ai-snapshots \
-    data/external/notebooklm-snapshots data/external/openai-gdpr-export \
-    data/external/claude-code-config-snapshots \
-    data/external/codex-config-snapshots \
-    data/external/gemini-config-snapshots \
-    data/external/grok-snapshots
-git add data/*.dvc data/external/*.dvc data/.gitignore data/external/.gitignore
-~/.claude/scripts/commit.sh "data: snapshot apos <operacao>"
-.venv/bin/dvc push
+```text
+extractor/copy -> raw -> reconciler -> merged -> parser -> processed -> unify -> unified
 ```
 
-**Cofres separados pai/filho desde 2026-05-04** — filho usa
-`ai-interaction-source-dvc` (101HMnOK...), pai (`AI Interaction Analysis/`)
-usa `ai-interaction-analysis-dvc` (13YGXSUK...). `dvc gc` agora eh **seguro**
-neste projeto: nao afeta blobs do pai. Pai consome `processed/` e `unified/`
-daqui via `dvc import` (puxa via Git+DVC, nao precisa do remote do pai).
+Ele publica Parquets unificados que o projeto consumidor `AI Interaction
+Analysis` le. Este e o projeto pai/fonte; `AI Interaction Analysis` e o
+projeto filho/consumidor.
 
-**Schema contract no pai:** mudancas em colunas/tipos de
-`data/unified/*.parquet` viram PR em `docs/unified-schema.md` no projeto pai
-**antes** do push aqui — pai tem smoke test (`scripts/smoke_test_unified.py`)
-que valida schema + NOT NULL + VALID_SOURCES + nao-encolhimento. Mudancas
-silenciosas quebram analises do pai. Detalhes + recover + troubleshooting:
-`docs/dvc-runbook.md`.
+Antes de alterar extractor, reconciler ou parser, leia `README.md`,
+`docs/README.md` e o `docs/platforms/<source>/state.md` correspondente. O
+codigo e os dados observaveis prevalecem sobre registros historicos.
 
-## Rotina pos-captura (checklist end-to-end)
+## Limites de preservacao e privacidade
 
-Apos qualquer ciclo de captura/parse de uma plataforma, rodar **na ordem**.
-Sem isso o pai nao enxerga os dados novos via `dvc import`.
+1. Capturar uma vez, nunca rebaixar: downloaders reutilizam binarios ja
+   existentes.
+2. Registros ausentes no servidor sao preservados como `preserved_missing`.
+3. Discovery parcial aciona `refetch_known`; nao deve contaminar `raw`.
+4. `src/schema/models.py` e a fronteira entre captura e analise.
+5. Dados pessoais ficam fora do Git. Trate `data/` e `.storage/` com cuidado.
 
-**1. Capturar + parsear + unify (filho):**
+`private/` e um symlink versionado para o workbench privado do proprietario,
+fora do checkout. Use-o para documentos de bancada, midias-fonte, handoffs e
+configuracoes privadas duraveis; o Git registra apenas o symlink. Nao adicione
+seu conteudo ao indice e nao crie material novo em `docs/local/`, que esta em
+curadoria gradual.
+
+`.venv/`, `.storage/`, `.runtime/`, `.dvc/cache/` e o checkout `data/` sao
+estado local descartavel ou recriavel, cada um com seu proprio contrato.
+
+## Pipeline e validacao
+
+- Scripts `<source>-sync.py` web fazem captura + assets + reconcile, mas nao
+  chamam o parser quando executados diretamente.
+- O dashboard/headless executa o `<source>-parse.py` depois de sync web
+  bem-sucedido e antes de `scripts/unify-parquets.py`.
+- Os syncs das CLIs ja fazem copy + parse.
+- Alteracoes no schema unificado devem ser coordenadas com o consumidor antes
+  de publicar dados.
+- Ao promover uma fonte, atualize `dashboard/data.py`, valide o dashboard
+  Streamlit e os relatorios Quarto. Nao declare a pipeline verde se o parquet
+  estiver anterior a `raw` ou `merged`.
+- Rode a suite de testes antes de merge; nao fixe quantidades de testes na
+  documentacao.
+
+Inicie o dashboard com:
 
 ```bash
-# (a) Captura — varia por plataforma
-PYTHONPATH=. .venv/bin/python scripts/<plat>-sync.py
-# (b) Parsers web sao uma etapa explicita; syncs CLI ja fazem parse
-PYTHONPATH=. .venv/bin/python scripts/<plat>-parse.py
-# (c) Materializa o cross-platform
+PYTHONPATH=. .venv/bin/streamlit run dashboard.py
+```
+
+Quando descobrir uma feature em uma plataforma, teste-a empiricamente nas
+outras e registre a conclusao em `docs/cross-platform-features.md`.
+
+## DVC: base atual e espaco
+
+O Google Drive e o remoto DVC operacional. O DVC guarda a base canonica atual
+fora do Mac, com arquivos incrementais e deduplicados; ele nao e um compromisso
+de manter para sempre todas as versoes historicas dos dados apontadas pelo Git.
+
+O ciclo normal de uma atualizacao validada e:
+
+```text
+sync/copy -> reconcile -> parse -> unify -> dvc add -> commit -> dvc push -> git push
+```
+
+`dvc push` e `git push` sao escritas externas. Execute-os somente com pedido
+explicito do usuario; uma execucao deliberada do dashboard com Publish marcado
+e autorizacao valida do operador.
+
+`dvc gc` e manutencao deliberada de espaco, nunca uma etapa automatica. Pode
+tornar revisoes antigas de dados irrecuperaveis, mesmo que o codigo e seus
+ponteiros continuem no Git. Antes de qualquer GC, a base atual precisa estar
+validada, commitada e enviada; rode primeiro a simulacao e obtenha autorizacao
+explicita para excluir. O procedimento exato esta em `docs/dvc-runbook.md`.
+
+Uma alternativa ao Drive e pesquisa futura, nao uma migracao ativa nem motivo
+para bloquear coleta ou publicacao normal. `docs/RECOVERY.md` documenta um
+incidente concluido de agosto de 2026; suas proibicoes valiam durante aquele
+procedimento, nao sao regras diarias.
+
+## Investigacao por plataforma
+
+- O threshold de discovery parcial e 20%; o fallback `refetch_known` usa IDs
+  ja preservados em vez de confiar no listing incompleto.
+- Login sempre e headed e os perfis persistem em `.storage/`.
+- O modo de captura e detalhes de Cloudflare/headless pertencem aos `state.md`
+  e `server-behavior.md` de cada plataforma. Consulte-os antes de alterar
+  autenticacao ou browser automation.
+- O NotebookLM exige download de assets em Range-chunks; a evidencia e a
+  implementacao estao em sua documentacao de plataforma. Nao simplifique para
+  um GET inteiro sem nova validacao empirica.
+
+## Comandos basicos
+
+```bash
+# Instalar dependencias da maquina atual
+.venv/bin/pip install -r requirements.txt
+.venv/bin/playwright install chromium
+
+# Testes
+PYTHONPATH=. .venv/bin/pytest
+
+# Materializar Parquets unificados apos parses
 PYTHONPATH=. .venv/bin/python scripts/unify-parquets.py
 ```
 
-**2. Comparar schema de `data/unified/messages.parquet` antes/depois.** Se
-mudou coluna ou tipo, abrir PR em `docs/unified-schema.md` no projeto pai
-**antes** de pushar aqui — smoke test do pai quebra silenciosamente. Conferir
-com:
+Comandos de captura, login e diagnostico ficam no `state.md` de cada fonte.
+Para restaurar um checkout apagado ou gerenciar espaco, use o runbook DVC e o
+guia privado `private/COMO-RETOMAR.md`.
 
-```bash
-.venv/bin/python -c "import duckdb; con=duckdb.connect(); \
-  print(con.execute(\"DESCRIBE SELECT * FROM read_parquet('data/unified/messages.parquet')\").fetchdf())"
-```
+## Convencoes
 
-**3. DVC add + commit + dvc push + git push (filho):**
-
-```bash
-.venv/bin/dvc add data/raw data/merged data/processed data/unified \
-    data/external/manual-saves data/external/deep-research-md \
-    data/external/perplexity-orphan-threads data/external/deepseek-snapshots \
-    data/external/chatgpt-extension-snapshot data/external/claude-ai-snapshots \
-    data/external/notebooklm-snapshots data/external/openai-gdpr-export \
-    data/external/claude-code-config-snapshots \
-    data/external/codex-config-snapshots \
-    data/external/gemini-config-snapshots \
-    data/external/grok-snapshots
-git add data/*.dvc data/external/*.dvc data/.gitignore data/external/.gitignore
-~/.claude/scripts/commit.sh "data: snapshot apos <plat> sync (<stats>)"
-.venv/bin/dvc push   # blobs pro source-dvc no gdrive
-git push             # rev_lock pro GitHub — sem isso, pai nao enxerga via dvc import
-```
-
-**Os dois pushs sao obrigatorios.** `dvc push` sobe os blobs (gdrive), `git push`
-sobe o `.dvc` atualizado (GitHub). `dvc import` no pai precisa dos dois.
-
-**4. No pai (`~/Desktop/AI Interaction Analysis/`): atualizar + smoke test:**
-
-```bash
-cd ~/Desktop/AI\ Interaction\ Analysis/
-dvc update data/processed.dvc data/unified.dvc
-python scripts/smoke_test_unified.py
-```
-
-Se o smoke falhar, **investigar** — drift de schema eh o caso comum (coluna
-nova ou tipo mudado no filho que o pai nao espera). Resolver editando
-`docs/unified-schema.md` no pai pra refletir a nova realidade, ou revertendo
-a mudanca no filho.
-
-## Estrutura
-
-```
-src/
-├── extractors/<source>/      # 6 modulos por plataforma (auth, api_client,
-│                             # discovery, fetcher, asset_downloader, orchestrator)
-├── reconcilers/<source>.py   # build_plan + run_reconciliation, preserva missing
-├── parsers/                  # merged -> parquet (canonico)
-│   ├── chatgpt.py            # ⭐ canonico — tree-walk, branches, ToolEvents,
-│   │                         #    voice, DALL-E, custom_gpt etc
-│   └── <outros>.py           # parsers das outras plataformas
-└── schema/models.py          # Conversation, Message, ToolEvent, Branch, ConversationProject
-
-scripts/
-├── <source>-login.py         # 1x por plataforma, abre navegador pra login
-├── <source>-export.py        # captura conversas (incremental por default)
-├── <source>-reconcile.py     # standalone (sync ja chama)
-├── <source>-download-assets.py
-├── <source>-sync.py          # ⭐ orquestrador (numero de etapas varia)
-└── <source>-parse.py         # merged -> parquet canonico
-
-notebooks/
-├── _quarto.yml               # config compartilhado (toc lateral, embed, theme)
-├── _style.css                # CSS compartilhado
-├── _template.qmd             # ⭐ partial universal (1.x schema/sample + 2.x cobertura
-│                             #    + 3.x volumes/distrib + 4.x preservation)
-├── _template_aux.qmd         # ⭐ partial pras tabelas auxiliares
-├── _template_overview.qmd    # ⭐ partial cross-plataforma
-├── chatgpt.qmd, claude-ai.qmd, codex.qmd, ...  # ~50 linhas cada — config
-│                             #    (SOURCE_KEY, SOURCE_TITLE, SOURCE_COLOR,
-│                             #    AUX_TABLES, ACCOUNT_FILTER) +
-│                             #    {{< include _template.qmd >}}. 14 qmds total.
-├── 00-overview.qmd, ...      # 4 qmds cross-plataforma (geral/web/cli/rag)
-└── _output/                  # (gitignored) HTML rendirizado, ~40MB cada
-
-tests/  (suite completa deve passar antes de qualquer merge)
-data/
-├── raw/                      # (gitignored) saida dos extractors
-├── merged/                   # (gitignored) saida dos reconcilers
-├── processed/                # (gitignored) saida dos parsers (per-source)
-├── unified/                  # (gitignored) saida do unify-parquets.py (cross-platform)
-└── external/                 # (gitignored) blobs preservados (snapshots, GDPR exports, etc)
-.venv/                        # local — Python ≥3.12 (testado em 3.12 e 3.13 no CI)
-                              # setup: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-```
-
-## Overview cross-platform (2026-05-04)
-
-`data/unified/` materializa 13 parquets consolidados a partir de
-`data/processed/<Source>/`. Concat + dedup PK composta. Idempotente.
-Rodar via `scripts/unify-parquets.py` apos os parses individuais.
-
-**Quarto overview** le `data/unified/` direto. 4 qmds cross-plataforma:
-
-- `notebooks/00-overview.qmd` — todas as 12 sources (sem filtro)
-- `notebooks/00-overview-web.qmd` — 8 web (chatgpt, claude_ai, perplexity,
-  qwen, deepseek, gemini, grok, kimi)
-- `notebooks/00-overview-cli.qmd` — 3 CLIs (claude_code, codex, gemini_cli)
-- `notebooks/00-overview-rag.qmd` — NotebookLM
-
-Per-subset qmd tem ~50L (setup + `SOURCES_FILTER = [...]` + include do
-template). Helper `setup_unified_views(con, unified_dir, sources_filter)`
-em `quarto_helpers.py` carrega views DuckDB com filtro opcional `WHERE
-source IN (...)`.
-
-```bash
-PYTHONPATH=. .venv/bin/python scripts/unify-parquets.py
-QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview.qmd
-```
-
-**Decisao arquitetural:** filho materializa `data/unified/` (interface DVC
-pro consumer + overview qmds). Decorrente de "filho eh casa canonica"
-(memory `project_canonical_data_home.md`).
-
-**Testes:** `tests/test_unify_parquets.py` (18 testes — identify_table,
-source_from_path, dedup PK composta, idempotencia, schema divergente
-UNION BY NAME, enriquecimento source).
-
-## Template canonico de notebooks (2026-05-03)
-
-14 qmds compartilham `notebooks/_template.qmd` (~900L) + opcionalmente
-`notebooks/_template_aux.qmd` (~200L pra plataformas com aux tables).
-Cada per-source qmd tem ~50 linhas — so config + include do template.
-
-**Helpers compartilhados:** `src/parsers/quarto_helpers.py` (1 modulo, 11
-funcoes — setup de views, schema/query, formatters, plot).
-
-**Sections universais (template):**
-- 1.1-1.4 schema + sample por tabela canonica (conv/msg/tool/branch)
-- 2.1 capture_method breakdown (extractor vs manual saves) — schema v3.2
-- 2.2-2.5 cobertura (model/thinking/tokens/latencia)
-- 3.1 timeline + cumulativo
-- 3.2 activity heatmap (hora x dia)
-- 3.3-3.4 msgs/words user vs assistant
-- 3.5-3.6 tool events + success rate + duration (CLIs)
-- 3.7-3.10 top models/longest/size/lifetime (`updated_at - created_at`)
-- 3.11 branches forks
-- 3.12 account breakdown (multi-conta)
-- 4.1-4.3 preservation/states/itable filtravel
-- 5.x auxiliares (NotebookLM/Qwen/Claude.ai) — quando AUX_TABLES set
-
-**Sections conditional via `has_col()`:** mostradas so quando a plataforma
-tem o campo. Ex: `summary`, `citations_json`, `thinking`, `interaction_type`,
-`account`.
-
-**Per-account filter:** `ACCOUNT_FILTER = "1"` no per-source qmd recria
-views lendo direto dos parquets com `WHERE account = 'X'`. Usado por
-`gemini-acc-{1,2}.qmd`, `notebooklm-acc-{1,2}.qmd`, `notebooklm-legacy.qmd`.
-
-**40 testes unitarios** em `tests/parsers/test_quarto_helpers.py`.
-
-**Adicionar uma secao nova:** mexer no `_template.qmd` (1 lugar) — aparece
-nos 14 qmds automaticamente. Adicionar campo conditional: usar `has_col(con,
-table, col)` como guarda.
-
-**Render:** `QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render
-notebooks/<plat>.qmd`. Sem `QUARTO_PYTHON`, falha por dep do `.venv`.
-
-## Helpers chave (NAO mexer sem entender)
-
-### `src/extractors/chatgpt/orchestrator.py`
-- `_find_last_capture(raw_root)`: ordena por `run_started_at` (NAO por mtime).
-  Robusto contra cenario "pasta sem sufixo + pasta com sufixo de hora".
-- `_get_max_known_discovery(raw_root)`: rglob recursivo pra incluir backups.
-- `DISCOVERY_DROP_ABORT_THRESHOLD = 0.20`
-
-### `scripts/chatgpt-sync.py`
-- Orquestra capture + assets + project_sources + reconcile em sequencia.
-  Como a pasta `data/raw/ChatGPT/` eh cumulativa, downloaders pulam binarios
-  ja existentes via `skip_existing`.
-
-### `src/extractors/chatgpt/project_sources.py`
-- `_merge_with_preserved(current, index_path)`: merge cumulativo do indice
-  `_files.json`, marca removidas com `_preserved_missing`.
-
-## Comandos comuns
-
-Pre-requisito: `.venv` ativado (`source .venv/bin/activate`) ou usar
-`.venv/bin/python` direto.
-
-```bash
-# Smoke test imports
-PYTHONPATH=. .venv/bin/python -c "from src.extractors.chatgpt.orchestrator import run_capture; print('ok')"
-
-# Rodar testes do ChatGPT
-PYTHONPATH=. .venv/bin/pytest tests/extractors/chatgpt/ tests/test_chatgpt_sync.py -v
-
-# Sync ChatGPT completo (rapido se tem captura anterior)
-PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --no-voice-pass
-
-# Parse merged -> parquet canonico (idempotente; ~3s pras 1171 convs atuais)
-PYTHONPATH=. .venv/bin/python scripts/chatgpt-parse.py
-
-# Renderiza o data-profile descritivo (~20-60s, conforme volume)
-QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/chatgpt.qmd
-
-# Testes do template canonico de notebooks (40 testes, < 1s)
-PYTHONPATH=. .venv/bin/pytest tests/parsers/test_quarto_helpers.py -v
-
-# Suite completa
-PYTHONPATH=. .venv/bin/pytest tests/
-```
-
-Comandos por plataforma estao em `docs/platforms/<plat>/state.md`.
-
-## Convencoes do projeto (heranca do projeto antigo)
-
-- Commits via `~/.claude/scripts/commit.sh "mensagem"` (forca autor Marlon
-  Lemes, bloqueia Co-Authored-By).
-- Conventional commits em portugues (feat:, fix:, chore:, docs:, refactor:, test:).
-- `data/raw/` gitignored — dados pessoais nunca no repo.
-- Idioma codigo: ingles. Comentarios e docs: portugues sem acentos
-  preferencialmente.
-
-## Headless vs headed por plataforma
-
-Heranca do AI Interaction Analysis. **Login eh sempre headed (1x por conta,
-persiste em `.storage/<plat>-profile-<conta>/`).** **Captura difere:**
-
-| Plataforma | Login | Captura |
-|---|---|---|
-| Claude.ai | headed (1x) | headless ✅ |
-| Gemini | headed (1x) | headless ✅ |
-| NotebookLM | headed (1x) | headless ✅ |
-| Qwen | headed (1x) | headless ✅ |
-| DeepSeek | headed (1x) | headless ✅ |
-| ChatGPT | headed (1x) | **headed** (Cloudflare detecta headless) |
-| Perplexity | headed (1x) | **headed** (Cloudflare 403 em headless) |
-
-5 das 7 rodam headless por padrao. ChatGPT e Perplexity precisam abrir
-browser na captura — Cloudflare bloqueia headless com 403 / challenge "Just
-a moment...". Documentado por design em `perplexity/api_client.py:12-13`.
-
-**Implicacao operacional:** se rodar Claude/Gemini/NotebookLM/Qwen/DeepSeek
-e ver browser abrir, **algo esta errado**. Se for ChatGPT ou Perplexity,
-**esperado**.
-
-Ver `docs/glossary.md` pra terminologia (discovery vs merged vs baseline,
-preserved_missing, fail-fast, hardlink, etc).
-
-## Gotchas conhecidos
-
-- `chatgpt-export.py` roda `headless=False` no orchestrator (DOM scrape de
-  projects + voice pass + Cloudflare). `download-assets.py` roda
-  `headless=True` (so chama API com cookies, nao precisa de DOM).
-- 8 assets ChatGPT confirmados como **irrecuperaveis** (parents deletados
-  no servidor) — `failed=8` em download-assets eh esperado, nao bug.
-- DOM scrape de projects as vezes pega 40 em vez de 47 — fail-fast cobre.
-- Discovery `/projects` 404a as vezes — fail-fast cobre via fallback
-  `/gizmos/discovery/mine` -> DOM scrape.
-- **NotebookLM asset downloads precisam Range-chunked, NAO GET inteiro**
-  (2026-05-12). Host `lh3.googleusercontent.com/notebooklm/{token}` trava
-  a conexao se voce pedir o arquivo inteiro (audio de 16MB = timeout 5min
-  + RAM ate congelar a maquina); responde 206 rapido pra `Range: bytes=
-  0-{end}` com end < length. Fix em `api_client.py::download_asset`: HEAD
-  pra content-length + GET em chunks de 8MB. **Nao "otimize" de volta pra
-  GET unico** — comentario no codigo documenta a evidencia empirica.
-  Historia completa: `docs/platforms/notebooklm/state.md` secao "Asset
-  downloads — Range-chunked".
+- Codigo e identificadores em ingles; documentacao pode seguir o idioma do
+  arquivo existente.
+- Commits usam Conventional Commits. Nao crie commit ou push sem pedido do
+  usuario.
+- Preserve mudancas preexistentes no worktree e nunca limpe dados apenas para
+  “fazer o DVC bater”.
+- `scripts/backup_to_dvc.sh` e legado; nao o use ate ser corrigido e validado.

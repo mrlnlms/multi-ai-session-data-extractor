@@ -82,8 +82,8 @@ end. Clears the cache at the end so the UI reflects the new data.
 
 **Important:** ChatGPT runs in headed mode by design (Cloudflare detects
 headless). Playwright will open a browser during sync — expected
-behavior, not a bug. Documented in `CLAUDE.md` in the "Headless vs headed
-per platform" section.
+behavior, not a bug. The source-specific rationale is documented in
+[`platforms/chatgpt/state.md`](../platforms/chatgpt/state.md).
 
 ### Platforms table
 
