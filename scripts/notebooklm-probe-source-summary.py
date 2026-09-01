@@ -28,8 +28,8 @@ KNOWN_RPCS = {
 
 
 async def main():
-    out_dir = Path(".tmp")
-    out_dir.mkdir(exist_ok=True)
+    out_dir = Path(".runtime") / "probes"
+    out_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
     out_path = out_dir / f"notebooklm-source-summary-probe-{ts}.json"
 

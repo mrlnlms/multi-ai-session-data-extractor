@@ -9,9 +9,9 @@ Cobertura:
 
 Output: data/processed/ChatGPT/{conversations,messages,tool_events,branches}.parquet
 
-Historico: veio do parser v3 (validado em 2026-04-28). Versoes anteriores
-(chatgpt_v2 MVP, chatgpt legacy GPT2Claude bookmarklet) ficaram em
-_backup-temp/parser-v3-promocao-2026-04-28/ pra rollback se necessario.
+Historico: veio do parser v3, validado em 2026-04-28. As versoes anteriores
+(chatgpt_v2 MVP e chatgpt legacy GPT2Claude bookmarklet) foram supersedidas
+nessa promocao.
 """
 
 from __future__ import annotations

@@ -9,7 +9,7 @@ Workflow:
 2. Voce clica em "Generate" em cada tipo: Mind Map, Slide Deck, Reports, Flashcards,
    Quiz, Infographic, Data Table — UM POR VEZ, esperando cada um terminar
 3. Tem 5min (300s) de captura
-4. Ao final, tudo salvo em .tmp/notebooklm-generators-probe-<ts>.json
+4. Ao final, tudo salvo em .runtime/probes/notebooklm-generators-probe-<ts>.json
 """
 
 import argparse
@@ -22,8 +22,8 @@ from src.extractors.notebooklm.auth import load_context, VALID_ACCOUNTS
 
 
 async def main(account: str, notebook_uuid: str, minutes: int):
-    out_dir = Path(".tmp")
-    out_dir.mkdir(exist_ok=True)
+    out_dir = Path(".runtime") / "probes"
+    out_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
     out_path = out_dir / f"notebooklm-generators-probe-{ts}.json"
 

@@ -3,7 +3,7 @@
 Roda Playwright com profile logado, hooka request events, faz acoes tipicas
 (carregar sidebar, abrir conversa), coleta rpcids + size + payload preview.
 
-Saida: .tmp/gemini-rpcids-<ts>.json com mapa de {rpcid: {count, sizes, sample_payload}}.
+Saida: .runtime/probes/gemini-rpcids-<ts>.json com mapa de {rpcid: {count, sizes, sample_payload}}.
 
 Uso: python scripts/gemini-probe-rpcids.py [--account 1]
 """
@@ -115,8 +115,8 @@ async def probe(account: int, hold_seconds: int = 20):
         await context.close()
 
     # Salva relatorio
-    outdir = Path(".tmp")
-    outdir.mkdir(exist_ok=True)
+    outdir = Path(".runtime") / "probes"
+    outdir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%dT%H%M%S")
     outpath = outdir / f"gemini-rpcids-{ts}.json"
 

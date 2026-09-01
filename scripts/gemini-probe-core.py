@@ -6,7 +6,7 @@ Estrategia:
   3. Chama MaZiqc com paginacao iterativa pra listar TODAS as convs
   4. Chama hNvQHb com uma conv_id real pra validar fetch
 
-Saida em .tmp/gemini-core-probe-<ts>.json
+Saida em .runtime/probes/gemini-core-probe-<ts>.json
 """
 
 import asyncio
@@ -223,7 +223,8 @@ async def main():
             "first_batch_convs": collected_convs,
             "maziqc_first_raw": results_first[0]["data"] if results_first else None,
         }
-        outp = Path(".tmp") / f"gemini-core-{datetime.now():%Y%m%dT%H%M%S}.json"
+        outp = Path(".runtime") / "probes" / f"gemini-core-{datetime.now():%Y%m%dT%H%M%S}.json"
+        outp.parent.mkdir(parents=True, exist_ok=True)
         outp.write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str))
         print(f"\nRelatorio em {outp}")
 

@@ -365,7 +365,8 @@ Stage 3 também é incremental (renderiza só os qmds das plats sincronizadas
 Template em `docs/operations/launchd-headless.plist.template`:
 
 ```bash
-# 1. Copiar e ajustar o path absoluto
+# 1. Preparar o diretorio local de logs, copiar e ajustar o path absoluto
+mkdir -p .runtime/logs
 sed "s|PROJECT_ROOT_ABS|$(pwd)|g" \
     docs/operations/launchd-headless.plist.template \
     > ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
@@ -374,8 +375,8 @@ sed "s|PROJECT_ROOT_ABS|$(pwd)|g" \
 launchctl load ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
 launchctl list | grep multi-ai-pipeline
 
-# 3. Logs vao pra data/pipeline-runs/headless.{log,err.log}
-tail -f data/pipeline-runs/headless.log
+# 3. Logs vao pra .runtime/logs/headless.{log,err.log}
+tail -f .runtime/logs/headless.log
 
 # Desativar:
 launchctl unload ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist

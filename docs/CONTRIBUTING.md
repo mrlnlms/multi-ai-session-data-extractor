@@ -116,8 +116,9 @@ Document server behavior in
 **Goal:** parser that delivers 4 parquets in the v3 schema.
 
 - Rewrite `src/parsers/<source>.py` (don't branch the legacy file —
-  rewrite in-place; keep backup in
-  `_backup-temp/parser-<source>-promocao-<date>/` during validation).
+  rewrite in-place; keep a temporary backup in
+  `.runtime/backups/parser-<source>-promocao-<date>/` during validation;
+  delete it after parity is confirmed).
 - Canonical schema: `Conversation`, `Message`, `ToolEvent`, `Branch`.
 - `branch_id` non-optional (default `<conv>_main` if no fork).
 - `is_preserved_missing` + `last_seen_in_server` in Conversation.
@@ -227,7 +228,7 @@ starting:
    exploration (60-90 min) → identify features → fixtures → parser.
 
 10. **Don't branch files.** Established pattern: rewrite in-place.
-    Backup in `_backup-temp/` during cross-validation. When parity is
+    Backup in `.runtime/backups/` during cross-validation. When parity is
     confirmed, delete the backup.
 
 ### Already-mapped specifics

@@ -164,8 +164,8 @@ async def main():
             print()
 
         # Salva relatorio completo pra inspeccao
-        outdir = Path(".tmp")
-        outdir.mkdir(exist_ok=True)
+        outdir = Path(".runtime") / "probes"
+        outdir.mkdir(parents=True, exist_ok=True)
         outp = outdir / f"notebooklm-new-rpcids-{datetime.now():%Y%m%dT%H%M%S}.json"
         with open(outp, "w", encoding="utf-8") as f:
             json.dump({k: v for k, v in captured.items()}, f, ensure_ascii=False, indent=2, default=str)

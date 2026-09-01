@@ -17,8 +17,8 @@ Cobertura:
 
 Output: data/processed/Claude.ai/{conversations,messages,tool_events,branches}.parquet
 
-Versao anterior (legacy MVP de 159 linhas) ficou em
-_backup-temp/parser-claude-ai-promocao-2026-05-01/ pra rollback.
+A versao anterior (legacy MVP de 159 linhas) foi supersedida na promocao
+validada de 2026-05-01.
 """
 
 from __future__ import annotations

@@ -125,7 +125,8 @@ async def main():
             path = r["url"].replace("https://notebooklm.google.com", "")
             print(f"  {r['status']} {r['method']} {path[:100]} ({r['size']}B, {r['content_type']})")
 
-        outp = Path(".tmp") / f"notebooklm-allreqs-{int(time.time())}.json"
+        outp = Path(".runtime") / "probes" / f"notebooklm-allreqs-{int(time.time())}.json"
+        outp.parent.mkdir(parents=True, exist_ok=True)
         outp.write_text(json.dumps(all_requests, ensure_ascii=False, indent=2))
         print(f"\nSalvo em: {outp}")
 

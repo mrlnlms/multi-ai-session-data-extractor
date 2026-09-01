@@ -14,7 +14,6 @@ __pycache__/
 *.egg-info/
 dist/
 build/
-.coverage
 
 # IDE
 .vscode/
@@ -44,7 +43,6 @@ static/quarto/
 
 # Backups
 *.bak
-_backup-temp/
 
 # Local scratch
 local/

@@ -154,8 +154,8 @@ async def main():
                     print(f"    post: {info['post_body'][:120]!r}")
                     print(f"    resp: {(info['data_preview'] or '?')[:220]!r}")
 
-        outp = Path(".tmp") / f"notebooklm-source-probe-{int(time.time())}.json"
-        outp.parent.mkdir(exist_ok=True)
+        outp = Path(".runtime") / "probes" / f"notebooklm-source-probe-{int(time.time())}.json"
+        outp.parent.mkdir(parents=True, exist_ok=True)
         outp.write_text(json.dumps(timeline, ensure_ascii=False, indent=2, default=str))
         print(f"\nTimeline salvo em: {outp}")
 

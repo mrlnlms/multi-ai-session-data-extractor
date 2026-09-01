@@ -15,8 +15,8 @@ Cobertura:
 
 Output: data/processed/Perplexity/{conversations,messages,tool_events,branches}.parquet
 
-Backup do parser v2 (formato extracted_messages legado):
-_backup-temp/parser-perplexity-v2-promocao-2026-05-01.py.bak
+O parser v2 (formato extracted_messages legado) foi supersedido na promocao
+validada de 2026-05-01.
 """
 
 from __future__ import annotations

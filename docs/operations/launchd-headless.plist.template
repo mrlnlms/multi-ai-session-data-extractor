@@ -9,7 +9,7 @@
     4. launchctl load ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
     5. Confirmar: launchctl list | grep multi-ai-pipeline
 
-  Logs vao pra PROJECT_ROOT_ABS/data/pipeline-runs/*.log (gitignored).
+  Logs vao pra PROJECT_ROOT_ABS/.runtime/logs/*.log (gitignored).
   Se ChatGPT/Perplexity nao estao em --plats, roda 100% unattended.
 
   Pra desativar:
@@ -52,10 +52,10 @@
     </dict>
 
     <key>StandardOutPath</key>
-    <string>PROJECT_ROOT_ABS/data/pipeline-runs/headless.log</string>
+    <string>PROJECT_ROOT_ABS/.runtime/logs/headless.log</string>
 
     <key>StandardErrorPath</key>
-    <string>PROJECT_ROOT_ABS/data/pipeline-runs/headless.err.log</string>
+    <string>PROJECT_ROOT_ABS/.runtime/logs/headless.err.log</string>
 
     <!-- Mata o job se passar de 4h (timeout sanity). -->
     <key>ExitTimeOut</key>
