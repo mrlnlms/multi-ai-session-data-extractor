@@ -108,7 +108,7 @@ class TestQmdsForPlatform:
 class TestLockfile:
     """Lockfile mantem estado entre runs do pipeline: parent + children orfaos.
 
-    Tests usam tmp_path pra isolar do .update-all.lock real do repo."""
+    Tests usam tmp_path pra isolar do lock real do repositorio."""
 
     @pytest.fixture(autouse=True)
     def _isolate_lock(self, tmp_path, monkeypatch):
@@ -374,6 +374,21 @@ class TestPersistRuns:
         assert entry["stage_status"] == ["done", "done", "done", "done"]
         # Tail removido (so metadata persiste)
         assert "tail" not in entry["results"][0]
+
+    def test_persist_creates_runtime_parent(self, tmp_path, monkeypatch):
+        log = tmp_path / ".runtime" / "pipeline-runs.jsonl"
+        monkeypatch.setattr("dashboard.pipeline.RUNS_LOG", log)
+
+        from dashboard.pipeline import persist_run
+
+        persist_run(
+            stage_status=["done"],
+            results=[],
+            publish_after=False,
+            scope="all",
+        )
+
+        assert log.exists()
 
     def test_recent_runs_returns_newest_first(self, _isolate_runs_log):
         from dashboard.pipeline import persist_run, recent_runs

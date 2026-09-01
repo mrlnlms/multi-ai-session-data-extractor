@@ -16,7 +16,7 @@ Local script to bring up/tear down the HTTP server that serves the data profiles
 ## What it does differently from raw `python -m http.server`
 
 - Runs in the background (close the terminal and it keeps going) — `nohup` + stdout redirect
-- Stores PID in `.serve-qmds.pid` (gitignored) — `stop` kills by exact PID, no need for `lsof`
+- Stores PID and log under `.runtime/{pids,logs}/` (gitignored) — `stop` kills by exact PID, no need for `lsof`
 - Detects an occupied port before trying to bring it up (useful message instead of stack trace)
 - Idempotent — `start` while already running = shows the URL, no error
 - `open` opens 15 tabs in safari/chrome (default browser)

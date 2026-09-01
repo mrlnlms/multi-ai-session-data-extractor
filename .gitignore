@@ -15,7 +15,6 @@ __pycache__/
 dist/
 build/
 .coverage
-.pytest_cache/
 
 # IDE
 .vscode/
@@ -57,18 +56,5 @@ local/
 # (CONTRIBUTING.md, LIMITATIONS.md, docs/probes/).
 docs/local/
 
-# Servidor HTTP local (scripts/serve-qmds.sh)
-.serve-qmds.pid
-.serve-qmds.log
-
-# Streamlit dashboard (background)
-.streamlit-dashboard.pid
-.streamlit-dashboard.log
-
-# Render batch helper
-.render-all.pid
-
-# Pipeline state (dashboard + CLI headless)
-.update-all.lock
-.pipeline-runs.jsonl
-data/pipeline-runs/
+# Estado transitório local: logs, PIDs, locks, histórico e cache de testes.
+.runtime/

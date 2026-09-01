@@ -5,7 +5,7 @@ Reusado por:
 - `pages/platform.py` — "Run full pipeline (this platform)" com 1 plat
 
 Side-effects Streamlit (st.markdown, st.empty, etc) — chamar de dentro de
-um render(). Lockfile (`.update-all.lock`) previne segunda execucao
+um render(). Lockfile (`.runtime/locks/pipeline.lock`) previne segunda execucao
 concorrente. Gating: stages 2-4 abortam se anterior falhou (exceto Stage 3
 quarto-missing = skipped benigno).
 
@@ -41,7 +41,7 @@ from dashboard.sync import (
 # Streamlit. Sem tails (so metadata) pra nao inflar; tails ficam no
 # session_state ate o user clicar Dismiss. Rotation acionada quando passa
 # de MAX_RUNS_BEFORE_ROTATE entries — mantem ultimas KEEP_RUNS_AFTER_ROTATE.
-RUNS_LOG = PROJECT_ROOT / ".pipeline-runs.jsonl"
+RUNS_LOG = PROJECT_ROOT / ".runtime" / "pipeline-runs.jsonl"
 MAX_RUNS_BEFORE_ROTATE = 1000
 KEEP_RUNS_AFTER_ROTATE = 500
 
@@ -87,7 +87,7 @@ def _stages_markdown(status: list[str], current_idx: Optional[int]) -> str:
 def _save_summary(stage_status: list[str], results: list[dict], publish_after: bool, scope: str) -> None:
     """Persiste resumo da ultima execucao em session_state pra render
     posterior. `scope` = 'all' | 'platform:<name>' identifica origem.
-    Tambem grava em .pipeline-runs.jsonl pra historico."""
+    Tambem grava em `.runtime/pipeline-runs.jsonl` pra historico."""
     summary = {
         "at": datetime.now(timezone.utc).isoformat(),
         "stage_status": list(stage_status),
@@ -101,7 +101,7 @@ def _save_summary(stage_status: list[str], results: list[dict], publish_after: b
 
 
 def persist_run(stage_status: list[str], results: list[dict], publish_after: bool, scope: str) -> None:
-    """Append entry no `.pipeline-runs.jsonl` com metadata da run. Sem tails
+    """Append entry no historico local com metadata da run. Sem tails
     (estavam em session_state). Falha silenciosa — nao bloqueia pipeline."""
     entry = {
         "at": datetime.now(timezone.utc).isoformat(),
@@ -114,6 +114,7 @@ def persist_run(stage_status: list[str], results: list[dict], publish_after: boo
         ],
     }
     try:
+        RUNS_LOG.parent.mkdir(parents=True, exist_ok=True)
         with RUNS_LOG.open("a") as f:
             f.write(json.dumps(entry) + "\n")
         _maybe_rotate_runs_log()
@@ -122,7 +123,7 @@ def persist_run(stage_status: list[str], results: list[dict], publish_after: boo
 
 
 def _maybe_rotate_runs_log() -> None:
-    """Trunca .pipeline-runs.jsonl quando ultrapassa MAX_RUNS_BEFORE_ROTATE,
+    """Trunca o historico quando ultrapassa MAX_RUNS_BEFORE_ROTATE,
     mantendo as ultimas KEEP_RUNS_AFTER_ROTATE entries. Evita arquivo
     crescendo indefinidamente em rodadas frequentes."""
     try:
@@ -160,7 +161,7 @@ def commit_msg_for_scope(scope: str) -> str:
 
 
 def recent_runs(limit: int = 10) -> list[dict]:
-    """Le ultimas N entries do .pipeline-runs.jsonl, mais recente primeiro."""
+    """Le as ultimas N entries do historico local, mais recente primeiro."""
     if not RUNS_LOG.exists():
         return []
     entries: list[dict] = []

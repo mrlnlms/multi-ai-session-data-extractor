@@ -19,8 +19,9 @@ set -euo pipefail
 PORT="${PORT:-8765}"
 OUTPUT_DIR="${OUTPUT_DIR:-notebooks/_output}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PIDFILE="$PROJECT_ROOT/.serve-qmds.pid"
-LOGFILE="$PROJECT_ROOT/.serve-qmds.log"
+RUNTIME_DIR="$PROJECT_ROOT/.runtime"
+PIDFILE="$RUNTIME_DIR/pids/serve-qmds.pid"
+LOGFILE="$RUNTIME_DIR/logs/serve-qmds.log"
 
 cd "$PROJECT_ROOT"
 
@@ -50,6 +51,8 @@ cmd_start() {
     echo "  lsof -i:$PORT" >&2
     return 1
   fi
+
+  mkdir -p "$(dirname "$PIDFILE")" "$(dirname "$LOGFILE")"
 
   nohup .venv/bin/python -m http.server "$PORT" --directory "$OUTPUT_DIR" \
     >"$LOGFILE" 2>&1 &

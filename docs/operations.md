@@ -274,7 +274,7 @@ PORT=8766 ./scripts/serve-qmds.sh         # different port
 OUTPUT_DIR=other ./scripts/serve-qmds.sh  # other dir
 ```
 
-PID + log written to `.serve-qmds.{pid,log}` (gitignored). Server runs in
+PID + log written under `.runtime/{pids,logs}/` (gitignored). Server runs in
 the background — close the terminal and it keeps running until `stop`.
 
 **Helpers and tests:** `src/parsers/quarto_helpers.py` covers setup
@@ -302,7 +302,7 @@ depois quando algo crítico falha — nada de commitar estado quebrado.
 
 ### Lockfile stale (`Pipeline already running`)
 
-Se o Streamlit crashou no meio de uma rodada, o `.update-all.lock` fica.
+Se o Streamlit crashou no meio de uma rodada, o `.runtime/locks/pipeline.lock` fica.
 Acquire da próxima rodada **já detecta PID morto automaticamente** e
 mata processos filhos (Playwright/dvc/quarto) via `os.killpg`. Você não
 precisa fazer nada na maioria dos casos.
@@ -311,10 +311,10 @@ Se quiser limpar manualmente:
 
 ```bash
 # Inspecionar o que tá lá
-cat .update-all.lock                                                # JSON {parent_pid, child_pids}
-ps -p $(.venv/bin/python -c "import json; print(json.load(open('.update-all.lock'))['parent_pid'])") \
+cat .runtime/locks/pipeline.lock                                    # JSON {parent_pid, child_pids}
+ps -p $(.venv/bin/python -c "import json; print(json.load(open('.runtime/locks/pipeline.lock'))['parent_pid'])") \
     && echo "lock OWNER VIVO — NAO mexer" \
-    || rm .update-all.lock
+    || rm .runtime/locks/pipeline.lock
 ```
 
 ### Subprocess órfão
@@ -332,13 +332,13 @@ pkill -f "playwright"
 
 ### Histórico de runs
 
-`.pipeline-runs.jsonl` (gitignored, append-only) guarda metadata de cada
+`.runtime/pipeline-runs.jsonl` (gitignored, append-only) guarda metadata de cada
 execução — sobrevive a restart do Streamlit. Visível em "Recent pipeline
 runs" no overview. Sem tails (só status + scope + timestamp). Pra ver
 todos:
 
 ```bash
-cat .pipeline-runs.jsonl | jq -r '"\(.at) \(.scope) \(.stage_status)"'
+cat .runtime/pipeline-runs.jsonl | jq -r '"\(.at) \(.scope) \(.stage_status)"'
 ```
 
 ---
@@ -356,7 +356,7 @@ PYTHONPATH=. .venv/bin/python scripts/headless-pipeline.py \
     --plats=Claude.ai,Gemini --no-publish
 ```
 
-Mesmo lockfile, mesmo gating, mesma persistência em `.pipeline-runs.jsonl`.
+Mesmo lockfile, mesmo gating, mesma persistência em `.runtime/pipeline-runs.jsonl`.
 Stage 3 também é incremental (renderiza só os qmds das plats sincronizadas
 + cross-overview).
 

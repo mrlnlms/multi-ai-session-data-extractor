@@ -30,7 +30,8 @@ _NONINTERACTIVE_ENV = {
 }
 
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
-LOCK_PATH = PROJECT_ROOT / ".update-all.lock"
+RUNTIME_DIR = PROJECT_ROOT / ".runtime"
+LOCK_PATH = RUNTIME_DIR / "locks" / "pipeline.lock"
 
 # As CLIs ja fazem copy + parse dentro do proprio sync. As fontes web fazem
 # capture + assets + reconcile e precisam do parser como passo separado antes
@@ -280,7 +281,7 @@ def _stream(
 
 # ===================== Pipeline lock =====================
 #
-# Schema do .update-all.lock (JSON):
+# Schema do lock de pipeline (JSON):
 #   {"parent_pid": <int>, "child_pids": [<int>, ...], "started_at": "<iso>"}
 #
 # - parent_pid: processo Streamlit/CLI que segura o lock.
@@ -325,6 +326,7 @@ def _read_lock() -> dict:
 
 def _write_lock(data: dict) -> None:
     try:
+        LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
         LOCK_PATH.write_text(json.dumps(data))
     except OSError:
         pass
