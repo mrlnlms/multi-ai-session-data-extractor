@@ -72,7 +72,7 @@ have only `README.md` (they're derived from local files, no server).
 
 ## Dashboard
 
-- [dashboard/manual.md](dashboard/manual.md) — features manual
+- [dashboard.md](dashboard.md) — features manual
   + operation (local Streamlit, single-user, read-only).
 
 ## Registro historico

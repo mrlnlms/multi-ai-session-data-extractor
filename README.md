@@ -178,7 +178,7 @@ PYTHONPATH=. streamlit run dashboard.py
 Opens at <http://localhost:8501>. Read-only over what sync produced —
 does not write or edit.
 
-Details in [docs/dashboard/manual.md](docs/dashboard/manual.md).
+Details in [docs/dashboard.md](docs/dashboard.md).
 
 ## Descriptive documents (Quarto)
 

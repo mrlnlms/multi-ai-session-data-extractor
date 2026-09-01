@@ -33,7 +33,7 @@ behavior remains in each platform's own documentation.
 | How might account instances, application packaging and local authentication fit together? | [account-instances-and-application-architecture.md](account-instances-and-application-architecture.md) | Paused architectural exploration with explicit open decisions; not an implementation spec. |
 | What is the canonical capture and processing contract? | [AGENTS.md](../AGENTS.md) and [`src/schema/models.py`](../src/schema/models.py) | Agent instructions and observable schema. |
 | What does a particular source currently capture or miss? | [`platforms/`](platforms/) and [LIMITATIONS.md](LIMITATIONS.md) | Per-source evidence and known gaps. |
-| How is the existing dashboard operated? | [dashboard/manual.md](dashboard/manual.md) | Current operational UI. |
+| How is the existing dashboard operated? | [dashboard.md](dashboard.md) | Current operational UI. |
 | Where is the complete documentation index? | [README.md](README.md) | Documentation catalog. |
 
 Future designs and specs should be linked from this map when created, rather

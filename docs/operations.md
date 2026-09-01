@@ -343,9 +343,9 @@ cat .runtime/pipeline-runs.jsonl | jq -r '"\(.at) \(.scope) \(.stage_status)"'
 
 ---
 
-## CLI headless (cron / launchd)
+## CLI headless
 
-Pra rodar o pipeline sem Streamlit — útil pra agendar via cron/launchd:
+Pra rodar o pipeline sem Streamlit:
 
 ```bash
 # Default: 10 plats que rodam sem browser visivel (sem ChatGPT/Perplexity)
@@ -359,32 +359,6 @@ PYTHONPATH=. .venv/bin/python scripts/headless-pipeline.py \
 Mesmo lockfile, mesmo gating, mesma persistência em `.runtime/pipeline-runs.jsonl`.
 Stage 3 também é incremental (renderiza só os qmds das plats sincronizadas
 + cross-overview).
-
-### Agendar com launchd (macOS)
-
-Template em `docs/operations/launchd-headless.plist.template`:
-
-```bash
-# 1. Preparar o diretorio local de logs, copiar e ajustar o path absoluto
-mkdir -p .runtime/logs
-sed "s|PROJECT_ROOT_ABS|$(pwd)|g" \
-    docs/operations/launchd-headless.plist.template \
-    > ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
-
-# 2. Ativar
-launchctl load ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
-launchctl list | grep multi-ai-pipeline
-
-# 3. Logs vao pra .runtime/logs/headless.{log,err.log}
-tail -f .runtime/logs/headless.log
-
-# Desativar:
-launchctl unload ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
-rm ~/Library/LaunchAgents/com.user.multi-ai-pipeline.plist
-```
-
-Default agendado: **diário às 03:00**. Editar `StartCalendarInterval` no
-plist pra mudar.
 
 ---
 

@@ -1,7 +1,8 @@
 # Dashboard — feature manual + operations
 
 Living document of what exists in the dashboard (feature manual +
-operations). Paired with `plan.md` (historical plan of the 4 phases).
+operations). The historical four-phase plan is in
+`local/plans/dashboard-plan.md`.
 
 Run with:
 
@@ -353,7 +354,7 @@ lsof -nP -iTCP:8501 -sTCP:LISTEN | awk 'NR>1 {print $2}' | xargs kill
 
 **Do not use the "External URL"** that Streamlit prints on boot — it's your
 public IP, exposing the dashboard to the internet without any authentication.
-Auth is explicitly out of scope (see `dashboard-plan.md` section 9).
+Auth is explicitly out of scope (see `local/plans/dashboard-plan.md` section 9).
 
 ### 10.5. Programmatic access (no browser)
 

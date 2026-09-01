@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""CLI orquestrador do pipeline 4-stage — roda sem Streamlit, util pra cron/launchd.
+"""CLI orquestrador do pipeline 4-stage — roda sem Streamlit.
 
 Default: 10 plats que rodam headless (sem browser visivel) — exclui ChatGPT
 e Perplexity que precisam de Cloudflare interativo.
@@ -49,7 +49,7 @@ HEADLESS_DEFAULT = [p for p in KNOWN_PLATFORMS if p not in _HEADED_REQUIRED]
 
 
 def _log(line: str) -> None:
-    """Print com timestamp ISO. Stdout-only (cron/launchd redireciona pra log)."""
+    """Print com timestamp ISO. A saída pode ser redirecionada para um log."""
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     print(f"{ts} {line}", flush=True)
 
