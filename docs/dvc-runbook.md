@@ -129,8 +129,31 @@ Antes de uma limpeza:
 .venv/bin/dvc gc --workspace --cloud --dry
 ```
 
-Somente com aprovacao explicita, repetir o comando sem `--dry`. O DVC pedira
-confirmacao interativa. Nunca use `--force` por conveniencia.
+No Google Drive, prefira a ferramenta do projeto em vez de executar o GC
+nativo sem `--dry`. O Drive pode demorar ou deixar uma requisicao HTTP presa;
+esta ferramenta cria um plano persistente, apaga sequencialmente em lotes e
+interrompe cada requisicao individual apos dois minutos. Ela nunca e chamada
+pela coleta nem pelo dashboard.
+
+```bash
+# So revisa e grava .runtime/dvc-gc/<data-hora>/plan.json; nao apaga nada.
+.venv/bin/python scripts/dvc_gc_maintenance.py plan
+
+# Depois da revisao e de autorizacao explicita: cria um plano novo e o executa
+# ate terminar. Pode continuar no Terminal sem depender de um agente.
+.venv/bin/python scripts/dvc_gc_maintenance.py run --apply
+
+# Se o Terminal ou a maquina parar, continue somente os objetos que ainda nao
+# tiveram resultado registrado. Substitua pelo diretorio indicado pelo comando.
+.venv/bin/python scripts/dvc_gc_maintenance.py resume \
+  .runtime/dvc-gc/<data-hora> --apply
+```
+
+O estado e o log ficam ignorados em `.runtime/dvc-gc/`. Uma requisicao que
+estoura o limite fica marcada como `timeout_unknown`: nao e repetida cegamente,
+pois o Drive pode ter aceitado a exclusao sem responder. Ao final, uma nova
+simulacao DVC diz se sobrou algo; so entao se cria um novo plano, se necessario.
+Nunca use `--force` por conveniencia.
 
 **Impacto assumido:** depois disso, `git checkout <commit-antigo>` pode
 continuar mostrando o codigo e os ponteiros antigos, mas `dvc pull` daquele
