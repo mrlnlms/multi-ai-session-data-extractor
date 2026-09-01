@@ -225,53 +225,41 @@ including logins:
 rm -rf data/ .storage/
 ```
 
-## Optional: DVC backup (full vault)
+## DVC: recoverable vault for the current data
 
 The pipeline writes to `data/raw/`, `data/merged/`, `data/processed/`,
 `data/unified/`, `data/external/`. These directories are gitignored — they
 hold personal data that must not go to the repo.
 
-If you want a versioned backup (so you can delete locally and recover
-later, or roll back to any historical state), set up DVC with your own
-Google Drive folder:
+This repository uses DVC as a recoverable vault for the **current canonical
+base**. Git versions the code and the small `.dvc` pointers; the remote stores
+the large personal data. It is not a promise that every historical data
+snapshot in Git can be restored forever: old DVC objects may be deliberately
+discarded after the current state has been published and verified.
+
+### Restore an existing archive on a new machine
+
+Restore your private `.dvc/config.local` first (it contains the local OAuth
+configuration and is intentionally outside Git), then pull the current data:
 
 ```bash
-# 1. Install dvc[gdrive] (already in requirements.txt)
+# DVC is already included in requirements.txt
 .venv/bin/pip install -r requirements.txt
-
-# 2. Create a folder in your own Google Drive, copy its ID from the URL.
-#    Then point DVC at it (overrides the default config from this repo):
-.venv/bin/dvc remote modify --local gdrive_remote url gdrive://<YOUR_FOLDER_ID>
-
-# 3. Optional — set your own OAuth client (avoids sharing the default app):
-#    https://console.cloud.google.com/auth/clients (create a Desktop client)
-.venv/bin/dvc remote modify --local gdrive_remote gdrive_client_id <YOUR_CLIENT_ID>
-.venv/bin/dvc remote modify --local gdrive_remote gdrive_client_secret <YOUR_CLIENT_SECRET>
-
-# 4. Track and push (~minutes to hours depending on data volume)
-.venv/bin/dvc add data/raw data/merged data/processed data/unified \
-    data/external/manual-saves data/external/deep-research-md \
-    data/external/perplexity-orphan-threads data/external/deepseek-snapshots \
-    data/external/chatgpt-extension-snapshot data/external/claude-ai-snapshots \
-    data/external/notebooklm-snapshots data/external/openai-gdpr-export \
-    data/external/claude-code-config-snapshots \
-    data/external/codex-config-snapshots \
-    data/external/gemini-config-snapshots
-git add data/*.dvc data/external/*.dvc data/.gitignore data/external/.gitignore
-git commit -m "data: initial dvc snapshot"
-.venv/bin/dvc push
+.venv/bin/dvc pull
 ```
 
-The `--local` flag writes to `.dvc/config.local` (gitignored), so your
-`gdrive_folder_id` and OAuth secret never go to a public fork. The repo's
-default `.dvc/config` is kept as a working example; you only need to
-override what's specific to you.
+The first pull may open an OAuth flow. Browser profiles in `.storage/` are not
+part of this vault; log in to platforms again before collecting.
 
-To restore on a new machine: clone the repo, restore `.dvc/config.local`
-(from your backup or recreate via the same `dvc remote modify --local`
-commands), then `dvc pull`.
+### Publish a new, validated collection
 
-Full operational guide: [dvc-runbook.md](dvc-runbook.md).
+After sync, parse, and unify have completed successfully, update the tracked
+data pointers and publish the current base. This is a deliberate operation:
+`dvc push` writes to external storage and `git push` publishes the new
+pointers. Use the exact command set and validation sequence in the runbook;
+do not use the legacy `scripts/backup_to_dvc.sh`.
+
+Full operational guide, including storage cleanup: [dvc-runbook.md](dvc-runbook.md).
 
 ## Next steps
 

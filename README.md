@@ -4,12 +4,17 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Capture and archive your own sessions across AI platforms
+Capture, preserve, and explore your own sessions across AI platforms
 (ChatGPT, Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Perplexity,
 Grok, Kimi)
 plus command-line tools (Claude Code, Codex, Gemini CLI, Antigravity CLI).
 Data is preserved locally in canonical format (parquet),
 even if you delete it from the server.
+
+The repository contains the code, documentation, and DVC pointers; personal
+data, browser profiles, and private operating notes stay outside Git. This
+makes it possible to rebuild a working machine without publishing the archive
+itself.
 
 > **This tool is for personal use, with your own accounts.**
 > It uses the platforms' internal APIs authenticated with cookies from
@@ -97,8 +102,14 @@ Result:
 
 ![ChatGPT platform drill-down — capture status, content metrics, monthly creation chart, models, projects, knowledge files, and reconcile history](docs/img/quickstart-02-platform.png)
 
-Repeat the 2 commands for other platforms (`claude-login.py`,
-`gemini-sync.py`, etc.). Details in [docs/SETUP.md](docs/SETUP.md).
+Repeat the 2 commands for other web platforms (`claude-login.py`,
+`gemini-sync.py`, etc.). CLI sources are copied and parsed by their respective
+`*-sync.py` commands. Details in [docs/SETUP.md](docs/SETUP.md).
+
+If you are restoring an existing personal archive rather than starting a new
+one, first restore your private DVC configuration and run `dvc pull`. The
+[DVC runbook](docs/dvc-runbook.md) explains that recovery path and the data
+retention policy.
 
 ## How it works
 
@@ -171,9 +182,8 @@ Details in [docs/dashboard/manual.md](docs/dashboard/manual.md).
 
 ## Descriptive documents (Quarto)
 
-14 documents per platform + 4 cross-platform views — data schema,
-coverage, distributions, examples. They share a single template
-to avoid duplication.
+Platform and cross-platform profiles cover data schema, coverage,
+distributions, and examples. They share templates to avoid duplication.
 
 ```bash
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/chatgpt.qmd
@@ -198,8 +208,8 @@ PYTHONPATH=. .venv/bin/pytest tests/parsers/     # parsers only
 ## Documentation
 
 - [docs/README.md](docs/README.md) — full index
-- [docs/SETUP.md](docs/SETUP.md) — detailed setup, first login,
-  troubleshooting, optional DVC backup
+- [docs/SETUP.md](docs/SETUP.md) — detailed setup, first login, and
+  troubleshooting
 - [docs/dvc-runbook.md](docs/dvc-runbook.md) — DVC operational guide
   (canonical-current data vault and local recovery)
 - [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — known gaps and limitations
