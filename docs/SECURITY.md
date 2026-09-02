@@ -9,7 +9,8 @@ scope of use, and considerations regarding the platforms' terms of use.
   login**. The tool does not bypass authentication or access third-party
   data.
 - Cookies/profiles live in `.storage/` (gitignored — never committed).
-- No credentials leave your machine (not even to external services).
+- Credentials never enter Git. Cookies are used only for authenticated
+  requests made directly to the respective platform.
 - If you share this project with someone else, they need to log in
   themselves — profiles are not portable nor shareable.
 
@@ -37,8 +38,9 @@ Each platform has a `scripts/<plat>-login.py` script:
 
 - Your password (the platform only sends/receives session cookies after
   login completes)
-- Permanent API tokens (use the ChatGPT API key separately — this tool
-  uses only the internal web API)
+- DVC remote secrets: local configuration may live in `.dvc/config.local`,
+  with a private copy in `private/dvc.config.local`. Treat both as passwords
+  and never add them to Git.
 
 ## What `.gitignore` protects
 
@@ -58,9 +60,9 @@ personal data. `git status` should show zero files in `data/`,
 
 ## Platform terms of use (ToS)
 
-This tool uses **internal APIs** of the platforms, authenticated with
-cookies from your own login. This is the same thing the browser does
-when you use the official app — just automated.
+This tool uses internal APIs of the platforms, authenticated with cookies from
+your own login. It automates requests associated with a web session; that does
+not remove any contractual restrictions on automation.
 
 **What this means:**
 
@@ -73,11 +75,9 @@ when you use the official app — just automated.
 
 **What is NOT covered:**
 
-- Specific ToS clauses that prohibit **any** automation, even for
-  personal use. Some platforms (notably OpenAI in current ToS) have
-  broad language about "scraping" and "automation". Read each platform's
-  ToS before using and consider whether legitimate personal use falls
-  under the prohibition.
+- Specific ToS clauses that prohibit **any** automation, including personal
+  use. Read the current terms of each platform and assess whether your use
+  falls under those restrictions.
 - This tool **has not been audited** by a lawyer nor reviewed by any of
   the platforms. It exists for personal archiving and research — do not
   use it in critical professional contexts without understanding the ToS
@@ -99,13 +99,13 @@ git status
 # Confirm .storage/ and data/ are gitignored
 git check-ignore .storage/ data/
 
-# Confirm zero credentials in past commits
-git log --all -p | grep -iE "password|cookie|token|api[_-]?key" | head
 ```
 
 If credentials appear in an old commit (even if removed later), Git
-history still contains them. Recommended: `git filter-repo` or
-recreate the repository from scratch before making it public.
+history still contains them. Revoke the exposed credential immediately and use
+a history-rewrite procedure appropriate to the repository before making it
+public. Avoid printing complete historical diffs in a shared terminal while
+investigating the incident.
 
 ### Cookie rotation
 

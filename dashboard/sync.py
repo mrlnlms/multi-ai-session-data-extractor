@@ -48,7 +48,7 @@ WEB_PLATFORMS = frozenset({
     "Kimi",
 })
 
-# Pastas versionadas via DVC; manter alinhadas a docs/dvc-runbook.md.
+# Pastas versionadas via DVC; manter alinhadas a docs/operations/dvc-runbook.md.
 # Atualizar AQUI quando adicionar plataforma com diretorio externo novo.
 DVC_PATHS: list[str] = [
     "data/raw",

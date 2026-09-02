@@ -12,8 +12,9 @@ O fluxo canonico e:
 extractor/copy -> raw -> reconciler -> merged -> parser -> processed -> unify -> unified
 ```
 
-Leia tambem `README.md`, `docs/README.md` e o `state.md` da plataforma antes
-de alterar um extractor, reconciler ou parser. `CLAUDE.md` contem o guia
+Leia tambem `README.md`, `docs/README.md` e o
+`docs/extractor-engineering/platforms/<web|cli>/<source>/state.md` da fonte
+antes de alterar um extractor, reconciler ou parser. `CLAUDE.md` contem o guia
 autonomo equivalente para Claude Code. As regras compartilhadas devem ficar
 alinhadas; o estado observavel no codigo e nos dados prevalece sobre texto
 historico.
@@ -46,16 +47,21 @@ estado local; nao devem ser movidos para o workbench privado por conveniencia.
   do dashboard/headless executa automaticamente o `<source>-parse.py` depois
   de cada sync web bem-sucedido e antes de `scripts/unify-parquets.py`.
 - Os syncs das 4 CLIs ja fazem copy + parse.
-- Este projeto e o pai/fonte canonica de captura. O projeto filho/consumidor
-  `AI Interaction Analysis` le os Parquets unificados publicados daqui.
-  Mudancas de schema unificado devem ser coordenadas com ele antes da
-  publicacao.
+- Este projeto publica o contrato de dados unificado. Mudancas de schema ou
+  de Parquets publicados devem ter seus impactos em consumidores downstream
+  revisados antes da publicacao.
 - Toda plataforma promovida deve aparecer em `dashboard/data.py`, no dashboard
   Streamlit e nos relatorios Quarto. O dashboard e iniciado por
   `PYTHONPATH=. .venv/bin/streamlit run dashboard.py`.
 - Nao declarar uma pipeline verde se o parquet for anterior ao raw/merged.
 - Rodar a suite de testes antes de merge; nao manter contagem fixa de testes
   na documentacao, pois parametrizacoes alteram esse numero.
+- Ao alterar um fato canonico (plataformas, contagem, comando, etapa de
+  pipeline, status, retencao ou contrato publico), atualizar a fonte primaria,
+  buscar a afirmacao antiga no codigo e na documentacao mantidos e corrigir as
+  superficies derivadas aplicaveis: ajuda/docstrings de CLI, README/indice,
+  operations, dashboard, Quarto, `state.md` e limites conhecidos. Antes de
+  encerrar, validar links locais e rodar `git diff --check`.
 
 ## DVC e retencao
 

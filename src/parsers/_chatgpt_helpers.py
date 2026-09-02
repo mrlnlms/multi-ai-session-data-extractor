@@ -23,7 +23,7 @@ def is_custom_gpt_gizmo_id(gizmo_id: Optional[str]) -> bool:
 
 def classify_event_type(tool_name: Optional[str]) -> str:
     """Mapeia tool_name pra categoria de event_type. Heuristica baseada
-    nos achados empiricos (parser-v3-empirical-findings.md secao 8)."""
+    nos achados empiricos (platforms/web/chatgpt/discovery.md secao 8)."""
     if not tool_name:
         return "other"
     name = tool_name

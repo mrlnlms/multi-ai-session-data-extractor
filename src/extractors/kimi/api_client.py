@@ -1,6 +1,6 @@
 """Client Kimi - wraps /apiv2/* (gRPC-Web/Connect) via page.evaluate(fetch).
 
-Endpoints confirmados via probe 2026-05-09 (ver docs/platforms/kimi/recon.md):
+Endpoints confirmados via probe 2026-05-09 (ver docs/extractor-engineering/platforms/web/kimi/discovery.md):
   POST /apiv2/kimi.chat.v1.ChatService/ListChats     body {pageSize, pageToken?}
   POST /apiv2/kimi.chat.v1.ChatService/GetChat       body {chatId}
   POST /apiv2/kimi.chat.v1.ChatService/ListMessages  body {chatId}

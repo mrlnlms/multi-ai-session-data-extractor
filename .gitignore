@@ -46,7 +46,7 @@ static/quarto/
 
 # Local-only docs (planos internos, journeys, housekeeping, superpowers).
 # Conteudo util pra contributor externo foi extraido pros docs publicos
-# (CONTRIBUTING.md, LIMITATIONS.md, docs/probes/).
+# (CONTRIBUTING.md, LIMITATIONS.md, docs/extractor-engineering/).
 docs/local/
 
 # Estado transitório local: logs, PIDs, locks, histórico e cache de testes.

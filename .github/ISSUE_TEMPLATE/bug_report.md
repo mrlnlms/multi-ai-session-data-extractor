@@ -41,6 +41,6 @@ labels: bug
 
 ## Pre-checks
 
-- [ ] Not listed in [LIMITATIONS.md](../../docs/LIMITATIONS.md) as a known limitation
+- [ ] Not listed in [known limitations](../../docs/extractor-engineering/known-limitations.md)
 - [ ] Reproduces on latest `main` (`git pull`)
 - [ ] No credentials committed in the pasted log

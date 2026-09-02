@@ -22,7 +22,7 @@ itself.
 > scraping data from other users or for bypassing terms of use —
 > and should not be used that way.
 
-![Streamlit dashboard showing all sources with status, total counts, and cross-platform views](docs/img/quickstart-01-hero.png)
+![Streamlit dashboard showing all sources with status, total counts, and cross-platform views](docs/assets/quickstart-01-hero.png)
 
 ## The problem
 
@@ -37,7 +37,8 @@ This project solves that by capturing everything locally:
   reports, slide decks)
 - Generated images (DALL-E, Nano Banana), user uploads, mind maps
 - Voice messages (transcripts), thinking blocks (reasoning), tool calls
-- Chats deleted on the server — preserved locally forever
+- Chats deleted on the server — preserved in the local cumulative archive and
+  in the published canonical base
 
 Output in **parquet** (unified schema across all 13 sources), ready
 for analysis in pandas/DuckDB/Quarto/whatever you prefer.
@@ -55,7 +56,7 @@ canonical parsing, and descriptive visualization (Quarto):
 | **Qwen** | web | 8 chat types (search, research, dalle, etc.), projects |
 | **DeepSeek** | web | R1 reasoning (thinking in ~31% of msgs), token usage |
 | **Gemini** | web | multi-account (2 Google accounts), 8 models |
-| **NotebookLM** | web | multi-account (3), 9 output types (audio, video, slide deck, etc.) |
+| **NotebookLM** | web | 2 active accounts plus a separate legacy archive; 9 output types (audio, video, slide deck, etc.) |
 | **Grok** | web | conversations, workspaces, tool events, assets, scheduled tasks |
 | **Kimi** | web | chats, installed skills, tool events, signed asset downloads |
 | **Claude Code** | CLI | local sessions (`~/.claude/projects/`), subagents |
@@ -65,7 +66,7 @@ canonical parsing, and descriptive visualization (Quarto):
 
 The automated test suite covers extractors, reconcilers, parsers, the
 canonical schema, dashboard, and unification. Known limitations and gaps are
-documented in [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
+documented in [extractor engineering's known limitations](docs/extractor-engineering/known-limitations.md).
 
 ## Quickstart
 
@@ -100,7 +101,7 @@ Result:
   deleted from the server)
 - `data/processed/ChatGPT/*.parquet` — canonical format for analysis
 
-![ChatGPT platform drill-down — capture status, content metrics, monthly creation chart, models, projects, knowledge files, and reconcile history](docs/img/quickstart-02-platform.png)
+![ChatGPT platform drill-down — capture status, content metrics, monthly creation chart, models, projects, knowledge files, and reconcile history](docs/assets/quickstart-02-platform.png)
 
 Repeat the 2 commands for other web platforms (`claude-login.py`,
 `gemini-sync.py`, etc.). CLI sources are copied and parsed by their respective
@@ -108,7 +109,7 @@ Repeat the 2 commands for other web platforms (`claude-login.py`,
 
 If you are restoring an existing personal archive rather than starting a new
 one, first restore your private DVC configuration and run `dvc pull`. The
-[DVC runbook](docs/dvc-runbook.md) explains that recovery path and the data
+[DVC runbook](docs/operations/dvc-runbook.md) explains that recovery path and the data
 retention policy.
 
 ## How it works
@@ -129,8 +130,8 @@ extractor → reconciler → parser → unify
    `data/unified/` with 13 parquet files (4 canonical + 9 auxiliaries),
    ready for cross-platform analysis.
 
-Full schema in `src/schema/models.py`. Glossary of project terms in
-[docs/glossary.md](docs/glossary.md).
+Full schema in `src/schema/models.py`. Capture and parser terminology is in
+[the extractor engineering glossary](docs/extractor-engineering/glossary.md).
 
 ## Capture: visible browser or background
 
@@ -139,10 +140,10 @@ log in manually). Capture after that varies:
 
 | Platform | Capture |
 |---|---|
-| Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek | No visible window |
+| Claude.ai, Gemini, NotebookLM, Qwen, DeepSeek, Grok, Kimi | No visible window |
 | ChatGPT, Perplexity | Visible window (Cloudflare detects scraping without a window) |
 
-If you run Claude.ai/Gemini/NotebookLM/Qwen/DeepSeek and see a window
+If you run Claude.ai/Gemini/NotebookLM/Qwen/DeepSeek/Grok/Kimi and see a window
 open during capture: something is wrong (likely an expired cookie).
 For ChatGPT/Perplexity: expected behavior.
 
@@ -156,7 +157,7 @@ python scripts/<plat>-sync.py     # capture + consolidation
 python scripts/<plat>-parse.py    # merged -> canonical parquet
 ```
 
-Consistent flags across all syncs:
+Common web-sync flags (availability varies by source):
 
 - `--full` — force full recapture (skips the incremental path)
 - `--no-binaries` — skip asset downloads (images, slide decks, etc.)
@@ -164,7 +165,7 @@ Consistent flags across all syncs:
 - `--dry-run` — show what would happen without executing
 
 Full list of commands per platform:
-[docs/operations.md](docs/operations.md).
+[docs/operations/pipeline.md](docs/operations/pipeline.md).
 
 ## Dashboard
 
@@ -172,13 +173,13 @@ Local Streamlit visualization — cross-platform totals, per-platform
 status, links to the descriptive documents:
 
 ```bash
-PYTHONPATH=. streamlit run dashboard.py
+PYTHONPATH=. .venv/bin/streamlit run dashboard.py
 ```
 
 Opens at <http://localhost:8501>. Read-only over what sync produced —
 does not write or edit.
 
-Details in [docs/dashboard.md](docs/dashboard.md).
+Details in [docs/operations/dashboard.md](docs/operations/dashboard.md).
 
 ## Descriptive documents (Quarto)
 
@@ -190,7 +191,7 @@ QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/chatgpt.qmd
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview.qmd
 ```
 
-![Cross-platform Quarto data profile — cumulative growth chart by platform and activity heatmap (hour × day) consolidating all sources](docs/img/quickstart-03-quarto.png)
+![Cross-platform Quarto data profile — cumulative growth chart by platform and activity heatmap (hour × day) consolidating all sources](docs/assets/quickstart-03-quarto.png)
 
 To view the generated HTMLs locally:
 
@@ -210,12 +211,12 @@ PYTHONPATH=. .venv/bin/pytest tests/parsers/     # parsers only
 - [docs/README.md](docs/README.md) — full index
 - [docs/SETUP.md](docs/SETUP.md) — detailed setup, first login, and
   troubleshooting
-- [docs/dvc-runbook.md](docs/dvc-runbook.md) — DVC operational guide
+- [docs/operations/dvc-runbook.md](docs/operations/dvc-runbook.md) — DVC operational guide
   (canonical-current data vault and local recovery)
-- [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — known gaps and limitations
-- [docs/operations.md](docs/operations.md) — common commands per platform
-- [docs/glossary.md](docs/glossary.md) — project terms
-- [docs/platforms/](docs/platforms/) — empirical behavior per platform
+- [docs/extractor-engineering/known-limitations.md](docs/extractor-engineering/known-limitations.md) — known extractor gaps and limitations
+- [docs/operations/pipeline.md](docs/operations/pipeline.md) — common commands per platform
+- [docs/extractor-engineering/glossary.md](docs/extractor-engineering/glossary.md) — capture and parser terms
+- [platform engineering records](docs/extractor-engineering/platforms/README.md) — empirical behavior per platform
 - [docs/SECURITY.md](docs/SECURITY.md) — credentials and ToS policy
 - [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — contributor guide
 
@@ -228,9 +229,9 @@ PYTHONPATH=. .venv/bin/pytest tests/parsers/     # parsers only
 3. **The canonical schema is the boundary.** Parsers deliver parquet in
    a unified schema; analysis consumes parquet. No platform
    particularities leak into the analysis stage.
-4. **Fall back safely in suspicious cases.** If the initial listing drops
-   >20% versus history, the extractor refetches previously known records by
-   ID instead of trusting a partial listing.
+4. **Fall back safely in suspicious cases.** If a discovery listing drops
+   materially versus known history, the extractor must not trust it blindly;
+   the applicable platform guardrail preserves or refetches known records.
 
 ## License
 
@@ -239,5 +240,5 @@ MIT — see [LICENSE](LICENSE).
 ## Contributing
 
 Issues and PRs welcome. Details in
-[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md), including the 8-phase
-playbook for adding a new platform.
+[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). The technical guide for a new
+platform is [adding-a-platform.md](docs/extractor-engineering/adding-a-platform.md).

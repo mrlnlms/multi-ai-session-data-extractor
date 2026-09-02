@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """CLI orquestrador do pipeline 4-stage — roda sem Streamlit.
 
-Default: 10 plats que rodam headless (sem browser visivel) — exclui ChatGPT
-e Perplexity que precisam de Cloudflare interativo.
+Default: fontes que rodam headless (sem browser visivel) — exclui ChatGPT e
+Perplexity, que precisam de Cloudflare interativo.
 
 Uso:
-    # 10 plats headless + publish (default)
+    # Fontes headless + publish (default)
     PYTHONPATH=. .venv/bin/python scripts/headless-pipeline.py
 
     # Subset especifico, sem publish
@@ -62,7 +62,10 @@ def main() -> int:
     p.add_argument(
         "--plats",
         default=",".join(HEADLESS_DEFAULT),
-        help=f"Lista CSV. Default = 10 headless: {','.join(HEADLESS_DEFAULT)}",
+        help=(
+            f"Lista CSV. Default = {len(HEADLESS_DEFAULT)} headless: "
+            f"{','.join(HEADLESS_DEFAULT)}"
+        ),
     )
     p.add_argument("--no-publish", action="store_true", help="Pula Stage 4 (DVC + git push).")
     args = p.parse_args()

@@ -13,13 +13,15 @@ Fluxo canonico:
 extractor/copy -> raw -> reconciler -> merged -> parser -> processed -> unify -> unified
 ```
 
-Ele publica Parquets unificados que o projeto consumidor `AI Interaction
-Analysis` le. Este e o projeto pai/fonte; `AI Interaction Analysis` e o
-projeto filho/consumidor.
+Ele publica Parquets unificados para consumo downstream. Mudancas no schema
+ou nos Parquets publicados exigem revisao deliberada dos impactos antes da
+publicacao.
 
 Antes de alterar extractor, reconciler ou parser, leia `README.md`,
-`docs/README.md` e o `docs/platforms/<source>/state.md` correspondente. O
-codigo e os dados observaveis prevalecem sobre registros historicos.
+`docs/README.md` e o
+`docs/extractor-engineering/platforms/<web|cli>/<source>/state.md`
+correspondente. O codigo e os dados observaveis prevalecem sobre registros
+historicos.
 
 ## Limites de preservacao e privacidade
 
@@ -46,13 +48,19 @@ estado local descartavel ou recriavel, cada um com seu proprio contrato.
 - O dashboard/headless executa o `<source>-parse.py` depois de sync web
   bem-sucedido e antes de `scripts/unify-parquets.py`.
 - Os syncs das CLIs ja fazem copy + parse.
-- Alteracoes no schema unificado devem ser coordenadas com o consumidor antes
-  de publicar dados.
+- Alteracoes no schema unificado e nos Parquets publicados exigem revisao dos
+  impactos em consumidores downstream antes da publicacao.
 - Ao promover uma fonte, atualize `dashboard/data.py`, valide o dashboard
   Streamlit e os relatorios Quarto. Nao declare a pipeline verde se o parquet
   estiver anterior a `raw` ou `merged`.
 - Rode a suite de testes antes de merge; nao fixe quantidades de testes na
   documentacao.
+- Ao alterar um fato canonico (plataformas, contagem, comando, etapa de
+  pipeline, status, retencao ou contrato publico), atualize a fonte primaria,
+  pesquise a afirmacao antiga no codigo e na documentacao mantidos e corrija
+  as superficies derivadas aplicaveis: ajuda/docstrings de CLI, README/indice,
+  operations, dashboard, Quarto, `state.md` e limites conhecidos. Antes de
+  encerrar, valide links locais e rode `git diff --check`.
 
 Inicie o dashboard com:
 
@@ -61,7 +69,8 @@ PYTHONPATH=. .venv/bin/streamlit run dashboard.py
 ```
 
 Quando descobrir uma feature em uma plataforma, teste-a empiricamente nas
-outras e registre a conclusao em `docs/cross-platform-features.md`.
+outras e registre a conclusao em
+`docs/extractor-engineering/cross-platform-validation.md`.
 
 ## DVC: base atual e espaco
 
@@ -83,24 +92,22 @@ e autorizacao valida do operador.
 tornar revisoes antigas de dados irrecuperaveis, mesmo que o codigo e seus
 ponteiros continuem no Git. Antes de qualquer GC, a base atual precisa estar
 validada, commitada e enviada; rode primeiro a simulacao e obtenha autorizacao
-explicita para excluir. O procedimento exato esta em `docs/dvc-runbook.md`.
+explicita para excluir. O procedimento exato esta em
+`docs/operations/dvc-runbook.md`.
 
 Uma alternativa ao Drive e pesquisa futura, nao uma migracao ativa nem motivo
-para bloquear coleta ou publicacao normal. `docs/RECOVERY.md` documenta um
-incidente concluido de agosto de 2026; suas proibicoes valiam durante aquele
-procedimento, nao sao regras diarias.
+para bloquear coleta ou publicacao normal.
 
 ## Investigacao por plataforma
 
-- O threshold de discovery parcial e 20%; o fallback `refetch_known` usa IDs
-  ja preservados em vez de confiar no listing incompleto.
+- Os guardrails de discovery parcial e os fallbacks variam por plataforma;
+  consulte o `state.md` antes de alterar discovery ou reconcile.
 - Login sempre e headed e os perfis persistem em `.storage/`.
 - O modo de captura e detalhes de Cloudflare/headless pertencem aos `state.md`
   e `server-behavior.md` de cada plataforma. Consulte-os antes de alterar
   autenticacao ou browser automation.
-- O NotebookLM exige download de assets em Range-chunks; a evidencia e a
-  implementacao estao em sua documentacao de plataforma. Nao simplifique para
-  um GET inteiro sem nova validacao empirica.
+- Requisitos de download de assets e comportamentos de API pertencem a
+  documentacao da plataforma; nao os simplifique sem nova validacao empirica.
 
 ## Comandos basicos
 
@@ -117,8 +124,9 @@ PYTHONPATH=. .venv/bin/python scripts/unify-parquets.py
 ```
 
 Comandos de captura, login e diagnostico ficam no `state.md` de cada fonte.
-Para restaurar um checkout apagado ou gerenciar espaco, use o runbook DVC e o
-guia privado `private/COMO-RETOMAR.md`.
+Para restaurar um checkout apagado ou gerenciar espaco, use o [guia de
+setup](docs/SETUP.md), o runbook DVC e o complemento privado
+`private/SETUP-PRIVADO.md`.
 
 ## Convencoes
 

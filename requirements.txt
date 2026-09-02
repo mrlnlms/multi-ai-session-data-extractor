@@ -19,7 +19,7 @@ jupyter-core>=5.7
 nbclient>=0.10
 nbformat>=5.10
 
-# DVC (cofre completo dos dados em gdrive — runbook em docs/dvc-runbook.md)
+# DVC (cofre completo dos dados em gdrive — runbook em docs/operations/dvc-runbook.md)
 dvc[gdrive]==3.67.1
 # PyDrive2 1.21.x ainda exige cryptography<44/pyOpenSSL<=24.2.1, enquanto
 # asyncssh 2.24+ exige cryptography>=48. Fixar o conjunto compatível evita que

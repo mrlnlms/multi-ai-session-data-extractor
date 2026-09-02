@@ -1,6 +1,6 @@
 """Client Grok - wraps /rest/* via page.evaluate(fetch).
 
-Endpoints confirmados via probe 2026-05-09 (ver docs/platforms/grok/recon.md):
+Endpoints confirmados via probe 2026-05-09 (ver docs/extractor-engineering/platforms/web/grok/discovery.md):
   GET  /rest/app-chat/conversations?pageSize=N[&pageToken=T][&workspaceId=ID]
   GET  /rest/app-chat/conversations_v2/{cid}?includeWorkspaces=true&includeTaskResult=true
   GET  /rest/app-chat/conversations/{cid}/response-node?includeThreads=true

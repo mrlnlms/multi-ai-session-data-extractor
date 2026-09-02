@@ -8,7 +8,7 @@
 # 3. dvc push pro Google Drive (deltas apenas — DVC nao re-envia o que ja esta la)
 #
 # Pra incluir data/raw/ quando for decidido (backlog #28), adicionar em TRACKED_DIRS.
-# Runbook completo: docs/dvc-runbook.md
+# Runbook completo: docs/operations/dvc-runbook.md
 
 set -e
 

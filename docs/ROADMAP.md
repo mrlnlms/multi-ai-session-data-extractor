@@ -11,10 +11,9 @@ behavior belongs in its own documentation.
 
 | Item | Status | Evidence | Next safe action |
 |---|---|---|---|
-| Recovery de 2026-08 | Complete, historical | [RECOVERY.md](RECOVERY.md) | Treat it as the audit record of a resolved incident, not as a daily runbook. |
-| DVC Google Drive remote | Active operational remote | [dvc-runbook.md](dvc-runbook.md) | Use it to publish and recover the canonical current dataset. |
+| DVC Google Drive remote | Active operational remote | [DVC runbook](operations/dvc-runbook.md) | Use it to publish and recover the canonical current dataset. |
 | Capture and processing | Unblocked | [AGENTS.md](../AGENTS.md) | Run the normal sync → parse → unify pipeline when updating a source. |
-| DVC garbage collection | Deliberate storage maintenance | [dvc-runbook.md](dvc-runbook.md) | Simulate, review and explicitly authorize it after a validated publication. |
+| DVC garbage collection | Deliberate storage maintenance | [DVC runbook](operations/dvc-runbook.md) | Simulate, review and explicitly authorize it after a validated publication. |
 
 Google Drive remains the active remote while alternatives are researched. This
 is not an active migration or a freeze of the normal capture/publish workflow.
@@ -27,13 +26,13 @@ behavior remains in each platform's own documentation.
 
 | Question | Authoritative document | Role |
 |---|---|---|
-| What product is this becoming, and what remains deliberately open? | [PERSONAL_AI_ARCHIVE.md](PERSONAL_AI_ARCHIVE.md) | Product vision; not a spec. |
+| What product is this becoming, and what remains deliberately open? | [product/product-vision.md](product/product-vision.md) | Product vision; not a spec. |
 | What is the current priority and what work is operationally pending? | This roadmap | Ordering and status. |
-| How should IDs, references and non-message events be interpreted? | [data-identity-and-reader-fidelity.md](data-identity-and-reader-fidelity.md) | Technical record for the reader and future curation. |
-| How might account instances, application packaging and local authentication fit together? | [account-instances-and-application-architecture.md](account-instances-and-application-architecture.md) | Paused architectural exploration with explicit open decisions; not an implementation spec. |
+| How should IDs, references and non-message events be interpreted? | [product/reader-and-identity-contract.md](product/reader-and-identity-contract.md) | Technical record for the reader and future curation. |
+| How might account instances, application packaging and local authentication fit together? | [product/account-architecture.md](product/account-architecture.md) | Paused architectural exploration with explicit open decisions; not an implementation spec. |
 | What is the canonical capture and processing contract? | [AGENTS.md](../AGENTS.md) and [`src/schema/models.py`](../src/schema/models.py) | Agent instructions and observable schema. |
-| What does a particular source currently capture or miss? | [`platforms/`](platforms/) and [LIMITATIONS.md](LIMITATIONS.md) | Per-source evidence and known gaps. |
-| How is the existing dashboard operated? | [dashboard.md](dashboard.md) | Current operational UI. |
+| What does a particular source currently capture or miss? | [platform engineering records](extractor-engineering/platforms/README.md) and [known limitations](extractor-engineering/known-limitations.md) | Per-source evidence and known gaps. |
+| How is the existing dashboard operated? | [operations/dashboard.md](operations/dashboard.md) | Current operational UI. |
 | Where is the complete documentation index? | [README.md](README.md) | Documentation catalog. |
 
 Future designs and specs should be linked from this map when created, rather
@@ -136,7 +135,7 @@ path to rich media through the future asset manifest. CLI timelines need
 explicit treatment for thinking, tool calls/results, trajectory steps and
 events without canonical messages. The relevant identity and fidelity findings
 are recorded in
-[data-identity-and-reader-fidelity.md](data-identity-and-reader-fidelity.md).
+[product/reader-and-identity-contract.md](product/reader-and-identity-contract.md).
 
 ### Product fronts and current emphasis
 
@@ -147,7 +146,7 @@ front completely before touching another:
 |---|---|---|
 | Archive and reader | First | Closes the immediate visibility gap and reveals fidelity issues in real conversations. |
 | Operation and health | Second | Evolves the existing Streamlit capabilities for accounts, logins, runs and diagnostics. |
-| Assisted curation | Third and iterative | Depends on reading context and on durable references, while reusing work from `AI Interaction Analysis`. |
+| Assisted curation | Third and iterative | Depends on reading context and on durable references. |
 
 Parser and schema refinements should be made incrementally when the reader
 provides concrete evidence. A full anticipatory rewrite of all sources is not a
@@ -157,8 +156,8 @@ prerequisite.
 
 | Decision | Why it is not automatic | Evidence | First step once chosen |
 |---|---|---|---|
-| Evaluate an alternative DVC object remote | It changes storage provider, cost, request limits and the recovery contract. Previous options did not meet the practical cost and retention requirements. | [data-storage-inventory.md](data-storage-inventory.md) and [storage design work](#storage-design-work) | Reopen research only when a viable alternative exists; Drive remains operational meanwhile. |
-| Change the unified schema or publish changed unified data | The consumer project must coordinate on schema changes. | [AGENTS.md](../AGENTS.md) | Agree the contract with `AI Interaction Analysis` before publishing. |
+| Evaluate an alternative DVC object remote | It changes storage provider, cost, request limits and the recovery contract. Previous options did not meet the practical cost and retention requirements. | [DVC runbook](operations/dvc-runbook.md) and [storage design work](#storage-design-work) | Reopen research only when a viable alternative exists; Drive remains operational meanwhile. |
+| Change the unified schema or publish changed unified data | It can change the published data contract. | [AGENTS.md](../AGENTS.md) and [`src/schema/models.py`](../src/schema/models.py) | Review affected outputs and validate the publication deliberately. |
 | Automate deletion of conversations upstream | A selection bug could irreversibly delete the wrong server-side conversations. | [ChatGPT capture-delete cycle](#chatgpt-capture-delete-cycle) | Keep this manual unless a future need justifies automation. |
 
 ## Operational work
@@ -199,11 +198,11 @@ updated when the item is investigated or closed.
 
 | Area | Examples of open coverage | Authoritative source |
 |---|---|---|
-| Perplexity Max / Pro features | Computer mode, scheduled tasks, model council, modern Deep Research. | [LIMITATIONS.md](LIMITATIONS.md#perplexity) |
-| Gemini | Draft/regenerate alternatives; additional account support; branches, grounding citations and Add to notebook. | [LIMITATIONS.md](LIMITATIONS.md#gemini) and [Gemini server behavior](platforms/gemini/server-behavior.md) |
-| DeepSeek | Agent mode, full R1 reasoning sample and uploaded files. | [DeepSeek server behavior](platforms/deepseek/server-behavior.md) |
-| NotebookLM | Map a representative real chat when one exists upstream. | [LIMITATIONS.md](LIMITATIONS.md#notebooklm) |
-| Cross-platform test depth | HTTP/auth/Playwright integration tests are empirical today; mocked coverage is a possible v1.0 investment. | [LIMITATIONS.md](LIMITATIONS.md#test-coverage) |
+| Perplexity Max / Pro features | Computer mode, scheduled tasks, model council, modern Deep Research. | [known limitations](extractor-engineering/known-limitations.md#perplexity) |
+| Gemini | Draft/regenerate alternatives; additional account support; branches, grounding citations and Add to notebook. | [known limitations](extractor-engineering/known-limitations.md#gemini) and [Gemini server behavior](extractor-engineering/platforms/web/gemini/server-behavior.md) |
+| DeepSeek | Agent mode, full R1 reasoning sample and uploaded files. | [DeepSeek server behavior](extractor-engineering/platforms/web/deepseek/server-behavior.md) |
+| NotebookLM | Map a representative real chat when one exists upstream. | [known limitations](extractor-engineering/known-limitations.md#notebooklm) |
+| Cross-platform test depth | HTTP/auth/Playwright integration tests are empirical today; mocked coverage is a possible v1.0 investment. | [known limitations](extractor-engineering/known-limitations.md#test-coverage) |
 
 ## Future platforms
 

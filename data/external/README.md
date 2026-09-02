@@ -69,7 +69,7 @@ storage do servidor. Estrutura por snapshot:
 
 Snapshot mantido apenas como blob historico pra recovery extremo
 (conta deletada -> sem acesso aos endpoints).
-Detalhes em [docs/platforms/grok/export-analysis.md](../../docs/platforms/grok/export-analysis.md).
+Detalhes na [análise de paridade do export Grok](../../docs/extractor-engineering/platforms/web/grok/export-parity-2026-05-09.md).
 
 ### openai-gdpr-export/ ⏸ preservado (sem parser)
 
