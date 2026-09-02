@@ -23,6 +23,18 @@ same way — sessions are JSONL files in the user's filesystem.
   `src/parsers/claude_code.py` (Phase 1: `_build_chain_links`).
 - **Repeated events in raw JSONL:** defensive dedup by `uuid`.
 
+## Deferred enrichment
+
+- **Inline user images:** JSONL can contain `content[]` blocks of
+  `type='image'` whose `source.data` is base64 and whose `source.media_type`
+  identifies the binary. The parser does not currently materialize those
+  images or publish their paths. The disposable `~/.claude/image-cache/` is
+  not authoritative; any future extraction must derive assets from the JSONL.
+- **Operational metadata:** `message.usage`, `gitBranch`, `cwd`,
+  `permissionMode` and attachment records are preserved in raw but are not
+  first-class fields in the unified output. Promote them only with a concrete
+  analysis need and a schema decision.
+
 ## Parquets gerados
 
 - `claude_code_conversations.parquet` — 1 linha por sessao

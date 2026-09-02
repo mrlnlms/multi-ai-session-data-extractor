@@ -35,10 +35,18 @@ de bancada, planos, probes, handoffs, midias-fonte e outros artefatos
 duraveis que nao pertencem ao projeto publicavel. O Git registra somente o
 symlink; nunca adicionar seu conteudo ao indice.
 
-Nao criar novo material em `docs/local/`: a pasta legada sera curada e
-migrada gradualmente para `private/`. `data/`, `.dvc/cache/`, `.storage/` e
-artefatos renderizados continuam tendo seus proprios contratos de DVC ou de
-estado local; nao devem ser movidos para o workbench privado por conveniencia.
+`data/`, `.dvc/cache/`, `.storage/` e artefatos renderizados continuam tendo
+seus proprios contratos de DVC ou de estado local; nao devem ser movidos para
+o workbench privado por conveniencia.
+
+Antes de classificar um registro tecnico legado como apenas privado, obsoleto
+ou descartavel, comparar suas afirmacoes com o codigo atual e com o `state.md`,
+`discovery.md`, `server-behavior.md` e limites conhecidos da fonte. Promover
+para a documentacao versionada os fatos duraveis que ainda faltarem, redigindo
+identificadores pessoais quando necessario; preservar o original em `private/`
+quando ele tambem contiver dados pessoais, logs de trabalho ou contexto datado.
+Nao concluir que houve consolidacao apenas pelo nome, idade ou status do
+arquivo.
 
 ## Pipeline e validacao
 

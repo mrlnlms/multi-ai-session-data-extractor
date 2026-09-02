@@ -35,11 +35,18 @@ historicos.
 `private/` e um symlink versionado para o workbench privado do proprietario,
 fora do checkout. Use-o para documentos de bancada, midias-fonte, handoffs e
 configuracoes privadas duraveis; o Git registra apenas o symlink. Nao adicione
-seu conteudo ao indice e nao crie material novo em `docs/local/`, que esta em
-curadoria gradual.
+seu conteudo ao indice.
 
 `.venv/`, `.storage/`, `.runtime/`, `.dvc/cache/` e o checkout `data/` sao
 estado local descartavel ou recriavel, cada um com seu proprio contrato.
+
+Antes de classificar um registro tecnico legado como apenas privado, obsoleto
+ou descartavel, compare suas afirmacoes com o codigo atual e com o `state.md`,
+`discovery.md`, `server-behavior.md` e limites conhecidos da fonte. Promova
+para a documentacao versionada os fatos duraveis que ainda faltarem, redigindo
+identificadores pessoais quando necessario; preserve o original em `private/`
+quando ele tambem contiver dados pessoais, logs de trabalho ou contexto datado.
+Nao conclua que houve consolidacao apenas pelo nome, idade ou status do arquivo.
 
 ## Pipeline e validacao
 

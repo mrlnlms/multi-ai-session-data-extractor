@@ -172,9 +172,11 @@ These validations require a Pro Max account and remain open until someone tests:
 
 ## Lower-priority CLI coverage
 
-- **Claude Code:** `gitBranch`, `cwd`, `permissionMode` and non-image
-  attachment records are not first-class canonical fields. Promote them only
-  with a concrete analysis need and a schema decision.
+- **Claude Code:** inline base64 image blocks, `gitBranch`, `cwd`,
+  `permissionMode` and attachment records are not first-class canonical
+  fields. Promote them only with a concrete analysis need and a schema
+  decision; the JSONL, not the disposable image cache, is the authoritative
+  source for a future image extractor.
 - **Codex:** `context_compacted` events are captured generically today.
   Promote them only with a concrete use and validation of the published
   schema.

@@ -27,6 +27,26 @@ estado se torne observavel. Voice tambem e comportamento upstream — o servidor
 transcreve e descarta o sinal de origem. Ambos sao limites, nao lacunas de
 parser.
 
+## Contratos de requisicao confirmados
+
+Os nomes da UI nao definem as rotas. Estes contratos foram confirmados em
+sessao autenticada e devem ser reprobeados se a plataforma mudar:
+
+| Entidade | Rota e metodo | Contrato relevante |
+|---|---|---|
+| Threads | `POST /rest/thread/list_ask_threads` | listagem paginada por offset |
+| Threads pinadas | `POST /rest/thread/list_pinned_ask_threads` | requer corpo `{}`; `GET` ou corpo ausente falha |
+| Thread completa | `GET /rest/thread/{uuid}` | corpo canonico da conversa |
+| Spaces | `GET /rest/collections/*` | a API chama o Space de collection; as rotas de conteudo usam o slug, nao o UUID |
+| Arquivos de Space | `POST /rest/file-repository/list-files` | corpo aninhado identifica `COLLECTION` e o owner da collection |
+| Pages | `GET /rest/article/{slug}` | o slug vem da URL apos navegacao controlada na SPA |
+| Skills | `GET /rest/skills?scope=collection&scope_id=<uuid>` | scopes observados: `global`, `organization`, `collection`, `individual` |
+| Anexos | `POST /rest/file-repository/download-attachment` ou `/download` | refresh exige `thread_id`; a primeira variante recebe `url`, a segunda `file_url` |
+
+O manifest deve registrar um `404 NoSuchKey` de S3 como
+`failed_upstream_deleted`, sem tratar uma URL renovada como prova de que o
+binario ainda existe.
+
 ## Reconciliacao
 
 Uma thread pode sumir de todas as listagens ou continuar referenciada dentro

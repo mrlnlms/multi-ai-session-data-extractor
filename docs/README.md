@@ -26,5 +26,4 @@ define as regras de trabalho para agentes.
 - [product/](product/) — visao do produto, arquitetura de contas e contrato
   do reader.
 
-`docs/local/` e material legado em curadoria. Nao crie documentacao nova ali;
-material privado e duravel pertence ao workbench apontado por `private/`.
+Material privado e duravel pertence ao workbench apontado por `private/`.
