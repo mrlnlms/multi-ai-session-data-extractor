@@ -36,6 +36,8 @@ SOURCE_COLORS = {
     "deepseek":    "#3B82F6",
     "gemini":      "#4285F4",
     "notebooklm":  "#F4B400",
+    "grok":        "#1DA1F2",
+    "kimi":        "#3DB39E",
     "claude_code": "#7C3AED",
     "codex":       "#374151",
     "gemini_cli":  "#1A56DB",
@@ -49,6 +51,8 @@ SOURCE_LABEL = {
     "deepseek":    "DeepSeek",
     "gemini":      "Gemini",
     "notebooklm":  "NotebookLM",
+    "grok":        "Grok",
+    "kimi":        "Kimi",
     "claude_code": "Claude Code",
     "codex":       "Codex",
     "gemini_cli":  "Gemini CLI",
@@ -56,9 +60,9 @@ SOURCE_LABEL = {
 }
 
 # Classification: which platforms expose a project concept natively
-PROJECT_NATIVE = {"chatgpt", "claude_ai", "qwen", "perplexity"}
+PROJECT_NATIVE = {"chatgpt", "claude_ai", "qwen", "perplexity", "grok"}
 PROJECT_CLI    = {"claude_code", "codex", "gemini_cli", "antigravity_cli"}
-PROJECT_NONE   = {"deepseek", "gemini", "notebooklm"}
+PROJECT_NONE   = {"deepseek", "gemini", "notebooklm", "kimi"}
 
 con = duckdb.connect()
 _setup = setup_unified_views(con, UNIFIED_DIR, sources_filter=None)
@@ -83,9 +87,9 @@ Three buckets, by platform behaviour:
 
 | Bucket | Platforms | What `project*` means |
 |---|---|---|
-| **Native project**       | ChatGPT, Claude.ai, Qwen, Perplexity (spaces) | Manual user grouping inside the platform |
+| **Native project**       | ChatGPT, Claude.ai, Qwen, Perplexity (spaces), Grok (workspaces) | Manual user grouping inside the platform |
 | **CLI working directory**| Claude Code, Codex, Gemini CLI, Antigravity CLI | `cwd` of the session (file path) |
-| **No concept**           | DeepSeek, Gemini, NotebookLM                  | Always NULL by design |
+| **No concept**           | DeepSeek, Gemini, NotebookLM, Kimi             | Always NULL by design; Kimi installed skills are metadata, not conversation links |
 
 ## 1. Coverage by platform
 

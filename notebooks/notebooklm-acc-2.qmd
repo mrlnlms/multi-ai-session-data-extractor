@@ -39,7 +39,7 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **NotebookLM account-2** (`marloonlemes`, pt-BR). Filtered view of the
+> **NotebookLM account-2** (pt-BR). Filtered view of the
 > consolidated folder. For the 3-account view: [`notebooklm.qmd`](notebooklm.html).
 > account-1: [`notebooklm-acc-1.qmd`](notebooklm-acc-1.html). legacy:
 > [`notebooklm-legacy.qmd`](notebooklm-legacy.html).

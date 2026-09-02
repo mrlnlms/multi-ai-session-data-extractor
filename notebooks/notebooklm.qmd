@@ -41,13 +41,11 @@ _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_
 
 > **About NotebookLM (consolidated):** aggregates 3 accounts:
 >
-> - **account-1** (en) — `hello.marlonlemes`
-> - **account-2** (pt-BR) — `marloonlemes`
-> - **account-3** (legacy) — `more.design`, extinct account captured in
->   Mar/2026 by the old extractor. Raw snapshot in
->   `data/external/notebooklm-snapshots/more-design-2026-03-30/`,
->   parquets `notebooklm_manual_*.parquet` via legacy parser
->   (`capture_method = 'legacy_notebooklm_more_design'`).
+> - **account-1** (en)
+> - **account-2** (pt-BR)
+> - **account-3** (legacy account), captured in
+>   Mar/2026 by the old extractor. Its snapshot and legacy-parser parquets
+>   remain part of the local archive.
 >
 > NotebookLM is not pure chat — each notebook generates up to 9 types of
 > outputs (audio, blog, video, flashcards, quiz, data table, slide deck,

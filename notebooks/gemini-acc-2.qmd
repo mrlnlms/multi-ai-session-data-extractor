@@ -33,13 +33,13 @@ MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Gemini"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
 AUX_TABLES     = []
-ACCOUNT_FILTER = "2"  # account-2 only (marloonlemes)
+ACCOUNT_FILTER = "2"  # account-2 only
 
 con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **Gemini account-2** (`marloonlemes`). Filtered view of the
+> **Gemini account-2.** Filtered view of the
 > consolidated folder `data/processed/Gemini/`. For the two-account view:
 > [`gemini.qmd`](gemini.html). For account-1: [`gemini-acc-1.qmd`](gemini-acc-1.html).
 

@@ -39,8 +39,8 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **About Gemini (consolidated):** aggregates account-1 (`hello.marlonlemes`) +
-> account-2 (`marloonlemes`). Raw schema is **positional** (Google batchexecute):
+> **About Gemini (consolidated):** aggregates account-1 + account-2. Raw
+> schema is **positional** (Google batchexecute):
 > paths discovered via probe. 8 models detected, 41% of assistant msgs
 > with thinking, image generation via lh3.googleusercontent.com → ToolEvent +
 > `Message.asset_paths`. Pin discovered via probe (`c[2]` of MaZiqc).

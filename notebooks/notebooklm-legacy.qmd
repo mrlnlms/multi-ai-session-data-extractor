@@ -1,7 +1,7 @@
 ---
-title: "NotebookLM — legacy more.design — Data Profile"
+title: "NotebookLM — legacy account — Data Profile"
 subtitle: "Legacy capture from 2026-03-30 (extinct account). _manual_ parquets via legacy parser."
-source-title: "NotebookLM legacy more.design"
+source-title: "NotebookLM legacy account"
 jupyter: python3
 ---
 
@@ -27,23 +27,22 @@ from src.parsers.quarto_helpers import (
 )
 
 SOURCE_KEY     = "notebooklm"
-SOURCE_TITLE   = "NotebookLM (legacy more.design)"
+SOURCE_TITLE   = "NotebookLM (legacy account)"
 SOURCE_COLOR   = "#0F9D58"  # Google green (legacy)
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "NotebookLM"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
 AUX_TABLES     = ["sources", "notes", "outputs", "guide_questions", "source_guides"]
-ACCOUNT_FILTER = "3"  # account-3 = legacy more.design
+ACCOUNT_FILTER = "3"  # account-3 = legacy account
 
 con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **NotebookLM legacy more.design.** Extinct account (`more.design`, pt-BR),
+> **NotebookLM legacy account.** Extinct account (pt-BR),
 > captured on 2026-03-30 by the old extractor of the parent project. Raw
-> snapshot in `data/external/notebooklm-snapshots/more-design-2026-03-30/`,
-> parquets `notebooklm_manual_*.parquet` via legacy parser
-> (`capture_method = 'legacy_notebooklm_more_design'`). 11 notebooks /
+> snapshot and `notebooklm_manual_*.parquet` remain part of the local archive
+> via the legacy parser. 11 notebooks /
 > 33 msgs / 27 outputs / 6 briefs.
 >
 > For the 3-account view: [`notebooklm.qmd`](notebooklm.html).

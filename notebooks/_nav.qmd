@@ -1,15 +1,21 @@
 
 ::: {.column-screen .nav-bar}
-[🏠 Home](00-overview.html) |
-[💬 ChatGPT](chatgpt.html) |
-[🧠 Claude](claude-ai.html) |
-[♊ Gemini](gemini.html) |
-[📓 NotebookLM](notebooklm.html) |
-[🔍 Perplexity](perplexity.html) |
-[🌊 Qwen](qwen.html) |
-[🐉 DeepSeek](deepseek.html) |
-[⌨️ Claude Code](claude-code.html) |
-[🤖 Codex](codex.html) |
+[🏠 All](00-overview.html)
+[🌐 Web](00-overview-web.html)
+[⌨️ CLI](00-overview-cli.html)
+[📓 RAG](00-overview-rag.html)
+[🗂️ Projects](00-overview-projects.html)
+[💬 ChatGPT](chatgpt.html)
+[🧠 Claude](claude-ai.html)
+[♊ Gemini](gemini.html)
+[📓 NotebookLM](notebooklm.html)
+[🔍 Perplexity](perplexity.html)
+[🌊 Qwen](qwen.html)
+[🐉 DeepSeek](deepseek.html)
+[𝕏 Grok](grok.html)
+[🌙 Kimi](kimi.html)
+[⌨️ Claude Code](claude-code.html)
+[🤖 Codex](codex.html)
 [📟 Gemini CLI](gemini-cli.html)
 [🪐 Antigravity CLI](antigravity-cli.html)
 :::
