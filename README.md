@@ -55,8 +55,8 @@ canonical parsing, and descriptive visualization (Quarto):
 | **Perplexity** | web | threads + pages + spaces + 9 artifact types |
 | **Qwen** | web | 8 chat types (search, research, dalle, etc.), projects |
 | **DeepSeek** | web | R1 reasoning (thinking in ~31% of msgs), token usage |
-| **Gemini** | web | multi-account (2 Google accounts), 8 models |
-| **NotebookLM** | web | 2 active accounts plus a separate legacy archive; 9 output types (audio, video, slide deck, etc.) |
+| **Gemini** | web | multi-account (3 Google accounts), 8 models |
+| **NotebookLM** | web | 3 active accounts plus a separate legacy archive; 9 output types (audio, video, slide deck, etc.) |
 | **Grok** | web | conversations, workspaces, tool events, assets, scheduled tasks |
 | **Kimi** | web | chats, installed skills, tool events, signed asset downloads |
 | **Claude Code** | CLI | local sessions (`~/.claude/projects/`), subagents |
