@@ -112,7 +112,8 @@ These validations require a Pro Max account and remain open until someone tests:
 - **Share URL:** Gemini allows sharing a conversation via public URL.
   This state is not recorded in the conversation body (the server generates the
   URL and keeps it isolated). Not an extractor gap — not capturable.
-- **Multi-account:** support for 2 Google accounts is hardcoded (acc-1, acc-2).
+- **Multi-account:** three active Google accounts are configured (acc-1,
+  acc-2, acc-3); the parser discovers `account-N` directories automatically.
   For more accounts, you would need to adjust `gemini-sync.py` and the
   Quarto template.
 

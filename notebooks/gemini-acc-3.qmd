@@ -1,7 +1,7 @@
 ---
-title: "Gemini — account-2 — Data Profile"
-subtitle: "Descriptive catalog of canonical parser parquets (account-2 only)"
-source-title: "Gemini account-2"
+title: "Gemini — account-3 — Data Profile"
+subtitle: "Descriptive catalog of canonical parser parquets (account-3 only)"
+source-title: "Gemini account-3"
 jupyter: python3
 ---
 
@@ -27,21 +27,21 @@ from src.parsers.quarto_helpers import (
 )
 
 SOURCE_KEY     = "gemini"
-SOURCE_TITLE   = "Gemini (account-2)"
-SOURCE_COLOR   = "#1A73E8"  # Google blue (darker)
+SOURCE_TITLE   = "Gemini (account-3)"
+SOURCE_COLOR   = "#0F9D58"  # Google green
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Gemini"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
 AUX_TABLES     = []
-ACCOUNT_FILTER = "2"  # account-2 only
+ACCOUNT_FILTER = "3"  # account-3 only
 
 con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **Gemini account-2.** Filtered view of the
+> **Gemini account-3.** Filtered view of the
 > consolidated folder `data/processed/Gemini/`. For the consolidated view:
-> [`gemini.qmd`](gemini.html). For account-1 and account-3:
-> [`gemini-acc-1.qmd`](gemini-acc-1.html) / [`gemini-acc-3.qmd`](gemini-acc-3.html).
+> [`gemini.qmd`](gemini.html). For account-1 and account-2:
+> [`gemini-acc-1.qmd`](gemini-acc-1.html) / [`gemini-acc-2.qmd`](gemini-acc-2.html).
 
 {{< include _template.qmd >}}

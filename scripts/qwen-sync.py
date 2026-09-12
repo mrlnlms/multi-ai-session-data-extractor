@@ -30,9 +30,14 @@ from src.extractors.qwen.asset_downloader import download_assets
 from src.extractors.qwen.auth import load_context
 from src.extractors.qwen.orchestrator import BASE_DIR as RAW_DIR, run_export
 from src.reconcilers.qwen import run_reconciliation
+from src.accounts import account_data_dir
 
 
 MERGED_DIR = Path("data/merged/Qwen")
+
+
+def _account_dir(base: Path, account: str) -> Path:
+    return account_data_dir(base, account)
 
 
 def _section(title: str):
@@ -62,8 +67,10 @@ async def main(args: argparse.Namespace) -> int:
 
     if args.dry_run:
         _section("DRY RUN")
-        print(f"  Capture seria escrita em: {RAW_DIR}")
-        print(f"  Reconcile seria em:      {MERGED_DIR}")
+        raw_dir = _account_dir(RAW_DIR, args.account)
+        merged_dir = _account_dir(MERGED_DIR, args.account)
+        print(f"  Capture seria escrita em: {raw_dir}")
+        print(f"  Reconcile seria em:      {merged_dir}")
         print(f"  Modo:                    {'full' if args.full else 'incremental'}")
         print(f"  Etapa 2 (assets):        {'skipped' if args.no_binaries else 'run'}")
         print(f"  Etapa 3 (reconcile):     {'skipped' if args.no_reconcile else 'run'}")
@@ -73,6 +80,7 @@ async def main(args: argparse.Namespace) -> int:
     try:
         raw_dir = await run_export(
             full=args.full, smoke_limit=args.smoke, account=args.account,
+            output_dir=_account_dir(RAW_DIR, args.account),
         )
     except Exception as e:
         print(f"\nERRO na captura: {e}")
@@ -94,7 +102,8 @@ async def main(args: argparse.Namespace) -> int:
         return 0
 
     _section("Etapa 3/3 — Reconcile")
-    report = run_reconciliation(raw_dir, MERGED_DIR, full=args.full)
+    merged_dir = _account_dir(MERGED_DIR, args.account)
+    report = run_reconciliation(raw_dir, merged_dir, full=args.full)
     print(report.summary())
     if report.aborted:
         print(f"  ABORTED: {report.abort_reason}")
@@ -103,7 +112,7 @@ async def main(args: argparse.Namespace) -> int:
         print(f"  Warnings ({len(report.warnings)}):")
         for w in report.warnings[:5]:
             print(f"    - {w}")
-    print(f"\nMerged em: {MERGED_DIR}")
+    print(f"\nMerged em: {merged_dir}")
     print(f"Total elapsed: {time.time() - started:.1f}s")
     return 0
 

@@ -22,9 +22,33 @@ bem-sucedido. Os quatro syncs de CLI ja fazem copy e parse.
 ```bash
 # Fonte web: exemplo ChatGPT
 PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --no-voice-pass
+# Outra conta ChatGPT, depois de executar chatgpt-login.py --profile account-2
+PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --account account-2 --no-voice-pass
 PYTHONPATH=. .venv/bin/python scripts/chatgpt-parse.py
 
-# Gemini ou NotebookLM: as duas contas ativas
+# Outra conta Claude.ai, depois de executar claude-login.py --profile account-2
+PYTHONPATH=. .venv/bin/python scripts/claude-sync.py --profile account-2
+PYTHONPATH=. .venv/bin/python scripts/claude-parse.py
+
+# Outra conta Kimi, depois de executar kimi-login.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/kimi-sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/kimi-parse.py
+
+# Outra conta DeepSeek, depois de executar deepseek-login.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/deepseek-sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/deepseek-parse.py
+
+# Outra conta Qwen, depois de executar qwen-login.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/qwen-sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/qwen-parse.py
+
+# Outra conta Grok ou Perplexity, depois do login no perfil separado
+PYTHONPATH=. .venv/bin/python scripts/grok-sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/grok-parse.py
+PYTHONPATH=. .venv/bin/python scripts/perplexity-sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/perplexity-parse.py
+
+# Gemini e NotebookLM: tres contas ativas
 PYTHONPATH=. .venv/bin/python scripts/gemini-sync.py
 PYTHONPATH=. .venv/bin/python scripts/gemini-parse.py
 PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py
@@ -38,6 +62,15 @@ Cada plataforma tem flags e requisitos proprios. Consulte seu `state.md`
 antes de usar `--full`, `--dry-run`, `--account`, `--headed` ou flags de
 assets. ChatGPT e Perplexity exigem janela visivel durante captura; as demais
 fontes web usam o modo documentado no estado tecnico.
+
+## Proveniencia de conta web
+
+Os parsers web leem opcionalmente `.storage/accounts.json`, um arquivo local
+ignorado pelo Git que associa uma plataforma e um profile tecnico ao e-mail da
+conta. Copie `config/accounts.example.json`, preencha apenas os profiles que
+existem na maquina e mantenha o arquivo em `.storage/`. O parser grava esse
+e-mail na coluna canonica `account`; se nao houver mapeamento, o valor continua
+nulo. Os IDs historicos de conversa nao mudam por causa dessa etiquetagem.
 
 Depois de uma ou mais fontes web processadas:
 

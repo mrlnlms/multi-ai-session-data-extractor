@@ -15,18 +15,19 @@ from pathlib import Path
 from src.extractors.grok.auth import load_context
 from src.extractors.grok.asset_downloader import download_assets
 from src.extractors.grok.orchestrator import BASE_DIR
+from src.accounts import account_data_dir
 
 
 async def main(args):
     context = await load_context(account=args.account, headless=True)
     try:
         stats = await download_assets(
-            context, BASE_DIR, skip_existing=not args.no_skip
+            context, account_data_dir(BASE_DIR, args.account), skip_existing=not args.no_skip
         )
     finally:
         await context.close()
 
-    log_path = BASE_DIR / "assets_log.json"
+    log_path = account_data_dir(BASE_DIR, args.account) / "assets_log.json"
     log_path.write_text(
         json.dumps(stats, ensure_ascii=False, indent=2, default=str),
         encoding="utf-8",

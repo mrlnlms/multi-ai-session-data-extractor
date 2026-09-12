@@ -154,6 +154,35 @@ def compute_processed_stats(parquet_path: Path) -> MergedStats:
     return stats
 
 
+def compute_account_summary(parquet_path: Path) -> list[dict[str, object]]:
+    """Summarize the non-null account provenance in one conversations parquet."""
+    import duckdb
+
+    con = duckdb.connect()
+    rows = con.execute(f"""
+        SELECT
+            account,
+            COUNT(*) AS conversations,
+            COUNT(*) FILTER (WHERE NOT is_preserved_missing) AS active,
+            COUNT(*) FILTER (WHERE is_preserved_missing) AS preserved_missing,
+            MAX(updated_at) AS most_recent_activity
+        FROM '{str(parquet_path)}'
+        WHERE account IS NOT NULL
+        GROUP BY account
+        ORDER BY account
+    """).fetchall()
+    return [
+        {
+            "Account": account,
+            "Conversations": conversations,
+            "Active": active,
+            "Preserved missing": preserved,
+            "Most recent activity": most_recent,
+        }
+        for account, conversations, active, preserved, most_recent in rows
+    ]
+
+
 def compute_merged_stats(merged_json_path: Path) -> MergedStats:
     """Le e agrega stats do merged.json. Custo proporcional ao arquivo."""
     with merged_json_path.open() as f:

@@ -138,6 +138,18 @@ def test_conversation_per_notebook(tmp_path):
     assert df.iloc[0]["mode"] == "chat"
 
 
+def test_account_label_does_not_change_notebook_conversation_id(tmp_path):
+    merged = _build_minimal_merged()
+    merged["notebooks"][0]["account"] = "name@example.com"
+    merged["notebooks"][0]["account_key"] = "1"
+
+    NotebookLMParser().parse(merged, output_dir=tmp_path)
+    df = pd.read_parquet(tmp_path / "notebooklm_conversations.parquet")
+
+    assert df.iloc[0]["conversation_id"] == "account-1_nb-uuid-1"
+    assert df.iloc[0]["account"] == "name@example.com"
+
+
 def test_guide_summary_becomes_system_message(tmp_path):
     """guide.summary vira system msg sequence=0 — garante message_count >= 1."""
     parser = NotebookLMParser()

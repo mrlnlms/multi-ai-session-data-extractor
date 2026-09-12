@@ -133,8 +133,9 @@ class NotebookLMParser:
         source_guides: list,
     ):
         account = str(nb.get("account", "1"))
+        account_key = str(nb.get("account_key", account))
         nb_uuid = nb["uuid"]
-        conv_id = f"account-{account}_{nb_uuid}"
+        conv_id = f"account-{account_key}_{nb_uuid}"
 
         # Timestamps from discovery (preferable) or metadata
         created_at = parse_timestamp(nb.get("create_time"))

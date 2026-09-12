@@ -2,7 +2,9 @@
 
 ## Pipeline
 
-- **Single cumulative folder:** `data/raw/Kimi/` and `data/merged/Kimi/`.
+- **Per-account cumulative folders:** the legacy `default` account remains in
+  `data/raw/Kimi/` and `data/merged/Kimi/`; another profile key uses
+  `account-<key>/` below each tree.
 - **Sync orchestrator (3 steps):** `scripts/kimi-sync.py` (capture +
   assets + reconcile).
 - **Headless capture** (Cloudflare did not block on smoke 2026-05-09).
@@ -25,6 +27,22 @@
 - The canonical parser produced 51 conversations, 1,288 messages, 226 tool
   events, 51 branches, and 4 installed skills; unified parquets were
   regenerated.
+
+### Additional account validation — 2026-09-12
+
+- An isolated `account-2` profile for `mrlnlms.me@gmail.com` captured 5 chats,
+  1 installed skill, and 5 binary files with zero fetch or asset errors.
+- The combined parser produced 56 conversations, 1,389 messages, 249 tool
+  events, 56 branches, and 5 installed skills.
+
+## Commands
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/kimi-sync.py
+PYTHONPATH=. .venv/bin/python scripts/kimi-login.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/kimi-sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/kimi-parse.py
+```
 
 ## Coverage
 

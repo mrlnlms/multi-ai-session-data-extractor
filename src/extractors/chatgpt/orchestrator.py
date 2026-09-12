@@ -68,7 +68,9 @@ def _get_max_known_discovery(raw_root: Path) -> int:
     return max_count
 
 
-async def run_capture(output_dir: Path, options: CaptureOptions) -> CaptureReport:
+async def run_capture(
+    output_dir: Path, options: CaptureOptions, profile_name: str = "default"
+) -> CaptureReport:
     """Roda captura completa do ChatGPT.
 
     Args:
@@ -89,7 +91,7 @@ async def run_capture(output_dir: Path, options: CaptureOptions) -> CaptureRepor
         duration_seconds=0.0,
     )
 
-    profile_dir = get_profile_dir()
+    profile_dir = get_profile_dir(profile_name)
 
     async with async_playwright() as p:
         context = await p.chromium.launch_persistent_context(

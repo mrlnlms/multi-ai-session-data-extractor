@@ -166,7 +166,7 @@ def test_gemini_parser_minimal_conv(tmp_path: Path):
 
 def test_gemini_parser_namespaces_account_in_conv_id(tmp_path: Path):
     merged = tmp_path / "merged" / "Gemini"
-    for acc in [1, 2]:
+    for acc in [1, 2, 3]:
         d = merged / f"account-{acc}" / "conversations"
         d.mkdir(parents=True)
         raw = [[_make_turn(f"q acc {acc}", f"a acc {acc}", 1762000000)], None, None, []]
@@ -180,7 +180,26 @@ def test_gemini_parser_namespaces_account_in_conv_id(tmp_path: Path):
     parser.parse(merged)
 
     ids = {c.conversation_id for c in parser.conversations}
-    assert ids == {"account-1_c_dup", "account-2_c_dup"}
+    assert ids == {"account-1_c_dup", "account-2_c_dup", "account-3_c_dup"}
+
+
+def test_gemini_parser_uses_email_label_without_changing_ids(tmp_path: Path):
+    merged = tmp_path / "merged" / "Gemini"
+    account_dir = merged / "account-1" / "conversations"
+    account_dir.mkdir(parents=True)
+    (account_dir / "c_test.json").write_text(json.dumps({
+        "uuid": "c_test", "raw": [[_make_turn("q", "a", 1762000000)], None, None, []],
+    }))
+
+    parser = GeminiParser(
+        merged_root=merged,
+        account_labels={"account-1": "name@example.com"},
+    )
+    parser.parse(merged)
+
+    assert parser.conversations[0].conversation_id == "account-1_c_test"
+    assert parser.conversations[0].account == "name@example.com"
+    assert {message.account for message in parser.messages} == {"name@example.com"}
 
 
 def test_gemini_parser_preserved_missing(tmp_path: Path):

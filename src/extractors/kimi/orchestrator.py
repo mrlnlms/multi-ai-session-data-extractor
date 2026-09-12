@@ -15,6 +15,7 @@ from src.extractors.kimi.api_client import KimiAPIClient
 from src.extractors.kimi.discovery import discover, persist_discovery
 from src.extractors.kimi.fetcher import fetch_conversations
 from src.extractors.kimi.refetch_known import refetch_known_kimi
+from src.accounts import account_data_dir
 
 
 BASE_DIR = Path("data/raw/Kimi")
@@ -94,9 +95,10 @@ async def run_export(
     smoke_limit: int | None = None,
     account: str = "default",
     headless: bool = True,
+    output_dir: Path | None = None,
 ) -> Path:
     started_at = datetime.now(timezone.utc)
-    output_dir = BASE_DIR
+    output_dir = output_dir or account_data_dir(BASE_DIR, account)
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"Raw output: {output_dir}")
 

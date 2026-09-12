@@ -40,7 +40,8 @@ _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_
 ```
 
 > **Gemini account-1.** Filtered view of the
-> consolidated folder `data/processed/Gemini/`. For the two-account view:
-> [`gemini.qmd`](gemini.html). For account-2: [`gemini-acc-2.qmd`](gemini-acc-2.html).
+> consolidated folder `data/processed/Gemini/`. For the consolidated view:
+> [`gemini.qmd`](gemini.html). For account-2 and account-3:
+> [`gemini-acc-2.qmd`](gemini-acc-2.html) / [`gemini-acc-3.qmd`](gemini-acc-3.html).
 
 {{< include _template.qmd >}}

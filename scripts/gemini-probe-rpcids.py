@@ -143,7 +143,7 @@ async def probe(account: int, hold_seconds: int = 20):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--account", type=int, default=1, choices=[1, 2])
+    parser.add_argument("--account", type=int, default=1, choices=[1, 2, 3])
     parser.add_argument("--hold", type=int, default=20, help="Seconds to wait on homepage")
     args = parser.parse_args()
     asyncio.run(probe(args.account, args.hold))

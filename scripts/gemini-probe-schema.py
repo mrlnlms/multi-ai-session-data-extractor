@@ -57,7 +57,7 @@ def _has_substr(obj, needles: list[str]) -> set[str]:
 
 def main():
     convs_data: list[dict] = []
-    for acc in [1, 2]:
+    for acc in [1, 2, 3]:
         cdir = Path(f"data/merged/Gemini/account-{acc}/conversations")
         if not cdir.exists():
             continue

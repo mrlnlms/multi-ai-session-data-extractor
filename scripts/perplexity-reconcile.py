@@ -5,15 +5,7 @@ import sys
 from pathlib import Path
 
 from src.reconcilers.perplexity import run_reconciliation, FEATURE_FLAGS
-
-
-def _find_latest_raw() -> Path | None:
-    base = Path("data/raw/Perplexity Data")
-    if not base.exists():
-        return None
-    cs = sorted([p for p in base.iterdir() if p.is_dir() and len(p.name) == 16],
-                key=lambda p: p.stat().st_mtime)
-    return cs[-1] if cs else None
+from src.accounts import account_data_dir
 
 
 def main():
@@ -22,14 +14,15 @@ def main():
     p.add_argument("--full", action="store_true")
     p.add_argument("--refetch-features", default=None)
     p.add_argument("--previous-merged", default=None)
+    p.add_argument("--account", default="default")
     a = p.parse_args()
 
-    raw = Path(a.raw_dir) if a.raw_dir else _find_latest_raw()
+    raw = Path(a.raw_dir) if a.raw_dir else account_data_dir(Path("data/raw/Perplexity"), a.account)
     if not raw:
-        print("ERRO: nenhum raw em data/raw/Perplexity Data/"); sys.exit(1)
+        print("ERRO: nenhum raw em data/raw/Perplexity/"); sys.exit(1)
     print(f"Raw: {raw}")
 
-    merged_base = Path("data/merged/Perplexity")
+    merged_base = account_data_dir(Path("data/merged/Perplexity"), a.account)
     prev = Path(a.previous_merged) if a.previous_merged else None
 
     force_feats = None

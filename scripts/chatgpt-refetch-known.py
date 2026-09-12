@@ -31,10 +31,11 @@ from src.extractors.chatgpt.refetch_known import (
     DEFAULT_BATCH_SIZE,
     refetch_known_via_page,
 )
+from src.accounts import account_data_dir
 
 
 async def refetch(account: str, batch_size: int = DEFAULT_BATCH_SIZE) -> None:
-    raw_dir = Path("data/raw/ChatGPT")
+    raw_dir = account_data_dir(Path("data/raw/ChatGPT"), account)
     raw_path = raw_dir / "chatgpt_raw.json"
     if not raw_path.exists():
         print(f"raw nao existe: {raw_path}")
@@ -89,7 +90,7 @@ async def refetch(account: str, batch_size: int = DEFAULT_BATCH_SIZE) -> None:
     print(f"Raw atualizado: {raw_path}")
     print(f"capture_log.jsonl atualizado")
     print("\nProximo passo:")
-    print("  PYTHONPATH=. .venv/bin/python scripts/chatgpt-reconcile.py data/raw/ChatGPT")
+    print(f"  PYTHONPATH=. .venv/bin/python scripts/chatgpt-reconcile.py {raw_dir}")
     print("  PYTHONPATH=. .venv/bin/python scripts/chatgpt-parse.py")
 
 

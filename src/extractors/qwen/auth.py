@@ -1,6 +1,6 @@
 """Playwright login persistente pra Qwen.
 
-Single-account por enquanto (.storage/qwen-profile-default/).
+Cada conta usa um perfil persistente proprio em `.storage/`.
 """
 
 from pathlib import Path

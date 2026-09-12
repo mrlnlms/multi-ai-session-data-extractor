@@ -6,9 +6,11 @@ Le data/merged/NotebookLM/account-{1,2}/ e escreve data/processed/NotebookLM/
 Uso: PYTHONPATH=. .venv/bin/python scripts/notebooklm-parse.py
 """
 
+import argparse
 import json
 from pathlib import Path
 
+from src.accounts import account_email
 from src.parsers.notebooklm import NotebookLMParser
 
 
@@ -16,7 +18,7 @@ MERGED_BASE = Path("data/merged/NotebookLM")
 PROCESSED_DIR = Path("data/processed/NotebookLM")
 
 
-def _load_account(account_dir: Path, account: str) -> dict:
+def _load_account(account_dir: Path, account_key: str, account_label: str) -> dict:
     """Le notebooks/sources/artifacts/mind_map_trees do merged dir per-account.
 
     Retorna dict com 'notebooks' (list) e 'sources' (dict).
@@ -57,7 +59,8 @@ def _load_account(account_dir: Path, account: str) -> dict:
             continue
 
         # Inject account
-        nb["account"] = account
+        nb["account"] = account_label
+        nb["account_key"] = account_key
 
         # Merge timestamps from discovery se disponivel
         disc = discovery.get(nb_uuid)
@@ -135,17 +138,23 @@ def _load_account(account_dir: Path, account: str) -> dict:
     return {"notebooks": notebooks, "sources": sources, "source_guides": source_guides}
 
 
-def main():
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+def main(argv: list[str] | None = None):
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--merged-root", type=Path, default=MERGED_BASE)
+    ap.add_argument("--output-dir", type=Path, default=PROCESSED_DIR)
+    ap.add_argument("--accounts-file", type=Path, default=Path(".storage/accounts.json"))
+    args = ap.parse_args(argv)
+    args.output_dir.mkdir(parents=True, exist_ok=True)
     merged_combined = {"notebooks": [], "sources": {}, "source_guides": {}}
 
-    if not MERGED_BASE.exists():
-        print(f"ERRO: merged base nao existe: {MERGED_BASE}")
+    if not args.merged_root.exists():
+        print(f"ERRO: merged base nao existe: {args.merged_root}")
         return 1
 
-    for account_dir in sorted(MERGED_BASE.glob("account-*")):
-        account = account_dir.name.replace("account-", "")
-        data = _load_account(account_dir, account)
+    for account_dir in sorted(args.merged_root.glob("account-*")):
+        account_key = account_dir.name.replace("account-", "")
+        account_label = account_email("notebooklm", account_dir.name, args.accounts_file) or account_key
+        data = _load_account(account_dir, account_key, account_label)
         merged_combined["notebooks"].extend(data["notebooks"])
         merged_combined["sources"].update(data["sources"])
         merged_combined["source_guides"].update(data.get("source_guides", {}))
@@ -153,12 +162,12 @@ def main():
               f"{len(data['sources'])} sources, {len(data.get('source_guides', {}))} source guides")
 
     parser = NotebookLMParser()
-    stats = parser.parse(merged_combined, output_dir=PROCESSED_DIR)
+    stats = parser.parse(merged_combined, output_dir=args.output_dir)
     print()
     print("=== STATS ===")
     for k, v in stats.items():
         print(f"  {k}: {v}")
-    print(f"\nParquets em: {PROCESSED_DIR}")
+    print(f"\nParquets em: {args.output_dir}")
     return 0
 
 

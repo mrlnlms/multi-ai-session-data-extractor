@@ -43,14 +43,15 @@ from src.extractors.chatgpt.models import CaptureOptions
 from src.extractors.chatgpt.orchestrator import run_capture
 from src.extractors.chatgpt.project_sources import download_project_sources
 from src.reconcilers.chatgpt import run_reconciliation
+from src.accounts import account_data_dir
 
 
-def _default_output_dir() -> Path:
-    """Pasta unica cumulativa — sempre o mesmo path."""
-    return Path("data/raw/ChatGPT")
+def _account_dir(base: Path, account: str) -> Path:
+    """Keep the legacy default tree stable; isolate every additional account."""
+    return account_data_dir(base, account)
 
 
-async def _download_project_sources_for(raw_dir: Path) -> dict:
+async def _download_project_sources_for(raw_dir: Path, account: str) -> dict:
     """Wrapper async que abre Playwright e baixa project_sources delta."""
     import json
     raw_path = raw_dir / "chatgpt_raw.json"
@@ -69,7 +70,7 @@ async def _download_project_sources_for(raw_dir: Path) -> dict:
     if not pids:
         return {"project_ids": 0, "downloaded": 0}
 
-    profile_dir = get_profile_dir()
+    profile_dir = get_profile_dir(account)
     async with async_playwright() as p:
         context = await p.chromium.launch_persistent_context(
             str(profile_dir), headless=True,
@@ -86,6 +87,7 @@ def main():
         description="Captura + binarios + reconcile ChatGPT em uma rodada"
     )
     parser.add_argument("--output-dir", type=Path, default=None)
+    parser.add_argument("--account", default="default", help="Technical ChatGPT profile key")
     parser.add_argument("--no-voice-pass", action="store_true",
                        help="Pula DOM voice pass na captura")
     parser.add_argument("--dry-run", action="store_true",
@@ -102,7 +104,7 @@ def main():
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(message)s")
 
-    output_dir = args.output_dir or _default_output_dir()
+    output_dir = args.output_dir or _account_dir(Path("data/raw/ChatGPT"), args.account)
     options = CaptureOptions(
         skip_voice=args.no_voice_pass,
         dry_run=args.dry_run,
@@ -113,7 +115,7 @@ def main():
     print("=" * 60)
     print("ETAPA 1/4: Captura de conversas")
     print("=" * 60)
-    capture_report = asyncio.run(run_capture(output_dir, options))
+    capture_report = asyncio.run(run_capture(output_dir, options, profile_name=args.account))
     print("\n" + capture_report.summary())
 
     if args.dry_run:
@@ -132,14 +134,14 @@ def main():
         print(f"Canvas: extracted={c['extracted']}, skip={c['skipped_existing']}, err={len(c['errors'])}")
         r = extract_deep_research(actual_raw_dir)
         print(f"Deep Research: extracted={r['extracted']}, skip={r['skipped_existing']}, err={len(r['errors'])}")
-        asset_report = asyncio.run(run_asset_download(actual_raw_dir))
+        asset_report = asyncio.run(run_asset_download(actual_raw_dir, profile_name=args.account))
         print(asset_report.summary())
 
         # ETAPA 3: Download project_sources delta
         print("\n" + "=" * 60)
         print("ETAPA 3/4: Download project sources (delta)")
         print("=" * 60)
-        ps_report = asyncio.run(_download_project_sources_for(actual_raw_dir))
+        ps_report = asyncio.run(_download_project_sources_for(actual_raw_dir, args.account))
         print(f"Projects scaneados: {ps_report.get('projects_scanned', 0)} "
               f"({ps_report.get('projects_with_files', 0)} com files)")
         print(f"Files: total={ps_report.get('total_files', 0)}, "
@@ -155,7 +157,7 @@ def main():
     print("\n" + "=" * 60)
     print("ETAPA 4/4: Reconciliacao")
     print("=" * 60)
-    merged_base = Path("data/merged/ChatGPT")
+    merged_base = _account_dir(Path("data/merged/ChatGPT"), args.account)
     reconcile_report = run_reconciliation(actual_raw_dir, merged_base)
     if reconcile_report.aborted:
         print(f"\nRECONCILER ABORTOU: {reconcile_report.abort_reason}")

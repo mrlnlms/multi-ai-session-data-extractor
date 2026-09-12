@@ -222,3 +222,45 @@ class TestOrchestratorFallback:
 
         await orch.run_export(account="1")
         refetch_mock.assert_not_awaited()
+
+    async def test_incremental_run_fetches_notebook_missing_from_partial_smoke_raw(self, tmp_path, mocker):
+        """A smoke run may leave one saved notebook while discovery has more."""
+        from src.extractors.notebooklm import orchestrator as orch
+
+        account_dir = tmp_path / "account-1"
+        notebooks = account_dir / "notebooks"
+        notebooks.mkdir(parents=True)
+        (notebooks / "u-existing.json").write_text(
+            json.dumps({"metadata": [], "notes": [], "audios": []}), encoding="utf-8"
+        )
+
+        mocker.patch.object(orch, "BASE_DIR", tmp_path)
+        ctx_mock = mocker.AsyncMock()
+        mocker.patch.object(orch, "load_context", new_callable=mocker.AsyncMock, return_value=ctx_mock)
+        mocker.patch.object(orch, "load_session", new_callable=mocker.AsyncMock, return_value={})
+        mocker.patch.object(orch, "NotebookLMClient", return_value=mocker.MagicMock())
+        mocker.patch.object(
+            orch, "discover", new_callable=mocker.AsyncMock,
+            return_value=[
+                {"uuid": "u-existing", "title": "Existing"},
+                {"uuid": "u-new", "title": "New"},
+            ],
+        )
+        mocker.patch.object(orch, "persist_discovery")
+        mocker.patch.object(
+            orch, "lite_fetch_notebook", new_callable=mocker.AsyncMock,
+            return_value={"metadata": [], "notes": [], "audios": []},
+        )
+        fetch_mock = mocker.patch.object(
+            orch, "fetch_notebook", new_callable=mocker.AsyncMock,
+            return_value={
+                "rpcs_ok": 6, "rpcs_empty": 0, "rpcs_errors": [],
+                "sources_fetched": 0, "n_source_uuids": 0, "sources_errors": [],
+                "artifacts_fetched_individual": 0, "mind_map_fetched": False,
+            },
+        )
+
+        await orch.run_export(account="1")
+
+        fetch_mock.assert_awaited_once()
+        assert fetch_mock.await_args.args[1] == "u-new"

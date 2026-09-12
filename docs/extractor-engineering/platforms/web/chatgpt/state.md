@@ -2,7 +2,9 @@
 
 ## Pipeline
 
-- **Single cumulative folder:** `data/raw/ChatGPT/` and `data/merged/ChatGPT/`.
+- **Per-account cumulative folders:** the legacy `default` account remains in
+  `data/raw/ChatGPT/` and `data/merged/ChatGPT/`; another profile key uses
+  `account-<key>/` below each tree.
 - **Sync orchestrator (4 steps):** `scripts/chatgpt-sync.py` — capture +
   assets + project_sources + reconcile.
 - **Capture:** **headed** (Cloudflare detects headless). Project discovery is
@@ -26,7 +28,8 @@
 
 ## Reference volume
 
-- 1207 cumulative conversations (1204 server-discovered + 3 preserved_missing).
+- 1249 cumulative conversations: 1207 in the legacy default account and 42 in
+  `account-2` (discovered 2026-09-12).
 - `LAST_RECONCILE.md` and `reconcile_log.jsonl` updated on every run.
 
 ## Canonical parser
@@ -47,7 +50,7 @@ messages.parquet, tool_events.parquet, branches.parquet.
 
 ### Typical volume
 
-1207 convs / 18,922 msgs / 3201 tool_events. Byte-for-byte idempotent after
+1249 convs / 21,765 msgs / 4071 tool_events. Byte-for-byte idempotent after
 the source's volatile server fields are normalized by the pipeline.
 
 ## Descriptive Quarto
@@ -62,9 +65,16 @@ the source's volatile server fields are normalized by the pipeline.
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --no-voice-pass
+# Login and sync an additional account once; its parser output is combined.
+PYTHONPATH=. .venv/bin/python scripts/chatgpt-login.py --profile account-2
+PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --account account-2 --no-voice-pass
 PYTHONPATH=. .venv/bin/python scripts/chatgpt-parse.py
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/chatgpt.qmd
 ```
+
+The optional local `.storage/accounts.json` maps profile keys to the e-mail
+written to the canonical `account` field. It does not change upstream
+conversation IDs.
 
 Without `QUARTO_PYTHON`, Quarto tries the system python and fails due to
 missing deps (duckdb, plotly, itables).

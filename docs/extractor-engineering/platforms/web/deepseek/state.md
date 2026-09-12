@@ -2,12 +2,13 @@
 
 ## Pipeline
 
-- **Single cumulative folder:** `data/raw/DeepSeek/` and `data/merged/DeepSeek/`.
+- **Pastas cumulativas por conta:** a conta padrao usa `data/raw/DeepSeek/`
+  e `data/merged/DeepSeek/`; as demais usam `account-<n>/` sob essas raizes.
 - **Sync orchestrator (2 steps):** `scripts/deepseek-sync.py` (capture +
   reconcile).
 - **Headless capture.**
-- **Auth:** default persistent profile in `.storage/deepseek-profile-default/`
-  (generated via `scripts/deepseek-login.py`). A profile can remain present
+- **Auth:** perfis persistentes em `.storage/deepseek-profile-<account>/`
+  (gerados via `scripts/deepseek-login.py --account <account>`). A profile can remain present
   after its `userToken` expires, so validate a minimal API request first.
 
 ## Coverage
@@ -25,6 +26,16 @@ projects (DeepSeek does not expose them).
   historical session (83 total).
 - The parser produced 83 conversations, 732 messages, 20 tool events, and
   275 branches; unified parquets were regenerated.
+
+### Additional account collection — 2026-09-12
+
+- A second personal account was captured through its own persistent browser
+  profile and isolated raw/merged trees.
+- Discovery found 1 current session; the smoke capture fetched it without
+  errors, and the following incremental run reused it.
+- The combined parser output has 84 conversations, 734 messages, 20 tool
+  events, and 276 branches. The canonical `account` field distinguishes the
+  two accounts by their configured email addresses.
 
 ### Historical reference volume
 
@@ -81,4 +92,14 @@ projects (DeepSeek does not expose them).
 PYTHONPATH=. .venv/bin/python scripts/deepseek-sync.py
 PYTHONPATH=. .venv/bin/python scripts/deepseek-parse.py
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/deepseek.qmd
+```
+
+Para uma conta adicional, use um perfil e uma arvore isolados; o parser reune
+as arvores e registra o email configurado em `.storage/accounts.json` no campo
+`account` dos Parquets:
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/deepseek-login.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/deepseek-sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/deepseek-parse.py
 ```

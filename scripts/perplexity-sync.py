@@ -26,9 +26,14 @@ from pathlib import Path
 
 from src.extractors.perplexity.orchestrator import run_export, BASE_DIR as RAW_DIR
 from src.reconcilers.perplexity import run_reconciliation
+from src.accounts import account_data_dir
 
 
 MERGED_DIR = Path("data/merged/Perplexity")
+
+
+def _account_dir(base: Path, account: str) -> Path:
+    return account_data_dir(base, account)
 
 
 def _section(title: str):
@@ -43,8 +48,10 @@ async def main(args: argparse.Namespace) -> int:
 
     if args.dry_run:
         _section("DRY RUN (sem efeitos)")
-        print(f"  Capture seria escrita em: {RAW_DIR}")
-        print(f"  Reconcile seria escrita em: {MERGED_DIR}")
+        raw_dir = _account_dir(RAW_DIR, args.account)
+        merged_dir = _account_dir(MERGED_DIR, args.account)
+        print(f"  Capture seria escrita em: {raw_dir}")
+        print(f"  Reconcile seria escrita em: {merged_dir}")
         print(f"  Modo: {'full' if args.full else 'incremental'}")
         print(f"  Reconcile: {'skipped' if args.no_reconcile else 'run'}")
         return 0
@@ -54,7 +61,11 @@ async def main(args: argparse.Namespace) -> int:
     # ============================================================
     _section("Etapa 1/2 — Capture")
     try:
-        raw_dir = await run_export(full=args.full, account=args.account)
+        raw_dir = await run_export(
+            full=args.full,
+            account=args.account,
+            output_dir=_account_dir(RAW_DIR, args.account),
+        )
     except Exception as e:
         print(f"\nERRO na captura: {e}")
         return 1
@@ -68,7 +79,8 @@ async def main(args: argparse.Namespace) -> int:
     # Etapa 2: Reconcile
     # ============================================================
     _section("Etapa 2/2 — Reconcile")
-    report = run_reconciliation(raw_dir, MERGED_DIR)
+    merged_dir = _account_dir(MERGED_DIR, args.account)
+    report = run_reconciliation(raw_dir, merged_dir)
     print(report.summary())
     if report.aborted:
         print(f"  ABORTED: {report.abort_reason}")
@@ -77,7 +89,7 @@ async def main(args: argparse.Namespace) -> int:
         print(f"  Warnings ({len(report.warnings)}):")
         for w in report.warnings[:5]:
             print(f"    - {w}")
-    print(f"\nMerged em: {MERGED_DIR}")
+    print(f"\nMerged em: {merged_dir}")
     print(f"Total elapsed: {time.time() - started:.1f}s")
     return 0
 

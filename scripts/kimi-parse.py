@@ -7,6 +7,7 @@ Uso:
 import argparse
 from pathlib import Path
 
+from src.accounts import account_email
 from src.parsers.kimi import KimiParser
 
 
@@ -15,10 +16,28 @@ def main():
     ap.add_argument("--merged", default="data/merged/Kimi")
     ap.add_argument("--out", default="data/processed/Kimi")
     ap.add_argument("--account", default=None)
+    ap.add_argument("--accounts-file", type=Path, default=Path(".storage/accounts.json"))
     args = ap.parse_args()
 
-    parser = KimiParser(account=args.account, merged_root=Path(args.merged))
-    parser.parse(Path(args.merged))
+    merged_root = Path(args.merged)
+    account_trees = [("default", merged_root)]
+    for account_dir in sorted(merged_root.glob("account-*")):
+        if account_dir.is_dir():
+            account_trees.append((account_dir.name, account_dir))
+
+    parser = KimiParser(merged_root=merged_root)
+    parser.reset()
+    for profile, tree in account_trees:
+        account = args.account or account_email("kimi", profile, args.accounts_file)
+        per_account = KimiParser(account=account, merged_root=tree)
+        per_account.parse(tree)
+        parser.conversations.extend(per_account.conversations)
+        parser.messages.extend(per_account.messages)
+        parser.events.extend(per_account.events)
+        parser.branches.extend(per_account.branches)
+        parser.skills["official"].extend(per_account.skills.get("official") or [])
+        parser.skills["installed"].extend(per_account.skills.get("installed") or [])
+        parser.assets_manifest.update(per_account.assets_manifest)
     parser.save(Path(args.out))
 
     print(
