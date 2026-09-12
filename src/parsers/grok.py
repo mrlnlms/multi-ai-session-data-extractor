@@ -71,6 +71,7 @@ class GrokParser(BaseParser):
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Grok")
         self.workspaces: list[dict] = []
         self.assets: list[dict] = []
+        self.asset_path_overrides: dict[str, str] = {}
         self.scheduled_tasks: dict = {}
         self.conversation_projects: list[ConversationProject] = []
 
@@ -78,6 +79,7 @@ class GrokParser(BaseParser):
         super().reset()
         self.workspaces = []
         self.assets = []
+        self.asset_path_overrides = {}
         self.scheduled_tasks = {}
         self.conversation_projects = []
 
@@ -372,7 +374,7 @@ class GrokParser(BaseParser):
                 "inline_status": a.get("inlineStatus") or "",
                 "summary": a.get("summary") or "",
                 "preview_image_key": a.get("previewImageKey") or "",
-                "asset_path": bin_index.get(aid) or "",
+                "asset_path": self.asset_path_overrides.get(aid) or bin_index.get(aid) or "",
                 "is_preserved_missing": bool(a.get("_preserved_missing", False)),
                 "created_at": self._ts(a.get("createTime")),
                 "last_use_time": self._ts(a.get("lastUseTime")),

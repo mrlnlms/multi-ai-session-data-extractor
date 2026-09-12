@@ -1,6 +1,6 @@
 """Playwright login persistente pra Grok.
 
-Single-account por enquanto (.storage/grok-profile-default/).
+Cada conta usa um perfil persistente proprio em `.storage/`.
 Login via grok.com (pode pedir SSO da conta X — fluxo headed cobre).
 """
 

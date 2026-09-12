@@ -10,13 +10,14 @@ from pathlib import Path
 from playwright.async_api import async_playwright, BrowserContext
 
 
-VALID_ACCOUNTS = ("1", "2")
+VALID_ACCOUNTS = ("1", "2", "3")
 
 # Lang (hl param) por conta — afeta labels em metadata de RPCs (ex: "Deep Dive" vs "Aprofundar").
 # Conteudo do user (chat, notes, source text) eh na lingua que foi escrito, independente do hl.
 ACCOUNT_LANG = {
     "1": "en",
     "2": "pt-BR",
+    "3": "pt-BR",
 }
 
 

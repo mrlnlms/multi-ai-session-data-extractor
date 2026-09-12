@@ -13,7 +13,7 @@ from src.extractors.gemini.orchestrator import run_export
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--account", type=int, default=1, choices=[1, 2])
+    parser.add_argument("--account", type=int, default=1, choices=[1, 2, 3])
     parser.add_argument("--full", action="store_true", help="Re-fetch tudo")
     parser.add_argument("--smoke", type=int, default=None, help="Smoke: limita N convs")
     args = parser.parse_args()

@@ -23,7 +23,7 @@ def _find_latest_raw(account: int) -> Path | None:
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--account", type=int, required=True, choices=[1, 2])
+    p.add_argument("--account", type=int, required=True, choices=[1, 2, 3])
     p.add_argument("raw_dir", nargs="?", default=None)
     p.add_argument("--full", action="store_true")
     p.add_argument("--previous-merged", default=None)

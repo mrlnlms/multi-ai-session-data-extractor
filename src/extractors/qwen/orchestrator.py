@@ -18,6 +18,7 @@ from src.extractors.qwen.api_client import QwenAPIClient
 from src.extractors.qwen.discovery import discover, persist_discovery
 from src.extractors.qwen.fetcher import fetch_conversations
 from src.extractors.qwen.refetch_known import refetch_known_qwen
+from src.accounts import account_data_dir
 
 
 BASE_DIR = Path("data/raw/Qwen")
@@ -100,9 +101,10 @@ async def run_export(
     full: bool = False,
     smoke_limit: int | None = None,
     account: str = "default",
+    output_dir: Path | None = None,
 ) -> Path:
     started_at = datetime.now(timezone.utc)
-    output_dir = BASE_DIR
+    output_dir = output_dir or account_data_dir(BASE_DIR, account)
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"Raw output: {output_dir}")
 

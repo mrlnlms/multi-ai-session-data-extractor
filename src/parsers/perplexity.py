@@ -134,9 +134,15 @@ def _featured_image_paths(entry: dict, manifest: dict) -> list[str]:
 class PerplexityParser(BaseParser):
     source_name = "perplexity"
 
-    def __init__(self, account: Optional[str] = None, merged_root: Optional[Path] = None):
+    def __init__(
+        self,
+        account: Optional[str] = None,
+        merged_root: Optional[Path] = None,
+        raw_root: Optional[Path] = None,
+    ):
         super().__init__(account)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Perplexity")
+        self.raw_root = Path(raw_root) if raw_root else Path("data/raw/Perplexity")
 
     def reset(self):
         super().reset()
@@ -150,7 +156,7 @@ class PerplexityParser(BaseParser):
         # Carrega manifest de attachments
         att_manifest: dict = {}
         for candidate in [
-            Path("data/raw/Perplexity/thread_attachments_manifest.json"),
+            self.raw_root / "thread_attachments_manifest.json",
             self.merged_root / "thread_attachments_manifest.json",
         ]:
             if candidate.exists():

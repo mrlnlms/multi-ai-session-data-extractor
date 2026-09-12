@@ -18,6 +18,7 @@ from dashboard import quarto
 from dashboard.data import PlatformState, directory_size_bytes
 from dashboard.metrics import (
     compute_merged_stats,
+    compute_account_summary,
     compute_processed_stats,
     compute_project_sources_stats,
     discovery_drop_flag,
@@ -34,6 +35,11 @@ def _cached_merged_stats(merged_path_str: str, mtime: float):
 @st.cache_data(show_spinner=False)
 def _cached_processed_stats(parquet_path_str: str, mtime: float):
     return compute_processed_stats(Path(parquet_path_str))
+
+
+@st.cache_data(show_spinner=False)
+def _cached_account_summary(parquet_path_str: str, mtime: float):
+    return compute_account_summary(Path(parquet_path_str))
 
 
 @st.cache_data(show_spinner=False)
@@ -316,6 +322,12 @@ def _render_metrics(state: PlatformState) -> None:
     cols[1].metric("Most recent activity", format_datetime(merged.newest_update_time))
 
     st.metric("Estimated messages", f"{merged.total_messages_estimated:,}")
+
+    if parquet is not None:
+        account_rows = _cached_account_summary(str(parquet), parquet.stat().st_mtime)
+        if account_rows:
+            st.subheader("Accounts")
+            st.dataframe(pd.DataFrame(account_rows), hide_index=True, width="stretch")
 
     if merged.creation_by_month:
         st.plotly_chart(_creation_chart(merged), width="stretch")

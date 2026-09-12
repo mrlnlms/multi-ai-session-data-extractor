@@ -2,7 +2,8 @@
 
 ## Pipeline
 
-- **Single cumulative folder:** `data/raw/Grok/` and `data/merged/Grok/`.
+- **Pastas cumulativas por conta:** a conta padrao usa `data/raw/Grok/` e
+  `data/merged/Grok/`; as demais usam `account-<n>/` sob essas raizes.
 - **Sync orchestrator (3 steps):** `scripts/grok-sync.py` (capture +
   assets + reconcile).
 - **Headless capture** (Cloudflare did not block on smoke 2026-05-09).
@@ -137,3 +138,15 @@ Endpoints chave:
 - `GET /rest/workspaces/{wid}` — detail with `customPersonality`
 
 Cursor pagination via `nextPageToken`. Cookies-only auth.
+
+## Additional account
+
+Uma conta adicional usa perfil, raw e merged isolados. O parser reune as
+arvores e grava o e-mail configurado em `.storage/accounts.json` no campo
+`account` dos Parquets:
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/grok-login.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/grok-sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/grok-parse.py
+```

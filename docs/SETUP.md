@@ -87,6 +87,9 @@ python scripts/grok-login.py
 python scripts/kimi-login.py
 ```
 
+Para uma segunda conta de uma plataforma, use um perfil separado, por exemplo
+`python scripts/deepseek-login.py --account account-2`.
+
 Para Gemini e NotebookLM, informe a conta explicitamente:
 
 ```bash
@@ -117,13 +120,52 @@ Comece por uma plataforma para validar o ambiente:
 python scripts/chatgpt-sync.py
 ```
 
+For another ChatGPT account, create and log into an isolated extractor profile
+once, then pass the same key to sync. The default account keeps the original
+paths; `account-2` uses its own raw and merged subdirectories.
+
+```bash
+python scripts/chatgpt-login.py --profile account-2
+python scripts/chatgpt-sync.py --account account-2 --no-voice-pass
+python scripts/chatgpt-parse.py
+```
+
+Claude.ai follows the same profile-key pattern:
+
+```bash
+python scripts/claude-login.py --profile account-2
+python scripts/claude-sync.py --profile account-2
+python scripts/claude-parse.py
+```
+
+Kimi also uses a named isolated profile for each additional account:
+
+```bash
+python scripts/kimi-login.py --account account-2
+python scripts/kimi-sync.py --account account-2
+python scripts/kimi-parse.py
+```
+
+Grok e Perplexity seguem o mesmo padrao quando uma segunda conta existir:
+
+```bash
+python scripts/grok-login.py --account account-2
+python scripts/grok-sync.py --account account-2
+python scripts/grok-parse.py
+
+python scripts/perplexity-login.py --account account-2
+python scripts/perplexity-sync.py --account account-2
+python scripts/perplexity-parse.py
+```
+
 Um sync web executado diretamente faz captura, download de assets e
 reconciliacao:
 
-1. **Captura** — baixa pela API interna e salva em `data/raw/ChatGPT/`.
+1. **Captura** — baixa pela API interna e salva em `data/raw/ChatGPT/` para
+   `default`, ou em `data/raw/ChatGPT/account-<key>/` para outra conta.
 2. **Assets** — imagens, uploads, arquivos de projeto e equivalentes.
 3. **Reconciliacao** — consolida com a captura anterior em
-   `data/merged/ChatGPT/`. Conversas que sumiram do servidor ficam com
+   `data/merged/ChatGPT/` (ou na subpasta da conta). Conversas que sumiram do servidor ficam com
    `is_preserved_missing=True`.
 
 Ao executar um sync web diretamente, rode depois o parser para converter o
@@ -148,9 +190,9 @@ Isso materializa os Parquets unificados em `data/unified/`.
 
 ## 5. Multiplas contas (Gemini, NotebookLM)
 
-Gemini e NotebookLM tem duas contas interativas suportadas (`1` e `2`). O
-acervo legacy do NotebookLM e preservado e processado pelo fluxo dedicado; nao
-e uma terceira conta para login ou sync atual.
+Gemini e NotebookLM tem tres contas interativas suportadas (`1`, `2` e `3`).
+(`1`, `2` e `3`). O acervo legacy do NotebookLM continua preservado e
+processado pelo fluxo dedicado, separado das contas de login atuais.
 
 Para Gemini:
 
@@ -158,15 +200,17 @@ Para Gemini:
 # Login to each account separately
 python scripts/gemini-login.py --account 1
 python scripts/gemini-login.py --account 2
+python scripts/gemini-login.py --account 3
 
-# Sync both accounts
+# Sync all accounts
 python scripts/gemini-sync.py
 
 # Or just one
 python scripts/gemini-sync.py --account 1
 ```
 
-Para NotebookLM, use o mesmo padrao com `--account 1` ou `--account 2`.
+Para NotebookLM, use o mesmo padrao com `--account 1`, `--account 2` ou
+`--account 3`.
 
 ## 6. Problemas comuns
 

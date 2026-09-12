@@ -393,6 +393,7 @@ def extract_deep_research(raw_dir: Path, skip_existing: bool = True) -> dict:
 async def run_asset_download(
     raw_dir: Path,
     only_conv_ids: list[str] | None = None,
+    profile_name: str = "default",
 ) -> AssetReport:
     """Orquestrador: itera raw, baixa todos os image_asset_pointer via API."""
     from playwright.async_api import async_playwright
@@ -421,7 +422,7 @@ async def run_asset_download(
     async with async_playwright() as p:
         # Playwright so usado pra obter token de sessao — nao abre pagina
         context = await p.chromium.launch_persistent_context(
-            str(get_profile_dir()),
+            str(get_profile_dir(profile_name)),
             headless=True,
             args=["--disable-blink-features=AutomationControlled"],
         )

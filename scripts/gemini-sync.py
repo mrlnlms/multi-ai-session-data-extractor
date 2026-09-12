@@ -5,10 +5,11 @@ Etapas (por conta):
     2. Assets      -> Deep Research PDFs offline + imagens online
     3. Reconcile   -> data/merged/Gemini/account-{N}/ (cumulativo)
 
-Multi-conta: por default roda ambas (1 e 2). Use --account N pra rodar so uma.
+Multi-conta: por default roda todas as contas ativas (1, 2 e 3). Use
+--account N pra rodar so uma.
 
 Flags:
-    --account {1,2}   roda so a conta indicada (default: ambas)
+    --account {1,2,3} roda so a conta indicada (default: todas)
     --no-binaries     pula etapa 2 (assets)
     --no-reconcile    pula etapa 3
     --full            forca refetch full
@@ -111,7 +112,7 @@ async def main(args: argparse.Namespace) -> int:
 
     if args.dry_run:
         _section("DRY RUN")
-        accounts = [args.account] if args.account else [1, 2]
+        accounts = [args.account] if args.account else [1, 2, 3]
         for acc in accounts:
             print(f"  Account {acc}:")
             print(f"    Capture:   data/raw/Gemini/account-{acc}/")
@@ -121,7 +122,7 @@ async def main(args: argparse.Namespace) -> int:
         print(f"  Etapa 3:     {'skipped' if args.no_reconcile else 'run'}")
         return 0
 
-    accounts = [args.account] if args.account else [1, 2]
+    accounts = [args.account] if args.account else [1, 2, 3]
     overall = 0
     for acc in accounts:
         rc = await _sync_account(args, acc)
@@ -135,8 +136,8 @@ async def main(args: argparse.Namespace) -> int:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--account", type=int, choices=[1, 2], default=None,
-                    help="Roda so a conta indicada (default: ambas)")
+    ap.add_argument("--account", type=int, choices=[1, 2, 3], default=None,
+                    help="Roda so a conta indicada (default: todas)")
     ap.add_argument("--no-binaries", action="store_true", help="Pula etapa 2 (assets)")
     ap.add_argument("--no-reconcile", action="store_true")
     ap.add_argument("--full", action="store_true")

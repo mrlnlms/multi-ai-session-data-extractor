@@ -235,11 +235,14 @@ async def run_export(
                     lite = await lite_fetch_notebook(client, nb["uuid"])
                 prev_path = output_dir / "notebooks" / f"{nb['uuid']}.json"
                 if not prev_path.exists():
-                    return ("fetch", nb)
+                    # Keep the classifier result shape uniform: a smoke run
+                    # can leave a partial raw tree while discovery lists more
+                    # notebooks on the next incremental run.
+                    return ("fetch", nb, ["new"])
                 try:
                     prev = json.loads(prev_path.read_text(encoding="utf-8"))
                 except Exception:
-                    return ("fetch", nb)
+                    return ("fetch", nb, ["unreadable"])
                 same_meta = _lite_metadata_equal(lite["metadata"], prev.get("metadata"))
                 same_notes = _eq_lenient(lite["notes"], prev.get("notes"))
                 same_audios = _eq_lenient(lite["audios"], prev.get("audios"))

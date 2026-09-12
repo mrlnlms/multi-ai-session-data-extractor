@@ -53,7 +53,7 @@ async def main(raw_dir: Path, account: int, artifacts_only: bool):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--account", type=int, default=1, choices=[1, 2])
+    parser.add_argument("--account", type=int, default=1, choices=[1, 2, 3])
     parser.add_argument("raw_dir", nargs="?", default=None)
     parser.add_argument("--artifacts-only", action="store_true",
                         help="So extrai Deep Research, pula download de imagens")

@@ -20,6 +20,7 @@ from src.extractors.claude_ai.api_client import ClaudeAPIClient
 from src.extractors.claude_ai.discovery import discover, persist_discovery
 from src.extractors.claude_ai.fetcher import fetch_conversations, fetch_projects
 from src.extractors.claude_ai.refetch_known import refetch_known_claude_ai
+from src.accounts import account_data_dir
 
 
 BASE_DIR = Path("data/raw/Claude.ai")
@@ -113,6 +114,7 @@ async def run_export(
     full: bool = False,
     smoke_limit: int | None = None,
     headless: bool = True,
+    output_dir: Path | None = None,
 ) -> Path:
     """Roda o pipeline completo: discovery + fetch convs + fetch projects.
 
@@ -123,10 +125,10 @@ async def run_export(
         headless: True por default (Claude.ai aceita headless em runtime)
 
     Returns:
-        Path do diretorio raw (sempre BASE_DIR — pasta unica cumulativa).
+        Path do diretorio raw da conta.
     """
     started_at = datetime.now(timezone.utc)
-    output_dir = BASE_DIR
+    output_dir = output_dir or account_data_dir(BASE_DIR, profile_name)
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"Raw output: {output_dir}")
 

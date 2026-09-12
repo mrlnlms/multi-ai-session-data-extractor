@@ -2,12 +2,13 @@
 
 ## Pipeline
 
-- **Single cumulative folder:** `data/raw/Qwen/` and `data/merged/Qwen/`.
+- **Pastas cumulativas por conta:** a conta padrao usa `data/raw/Qwen/` e
+  `data/merged/Qwen/`; as demais usam `account-<n>/` sob essas raizes.
 - **Sync orchestrator (2 steps):** `scripts/qwen-sync.py` (capture +
   reconcile).
 - **Headless capture.**
-- **Auth:** default persistent profile in `.storage/qwen-profile-default/`
-  (generated via `scripts/qwen-login.py`). The token may expire even when the
+- **Auth:** perfis persistentes em `.storage/qwen-profile-<account>/`
+  (gerados via `scripts/qwen-login.py --account <account>`). The token may expire even when the
   profile still opens; validate a minimal API list request before a sync.
 
 ## Coverage
@@ -29,6 +30,18 @@ Chats + projects + project files captured. Reconciler v3
 - The parser produced 145 conversations, 2,157 messages, 9 tool events,
   175 branches, 6 projects, and 15 project docs; the unified parquets were
   regenerated.
+
+### Additional account collection — 2026-09-12
+
+- A second personal account was captured through its own persistent browser
+  profile and isolated raw/merged trees.
+- Discovery found 3 current chats, 1 project, and 4 project files. The full
+  incremental capture fetched all missing chat bodies without errors and
+  downloaded all 4 project files.
+- The combined parser output has 148 conversations, 2,188 messages, 9 tool
+  events, 179 branches, 7 projects, and 19 project docs. The canonical
+  `account` field distinguishes the two accounts by their configured email
+  addresses.
 
 ### Historical reference volume
 
@@ -85,4 +98,14 @@ manifest. Parser resolves `asset_paths` via `assets_manifest.json`.
 PYTHONPATH=. .venv/bin/python scripts/qwen-sync.py
 PYTHONPATH=. .venv/bin/python scripts/qwen-parse.py
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/qwen.qmd
+```
+
+Para uma conta adicional, use um perfil e uma arvore isolados; o parser reune
+as arvores e registra o email configurado em `.storage/accounts.json` no campo
+`account` dos Parquets:
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/qwen-login.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/qwen-sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/qwen-parse.py
 ```

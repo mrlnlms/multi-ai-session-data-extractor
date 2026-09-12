@@ -2,7 +2,9 @@
 
 ## Pipeline
 
-- **Single cumulative folder:** `data/raw/Claude.ai/` and `data/merged/Claude.ai/`.
+- **Per-account cumulative folders:** the legacy `default` account remains in
+  `data/raw/Claude.ai/` and `data/merged/Claude.ai/`; another profile key uses
+  `account-<key>/` below each tree.
 - **Sync orchestrator (3 steps):** `scripts/claude-sync.py` (capture +
   assets + reconcile).
 - **Headless capture** (no Cloudflare challenge at runtime).
@@ -23,7 +25,15 @@ Reconciler v3 (FEATURES_VERSION=2): full preservation (convs +
 projects), idempotent. Output: `data/merged/Claude.ai/conversations/<uuid>.json`
 + `projects/<uuid>.json` + `assets/`.
 
-### Latest validated collection — 2026-08-30
+### Latest validated collection — 2026-09-12
+
+- A second isolated profile, `account-2`, captured 14 conversations, 3
+  projects, and 7 binary files with zero fetch or asset errors. Its canonical
+  account label is `mrlnlms.me@gmail.com`.
+- The combined parser produced 934 conversations, 26,367 messages, 17,792
+  tool events, 1,269 branches, and 87 projects.
+
+### Prior validated collection — 2026-08-30
 
 - API session was renewed and validated against the conversation-list endpoint
   before capture. Merely opening a persistent context is not sufficient: an
@@ -99,6 +109,9 @@ color: Anthropic burnt orange `#CC785C`.
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/claude-sync.py
+# Additional Claude account after one interactive login:
+PYTHONPATH=. .venv/bin/python scripts/claude-login.py --profile account-2
+PYTHONPATH=. .venv/bin/python scripts/claude-sync.py --profile account-2
 # If sync left gaps (transient timeouts):
 PYTHONPATH=. .venv/bin/python scripts/claude-refetch-known.py
 PYTHONPATH=. .venv/bin/python scripts/claude-parse.py

@@ -2,13 +2,13 @@
 
 ## Pipeline
 
-- **Multi-account** — 2 Google accounts. Profiles in
-  `.storage/gemini-profile-{1,2}/` (generated via `scripts/gemini-login.py`).
+- **Multi-account** — 3 Google accounts. Profiles in
+  `.storage/gemini-profile-{1,2,3}/` (generated via `scripts/gemini-login.py`).
 - **Single cumulative folder per-account:** `data/raw/Gemini/account-{N}/` and
   `data/merged/Gemini/account-{N}/`.
 - **Sync orchestrator (3 multi-account steps):**
   `scripts/gemini-sync.py` — capture per-account + assets + reconcile
-  per-account. Iterates over both accounts in sequence (default) or
+  per-account. Iterates over all active accounts in sequence (default) or
   `--account N` to run just one.
 - **Headless capture** (no Cloudflare at runtime).
 
@@ -31,6 +31,16 @@ Conversations + assistant messages + tool events + images
 - `scripts/gemini-reconcile.py` is again usable with the current
   `data/raw/Gemini/account-{N}` layout. It supports `--full`; there are no
   Gemini-specific feature-refetch flags.
+
+### Third account — 2026-09-12
+
+- Account 3 uses its own browser profile, raw/merged trees, and canonical
+  `account-3_{uuid}` conversation-ID namespace.
+- The parser discovers every numeric `account-N` tree under the merged root;
+  the sync and auxiliary commands accept accounts 1, 2 and 3.
+- The first collection found and fetched 1 conversation without errors. It had
+  no downloadable images or Deep Research reports. The combined parser now
+  has 102 conversations, 760 messages, and 1,742 tool events.
 
 ### Historical reference volume
 
@@ -78,9 +88,11 @@ discovered via probe (`scripts/gemini-probe-schema.py`):
 
 - `notebooks/gemini-acc-1.qmd` (canonical template, account-1 only).
 - `notebooks/gemini-acc-2.qmd` (canonical template, account-2 only).
+- `notebooks/gemini-acc-3.qmd` (canonical template, account-3 only).
 - `notebooks/gemini.qmd` (consolidated, with stacked bars per account in
   key sections).
-- Color: Google blue `#4285F4` (acc-1), darker blue `#1A73E8` (acc-2).
+- Color: Google blue `#4285F4` (acc-1), darker blue `#1A73E8` (acc-2), and
+  Google green `#0F9D58` (acc-3).
 
 ## Related documents
 
@@ -91,10 +103,10 @@ discovered via probe (`scripts/gemini-probe-schema.py`):
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/gemini-sync.py             # both accounts
+PYTHONPATH=. .venv/bin/python scripts/gemini-sync.py             # all accounts
 PYTHONPATH=. .venv/bin/python scripts/gemini-sync.py --account 1 # account 1 only
 PYTHONPATH=. .venv/bin/python scripts/gemini-parse.py
-for f in gemini gemini-acc-1 gemini-acc-2; do
+for f in gemini gemini-acc-1 gemini-acc-2 gemini-acc-3; do
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd
 done
 ```

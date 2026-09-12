@@ -7,8 +7,11 @@ antes de comparar.
 """
 from datetime import datetime, timezone
 
+import pandas as pd
+
 from dashboard.data import CaptureRun, PlatformState
 from dashboard.metrics import discovery_drop_flag
+from dashboard.metrics import compute_account_summary
 
 
 def _run(started: datetime, total: int, mode: str = "incremental", account: str | None = None) -> CaptureRun:
@@ -26,6 +29,32 @@ def _run(started: datetime, total: int, mode: str = "incremental", account: str 
 
 def _state(name: str, runs: list[CaptureRun]) -> PlatformState:
     return PlatformState(name=name, raw_dir=None, merged_dir=None, capture_runs=runs)
+
+
+def test_account_summary_groups_only_tagged_conversations(tmp_path):
+    parquet = tmp_path / "conversations.parquet"
+    pd.DataFrame({
+        "account": ["one@example.com", "one@example.com", "two@example.com", None],
+        "is_preserved_missing": [False, True, False, False],
+        "updated_at": pd.to_datetime(["2026-01-01", "2026-01-02", "2026-01-03", "2026-01-04"]),
+    }).to_parquet(parquet)
+
+    assert compute_account_summary(parquet) == [
+        {
+            "Account": "one@example.com",
+            "Conversations": 2,
+            "Active": 1,
+            "Preserved missing": 1,
+            "Most recent activity": datetime(2026, 1, 2),
+        },
+        {
+            "Account": "two@example.com",
+            "Conversations": 1,
+            "Active": 1,
+            "Preserved missing": 0,
+            "Most recent activity": datetime(2026, 1, 3),
+        },
+    ]
 
 
 def test_drop_flag_false_when_single_account_stable():

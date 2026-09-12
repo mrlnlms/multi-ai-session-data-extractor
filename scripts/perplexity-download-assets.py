@@ -15,17 +15,7 @@ from pathlib import Path
 
 from src.extractors.perplexity.auth import load_context
 from src.extractors.perplexity.asset_downloader import download_assets
-
-
-def _find_latest_raw() -> Path | None:
-    base = Path("data/raw/Perplexity Data")
-    if not base.exists():
-        return None
-    candidates = sorted(
-        [p for p in base.iterdir() if p.is_dir() and len(p.name) == 16 and "T" in p.name],
-        key=lambda p: p.stat().st_mtime,
-    )
-    return candidates[-1] if candidates else None
+from src.accounts import account_data_dir
 
 
 async def main(raw_dir: Path, account: str):
@@ -50,9 +40,9 @@ if __name__ == "__main__":
     parser.add_argument("--account", type=str, default="default")
     args = parser.parse_args()
 
-    raw = Path(args.raw_dir) if args.raw_dir else _find_latest_raw()
+    raw = Path(args.raw_dir) if args.raw_dir else account_data_dir(Path("data/raw/Perplexity"), args.account)
     if not raw or not raw.exists():
-        print("ERRO: nenhum raw achado em data/raw/Perplexity Data/")
+        print("ERRO: nenhum raw achado em data/raw/Perplexity/")
         sys.exit(1)
     print(f"Usando raw: {raw}")
 

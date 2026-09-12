@@ -6,8 +6,8 @@ slide deck PDF+PPTX, infographic, mind map).
 
 ## Pipeline
 
-- **Multi-account** — up to 3 accounts (acc-1, acc-2, acc-3 legacy). Profiles
-  in `.storage/notebooklm-profile-{1,2}/` (generated via
+- **Multi-account** — three active accounts (acc-1, acc-2, acc-3). Profiles
+  in `.storage/notebooklm-profile-{1,2,3}/` (generated via
   `scripts/notebooklm-login.py`).
 - **Single cumulative folder per-account:** `data/raw/NotebookLM/account-{N}/`
   and `data/merged/NotebookLM/account-{N}/`.
@@ -28,10 +28,11 @@ Essa combinacao e particular do NotebookLM; detalhes de schema e RPC ficam na
 
 ### Reference volume (sample corpus)
 
-- acc-1: 95 notebooks / 974 sources / 1484 assets (4 audios + 12 videos +
-  30 slide decks + 1344 page images + 54 text artifacts + 76 notes + 45
-  mind_maps).
-- acc-2: 48 notebooks / 199 sources / 38 assets + 96 notes + 53 mind_maps.
+- acc-1: 130 notebooks / 1,499 sources.
+- acc-2: 55 notebooks / 207 sources.
+- acc-3: 3 notebooks / 36 sources / 79 page images + 6 notes + 3 mind maps;
+  two audio URLs returned upstream HTTP errors during its first sync
+  (2026-09-12).
 
 ## Mapped RPCs (api_client + fetcher)
 
@@ -228,8 +229,9 @@ also without removal or overwrite. The NotebookLM parser then completed with
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py             # both accounts
+PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py             # all active accounts
 PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py --account 1 # only account 1
+PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py --account 3 # only account 3
 PYTHONPATH=. .venv/bin/python scripts/notebooklm-parse.py
 for f in notebooklm notebooklm-acc-1 notebooklm-acc-2; do
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd

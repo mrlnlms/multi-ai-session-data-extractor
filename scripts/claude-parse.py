@@ -16,6 +16,7 @@ import argparse
 import logging
 from pathlib import Path
 
+from src.accounts import account_email
 from src.parsers.claude_ai import ClaudeAIParser
 
 
@@ -33,6 +34,7 @@ def main():
         "--account", default=None,
         help="Tag account no campo Conversation.account (default: None)",
     )
+    ap.add_argument("--accounts-file", type=Path, default=Path(".storage/accounts.json"))
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -48,8 +50,22 @@ def main():
     log.info(f"Input merged: {args.merged_root}")
     log.info(f"Output dir:   {args.output_dir}")
 
-    parser = ClaudeAIParser(account=args.account, merged_root=args.merged_root)
-    parser.parse(args.merged_root)
+    account_trees = [("default", args.merged_root)]
+    for account_dir in sorted(args.merged_root.glob("account-*")):
+        if account_dir.is_dir():
+            account_trees.append((account_dir.name, account_dir))
+
+    parser = ClaudeAIParser(merged_root=args.merged_root)
+    parser.reset()
+    for profile, merged_root in account_trees:
+        account = args.account or account_email("claude_ai", profile, args.accounts_file)
+        per_account = ClaudeAIParser(account=account, merged_root=merged_root)
+        per_account.parse(merged_root)
+        parser.conversations.extend(per_account.conversations)
+        parser.messages.extend(per_account.messages)
+        parser.events.extend(per_account.events)
+        parser.branches.extend(per_account.branches)
+        parser.projects.extend(per_account.projects)
 
     log.info(
         f"Parseado: {len(parser.conversations)} convs, "

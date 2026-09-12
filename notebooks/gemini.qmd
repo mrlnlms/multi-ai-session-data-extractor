@@ -39,13 +39,14 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **About Gemini (consolidated):** aggregates account-1 + account-2. Raw
+> **About Gemini (consolidated):** aggregates account-1, account-2 and account-3. Raw
 > schema is **positional** (Google batchexecute):
 > paths discovered via probe. 8 models detected, 41% of assistant msgs
 > with thinking, image generation via lh3.googleusercontent.com → ToolEvent +
 > `Message.asset_paths`. Pin discovered via probe (`c[2]` of MaZiqc).
 >
 > For a single-account view: [`gemini-acc-1.qmd`](gemini-acc-1.html) /
-> [`gemini-acc-2.qmd`](gemini-acc-2.html).
+> [`gemini-acc-2.qmd`](gemini-acc-2.html) /
+> [`gemini-acc-3.qmd`](gemini-acc-3.html).
 
 {{< include _template.qmd >}}

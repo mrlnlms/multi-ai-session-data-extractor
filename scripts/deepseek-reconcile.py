@@ -6,6 +6,7 @@ from pathlib import Path
 
 from src.extractors.deepseek.orchestrator import BASE_DIR as RAW_DIR
 from src.reconcilers.deepseek import run_reconciliation, FEATURE_FLAGS
+from src.accounts import account_data_dir
 
 
 MERGED_DIR = Path("data/merged/DeepSeek")
@@ -17,9 +18,10 @@ def main():
     ap.add_argument("--full", action="store_true")
     ap.add_argument("--refetch-features", default=None)
     ap.add_argument("--previous-merged", default=None)
+    ap.add_argument("--account", default="default")
     args = ap.parse_args()
 
-    raw = Path(args.raw_dir) if args.raw_dir else RAW_DIR
+    raw = Path(args.raw_dir) if args.raw_dir else account_data_dir(RAW_DIR, args.account)
     if not raw.exists() or not (raw / "discovery_ids.json").exists():
         print(f"ERRO: raw nao encontrado em {raw}. Rode scripts/deepseek-export.py primeiro.")
         sys.exit(1)
@@ -35,14 +37,15 @@ def main():
             sys.exit(2)
         force_feats = feats
 
-    r = run_reconciliation(raw, MERGED_DIR, prev, force_feats, args.full)
+    merged = account_data_dir(MERGED_DIR, args.account)
+    r = run_reconciliation(raw, merged, prev, force_feats, args.full)
     print("\n" + r.summary())
     if r.aborted:
         print(f"ABORTADO: {r.abort_reason}"); sys.exit(3)
     if r.warnings:
         print(f"\nWarnings ({len(r.warnings)}) primeiros 10:")
         for w in r.warnings[:10]: print(f"  {w}")
-    print(f"\nMerged em: {MERGED_DIR}")
+    print(f"\nMerged em: {merged}")
 
 
 if __name__ == "__main__":

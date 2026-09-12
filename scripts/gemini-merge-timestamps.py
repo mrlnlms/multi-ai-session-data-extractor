@@ -288,6 +288,6 @@ def main(account: int):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--account", type=int, default=1, choices=[1, 2])
+    parser.add_argument("--account", type=int, default=1, choices=[1, 2, 3])
     args = parser.parse_args()
     main(args.account)

@@ -2,7 +2,8 @@
 
 ## Pipeline
 
-- **Single cumulative folder:** `data/raw/Perplexity/` and `data/merged/Perplexity/`.
+- **Pastas cumulativas por conta:** a conta padrao usa `data/raw/Perplexity/`
+  e `data/merged/Perplexity/`; as demais usam `account-<n>/` sob essas raizes.
 - **Sync orchestrator (2 steps):** `scripts/perplexity-sync.py`
   (capture + reconcile). Captures everything in one shot (no separate
   asset step).
@@ -81,4 +82,14 @@ recent capture timestamp.
 PYTHONPATH=. .venv/bin/python scripts/perplexity-sync.py
 PYTHONPATH=. .venv/bin/python scripts/perplexity-parse.py
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/perplexity.qmd
+```
+
+Para uma conta adicional, use um perfil e uma arvore isolados. O parser reune
+as arvores e grava o e-mail configurado em `.storage/accounts.json` no campo
+`account` dos Parquets:
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/perplexity-login.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/perplexity-sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/perplexity-parse.py
 ```

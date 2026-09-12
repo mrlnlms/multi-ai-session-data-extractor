@@ -1,6 +1,6 @@
 """Playwright login persistente pra Perplexity.
 
-Single-account por enquanto (.storage/perplexity-profile-default/).
+Cada conta usa um perfil persistente proprio em `.storage/`.
 """
 
 from pathlib import Path

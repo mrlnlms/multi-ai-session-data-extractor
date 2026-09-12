@@ -4,7 +4,7 @@ Consome merged em data/merged/Gemini/account-{1,2}/conversations/<uuid>.json
 + assets/. Schema raw eh posicional (Google batchexecute, sem keys).
 
 Cobertura (probe 2026-05-02 em 80 convs):
-- Multi-conta: itera account-1 + account-2, namespace `{account}_{uuid}` em
+- Multi-conta: itera as arvores `account-N`, namespace `{account}_{uuid}` em
   conversation_id pra evitar colisao
 - Turn → user message + assistant message (par sequencial)
 - Model name (turn[3][21], e.g. '2.5 Flash') → Message.model
@@ -35,7 +35,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Mapping, Optional
 
 import pandas as pd
 
@@ -98,12 +98,14 @@ class GeminiParser(BaseParser):
         self,
         account: Optional[str] = None,
         merged_root: Optional[Path] = None,
+        account_labels: Mapping[str, str] | None = None,
     ):
         super().__init__(account)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Gemini")
+        self.account_labels = dict(account_labels or {})
 
     def parse(self, input_path: Path | None = None) -> None:
-        """Itera merged/Gemini/account-{1,2}/conversations/.
+        """Itera merged/Gemini/account-{N}/conversations/.
 
         Se input_path for fornecido, le so dele. Senao usa self.merged_root.
         """
@@ -112,14 +114,18 @@ class GeminiParser(BaseParser):
             logger.warning(f"merged root nao existe: {root}")
             return
 
-        for acc in [1, 2]:
-            acc_dir = root / f"account-{acc}"
-            if not acc_dir.exists():
+        account_dirs = []
+        for acc_dir in root.glob("account-*"):
+            try:
+                account_dirs.append((int(acc_dir.name.removeprefix("account-")), acc_dir))
+            except ValueError:
                 continue
+        for acc, acc_dir in sorted(account_dirs):
             self._parse_account(acc_dir, acc)
 
     def _parse_account(self, account_dir: Path, account: int) -> None:
         manifest = _load_assets_manifest(self.merged_root, account)
+        account_label = self.account_labels.get(f"account-{account}", str(account))
         conv_dir = account_dir / "conversations"
         if not conv_dir.exists():
             return
@@ -156,12 +162,15 @@ class GeminiParser(BaseParser):
             except Exception as e:
                 logger.warning(f"skip {jp.name}: {e}")
                 continue
-            self._parse_conv(obj, account, titles, created_at_secs, pinned_set, manifest)
+            self._parse_conv(
+                obj, account, account_label, titles, created_at_secs, pinned_set, manifest
+            )
 
     def _parse_conv(
         self,
         obj: dict,
         account: int,
+        account_label: str,
         titles: dict[str, str],
         created_at_secs: dict[str, int],
         pinned_set: set[str],
@@ -209,7 +218,7 @@ class GeminiParser(BaseParser):
                     content=user_text,
                     model=None,
                     created_at=ts,
-                    account=str(account),
+                    account=account_label,
                     content_types="text",
                 ))
                 msg_ids_in_order.append(user_msg_id)
@@ -252,7 +261,7 @@ class GeminiParser(BaseParser):
                     thinking=thinking,
                     model=model_name,
                     created_at=ts,
-                    account=str(account),
+                    account=account_label,
                     content_types="text" if not img_urls else "text+image",
                     asset_paths=asset_paths or None,
                     attachment_names=json.dumps(attachment_filenames, ensure_ascii=False)
@@ -310,7 +319,7 @@ class GeminiParser(BaseParser):
             updated_at=self._ts(last_secs) if last_secs else pd.NaT,
             message_count=msg_count,
             model=sorted(models_seen)[-1] if models_seen else None,
-            account=str(account),
+            account=account_label,
             mode="chat",
             url=url,
             is_pinned=uuid in pinned_set,

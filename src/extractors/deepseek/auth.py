@@ -1,7 +1,7 @@
 """Playwright login persistente pra DeepSeek.
 
 Pattern espelha gemini/chatgpt — launch_persistent_context mantem cookies.
-Single-account por enquanto (profile em .storage/deepseek-profile-default/).
+Cada conta usa um perfil persistente proprio em `.storage/`.
 """
 
 from pathlib import Path

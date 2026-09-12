@@ -42,14 +42,14 @@ prematura.
 
 ### 2.1 Plataformas web
 
-Gemini e NotebookLM possuem profiles e arvores `raw`/`merged` por conta. O
-codigo, porem, ainda conhece conjuntos particulares de contas, como `[1, 2]`,
-e os relatorios individuais usam arquivos `*-acc-1.qmd`, `*-acc-2.qmd` etc.
+Gemini e NotebookLM possuem profiles e arvores `raw`/`merged` por conta.
+Gemini usa tres contas ativas e descobre automaticamente as arvores
+`account-N` no parser; os relatorios individuais seguem o padrao
+`*-acc-N.qmd`.
 
-ChatGPT, Claude.ai, Kimi, Qwen, DeepSeek, Grok e Perplexity possuem graus
-diferentes de suporte a um profile selecionavel, mas seus caminhos cumulativos,
-reconcilers ou parsers continuam assumindo uma unica conta. Trocar apenas o
-profile sem isolar os dados pode:
+ChatGPT, Claude.ai, Kimi, Qwen e DeepSeek tambem usam um profile selecionavel
+e arvores cumulativas isoladas por conta. Grok e Perplexity continuam com uma
+conta configurada. Trocar apenas o profile sem isolar os dados pode:
 
 - sobrescrever o raw da conta anterior;
 - fazer o reconciler interpretar conversas de outra conta como removidas;
