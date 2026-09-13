@@ -11,7 +11,7 @@ Para rodar scripts manualmente, consulte [pipeline.md](pipeline.md).
 ## Iniciar
 
 ```bash
-PYTHONPATH=. .venv/bin/streamlit run dashboard.py
+PYTHONPATH=. .venv/bin/streamlit run dashboard/app.py
 ```
 
 Abra o endereço mostrado pelo Streamlit, normalmente

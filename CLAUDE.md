@@ -86,7 +86,7 @@ Nao conclua que houve consolidacao apenas pelo nome, idade ou status do arquivo.
 Inicie o dashboard com:
 
 ```bash
-PYTHONPATH=. .venv/bin/streamlit run dashboard.py
+PYTHONPATH=. .venv/bin/streamlit run dashboard/app.py
 ```
 
 Quando descobrir uma feature em uma plataforma, teste-a empiricamente nas

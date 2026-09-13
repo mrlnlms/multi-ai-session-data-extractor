@@ -337,7 +337,7 @@ Guia operacional completo, incluindo limpeza de armazenamento:
 
 ## Proximos passos
 
-- **Dashboard local** — `PYTHONPATH=. streamlit run dashboard.py`
+- **Dashboard local** — `PYTHONPATH=. streamlit run dashboard/app.py`
 - **Documentos descritivos por plataforma** —
   `quarto render notebooks/<plat>.qmd` (veja [operations/pipeline.md](operations/pipeline.md))
 - **Analise de Parquet** — leia `data/unified/*.parquet` com pandas ou DuckDB

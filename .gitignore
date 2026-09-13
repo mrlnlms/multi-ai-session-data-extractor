@@ -19,9 +19,9 @@ build/
 .vscode/
 .idea/
 
-# Skills bundled with the local Streamlit virtualenv
-.agents/skills/developing-with-streamlit
-.claude/skills/developing-with-streamlit
+# Agent skills generated from the local Streamlit virtualenv
+.agents/
+.claude/
 
 # Quarto
 .quarto/

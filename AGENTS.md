@@ -74,7 +74,7 @@ arquivo.
   revisados antes da publicacao.
 - Toda plataforma promovida deve aparecer em `dashboard/data.py`, no dashboard
   Streamlit e nos relatorios Quarto. O dashboard e iniciado por
-  `PYTHONPATH=. .venv/bin/streamlit run dashboard.py`.
+  `PYTHONPATH=. .venv/bin/streamlit run dashboard/app.py`.
 - Nao declarar uma pipeline verde se o parquet for anterior ao raw/merged.
 - Rodar a suite de testes antes de merge; nao manter contagem fixa de testes
   na documentacao, pois parametrizacoes alteram esse numero.

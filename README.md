@@ -176,7 +176,7 @@ Local Streamlit visualization — cross-platform totals, per-platform
 status, links to the descriptive documents:
 
 ```bash
-PYTHONPATH=. .venv/bin/streamlit run dashboard.py
+PYTHONPATH=. .venv/bin/streamlit run dashboard/app.py
 ```
 
 Opens at <http://localhost:8501>. Read-only over what sync produced —

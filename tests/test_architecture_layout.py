@@ -71,6 +71,17 @@ def test_legacy_scripts_directory_is_absent():
     assert not (PROJECT_ROOT / "scripts").exists()
 
 
+def test_streamlit_entrypoint_lives_with_dashboard_package():
+    assert (PROJECT_ROOT / "dashboard" / "app.py").is_file()
+    assert not (PROJECT_ROOT / "dashboard.py").exists()
+
+
+def test_environment_generated_skill_directories_are_ignored():
+    gitignore = (PROJECT_ROOT / ".gitignore").read_text().splitlines()
+    assert ".agents/" in gitignore
+    assert ".claude/" in gitignore
+
+
 @pytest.mark.parametrize("module", ("headless", "manual_saves", "serve_reports", "unify"))
 def test_cross_platform_command_is_importable(module: str):
     path = PROJECT_ROOT / "src" / "workflows" / f"{module}.py"
