@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dashboard import sync
+from src.workflows import execution as sync
 
 
 PROJECT_ROOT = sync.PROJECT_ROOT

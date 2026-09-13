@@ -12,42 +12,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from src.platforms.registry import KNOWN_PLATFORMS, SCRIPT_PREFIX
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_RAW = PROJECT_ROOT / "data" / "raw"
 DATA_MERGED = PROJECT_ROOT / "data" / "merged"
 DATA_PROCESSED = PROJECT_ROOT / "data" / "processed"
-
-KNOWN_PLATFORMS: list[str] = [
-    "ChatGPT",
-    "Claude.ai",
-    "Gemini",
-    "NotebookLM",
-    "Qwen",
-    "DeepSeek",
-    "Perplexity",
-    "Grok",
-    "Kimi",
-    "Claude Code",
-    "Codex",
-    "Gemini CLI",
-    "Antigravity CLI",
-]
-
-SCRIPT_PREFIX: dict[str, str] = {
-    "ChatGPT": "chatgpt",
-    "Claude.ai": "claude",
-    "Gemini": "gemini",
-    "NotebookLM": "notebooklm",
-    "Qwen": "qwen",
-    "DeepSeek": "deepseek",
-    "Perplexity": "perplexity",
-    "Grok": "grok",
-    "Kimi": "kimi",
-    "Claude Code": "claude-code",
-    "Codex": "codex",
-    "Gemini CLI": "gemini-cli",
-    "Antigravity CLI": "antigravity-cli",
-}
 
 PARSER_INPUT_SUFFIXES: dict[str, frozenset[str]] = {
     "Claude Code": frozenset({".jsonl"}),

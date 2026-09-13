@@ -80,6 +80,12 @@ def test_cross_platform_entrypoint_lives_in_workflows(filename: str):
     assert (SCRIPTS_DIR / "workflows" / filename).is_file()
 
 
+def test_python_workflow_entrypoints_stay_thin():
+    """Operator commands must delegate; implementation belongs in src/workflows."""
+    for path in (SCRIPTS_DIR / "workflows").glob("*.py"):
+        assert len(path.read_text().splitlines()) <= 50, path
+
+
 @pytest.mark.parametrize("filename", sorted(TOOL_FILES))
 def test_optional_operator_command_lives_in_tools(filename: str):
     assert (SCRIPTS_DIR / "tools" / filename).is_file()

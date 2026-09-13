@@ -1,5 +1,5 @@
-# tests/test_unify_parquets.py
-"""Testes pro scripts/workflows/unify-parquets.py.
+# tests/workflows/test_unify.py
+"""Tests for the importable unified-Parquet workflow.
 
 Cobre os 5 helpers + fluxo end-to-end:
 - `_identify_table` — sufixo simples e composto (source_guides vs sources)
@@ -20,19 +20,12 @@ Bugs cobertos:
 
 from __future__ import annotations
 
-import importlib.util
-import sys
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
-# Carregar o script (nao eh modulo Python normal — fica em scripts/)
-_unify_path = Path(__file__).parent.parent / "scripts" / "workflows" / "unify-parquets.py"
-_spec = importlib.util.spec_from_file_location("unify_parquets", _unify_path)
-unify_module = importlib.util.module_from_spec(_spec)
-sys.modules["unify_parquets"] = unify_module
-_spec.loader.exec_module(unify_module)
+from src.workflows import unify as unify_module
 
 
 # === _identify_table ===

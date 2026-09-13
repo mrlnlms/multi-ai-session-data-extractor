@@ -6,8 +6,11 @@ sync and parse modules there. Web sync commands capture assets and reconcile; th
 dashboard/headless workflow then runs the corresponding parser before
 unification. CLI sync commands already copy and parse.
 
-Platform command modules are the executable interface. Shared workflows, the
-dashboard, and tests reuse them rather than copying source rules into scripts.
+Platform command modules are the executable interface. Cross-platform workflow
+implementations live in `src/workflows/`; the Python files in
+`scripts/workflows/` are stable, thin operator commands that delegate to those
+modules. The dashboard and tests import `src` directly rather than loading
+scripts or copying source rules.
 
 For example:
 
@@ -25,9 +28,10 @@ For setup and normal command examples, use
 
 ## Workflows
 
-`workflows/` contains cross-platform operations: shared CLI copying, the
+`scripts/workflows/` exposes operator commands for shared CLI copying, the
 headless pipeline, manual-save ingestion, unification, and local serving of
-Quarto output.
+Quarto output. Reusable Python behavior belongs to `src/workflows/`; the shell
+server remains here because it is itself an operator command.
 
 ## Probes
 

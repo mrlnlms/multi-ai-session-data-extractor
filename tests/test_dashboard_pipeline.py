@@ -114,11 +114,11 @@ class TestLockfile:
     def _isolate_lock(self, tmp_path, monkeypatch):
         # Patch LOCK_PATH pra arquivo temporario — nao bagunca o lock real
         lock = tmp_path / ".test-lock"
-        monkeypatch.setattr("dashboard.sync.LOCK_PATH", lock)
+        monkeypatch.setattr("src.workflows.execution.LOCK_PATH", lock)
         yield lock
 
     def test_fresh_acquire_writes_json(self, _isolate_lock):
-        from dashboard.sync import _read_lock, acquire_pipeline_lock, release_pipeline_lock
+        from src.workflows.execution import _read_lock, acquire_pipeline_lock, release_pipeline_lock
 
         err = acquire_pipeline_lock()
         assert err is None
@@ -129,7 +129,7 @@ class TestLockfile:
         assert not _isolate_lock.exists()
 
     def test_double_acquire_blocked_if_pid_alive(self, _isolate_lock):
-        from dashboard.sync import acquire_pipeline_lock, release_pipeline_lock
+        from src.workflows.execution import acquire_pipeline_lock, release_pipeline_lock
 
         assert acquire_pipeline_lock() is None
         err = acquire_pipeline_lock()
@@ -138,7 +138,7 @@ class TestLockfile:
         release_pipeline_lock()
 
     def test_stale_lock_with_dead_parent_acquired(self, _isolate_lock):
-        from dashboard.sync import _read_lock, acquire_pipeline_lock, release_pipeline_lock
+        from src.workflows.execution import _read_lock, acquire_pipeline_lock, release_pipeline_lock
 
         # PID 999999 nao existe — simula crash
         _isolate_lock.write_text(json.dumps({"parent_pid": 999999, "child_pids": []}))
@@ -149,7 +149,7 @@ class TestLockfile:
         release_pipeline_lock()
 
     def test_legacy_int_lockfile_compat(self, _isolate_lock):
-        from dashboard.sync import _read_lock
+        from src.workflows.execution import _read_lock
 
         _isolate_lock.write_text(str(os.getpid()))
         data = _read_lock()
@@ -157,7 +157,7 @@ class TestLockfile:
         assert data["child_pids"] == []
 
     def test_register_unregister_child(self, _isolate_lock):
-        from dashboard.sync import (
+        from src.workflows.execution import (
             _read_lock,
             _register_child,
             _unregister_child,
@@ -174,7 +174,7 @@ class TestLockfile:
         release_pipeline_lock()
 
     def test_acquire_writes_started_at(self, _isolate_lock):
-        from dashboard.sync import _read_lock, acquire_pipeline_lock, release_pipeline_lock
+        from src.workflows.execution import _read_lock, acquire_pipeline_lock, release_pipeline_lock
 
         acquire_pipeline_lock()
         data = _read_lock()
@@ -185,7 +185,7 @@ class TestLockfile:
         release_pipeline_lock()
 
     def test_acquire_error_includes_age_when_lock_alive(self, _isolate_lock):
-        from dashboard.sync import acquire_pipeline_lock, release_pipeline_lock
+        from src.workflows.execution import acquire_pipeline_lock, release_pipeline_lock
 
         acquire_pipeline_lock()
         err = acquire_pipeline_lock()
@@ -198,7 +198,7 @@ class TestLockfile:
     def test_acquire_error_without_started_at_omits_age(self, _isolate_lock):
         """Lockfile legado (sem started_at) — erro nao quebra, so nao mostra idade."""
         import json as _j
-        from dashboard.sync import acquire_pipeline_lock, release_pipeline_lock
+        from src.workflows.execution import acquire_pipeline_lock, release_pipeline_lock
 
         _isolate_lock.write_text(_j.dumps({"parent_pid": os.getpid(), "child_pids": []}))
         err = acquire_pipeline_lock()
@@ -208,14 +208,14 @@ class TestLockfile:
         release_pipeline_lock()
 
     def test_stale_lock_kills_orphan_children(self, _isolate_lock):
-        from dashboard.sync import acquire_pipeline_lock, release_pipeline_lock
+        from src.workflows.execution import acquire_pipeline_lock, release_pipeline_lock
 
         # Simula crash com children registrados — PIDs fakes. _kill_process_tree
         # usa psutil; mockamos pra contar tentativas em cada PID orfao.
         _isolate_lock.write_text(
             json.dumps({"parent_pid": 999999, "child_pids": [888888, 777777]})
         )
-        with patch("dashboard.sync._kill_process_tree") as mock_kill:
+        with patch("src.workflows.execution._kill_process_tree") as mock_kill:
             err = acquire_pipeline_lock()
             assert err is None
             killed_pids = [call.args[0] for call in mock_kill.call_args_list]
@@ -227,7 +227,7 @@ class TestLockfile:
         """End-to-end: psutil walk recursivo + SIGTERM no subprocess real."""
         import subprocess
         import time
-        from dashboard.sync import _kill_process_tree
+        from src.workflows.execution import _kill_process_tree
 
         p = subprocess.Popen(["sleep", "30"], start_new_session=True)
         try:
@@ -255,7 +255,7 @@ class TestLockfile:
         import sys
         import time
         import psutil
-        from dashboard.sync import _kill_process_tree
+        from src.workflows.execution import _kill_process_tree
 
         # Subprocess que sobe Chromium e fica esperando — replica o que
         # `<plat>-export.py` faz quando o orchestrator esta em run.
@@ -352,11 +352,11 @@ class TestPersistRuns:
     @pytest.fixture(autouse=True)
     def _isolate_runs_log(self, tmp_path, monkeypatch):
         log = tmp_path / ".test-runs.jsonl"
-        monkeypatch.setattr("dashboard.pipeline.RUNS_LOG", log)
+        monkeypatch.setattr("src.workflows.pipeline.RUNS_LOG", log)
         yield log
 
     def test_persist_appends_entry(self, _isolate_runs_log):
-        from dashboard.pipeline import persist_run, recent_runs
+        from src.workflows.pipeline import persist_run, recent_runs
 
         persist_run(
             stage_status=["done", "done", "done", "done"],
@@ -377,9 +377,9 @@ class TestPersistRuns:
 
     def test_persist_creates_runtime_parent(self, tmp_path, monkeypatch):
         log = tmp_path / ".runtime" / "pipeline-runs.jsonl"
-        monkeypatch.setattr("dashboard.pipeline.RUNS_LOG", log)
+        monkeypatch.setattr("src.workflows.pipeline.RUNS_LOG", log)
 
-        from dashboard.pipeline import persist_run
+        from src.workflows.pipeline import persist_run
 
         persist_run(
             stage_status=["done"],
@@ -391,7 +391,7 @@ class TestPersistRuns:
         assert log.exists()
 
     def test_recent_runs_returns_newest_first(self, _isolate_runs_log):
-        from dashboard.pipeline import persist_run, recent_runs
+        from src.workflows.pipeline import persist_run, recent_runs
 
         persist_run(["done"] * 4, [], True, scope="first")
         persist_run(["done"] * 4, [], True, scope="second")
@@ -400,7 +400,7 @@ class TestPersistRuns:
         assert [r["scope"] for r in runs] == ["third", "second", "first"]
 
     def test_recent_runs_limit(self, _isolate_runs_log):
-        from dashboard.pipeline import persist_run, recent_runs
+        from src.workflows.pipeline import persist_run, recent_runs
 
         for i in range(15):
             persist_run(["done"] * 4, [], True, scope=f"run-{i}")
@@ -410,32 +410,32 @@ class TestPersistRuns:
         assert [r["scope"] for r in runs] == [f"run-{i}" for i in (14, 13, 12, 11, 10)]
 
     def test_recent_runs_empty_when_no_log(self, _isolate_runs_log):
-        from dashboard.pipeline import recent_runs
+        from src.workflows.pipeline import recent_runs
 
         # Sem chamar persist_run primeiro
         assert recent_runs() == []
 
     def test_commit_msg_for_scope_all(self):
-        from dashboard.pipeline import commit_msg_for_scope
+        from src.workflows.pipeline import commit_msg_for_scope
 
         msg = commit_msg_for_scope("all")
         assert msg.startswith("data: dashboard sync (all platforms, ")
         assert msg.endswith(")")
 
     def test_commit_msg_for_scope_platform(self):
-        from dashboard.pipeline import commit_msg_for_scope
+        from src.workflows.pipeline import commit_msg_for_scope
 
         assert "(NotebookLM, " in commit_msg_for_scope("platform:NotebookLM")
         assert "(Claude.ai, " in commit_msg_for_scope("platform:Claude.ai")
 
     def test_commit_msg_for_scope_cli_headless(self):
-        from dashboard.pipeline import commit_msg_for_scope
+        from src.workflows.pipeline import commit_msg_for_scope
 
         msg = commit_msg_for_scope("cli:headless")
         assert msg.startswith("data: headless sync (")
 
     def test_commit_msg_for_scope_unknown_fallback(self):
-        from dashboard.pipeline import commit_msg_for_scope
+        from src.workflows.pipeline import commit_msg_for_scope
 
         msg = commit_msg_for_scope("custom-scope")
         assert "custom-scope" in msg
@@ -443,8 +443,8 @@ class TestPersistRuns:
 
     def test_rotation_truncates_after_max(self, _isolate_runs_log, monkeypatch):
         """Quando ultrapassa MAX_RUNS_BEFORE_ROTATE, trunca pra KEEP_RUNS_AFTER_ROTATE."""
-        from dashboard import pipeline as pl
-        from dashboard.pipeline import persist_run, recent_runs
+        from src.workflows import pipeline as pl
+        from src.workflows.pipeline import persist_run, recent_runs
 
         # Usa thresholds pequenos pra teste rapido
         monkeypatch.setattr(pl, "MAX_RUNS_BEFORE_ROTATE", 10)
@@ -471,7 +471,7 @@ class TestPersistRuns:
         assert scopes == ["r-6", "r-7", "r-8", "r-9", "r-10"]
 
     def test_recent_runs_handles_corrupt_lines(self, _isolate_runs_log):
-        from dashboard.pipeline import recent_runs
+        from src.workflows.pipeline import recent_runs
 
         _isolate_runs_log.write_text(
             json.dumps({"scope": "ok-1", "at": "2026-01-01T00:00:00Z",

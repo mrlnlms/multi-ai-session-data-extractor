@@ -1,0 +1,723 @@
+"""Shared process execution for capture, reporting, and publication workflows.
+
+As 13 fontes conhecidas possuem orquestrador ``<source>-sync.py``. O fallback
+para ``<source>-export.py`` permanece para uma futura plataforma que ainda
+nao tenha sync completo.
+"""
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import threading
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Callable, Optional
+
+from src.runtime.project import find_project_root
+from src.platforms.registry import (
+    KNOWN_PLATFORMS,
+    PLATFORM_COMMAND_PACKAGES,
+    SCRIPT_PREFIX,
+    WEB_PLATFORMS,
+)
+
+PROJECT_ROOT = find_project_root(Path(__file__))
+
+# Env vars que impedem subprocess de prompter quando credentials faltam.
+# Sem isso, `git push` / `dvc push` podem pendurar pra sempre esperando
+# entrada de TTY que o Streamlit nao tem. NAO mexer em DISPLAY: Chromium
+# headed do ChatGPT/Perplexity herda essa env, e em Linux DISPLAY="" quebra.
+_NONINTERACTIVE_ENV = {
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_ASKPASS": "/bin/true",
+    "SSH_ASKPASS": "/bin/true",
+}
+
+SCRIPTS_DIR = PROJECT_ROOT / "scripts"
+PLATFORM_SCRIPTS_DIR = SCRIPTS_DIR / "platform"
+RUNTIME_DIR = PROJECT_ROOT / ".runtime"
+LOCK_PATH = RUNTIME_DIR / "locks" / "pipeline.lock"
+
+# Platforms move here one at a time during the vertical-package refactor.
+# Once registered, their operational entrypoints run as Python modules and no
+# parallel scripts/platform/<source>/ tree remains.
+# As CLIs ja fazem copy + parse dentro do proprio sync. As fontes web fazem
+# capture + assets + reconcile e precisam do parser como passo separado antes
+# de qualquer unify.
+# Pastas versionadas via DVC; manter alinhadas a docs/operations/dvc-runbook.md.
+# Atualizar AQUI quando adicionar plataforma com diretorio externo novo.
+DVC_PATHS: list[str] = [
+    "data/raw",
+    "data/merged",
+    "data/processed",
+    "data/unified",
+    "data/external/manual-saves",
+    "data/external/deep-research-md",
+    "data/external/perplexity-orphan-threads",
+    "data/external/deepseek-snapshots",
+    "data/external/chatgpt-extension-snapshot",
+    "data/external/claude-ai-snapshots",
+    "data/external/notebooklm-snapshots",
+    "data/external/openai-gdpr-export",
+    "data/external/claude-code-config-snapshots",
+    "data/external/codex-config-snapshots",
+    "data/external/gemini-config-snapshots",
+    "data/external/grok-snapshots",
+]
+
+
+def _safe_env() -> dict[str, str]:
+    return dict(os.environ)
+
+
+def platform_script(platform: str, action: str) -> Optional[Path]:
+    prefix = SCRIPT_PREFIX.get(platform)
+    if not prefix:
+        return None
+    return PLATFORM_SCRIPTS_DIR / prefix / f"{action}.py"
+
+
+def has_sync_script(platform: str) -> bool:
+    if platform in PLATFORM_COMMAND_PACKAGES:
+        return True
+    script = platform_script(platform, "sync")
+    return script is not None and script.exists()
+
+
+def sync_command(platform: str) -> Optional[list[str]]:
+    """Retorna o comando preferido pra capturar a plataforma.
+
+    Retorna o sync orquestrador ou None se a plataforma nao o possuir.
+    """
+    python = sys.executable
+    command_package = PLATFORM_COMMAND_PACKAGES.get(platform)
+    if command_package:
+        cmd = [python, "-m", f"{command_package}.sync"]
+        if platform == "ChatGPT":
+            cmd.append("--no-voice-pass")
+        return cmd
+    script = platform_script(platform, "sync")
+    if script is not None and script.exists():
+        cmd = [python, str(script)]
+        if platform == "ChatGPT":
+            cmd.append("--no-voice-pass")
+        return cmd
+    return None
+
+
+def parse_command(platform: str) -> Optional[list[str]]:
+    """Return the mandatory post-sync parser command for a web platform."""
+    if platform not in WEB_PLATFORMS:
+        return None
+    command_package = PLATFORM_COMMAND_PACKAGES.get(platform)
+    if command_package:
+        return [sys.executable, "-m", f"{command_package}.parse"]
+    script = platform_script(platform, "parse")
+    if script is None or not script.exists():
+        return None
+    return [sys.executable, str(script)]
+
+
+def run_sync(platform: str, capture_output: bool = True) -> subprocess.CompletedProcess:
+    """Run sync and, for web platforms, its mandatory parser."""
+    cmd = sync_command(platform)
+    if cmd is None:
+        raise RuntimeError(f"No sync or export script found for {platform}")
+    env_pythonpath = str(PROJECT_ROOT)
+    sync_result = subprocess.run(
+        cmd,
+        cwd=str(PROJECT_ROOT),
+        capture_output=capture_output,
+        text=True,
+        env={**_safe_env(), "PYTHONPATH": env_pythonpath},
+    )
+    parser_cmd = parse_command(platform)
+    if sync_result.returncode != 0 or parser_cmd is None:
+        return sync_result
+    parse_result = subprocess.run(
+        parser_cmd,
+        cwd=str(PROJECT_ROOT),
+        capture_output=capture_output,
+        text=True,
+        env={**_safe_env(), "PYTHONPATH": env_pythonpath},
+    )
+    if capture_output:
+        parse_result.stdout = (sync_result.stdout or "") + (parse_result.stdout or "")
+        parse_result.stderr = (sync_result.stderr or "") + (parse_result.stderr or "")
+    return parse_result
+
+
+def run_sync_streaming(
+    platform: str,
+    on_line,
+    tail_size: int = 30,
+    timeout: Optional[float] = 3600.0,
+) -> tuple[int, str]:
+    """Run sync and the mandatory web parser with streaming output.
+
+    `on_line(str)` eh chamado pra cada linha do stdout (stderr merged).
+    Retorna (returncode, ultimas tail_size linhas concatenadas) — util pra
+    montar mensagem de erro sem precisar reabrir log. `timeout` em segundos
+    (default 1h) mata o processo se exceder — protege contra prompts/hang.
+    """
+    cmd = sync_command(platform)
+    if cmd is None:
+        raise RuntimeError(f"No sync or export script found for {platform}")
+    rc, sync_tail = _stream(cmd, on_line, tail_size=tail_size, timeout=timeout)
+    if rc != 0:
+        return rc, sync_tail
+    parser_cmd = parse_command(platform)
+    if parser_cmd is None:
+        return rc, sync_tail
+    on_line(f"=== Parse {platform} -> data/processed ===")
+    rc, parse_tail = _stream(
+        parser_cmd,
+        on_line,
+        tail_size=tail_size,
+        timeout=timeout,
+    )
+    combined = "\n".join(part for part in (sync_tail, parse_tail) if part)
+    return rc, "\n".join(combined.splitlines()[-tail_size:])
+
+
+def run_unify(capture_output: bool = True) -> subprocess.CompletedProcess:
+    """Roda scripts/workflows/unify-parquets.py — materializa data/unified/ a partir
+    de data/processed/<plat>/. Idempotente, sem args. Bloqueante."""
+    cmd = [sys.executable, "-m", "src.workflows.unify"]
+    return subprocess.run(
+        cmd,
+        cwd=str(PROJECT_ROOT),
+        capture_output=capture_output,
+        text=True,
+        env={**_safe_env(), "PYTHONPATH": str(PROJECT_ROOT)},
+    )
+
+
+def run_unify_streaming(
+    on_line: Callable[[str], None],
+    timeout: float = 30 * 60.0,
+) -> tuple[int, str]:
+    """Versao streaming do unify pro pipeline. UI uniforme com os outros stages."""
+    cmd = [sys.executable, "-m", "src.workflows.unify"]
+    return _stream(cmd, on_line, tail_size=30, timeout=timeout)
+
+
+def _stream(
+    cmd: list[str],
+    on_line: Callable[[str], None],
+    tail_size: int = 20,
+    timeout: Optional[float] = None,
+    extra_env: Optional[dict[str, str]] = None,
+) -> tuple[int, str]:
+    """Roda comando, streaming stdout (stderr merged) linha a linha via callback.
+    Retorna (returncode, ultimas `tail_size` linhas concatenadas).
+
+    - `stdin=DEVNULL` + env nao-interativa: nunca penduram em prompts.
+    - `start_new_session=True`: cria process group separado pra que cleanup
+      de subprocess orfao (quando Streamlit crasha mid-run) possa fazer
+      `os.killpg` em todo o grupo.
+    - PID do subprocess eh registrado no lockfile pra recovery na proxima
+      execucao (acquire detecta stale, mata orfaos antes de prosseguir).
+    - `timeout` (segundos): mata o processo se exceder. Sem timeout = sem
+      cap (perigoso pra subcomandos que podem hang silencioso).
+    - `extra_env`: vars adicionais (ex: QUARTO_PYTHON pro `quarto render`).
+    """
+    env = {**_safe_env(), "PYTHONPATH": str(PROJECT_ROOT), **_NONINTERACTIVE_ENV}
+    if extra_env:
+        env.update(extra_env)
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(PROJECT_ROOT),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL,
+        text=True,
+        bufsize=1,
+        env=env,
+        start_new_session=True,
+    )
+    _register_child(proc.pid)
+    timer: Optional[threading.Timer] = None
+    timed_out = {"v": False}
+    if timeout is not None:
+        def _kill():
+            timed_out["v"] = True
+            _kill_process_tree(proc.pid)
+        timer = threading.Timer(timeout, _kill)
+        timer.start()
+
+    tail: list[str] = []
+    assert proc.stdout is not None
+    try:
+        for line in proc.stdout:
+            line = line.rstrip("\n")
+            tail.append(line)
+            if len(tail) > tail_size:
+                tail = tail[-tail_size:]
+            try:
+                on_line(line)
+            except Exception:
+                pass  # callback do Streamlit nao deve interromper o subprocess
+        proc.wait()
+    finally:
+        if timer is not None:
+            timer.cancel()
+        _unregister_child(proc.pid)
+    if timed_out["v"]:
+        msg = f"TIMEOUT: process killed after {timeout}s"
+        tail.append(msg)
+        try:
+            on_line(msg)
+        except Exception:
+            pass
+        # subprocess foi killed -> returncode reflete o sinal (negativo);
+        # forcamos um codigo nao-zero distinguivel pra UI.
+        return 124, "\n".join(tail)
+    return proc.returncode, "\n".join(tail)
+
+
+# ===================== Pipeline lock =====================
+#
+# Schema do lock de pipeline (JSON):
+#   {"parent_pid": <int>, "child_pids": [<int>, ...], "started_at": "<iso>"}
+#
+# - parent_pid: processo Streamlit/CLI que segura o lock.
+# - child_pids: subprocess ativos abertos por `_stream`. Cada subprocess
+#   eh seu proprio process group leader (start_new_session=True), permitindo
+#   `os.killpg(pid, SIGTERM)` em cleanup.
+# - started_at: timestamp ISO UTC de quando o lock foi adquirido. Permite
+#   `acquire_pipeline_lock` exibir idade do lock quando outro processo
+#   tenta adquirir e o atual ainda esta vivo ("Pipeline already running
+#   (PID X, since 12min ago)").
+#
+# Lock stale (parent morto): `acquire_pipeline_lock` mata todos child_pids
+# remanescentes (processo Playwright/dvc/quarto que ficaram orfaos) antes
+# de prosseguir. Robustez contra crash do Streamlit ou fechamento da aba.
+#
+# Compat retroativa: lockfile antigo era so um int da PID, ou JSON sem
+# started_at — `_read_lock` trata ambos.
+
+_lock_mutex = threading.Lock()
+
+
+def _read_lock() -> dict:
+    try:
+        text = LOCK_PATH.read_text().strip()
+    except OSError:
+        return {}
+    if not text:
+        return {}
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict) and "parent_pid" in data:
+            data.setdefault("child_pids", [])
+            return data
+    except json.JSONDecodeError:
+        pass
+    # Legacy: lockfile so um int
+    try:
+        return {"parent_pid": int(text), "child_pids": []}
+    except ValueError:
+        return {}
+
+
+def _write_lock(data: dict) -> None:
+    try:
+        LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+        LOCK_PATH.write_text(json.dumps(data))
+    except OSError:
+        pass
+
+
+def _register_child(pid: int) -> None:
+    """Append PID de subprocess ao lockfile. Chamado por `_stream`."""
+    with _lock_mutex:
+        data = _read_lock()
+        if not data:
+            return  # sem lock (rodando fora de pipeline) — ignora
+        children = data.get("child_pids", [])
+        if pid not in children:
+            children.append(pid)
+            data["child_pids"] = children
+            _write_lock(data)
+
+
+def _unregister_child(pid: int) -> None:
+    """Remove PID de subprocess do lockfile quando termina."""
+    with _lock_mutex:
+        data = _read_lock()
+        if not data:
+            return
+        children = data.get("child_pids", [])
+        if pid in children:
+            children.remove(pid)
+            data["child_pids"] = children
+            _write_lock(data)
+
+
+def _kill_process_tree(pid: int) -> None:
+    """Mata o processo e TODOS descendentes via psutil — robusto contra
+    Chromium workers que migram pra process group proprio (escape de killpg).
+
+    Estrategia (em ordem):
+      1. psutil walk recursivo + SIGTERM em cada descendente + raiz
+      2. fallback killpg (cobre 95% dos casos sem psutil)
+      3. fallback os.kill simples (ultimo recurso)
+
+    Silent ProcessLookupError/PermissionError — esperado quando processos
+    ja morreram naturalmente.
+    """
+    try:
+        import psutil
+        try:
+            proc = psutil.Process(pid)
+            # children(recursive=True) usa syscall (ptree), independente de PGID
+            for child in proc.children(recursive=True):
+                try:
+                    child.terminate()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            try:
+                proc.terminate()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+            return
+        except psutil.NoSuchProcess:
+            return
+        except (psutil.AccessDenied, PermissionError, OSError):
+            pass
+    except ImportError:
+        pass
+    # Fallback 1: killpg (cobre process group leaders)
+    try:
+        os.killpg(pid, signal.SIGTERM)
+        return
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+    # Fallback 2: kill simples
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+
+
+def _kill_orphan_children(pids: list[int]) -> None:
+    """Mata processo + arvore de descendentes de cada PID orfao."""
+    for pid in pids:
+        _kill_process_tree(pid)
+
+
+def _format_lock_age(started_at_iso: Optional[str]) -> str:
+    """Idade humanamente legivel do lock (since X). Retorna '' se ausente/invalido."""
+    if not started_at_iso:
+        return ""
+    try:
+        started = datetime.fromisoformat(started_at_iso.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return ""
+    delta = datetime.now(timezone.utc) - started
+    secs = int(delta.total_seconds())
+    if secs < 60:
+        return f", since {secs}s ago"
+    if secs < 3600:
+        return f", since {secs // 60}min ago"
+    return f", since {secs // 3600}h{(secs % 3600) // 60}min ago"
+
+
+def acquire_pipeline_lock() -> Optional[str]:
+    """Tenta adquirir lock pra rodar pipeline. Retorna None em sucesso,
+    string de erro se outro processo ainda esta vivo.
+
+    Lock stale (parent PID morto) eh removido automaticamente; child_pids
+    remanescentes (subprocess orfaos) sao morto via SIGTERM no process
+    group antes de adquirir.
+    """
+    with _lock_mutex:
+        data = _read_lock()
+        if data:
+            parent_pid = data.get("parent_pid")
+            if parent_pid is not None:
+                try:
+                    os.kill(parent_pid, 0)
+                    age = _format_lock_age(data.get("started_at"))
+                    return (
+                        f"Pipeline already running (PID {parent_pid}{age}). "
+                        f"Wait or remove {LOCK_PATH.name} manually if stuck."
+                    )
+                except (ProcessLookupError, PermissionError):
+                    # Stale parent — mata orfaos antes de prosseguir.
+                    _kill_orphan_children(data.get("child_pids", []))
+            try:
+                LOCK_PATH.unlink()
+            except OSError:
+                pass
+        try:
+            _write_lock({
+                "parent_pid": os.getpid(),
+                "child_pids": [],
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            })
+        except OSError as e:
+            return f"Could not create lockfile {LOCK_PATH}: {e}"
+    return None
+
+
+def release_pipeline_lock() -> None:
+    """Libera o lock. Mata children remanescentes (caso pipeline tenha
+    sido interrompido mid-run via exception) antes de remover o arquivo."""
+    with _lock_mutex:
+        data = _read_lock()
+        if data and data.get("parent_pid") == os.getpid():
+            _kill_orphan_children(data.get("child_pids", []))
+        try:
+            LOCK_PATH.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
+
+
+# ===================== DVC / git state =====================
+
+
+def _dvc_working_dir_clean() -> bool:
+    """True se `dvc status` reporta working dir sincronizado com .dvc files.
+
+    Quando True, podemos pular `dvc add` (re-hash caro) + commit fantasma.
+    """
+    venv_dvc = PROJECT_ROOT / ".venv" / "bin" / "dvc"
+    if not venv_dvc.exists():
+        return False
+    try:
+        result = subprocess.run(
+            [str(venv_dvc), "status"],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env={**_safe_env(), **_NONINTERACTIVE_ENV},
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    if result.returncode != 0:
+        return False
+    # `dvc status` (working) imprime "Data and pipelines are up to date." quando limpo.
+    out = (result.stdout + result.stderr).lower()
+    return "up to date" in out
+
+
+def _git_commits_ahead() -> int:
+    """Numero de commits locais nao pushed pra upstream. 0 se nada a pushar."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-list", "--count", "@{u}..HEAD"],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return 0
+    if result.returncode != 0:
+        return 0
+    try:
+        return int(result.stdout.strip() or "0")
+    except ValueError:
+        return 0
+
+
+# ===================== Publish =====================
+
+
+def run_publish_streaming(
+    on_line: Callable[[str], None],
+    commit_msg: Optional[str] = None,
+) -> tuple[int, str]:
+    """Pipeline pos-captura: pre-check -> dvc add -> git add -> commit ->
+    dvc push -> git push. Para no primeiro erro.
+
+    Pre-check evita commit fantasma `chore: refresh .dvc hashes` quando
+    nao ha captura nova. Se working dir DVC limpo E sem commits ahead,
+    retorna (0, 'nothing to publish'). Se so ha commits ahead, faz apenas
+    `dvc push` + `git push` (idempotentes).
+
+    Imprime markers `[step/N]` pra UI parsear progresso.
+    """
+    venv_dvc = PROJECT_ROOT / ".venv" / "bin" / "dvc"
+    if not venv_dvc.exists():
+        on_line(f"ERROR: {venv_dvc} not found. Setup .venv first.")
+        return 1, "dvc binary missing"
+
+    # Pre-check: evita commit fantasma quando nada mudou
+    on_line("[pre] checking dvc status + git ahead…")
+    dvc_clean = _dvc_working_dir_clean()
+    git_ahead = _git_commits_ahead()
+    on_line(f"[pre] dvc_clean={dvc_clean} git_commits_ahead={git_ahead}")
+
+    if dvc_clean and git_ahead == 0:
+        on_line("[skip] nothing to publish (dvc + git already in sync)")
+        return 0, "nothing to publish (dvc working dir clean, no commits ahead)"
+
+    # Timeouts generosos por step. Re-hash de raw inteiro pode levar
+    # tempo; upload pra gdrive idem. Sem timeout = risco de UI travada
+    # pra sempre. Com timeout = falha visivel.
+    T_ADD = 60 * 60       # dvc add — re-hash pode demorar
+    T_GIT = 5 * 60        # git add / commit / push de .dvc files (texto pequeno)
+    T_PUSH = 2 * 60 * 60  # dvc push — pode mandar GBs
+
+    if dvc_clean:
+        # Caso: previous run commitou mas push falhou. So executa pushes.
+        on_line(f"[1/2] dvc push — uploading any missing blobs (idempotent)")
+        rc, tail = _stream([str(venv_dvc), "push"], on_line, timeout=T_PUSH)
+        if rc != 0:
+            return rc, f"dvc push failed (rc={rc}):\n{tail}"
+        on_line(f"[2/2] git push — {git_ahead} commits ahead")
+        rc, tail = _stream(["git", "push"], on_line, timeout=T_GIT)
+        if rc != 0:
+            return rc, f"git push failed (rc={rc}):\n{tail}"
+        return 0, f"pushed {git_ahead} commits (no new dvc add needed)"
+
+    # Caso comum: dvc working dir mudou — pipeline completo.
+    existing_dvc_paths = [p for p in DVC_PATHS if (PROJECT_ROOT / p).exists()]
+
+    # [1/5] dvc add
+    on_line(f"[1/5] dvc add — {len(existing_dvc_paths)} paths")
+    rc, tail = _stream([str(venv_dvc), "add", *existing_dvc_paths], on_line, timeout=T_ADD)
+    if rc != 0:
+        return rc, f"dvc add failed (rc={rc}):\n{tail}"
+
+    # [2/5] git add  — paths concretos (sem glob shell)
+    dvc_files = sorted(
+        list(PROJECT_ROOT.glob("data/*.dvc"))
+        + list(PROJECT_ROOT.glob("data/external/*.dvc"))
+    )
+    gitignores = [
+        p for p in (
+            PROJECT_ROOT / "data" / ".gitignore",
+            PROJECT_ROOT / "data" / "external" / ".gitignore",
+        ) if p.exists()
+    ]
+    git_add_targets = [str(p.relative_to(PROJECT_ROOT)) for p in dvc_files + gitignores]
+    on_line(f"[2/5] git add — {len(git_add_targets)} files")
+    if git_add_targets:
+        rc, tail = _stream(["git", "add", *git_add_targets], on_line, timeout=T_GIT)
+        if rc != 0:
+            return rc, f"git add failed (rc={rc}):\n{tail}"
+
+    # [3/5] commit (skip if nothing staged)
+    staged_check = subprocess.run(
+        ["git", "diff", "--cached", "--quiet"],
+        cwd=str(PROJECT_ROOT),
+        capture_output=True,
+    )
+    if staged_check.returncode == 0:
+        on_line("[3/5] commit — nothing staged, skipping")
+    else:
+        commit_script = Path.home() / ".claude" / "scripts" / "commit.sh"
+        if not commit_script.exists():
+            on_line(f"ERROR: {commit_script} not found")
+            return 1, "commit.sh missing"
+        msg = commit_msg or f"data: dashboard sync ({datetime.now(timezone.utc).strftime('%Y-%m-%d')})"
+        on_line(f"[3/5] commit — {msg!r}")
+        rc, tail = _stream([str(commit_script), msg], on_line, timeout=T_GIT)
+        if rc != 0:
+            return rc, f"commit failed (rc={rc}):\n{tail}"
+
+    # [4/5] dvc push
+    on_line("[4/5] dvc push — uploading blobs to gdrive")
+    rc, tail = _stream([str(venv_dvc), "push"], on_line, timeout=T_PUSH)
+    if rc != 0:
+        return rc, f"dvc push failed (rc={rc}):\n{tail}"
+
+    # [5/5] git push
+    on_line("[5/5] git push — pushing rev_lock")
+    rc, tail = _stream(["git", "push"], on_line, timeout=T_GIT)
+    if rc != 0:
+        return rc, f"git push failed (rc={rc}):\n{tail}"
+
+    return 0, "all publish steps ok"
+
+
+def quarto_installed() -> bool:
+    return shutil.which("quarto") is not None
+
+
+def discover_qmds(platforms_filter: Optional[list[str]] = None) -> list[Path]:
+    """Lista notebooks Quarto pra renderizar.
+
+    - `platforms_filter=None`: todos `notebooks/*.qmd` (exceto _template).
+    - `platforms_filter=["NotebookLM"]`: so qmds dessa plat (consolidado +
+      per-account/legacy) + cross-overview (00-*.qmd). Stage 3 incremental
+      pra evitar re-render dos 22 qmds quando sync foi de 1 plat so.
+
+    Ordenacao: 00-* primeiro, resto alfabetico.
+    """
+    notebooks_dir = PROJECT_ROOT / "notebooks"
+    if not notebooks_dir.exists():
+        return []
+    if platforms_filter is None:
+        qmds = [p for p in notebooks_dir.glob("*.qmd") if not p.name.startswith("_")]
+        return sorted(qmds, key=lambda p: (not p.name.startswith("00-"), p.name))
+    # Filtrado: qmds das plats listadas + cross-overview
+    selected: set[Path] = set()
+    for plat in platforms_filter:
+        slug = plat.lower().replace(".", "-").replace(" ", "-")
+        consolidated = notebooks_dir / f"{slug}.qmd"
+        if consolidated.exists():
+            selected.add(consolidated)
+        selected.update(notebooks_dir.glob(f"{slug}-acc-*.qmd"))
+        selected.update(notebooks_dir.glob(f"{slug}-legacy.qmd"))
+    selected.update(notebooks_dir.glob("00-overview*.qmd"))
+    return sorted(selected, key=lambda p: (not p.name.startswith("00-"), p.name))
+
+
+def run_quarto_streaming(
+    on_line: Callable[[str], None],
+    timeout_per_qmd: float = 900.0,
+    platforms_filter: Optional[list[str]] = None,
+) -> tuple[int, str]:
+    """Renderiza notebooks/*.qmd (exceto templates).
+
+    `platforms_filter`: se setado, renderiza so qmds dessas plats + cross-
+    overview. None = todos qmds (default).
+
+    Imprime markers `[i/N] rendering <name>` pra UI parsear progresso.
+    Continua nos proximos qmds se um falhar; rc final reflete agregado.
+    """
+    if not quarto_installed():
+        on_line("ERROR: quarto CLI not in PATH — `brew install quarto-cli`")
+        return 1, "quarto not installed"
+
+    qmds = discover_qmds(platforms_filter=platforms_filter)
+    if not qmds:
+        on_line("WARNING: no qmds found in notebooks/")
+        return 0, "no qmds"
+
+    quarto_python = str(PROJECT_ROOT / ".venv" / "bin" / "python")
+    extra_env = {"QUARTO_PYTHON": quarto_python}
+
+    on_line(f"Found {len(qmds)} notebooks to render")
+    failures: list[str] = []
+    for i, qmd in enumerate(qmds, 1):
+        on_line(f"[{i}/{len(qmds)}] rendering {qmd.name}")
+        rel = str(qmd.relative_to(PROJECT_ROOT))
+        rc, _tail = _stream(
+            ["quarto", "render", rel],
+            on_line,
+            timeout=timeout_per_qmd,
+            extra_env=extra_env,
+        )
+        if rc != 0:
+            failures.append(f"{qmd.name} (rc={rc})")
+            on_line(f"  ❌ {qmd.name} failed (rc={rc})")
+        else:
+            on_line(f"  ✅ {qmd.name} ok")
+
+    summary = f"{len(qmds) - len(failures)}/{len(qmds)} qmds rendered"
+    if failures:
+        return 1, f"{summary}; failures: {', '.join(failures)}"
+    return 0, summary

@@ -16,7 +16,6 @@ isso depende do estado agregado, nao da plat sincronizada.
 """
 from __future__ import annotations
 
-import json
 import subprocess
 import webbrowser
 from datetime import datetime, timezone
@@ -28,7 +27,7 @@ import streamlit as st
 from dashboard.data import PROJECT_ROOT, PlatformState
 from dashboard.progress import parse_progress
 from dashboard.quarto import report_server_base_url
-from dashboard.sync import (
+from src.workflows.execution import (
     acquire_pipeline_lock,
     quarto_installed,
     release_pipeline_lock,
@@ -37,30 +36,13 @@ from dashboard.sync import (
     run_sync_streaming,
     run_unify_streaming,
 )
-
-# Trilha persistente de runs — append-only jsonl, sobrevive a restart do
-# Streamlit. Sem tails (so metadata) pra nao inflar; tails ficam no
-# session_state ate o user clicar Dismiss. Rotation acionada quando passa
-# de MAX_RUNS_BEFORE_ROTATE entries — mantem ultimas KEEP_RUNS_AFTER_ROTATE.
-RUNS_LOG = PROJECT_ROOT / ".runtime" / "pipeline-runs.jsonl"
-MAX_RUNS_BEFORE_ROTATE = 1000
-KEEP_RUNS_AFTER_ROTATE = 500
-
-
-STAGE_NAMES: list[str] = [
-    "Sync + parse platforms",
-    "Unify parquets",
-    "Quarto render",
-    "Publish (DVC + git)",
-]
-
-# Keys curtas pra `results[i]["stage"]` — derivadas de STAGE_NAMES pra evitar
-# drift se renomear (ex: 'Sync platforms' -> 'Sync'). Renderiza igual no
-# summary expander e na trilha persistente.
-STAGE_KEYS: list[str] = [
-    f"{i+1}/{len(STAGE_NAMES)} {n.split()[0]}"
-    for i, n in enumerate(STAGE_NAMES)
-]
+from src.workflows.pipeline import (
+    STAGE_KEYS,
+    STAGE_NAMES,
+    commit_msg_for_scope,
+    persist_run,
+    recent_runs,
+)
 
 # Mapeamento centralizado pra evitar bugs de inconsistencia entre painel
 # macro e summary expander. "aborted" = nao rodou por causa de falha anterior;
@@ -99,86 +81,6 @@ def _save_summary(stage_status: list[str], results: list[dict], publish_after: b
     }
     st.session_state["pipeline_summary"] = summary
     persist_run(stage_status, results, publish_after, scope)
-
-
-def persist_run(stage_status: list[str], results: list[dict], publish_after: bool, scope: str) -> None:
-    """Append entry no historico local com metadata da run. Sem tails
-    (estavam em session_state). Falha silenciosa — nao bloqueia pipeline."""
-    entry = {
-        "at": datetime.now(timezone.utc).isoformat(),
-        "scope": scope,
-        "stage_status": list(stage_status),
-        "publish": publish_after,
-        "results": [
-            {k: v for k, v in r.items() if k != "tail"}
-            for r in results
-        ],
-    }
-    try:
-        RUNS_LOG.parent.mkdir(parents=True, exist_ok=True)
-        with RUNS_LOG.open("a") as f:
-            f.write(json.dumps(entry) + "\n")
-        _maybe_rotate_runs_log()
-    except OSError:
-        pass
-
-
-def _maybe_rotate_runs_log() -> None:
-    """Trunca o historico quando ultrapassa MAX_RUNS_BEFORE_ROTATE,
-    mantendo as ultimas KEEP_RUNS_AFTER_ROTATE entries. Evita arquivo
-    crescendo indefinidamente em rodadas frequentes."""
-    try:
-        with RUNS_LOG.open() as f:
-            lines = f.readlines()
-        if len(lines) <= MAX_RUNS_BEFORE_ROTATE:
-            return
-        kept = lines[-KEEP_RUNS_AFTER_ROTATE:]
-        with RUNS_LOG.open("w") as f:
-            f.writelines(kept)
-    except OSError:
-        pass
-
-
-def commit_msg_for_scope(scope: str) -> str:
-    """Mensagem de commit pro Stage 4 baseada no scope da run.
-
-    'all'              -> 'data: dashboard sync (all platforms, 2026-05-12)'
-    'platform:Gemini'  -> 'data: dashboard sync (Gemini, 2026-05-12)'
-    'cli:headless'     -> 'data: cli headless sync (2026-05-12)'
-
-    Usado pra evitar commits genericos identicos quando se roda varios
-    Update all / sync por plat no mesmo dia.
-    """
-    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    if scope == "all":
-        return f"data: dashboard sync (all platforms, {date})"
-    if scope.startswith("platform:"):
-        plat = scope.split(":", 1)[1]
-        return f"data: dashboard sync ({plat}, {date})"
-    if scope.startswith("cli:"):
-        kind = scope.split(":", 1)[1]
-        return f"data: {kind} sync ({date})"
-    return f"data: pipeline sync ({scope}, {date})"
-
-
-def recent_runs(limit: int = 10) -> list[dict]:
-    """Le as ultimas N entries do historico local, mais recente primeiro."""
-    if not RUNS_LOG.exists():
-        return []
-    entries: list[dict] = []
-    try:
-        with RUNS_LOG.open() as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entries.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
-    except OSError:
-        return []
-    return entries[-limit:][::-1]
 
 
 def render_recent_runs_section(limit: int = 10) -> None:

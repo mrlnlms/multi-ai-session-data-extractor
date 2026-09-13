@@ -59,11 +59,12 @@ Nao conclua que houve consolidacao apenas pelo nome, idade ou status do arquivo.
   modulos em `commands/` para login, sync e parse; fontes CLI expoem sync e
   parse. Probes empiricos ficam em `src/platforms/<source>/probes/`;
   ferramentas excepcionais especificas tambem ficam junto da plataforma.
-  Fluxos transversais ficam em
-  `scripts/workflows/`; comandos opcionais do operador ficam em
+  Entry points de fluxos transversais ficam em
+  `scripts/workflows/`; sua implementacao fica em `src/workflows/`; comandos opcionais do operador ficam em
   `scripts/tools/` e nao integram o pipeline normal.
-- `scripts/` contem apenas workflows transversais e ferramentas opcionais do
-  operador. Dashboard, workflows e testes reutilizam os pacotes em `src/`.
+- `scripts/` contem apenas entrypoints finos para workflows transversais e
+  ferramentas opcionais do operador. A implementacao importavel dos workflows
+  fica em `src/workflows/`; dashboard, entrypoints e testes reutilizam `src/`.
 - Modulos `src.platforms.<source>.commands.sync` web fazem captura + assets + reconcile, mas nao
   chamam o parser quando executados diretamente.
 - O dashboard/headless executa o `parse.py` da fonte depois de sync web
