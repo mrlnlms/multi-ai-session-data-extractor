@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from src.reconcilers.files import link_or_copy
+
 logger = logging.getLogger(__name__)
 
 
@@ -271,8 +273,7 @@ def _merge_dir(src: Path, dst: Path) -> None:
         tgt = dst / rel
         if tgt.exists():
             continue
-        tgt.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(item, tgt)
+        link_or_copy(item, tgt)
 
 
 def _write_last_reconcile_md(

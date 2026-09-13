@@ -20,11 +20,12 @@ Features futuras (novos rpcids) usam FEATURES_VERSION pra forcar refetch seletiv
 
 import json
 import logging
-import os
 import shutil
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+
+from src.reconcilers.files import link_or_copy
 
 logger = logging.getLogger(__name__)
 
@@ -283,11 +284,7 @@ def _copy_artifacts_and_mindmap(uuid: str, src_root: Path, dst_root: Path) -> No
 
 
 def _merge_assets(raw_dir: Path, output_dir: Path) -> None:
-    """Copia assets do raw atual pro merged via hardlink (economia de espaco).
-
-    Tenta os.link() primeiro. Se falhar (ex: cross-device, embora raro no
-    projeto onde tudo vive em /data/), cai de volta pra shutil.copy2().
-    """
+    """Materializa assets imutaveis sem duplicar bytes quando possivel."""
     src = raw_dir / "assets"
     dst = output_dir / "assets"
     if not src.exists():
@@ -297,13 +294,7 @@ def _merge_assets(raw_dir: Path, output_dir: Path) -> None:
             continue
         rel = item.relative_to(src)
         tgt = dst / rel
-        if tgt.exists():
-            continue
-        tgt.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            os.link(item, tgt)
-        except OSError:
-            shutil.copy2(item, tgt)
+        link_or_copy(item, tgt)
 
 
 def _write_last_reconcile_md(merged_dir: Path, log_entry: dict) -> None:

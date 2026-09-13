@@ -21,6 +21,10 @@ Automatic recovery from transient timeouts via `scripts/platform/claude/refetch-
 Binaries + artifacts (code/markdown/html/react via `tool_use`) extracted
 during asset download.
 
+Immutable binaries and extracted artifacts are materialized in `merged` with
+a hardlink when supported, with a normal copy as the cross-filesystem fallback.
+Mutable JSON remains independent.
+
 Reconciler v3 (FEATURES_VERSION=2): full preservation (convs +
 projects), idempotent. Output: `data/merged/Claude.ai/conversations/<uuid>.json`
 + `projects/<uuid>.json` + `assets/`.

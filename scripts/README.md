@@ -41,16 +41,19 @@ tools. Run a probe only to answer a specific platform question, and record
 durable findings in the source's engineering documentation. Probes may open
 browsers or call internal APIs and are not part of routine collection.
 
-## Maintenance and historical inputs
+## Operator tools and historical inputs
 
-`maintenance/` contains deliberate cross-platform storage upkeep commands:
-local asset deduplication and DVC remote garbage collection. Source-specific
-exceptional tools remain with their platform; for example, Antigravity CLI's
-`recover-legacy.py` decodes copied legacy containers before the normal parser
-consumes their sidecars. Historical format adapters are part of their
-platform's official parser: NotebookLM's normal `parse.py` includes immutable
-old-format snapshots from `data/external/notebooklm-snapshots/`.
+`tools/` contains optional operator commands that are useful to the repository
+but are not pipeline stages. `prune-dvc-history.py` deliberately removes remote
+DVC objects outside the current workspace state; it uses the configured default
+remote or one selected with `--remote`, so forks are not tied to Google Drive.
 
-Maintenance and exceptional recovery commands are not normal pipeline stages;
+Source-specific exceptional tools remain with their platform; for example,
+Antigravity CLI's `recover-legacy.py` decodes copied legacy containers before
+the normal parser consumes their sidecars. Historical format adapters are part
+of their platform's official parser: NotebookLM's normal `parse.py` includes
+immutable old-format snapshots from `data/external/notebooklm-snapshots/`.
+
+Operator tools and exceptional recovery commands are not normal pipeline stages;
 read the relevant runbook or source state record linked from
 [`docs/README.md`](../docs/README.md) before using them.

@@ -18,11 +18,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+
+from src.reconcilers.files import link_or_copy
 
 logger = logging.getLogger(__name__)
 
@@ -32,17 +33,6 @@ def _safe_copy(src: Path, dst: Path) -> None:
     if src.exists() and dst.exists() and src.samefile(dst):
         return
     shutil.copy2(src, dst)
-
-
-def _link_or_copy(src: Path, dst: Path) -> None:
-    """Tenta hardlink, cai de volta pra copia."""
-    if dst.exists():
-        return
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        os.link(src, dst)
-    except OSError:
-        shutil.copy2(src, dst)
 
 
 FEATURES_VERSION = 2  # bumpado pra layout pasta unica
@@ -343,7 +333,7 @@ def _merge_dir(src: Path, dst: Path) -> None:
             continue
         rel = item.relative_to(src)
         target = dst / rel
-        _link_or_copy(item, target)
+        link_or_copy(item, target)
 
 
 def _write_last_reconcile_md(

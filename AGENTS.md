@@ -60,7 +60,8 @@ arquivo.
   `parse.py`; fontes CLI expoem `sync.py` e `parse.py`. Probes empiricos ficam
   em `scripts/platform/<source>/probes/`; ferramentas excepcionais especificas
   tambem ficam junto da plataforma. Fluxos transversais ficam em
-  `scripts/workflows/`; manutencao transversal fica em `scripts/maintenance/`.
+  `scripts/workflows/`; comandos opcionais do operador ficam em
+  `scripts/tools/` e nao integram o pipeline normal.
 - Os scripts `scripts/platform/<source>/sync.py` das fontes web fazem captura + assets +
   reconcile e nao chamam o parser quando executados diretamente. O pipeline
   do dashboard/headless executa automaticamente o `parse.py` da fonte depois

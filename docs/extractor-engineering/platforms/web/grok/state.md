@@ -87,7 +87,8 @@ Total: 10.02MB.
 Naming local: `data/raw/Grok/assets/<asset_id>.<ext>` (mime → ext).
 Manifest: `data/raw/Grok/assets_manifest.json` ({asset_id: {url,
 relpath, size, mime}}). Reconciler espelha pra
-`data/merged/Grok/assets/`. Parser populates coluna `asset_path` em
+`data/merged/Grok/assets/` por hardlink quando suportado, com copia normal como
+fallback entre filesystems. Parser populates coluna `asset_path` em
 `grok_assets.parquet`.
 
 Pipeline 3 etapas (capture + assets + reconcile) torna export oficial

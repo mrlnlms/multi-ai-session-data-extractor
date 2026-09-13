@@ -129,23 +129,25 @@ Antes de uma limpeza:
 .venv/bin/dvc gc --workspace --cloud --dry
 ```
 
-No Google Drive, prefira a ferramenta do projeto em vez de executar o GC
-nativo sem `--dry`. O Drive pode demorar ou deixar uma requisicao HTTP presa;
-esta ferramenta cria um plano persistente, apaga sequencialmente em lotes e
-interrompe cada requisicao individual apos dois minutos. Ela nunca e chamada
+Para aplicar a decisao, prefira a ferramenta do projeto em vez de executar o
+GC nativo sem `--dry`. Ela funciona com o remoto padrao configurado em
+`core.remote`, ou com outro remoto indicado por `--remote`. O Google Drive e o
+padrao desta instalacao e pode demorar ou deixar uma requisicao HTTP presa;
+por isso a ferramenta cria um plano persistente, apaga sequencialmente em lotes
+e interrompe cada requisicao individual apos dois minutos. Ela nunca e chamada
 pela coleta nem pelo dashboard.
 
 ```bash
 # So revisa e grava .runtime/dvc-gc/<data-hora>/plan.json; nao apaga nada.
-.venv/bin/python scripts/maintenance/dvc-gc.py plan
+.venv/bin/python scripts/tools/prune-dvc-history.py plan
 
 # Depois da revisao e de autorizacao explicita: cria um plano novo e o executa
 # ate terminar. Pode continuar no Terminal sem depender de um agente.
-.venv/bin/python scripts/maintenance/dvc-gc.py run --apply
+.venv/bin/python scripts/tools/prune-dvc-history.py run --apply
 
 # Se o Terminal ou a maquina parar, continue somente os objetos que ainda nao
 # tiveram resultado registrado. Substitua pelo diretorio indicado pelo comando.
-.venv/bin/python scripts/maintenance/dvc-gc.py resume \
+.venv/bin/python scripts/tools/prune-dvc-history.py resume \
   .runtime/dvc-gc/<data-hora> --apply
 ```
 

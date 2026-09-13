@@ -37,6 +37,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from src.reconcilers.files import link_or_copy
+
 logger = logging.getLogger(__name__)
 
 
@@ -464,8 +466,7 @@ def _merge_assets(raw_dir: Path, previous_merged: Path | None, output_dir: Path)
             tgt = dst / rel
             if tgt.exists():
                 continue
-            tgt.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(item, tgt)
+            link_or_copy(item, tgt)
 
     _copy_tree(raw_dir / "assets", output_dir / "assets")
     if previous_merged and previous_merged != output_dir:

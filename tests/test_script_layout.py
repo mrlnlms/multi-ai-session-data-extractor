@@ -33,6 +33,7 @@ WORKFLOW_FILES = {
     "serve-qmds.sh",
     "unify-parquets.py",
 }
+TOOL_FILES = {"prune-dvc-history.py"}
 
 
 @pytest.mark.parametrize(
@@ -56,6 +57,15 @@ def test_supported_source_has_platform_tool(platform: str, tool: str):
 @pytest.mark.parametrize("filename", sorted(WORKFLOW_FILES))
 def test_cross_platform_entrypoint_lives_in_workflows(filename: str):
     assert (SCRIPTS_DIR / "workflows" / filename).is_file()
+
+
+@pytest.mark.parametrize("filename", sorted(TOOL_FILES))
+def test_optional_operator_command_lives_in_tools(filename: str):
+    assert (SCRIPTS_DIR / "tools" / filename).is_file()
+
+
+def test_obsolete_maintenance_directory_is_absent():
+    assert not (SCRIPTS_DIR / "maintenance").exists()
 
 
 def test_scripts_root_contains_only_readme():

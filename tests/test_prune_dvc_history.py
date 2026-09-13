@@ -2,8 +2,8 @@ import importlib.util
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).parents[1] / "scripts" / "maintenance" / "dvc-gc.py"
-SPEC = importlib.util.spec_from_file_location("dvc_gc_maintenance", SCRIPT)
+SCRIPT = Path(__file__).parents[1] / "scripts" / "tools" / "prune-dvc-history.py"
+SPEC = importlib.util.spec_from_file_location("prune_dvc_history", SCRIPT)
 assert SPEC and SPEC.loader
 gc = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(gc)
@@ -42,3 +42,11 @@ def test_clean_status_accepts_normal_dvc_messages():
     assert gc.clean_status("Data and pipelines are up to date.\n")
     assert gc.clean_status("Cache and remote 'gdrive_remote' are in sync.\n")
     assert not gc.clean_status("data/raw.dvc changed")
+
+
+def test_default_remote_comes_from_repository_config(monkeypatch):
+    class FakeRepo:
+        config = {"core": {"remote": "my_object_store"}}
+
+    monkeypatch.setattr(gc, "Repo", lambda _path: FakeRepo())
+    assert gc.default_remote_name() == "my_object_store"

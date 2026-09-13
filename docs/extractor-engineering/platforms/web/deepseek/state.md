@@ -16,6 +16,9 @@
 Chat sessions captured. Reconciler v3 (FEATURES_VERSION=2): no
 projects (DeepSeek does not expose them).
 
+Binary assets are immutable and enter `merged` through a hardlink when the
+filesystem supports it, with a normal copy as the portability fallback.
+
 ### Latest validated collection — 2026-08-30
 
 - The profile's stored token had expired and was renewed by interactive login;

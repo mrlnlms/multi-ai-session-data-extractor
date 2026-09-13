@@ -47,11 +47,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import shutil
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+
+from src.reconcilers.files import link_or_copy
 
 logger = logging.getLogger(__name__)
 
@@ -387,15 +388,13 @@ def run_reconciliation(
             if not item.is_file():
                 continue
             target = merged_output / "assets" / "files" / item.name
-            if not target.exists():
-                _safe_copy(item, target)
+            link_or_copy(item, target)
     if prev_assets_dir and (prev_assets_dir / "files").exists():
         for item in (prev_assets_dir / "files").iterdir():
             if not item.is_file():
                 continue
             target = merged_output / "assets" / "files" / item.name
-            if not target.exists():
-                _safe_copy(item, target)
+            link_or_copy(item, target)
     report.asset_binaries_total = len([
         f for f in (merged_output / "assets" / "files").iterdir()
         if f.is_file() and f.name != "_manifest.json"

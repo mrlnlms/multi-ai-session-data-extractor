@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Deliberate, resumable DVC cloud-GC maintenance for the current data state.
+"""Deliberately prune remote DVC objects outside the current data state.
 
-This exists because Google Drive is a slow DVC object store: DVC's native GC
-deletes objects one at a time and an individual HTTP response can hang.  The
-tool keeps DVC's own dry-run as the source of truth, persists its plan under
-``.runtime/`` and puts a deadline on each Drive request.
+The command works with the repository's configured DVC remote, or a remote
+selected with ``--remote``. It exists because some object stores make DVC's
+native deletion slow or prone to hanging. The tool keeps DVC's own dry-run as
+the source of truth, persists its plan under ``.runtime/`` and puts a deadline
+on each remote request.
 
 It is intentionally *not* part of collection or publishing.  Applying a plan
 deletes historical DVC objects from the configured remote and therefore always
@@ -29,7 +30,6 @@ from dvc.repo import Repo
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_REMOTE = "gdrive_remote"
 DEFAULT_BATCH_SIZE = 500
 DEFAULT_REQUEST_TIMEOUT = 120
 RUNTIME_ROOT = PROJECT_ROOT / ".runtime" / "dvc-gc"
@@ -41,7 +41,7 @@ def assert_project_root() -> None:
 
 
 class RequestTimedOut(TimeoutError):
-    """A single Drive deletion exceeded the selected deadline."""
+    """A single remote deletion exceeded the selected deadline."""
 
 
 class request_deadline:
@@ -123,6 +123,16 @@ def configured_remote(remote_name: str) -> tuple[Any, str]:
     repo = Repo(".")
     fs_cls, config, root = get_cloud_fs(repo.config, name=remote_name)
     return fs_cls(**config), root
+
+
+def default_remote_name() -> str:
+    """Return the repository's configured default DVC remote."""
+    remote = Repo(".").config.get("core", {}).get("remote")
+    if not remote:
+        raise RuntimeError(
+            "No default DVC remote is configured; pass --remote <name>."
+        )
+    return remote
 
 
 def expected_prefix(root: str) -> str:
@@ -284,10 +294,10 @@ def parser() -> argparse.ArgumentParser:
     commands = root.add_subparsers(dest="command", required=True)
 
     plan = commands.add_parser("plan", help="preflight and write a non-destructive GC plan")
-    plan.add_argument("--remote", default=DEFAULT_REMOTE)
+    plan.add_argument("--remote", help="DVC remote name (default: core.remote)")
 
     run = commands.add_parser("run", help="create and execute a new plan")
-    run.add_argument("--remote", default=DEFAULT_REMOTE)
+    run.add_argument("--remote", help="DVC remote name (default: core.remote)")
     run.add_argument("--apply", action="store_true", help="required: permit remote object deletion")
     run.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     run.add_argument("--request-timeout", type=int, default=DEFAULT_REQUEST_TIMEOUT)
@@ -306,7 +316,7 @@ def main() -> int:
     assert_project_root()
     args = parser().parse_args()
     if args.command == "plan":
-        create_plan(args.remote)
+        create_plan(args.remote or default_remote_name())
         return 0
     if not args.apply:
         raise SystemExit("Refusing to delete remote DVC objects without --apply.")
@@ -315,7 +325,7 @@ def main() -> int:
     if args.max_batches is not None and args.max_batches < 1:
         raise SystemExit("--max-batches must be positive.")
     if args.command == "run":
-        directory = create_plan(args.remote)
+        directory = create_plan(args.remote or default_remote_name())
     else:
         directory = args.run_directory
     return 0 if apply_plan(directory, args.batch_size, args.request_timeout, args.max_batches) else 1

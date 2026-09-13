@@ -9,6 +9,11 @@ em [dvc-runbook.md](dvc-runbook.md).
 sync/copy -> raw -> reconcile -> parse -> processed -> unify -> unified
 ```
 
+Os reconcilers tratam assets binarios como imutaveis: ao preserva-los em
+`merged`, tentam criar hardlinks para evitar uma segunda copia fisica e usam
+uma copia normal como fallback quando o filesystem nao suporta links. JSON,
+manifestos e outros arquivos que podem ser anotados continuam independentes.
+
 Use `PYTHONPATH=. .venv/bin/python` para executar scripts sem depender do
 Python global.
 

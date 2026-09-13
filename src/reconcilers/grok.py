@@ -22,6 +22,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from src.reconcilers.files import link_or_copy
+
 logger = logging.getLogger(__name__)
 
 
@@ -268,8 +270,7 @@ def run_reconciliation(
             if not src_bin.is_file():
                 continue
             dst_bin = merged_assets_bin / src_bin.name
-            if not dst_bin.exists():
-                shutil.copy2(src_bin, dst_bin)
+            link_or_copy(src_bin, dst_bin)
     if previous_merged and previous_merged != merged_output:
         prev_bin = previous_merged / "assets"
         if prev_bin.exists():
@@ -278,8 +279,7 @@ def run_reconciliation(
                 if not src_bin.is_file():
                     continue
                 dst_bin = merged_assets_bin / src_bin.name
-                if not dst_bin.exists():
-                    shutil.copy2(src_bin, dst_bin)
+                link_or_copy(src_bin, dst_bin)
 
     # Scheduled tasks (sobrescreve do raw atual; usage/contagem dinamica
     # sem PK estavel — preservation por taskId quando disponivel)

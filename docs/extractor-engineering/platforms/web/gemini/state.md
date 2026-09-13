@@ -16,6 +16,8 @@
 
 Conversations + assistant messages + tool events + images
 (lh3.googleusercontent.com) + extracted Deep Research markdown reports.
+Immutable assets are hard-linked into `merged` when supported, with a normal
+copy fallback; mutable conversation JSON remains independent.
 
 ### Latest validated collection — 2026-08-30
 
