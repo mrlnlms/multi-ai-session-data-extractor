@@ -59,16 +59,15 @@ Nao conclua que houve consolidacao apenas pelo nome, idade ou status do arquivo.
   modulos em `commands/` para login, sync e parse; fontes CLI expoem sync e
   parse. Probes empiricos ficam em `src/platforms/<source>/probes/`;
   ferramentas excepcionais especificas tambem ficam junto da plataforma.
-  Entry points de fluxos transversais ficam em
-  `scripts/workflows/`; sua implementacao fica em `src/workflows/`; comandos opcionais do operador ficam em
-  `scripts/tools/` e nao integram o pipeline normal.
-- `scripts/` contem apenas entrypoints finos para workflows transversais e
-  ferramentas opcionais do operador. A implementacao importavel dos workflows
-  fica em `src/workflows/`; dashboard, entrypoints e testes reutilizam `src/`.
+  Comandos e implementacao de fluxos transversais ficam em
+  `src/workflows/`; operacoes excepcionais do repositorio ficam em
+  `src/operations/` e nao integram o pipeline normal.
+- Interfaces Python executaveis, dashboard, entrypoints e testes reutilizam
+  `src/`; nao manter uma arvore paralela em `scripts/`.
 - Modulos `src.platforms.<source>.commands.sync` web fazem captura + assets + reconcile, mas nao
   chamam o parser quando executados diretamente.
 - O dashboard/headless executa o `parse.py` da fonte depois de sync web
-  bem-sucedido e antes de `scripts/workflows/unify-parquets.py`.
+  bem-sucedido e antes de `python -m src.workflows.unify`.
 - Os syncs das CLIs ja fazem copy + parse.
 - Alteracoes no schema unificado e nos Parquets publicados exigem revisao dos
   impactos em consumidores downstream antes da publicacao.
@@ -142,7 +141,7 @@ para bloquear coleta ou publicacao normal.
 PYTHONPATH=. .venv/bin/pytest
 
 # Materializar Parquets unificados apos parses
-PYTHONPATH=. .venv/bin/python scripts/workflows/unify-parquets.py
+PYTHONPATH=. .venv/bin/python -m src.workflows.unify
 ```
 
 Comandos de captura, login e diagnostico ficam no `state.md` de cada fonte.

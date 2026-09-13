@@ -48,7 +48,7 @@ fonte inteira.
 ## Fechamento da rodada
 
 Depois que todas as fontes em escopo tiverem Parquets atuais, execute
-`scripts/workflows/unify-parquets.py`, valide a atualidade do conjunto unificado e
+`python -m src.workflows.unify`, valide a atualidade do conjunto unificado e
 renderize apenas os perfis Quarto afetados quando isso ajudar na verificacao.
 
 `dvc push` e `dvc gc` nao fazem parte deste runbook: publicacao e retencao sao

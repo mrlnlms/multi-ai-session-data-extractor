@@ -79,7 +79,7 @@ def setup_unified_views(
 
     Args:
         con: conexao DuckDB
-        unified_dir: data/unified/ (output do scripts/workflows/unify-parquets.py)
+        unified_dir: data/unified/ (output de ``python -m src.workflows.unify``)
         sources_filter: lista de sources (ex: ['chatgpt','claude_ai']) ou None
             pra todas. Aplicado via WHERE source IN (...) na criacao da view.
 

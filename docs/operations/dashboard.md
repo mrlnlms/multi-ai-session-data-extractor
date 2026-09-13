@@ -56,7 +56,8 @@ mesma sequência:
 ```
 
 Para fontes web, o dashboard executa o parser logo após um sync bem-sucedido.
-Isso é diferente de chamar `scripts/<fonte>-sync.py` diretamente no terminal,
+Isso é diferente de chamar o módulo `src.platforms.<source_id>.commands.sync`
+diretamente no terminal,
 caso em que o parse continua sendo um passo explícito. Os syncs das fontes CLI
 já incluem copy e parse.
 
@@ -82,10 +83,10 @@ O equivalente para terminal é:
 
 ```bash
 # Exclui por padrão ChatGPT e Perplexity, que exigem browser visível.
-PYTHONPATH=. .venv/bin/python scripts/workflows/headless-pipeline.py --no-publish
+PYTHONPATH=. .venv/bin/python -m src.workflows.headless --no-publish
 
 # Para um subconjunto explícito:
-PYTHONPATH=. .venv/bin/python scripts/workflows/headless-pipeline.py \
+PYTHONPATH=. .venv/bin/python -m src.workflows.headless \
   --plats=Claude.ai,Gemini --no-publish
 ```
 

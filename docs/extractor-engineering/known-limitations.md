@@ -95,7 +95,7 @@ These validations require a Pro Max account and remain open until someone tests:
 - **`is_archived` and `is_temporary` — always None:** DeepSeek does not expose
   these features. None pattern (not False) to make it clear.
 - **`message_id` is local-per-conv INT (1-98):** not a global UUID. For
-  cross-platform consolidation, `unify-parquets.py` uses composite PK
+  cross-platform consolidation, `src.workflows.unify` uses composite PK
   `[source, conversation_id, message_id]`.
 
 ### Gemini

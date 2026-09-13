@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Deliberately prune remote DVC objects outside the current data state.
 
+Run with ``python -m src.operations.dvc_gc``. This is repository maintenance,
+not a collection or publication pipeline stage.
+
 The command works with the repository's configured DVC remote, or a remote
 selected with ``--remote``. It exists because some object stores make DVC's
 native deletion slow or prone to hanging. The tool keeps DVC's own dry-run as
@@ -37,7 +40,7 @@ RUNTIME_ROOT = PROJECT_ROOT / ".runtime" / "dvc-gc"
 
 def assert_project_root() -> None:
     if not (PROJECT_ROOT / "src").is_dir() or not (PROJECT_ROOT / "data").is_dir():
-        raise RuntimeError(f"invalid project root resolved from script path: {PROJECT_ROOT}")
+        raise RuntimeError(f"invalid project root resolved from module path: {PROJECT_ROOT}")
 
 
 class RequestTimedOut(TimeoutError):

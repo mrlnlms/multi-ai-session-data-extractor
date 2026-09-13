@@ -186,7 +186,7 @@ def _render_pipeline_button(state: PlatformState) -> None:
     if cmd is None:
         st.info(
             f"No sync or export script for {state.name} yet. "
-            f"Implementing `scripts/{state.name.lower()}-sync.py` enables the button."
+            f"Implementing the registered `src.platforms.<source_id>.commands.sync` module enables the button."
         )
         return
 

@@ -166,8 +166,9 @@ Common web-sync flags (availability varies by source):
 
 Full list of commands per platform:
 [docs/operations/pipeline.md](docs/operations/pipeline.md).
-Secondary platform helpers, probes, maintenance, and recovery commands are
-classified in [`scripts/README.md`](scripts/README.md).
+Secondary platform helpers and probes live with their source. The
+[operational command map](docs/operations/commands.md) indexes routine and
+exceptional commands, including manual-save ingestion and DVC maintenance.
 
 ## Dashboard
 
@@ -198,7 +199,7 @@ QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview.qmd
 To view the generated HTMLs locally:
 
 ```bash
-./scripts/workflows/serve-qmds.sh open
+PYTHONPATH=. .venv/bin/python -m src.workflows.serve_reports open
 ```
 
 This server exposes `notebooks/_output/` directly at

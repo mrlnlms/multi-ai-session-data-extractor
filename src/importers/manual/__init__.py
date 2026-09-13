@@ -4,8 +4,7 @@ Cada parser adota source = plataforma original (chatgpt/claude_ai/etc) e
 capture_method = string especifica (manual_clipping_obsidian, manual_copypaste,
 manual_terminal_cc).
 
-Output via `src.workflows.manual_saves` (exposed operationally by
-`scripts/workflows/manual-saves-sync.py`): groups by source
+Output via the `src.workflows.manual_saves` command: groups by source
 destino e escreve `<source>_manual_<table>.parquet` em cada
 `data/processed/<Plataforma>/`.
 

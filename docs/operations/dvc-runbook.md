@@ -139,15 +139,15 @@ pela coleta nem pelo dashboard.
 
 ```bash
 # So revisa e grava .runtime/dvc-gc/<data-hora>/plan.json; nao apaga nada.
-.venv/bin/python scripts/tools/prune-dvc-history.py plan
+.venv/bin/python -m src.operations.dvc_gc plan
 
 # Depois da revisao e de autorizacao explicita: cria um plano novo e o executa
 # ate terminar. Pode continuar no Terminal sem depender de um agente.
-.venv/bin/python scripts/tools/prune-dvc-history.py run --apply
+.venv/bin/python -m src.operations.dvc_gc run --apply
 
 # Se o Terminal ou a maquina parar, continue somente os objetos que ainda nao
 # tiveram resultado registrado. Substitua pelo diretorio indicado pelo comando.
-.venv/bin/python scripts/tools/prune-dvc-history.py resume \
+.venv/bin/python -m src.operations.dvc_gc resume \
   .runtime/dvc-gc/<data-hora> --apply
 ```
 

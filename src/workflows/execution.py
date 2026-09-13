@@ -21,7 +21,6 @@ from src.runtime.project import find_project_root
 from src.platforms.registry import (
     KNOWN_PLATFORMS,
     PLATFORM_COMMAND_PACKAGES,
-    SCRIPT_PREFIX,
     WEB_PLATFORMS,
 )
 
@@ -37,14 +36,11 @@ _NONINTERACTIVE_ENV = {
     "SSH_ASKPASS": "/bin/true",
 }
 
-SCRIPTS_DIR = PROJECT_ROOT / "scripts"
-PLATFORM_SCRIPTS_DIR = SCRIPTS_DIR / "platform"
 RUNTIME_DIR = PROJECT_ROOT / ".runtime"
 LOCK_PATH = RUNTIME_DIR / "locks" / "pipeline.lock"
 
-# Platforms move here one at a time during the vertical-package refactor.
-# Once registered, their operational entrypoints run as Python modules and no
-# parallel scripts/platform/<source>/ tree remains.
+# Operational entrypoints run as Python modules registered in
+# ``src.platforms.registry``.
 # As CLIs ja fazem copy + parse dentro do proprio sync. As fontes web fazem
 # capture + assets + reconcile e precisam do parser como passo separado antes
 # de qualquer unify.
@@ -74,18 +70,8 @@ def _safe_env() -> dict[str, str]:
     return dict(os.environ)
 
 
-def platform_script(platform: str, action: str) -> Optional[Path]:
-    prefix = SCRIPT_PREFIX.get(platform)
-    if not prefix:
-        return None
-    return PLATFORM_SCRIPTS_DIR / prefix / f"{action}.py"
-
-
 def has_sync_script(platform: str) -> bool:
-    if platform in PLATFORM_COMMAND_PACKAGES:
-        return True
-    script = platform_script(platform, "sync")
-    return script is not None and script.exists()
+    return platform in PLATFORM_COMMAND_PACKAGES
 
 
 def sync_command(platform: str) -> Optional[list[str]]:
@@ -100,12 +86,6 @@ def sync_command(platform: str) -> Optional[list[str]]:
         if platform == "ChatGPT":
             cmd.append("--no-voice-pass")
         return cmd
-    script = platform_script(platform, "sync")
-    if script is not None and script.exists():
-        cmd = [python, str(script)]
-        if platform == "ChatGPT":
-            cmd.append("--no-voice-pass")
-        return cmd
     return None
 
 
@@ -116,10 +96,7 @@ def parse_command(platform: str) -> Optional[list[str]]:
     command_package = PLATFORM_COMMAND_PACKAGES.get(platform)
     if command_package:
         return [sys.executable, "-m", f"{command_package}.parse"]
-    script = platform_script(platform, "parse")
-    if script is None or not script.exists():
-        return None
-    return [sys.executable, str(script)]
+    return None
 
 
 def run_sync(platform: str, capture_output: bool = True) -> subprocess.CompletedProcess:
@@ -185,8 +162,7 @@ def run_sync_streaming(
 
 
 def run_unify(capture_output: bool = True) -> subprocess.CompletedProcess:
-    """Roda scripts/workflows/unify-parquets.py — materializa data/unified/ a partir
-    de data/processed/<plat>/. Idempotente, sem args. Bloqueante."""
+    """Run ``src.workflows.unify`` to materialize ``data/unified``."""
     cmd = [sys.executable, "-m", "src.workflows.unify"]
     return subprocess.run(
         cmd,

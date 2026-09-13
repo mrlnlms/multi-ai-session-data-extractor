@@ -80,7 +80,7 @@ e text artifacts.
 | Conta 2, repetição sem UI | 53 notebooks: `0 fetch`, `53 copy`; reconcile: `0 updated`, `53 copied`, `2 preserved_missing` |
 | Conta 1, após capturar 30 diferenças em notas | Repetição imediata sem UI: 129 notebooks: `0 fetch`, `129 copy`; reconcile: `0 updated`, `129 copied`, `1 preserved_missing` |
 | Testes focados | Passaram, incluindo URL/texto volátil, mudança real de identidade e fonte curta antes de fonte normal |
-| Dados derivados | parser e `unify-parquets.py` concluíram; o unified ficou mais novo que todos os parquets de entrada |
+| Dados derivados | parser e `src.workflows.unify` concluíram; o unified ficou mais novo que todos os parquets de entrada |
 
 As 30 diferenças de notas da conta 1 foram preservadas como atualizações; a
 repetição estável mostra apenas que elas não eram um falso positivo recorrente

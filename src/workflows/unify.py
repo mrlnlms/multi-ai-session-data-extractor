@@ -9,11 +9,12 @@ Pipeline:
        raw    ->   merged   -> processed -> unified
 
 Uso:
-    PYTHONPATH=. .venv/bin/python scripts/workflows/unify-parquets.py
+    PYTHONPATH=. .venv/bin/python -m src.workflows.unify
 """
 
 from __future__ import annotations
 
+import argparse
 import logging
 from pathlib import Path
 
@@ -173,6 +174,7 @@ def unify(processed_dir: Path, unified_dir: Path) -> dict[str, int]:
 
 
 def main() -> int:
+    argparse.ArgumentParser(description=__doc__).parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     project_root = find_project_root(Path(__file__))

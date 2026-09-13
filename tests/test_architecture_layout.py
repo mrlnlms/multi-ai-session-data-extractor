@@ -2,12 +2,11 @@ from pathlib import Path
 
 import pytest
 
-from dashboard.data import KNOWN_PLATFORMS, SCRIPT_PREFIX
+from dashboard.data import KNOWN_PLATFORMS
 from dashboard.sync import WEB_PLATFORMS, parse_command, sync_command
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 PLATFORM_ACTIONS = {
     "ChatGPT": {"login", "sync", "parse"},
     "Claude.ai": {"login", "sync", "parse"},
@@ -26,14 +25,6 @@ PLATFORM_ACTIONS = {
 PLATFORM_TOOLS = {
     "Antigravity CLI": {"recover-legacy"},
 }
-WORKFLOW_FILES = {
-    "copy-cli-data.py",
-    "headless-pipeline.py",
-    "manual-saves-sync.py",
-    "serve-qmds.sh",
-    "unify-parquets.py",
-}
-TOOL_FILES = {"prune-dvc-history.py"}
 PLATFORM_PACKAGE = {
     "ChatGPT": "chatgpt",
     "Claude.ai": "claude_ai",
@@ -75,28 +66,51 @@ def test_supported_source_has_platform_tool(platform: str, tool: str):
     ).is_file()
 
 
-@pytest.mark.parametrize("filename", sorted(WORKFLOW_FILES))
-def test_cross_platform_entrypoint_lives_in_workflows(filename: str):
-    assert (SCRIPTS_DIR / "workflows" / filename).is_file()
+def test_legacy_scripts_directory_is_absent():
+    """Executable Python interfaces belong to importable modules under src."""
+    assert not (PROJECT_ROOT / "scripts").exists()
 
 
-def test_python_workflow_entrypoints_stay_thin():
-    """Operator commands must delegate; implementation belongs in src/workflows."""
-    for path in (SCRIPTS_DIR / "workflows").glob("*.py"):
-        assert len(path.read_text().splitlines()) <= 50, path
+@pytest.mark.parametrize("module", ("headless", "manual_saves", "serve_reports", "unify"))
+def test_cross_platform_command_is_importable(module: str):
+    path = PROJECT_ROOT / "src" / "workflows" / f"{module}.py"
+    assert path.is_file()
+    assert 'if __name__ == "__main__"' in path.read_text()
 
 
-@pytest.mark.parametrize("filename", sorted(TOOL_FILES))
-def test_optional_operator_command_lives_in_tools(filename: str):
-    assert (SCRIPTS_DIR / "tools" / filename).is_file()
+def test_exceptional_operation_is_importable():
+    path = PROJECT_ROOT / "src" / "operations" / "dvc_gc.py"
+    assert path.is_file()
+    assert 'if __name__ == "__main__"' in path.read_text()
+
+
+def test_generic_tools_namespace_is_absent():
+    assert not (PROJECT_ROOT / "src" / "tools").exists()
+
+
+def test_operational_command_map_covers_nonroutine_commands():
+    command_map = (PROJECT_ROOT / "docs" / "operations" / "commands.md").read_text()
+    for module in (
+        "src.workflows.manual_saves",
+        "src.workflows.serve_reports",
+        "src.capture.cli.snapshot",
+        "src.operations.dvc_gc",
+    ):
+        assert module in command_map
 
 
 def test_obsolete_maintenance_directory_is_absent():
-    assert not (SCRIPTS_DIR / "maintenance").exists()
+    assert not (PROJECT_ROOT / "src" / "maintenance").exists()
 
 
-def test_scripts_root_contains_only_readme():
-    assert {path.name for path in SCRIPTS_DIR.iterdir() if path.is_file()} == {"README.md"}
+def test_maintained_python_does_not_invoke_scripts_workflows():
+    roots = (PROJECT_ROOT / "src", PROJECT_ROOT / "dashboard")
+    offenders = []
+    for root in roots:
+        for path in root.rglob("*.py"):
+            if "scripts/workflows/" in path.read_text():
+                offenders.append(path.relative_to(PROJECT_ROOT))
+    assert offenders == []
 
 
 def test_layout_contract_covers_every_known_platform():
@@ -110,48 +124,25 @@ def test_web_platforms_are_exactly_platforms_with_login():
     assert expected == set(WEB_PLATFORMS)
 
 
-def test_platform_directories_match_registered_prefixes():
-    assert MIGRATED_PLATFORMS == set(KNOWN_PLATFORMS)
-    assert not (SCRIPTS_DIR / "platform").exists()
-
-
 def test_horizontal_source_namespaces_are_absent():
     for namespace in ("extractors", "parsers", "reconcilers"):
         assert not (PROJECT_ROOT / "src" / namespace).exists()
 
 
 def test_no_legacy_root_entrypoints():
-    assert not list(SCRIPTS_DIR.glob("*-login.py"))
-    assert not list(SCRIPTS_DIR.glob("*-sync.py"))
-    assert not list(SCRIPTS_DIR.glob("*-parse.py"))
+    assert not list(PROJECT_ROOT.glob("*-login.py"))
+    assert not list(PROJECT_ROOT.glob("*-sync.py"))
+    assert not list(PROJECT_ROOT.glob("*-parse.py"))
 
 
 def test_recovery_directory_is_not_used_for_platform_imports():
-    recovery_dir = SCRIPTS_DIR / "recovery"
+    recovery_dir = PROJECT_ROOT / "src" / "recovery"
     if recovery_dir.exists():
         assert not list(recovery_dir.glob("notebooklm*.py"))
 
 
 def test_probes_live_inside_platform_directories():
-    assert not (SCRIPTS_DIR / "probes").exists()
-    for probes_dir in SCRIPTS_DIR.glob("platform/*/probes"):
-        assert probes_dir.parent.name in SCRIPT_PREFIX.values()
-
-
-def test_no_python_cache_is_tracked():
-    if not (PROJECT_ROOT / ".git").is_dir():
-        pytest.skip("tracked-file assertion requires a Git checkout")
-
-    import subprocess
-
-    result = subprocess.run(
-        ["git", "ls-files", "scripts/**/__pycache__/*"],
-        cwd=PROJECT_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    assert result.stdout == ""
+    assert not (PROJECT_ROOT / "src" / "probes").exists()
 
 
 @pytest.mark.parametrize("platform", KNOWN_PLATFORMS)

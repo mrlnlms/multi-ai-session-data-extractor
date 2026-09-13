@@ -8,7 +8,7 @@ Helpers pra:
 - gerar URLs pro servidor local dos relatórios
 
 `notebooks/_output/` e a fonte unica dos HTMLs renderizados. O script
-`scripts/workflows/serve-qmds.sh` serve esse diretorio diretamente; o dashboard apenas
+`src.workflows.serve_reports` serve esse diretorio diretamente; o dashboard apenas
 gera URLs para esse servidor, sem copiar ou linkar arquivos em `static/`.
 """
 from __future__ import annotations
@@ -137,7 +137,7 @@ def _render_qmd_path(qmd: Path) -> subprocess.CompletedProcess:
 
 
 def render_and_publish(platform: str) -> tuple[bool, Optional[str]]:
-    """Renderiza o consolidado no diretorio servido por `serve-qmds.sh`.
+    """Renderiza o consolidado no diretorio servido por `serve_reports`.
 
     Returns: (success, error_message_se_falhou).
     """
@@ -152,7 +152,7 @@ def render_and_publish(platform: str) -> tuple[bool, Optional[str]]:
 
 
 def render_and_publish_qmd(qmd: Path) -> tuple[bool, Optional[str]]:
-    """Renderiza um .qmd qualquer no diretorio servido por `serve-qmds.sh`."""
+    """Renderiza um .qmd qualquer no diretorio servido por `serve_reports`."""
     try:
         result = _render_qmd_path(qmd)
     except FileNotFoundError as e:

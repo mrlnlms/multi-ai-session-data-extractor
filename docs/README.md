@@ -17,6 +17,7 @@ define as regras de trabalho para agentes.
 
 - [operations/](operations/) — operacao cotidiana: pipeline, dashboard,
   recuperacao/publicacao DVC, retencao e
+  [mapa de comandos](operations/commands.md),
   [termos operacionais](operations/glossary.md), incluindo o
   [runbook de coleta web](operations/web-collection.md).
 - [extractor-engineering/](extractor-engineering/) — engenharia da captura,
@@ -27,5 +28,3 @@ define as regras de trabalho para agentes.
   do reader.
 
 Material privado e duravel pertence ao workbench apontado por `private/`.
-O mapa da interface operacional e das ferramentas de engenharia fica em
-[`scripts/README.md`](../scripts/README.md).

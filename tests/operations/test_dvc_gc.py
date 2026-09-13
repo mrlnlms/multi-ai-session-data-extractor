@@ -1,12 +1,4 @@
-import importlib.util
-from pathlib import Path
-
-
-SCRIPT = Path(__file__).parents[1] / "scripts" / "tools" / "prune-dvc-history.py"
-SPEC = importlib.util.spec_from_file_location("prune_dvc_history", SCRIPT)
-assert SPEC and SPEC.loader
-gc = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(gc)
+from src.operations import dvc_gc as gc
 
 
 def test_candidates_only_accept_dvc_removal_lines():

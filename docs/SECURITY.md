@@ -16,7 +16,7 @@ scope of use, and considerations regarding the platforms' terms of use.
 
 ## How login works
 
-Each platform has a `scripts/<plat>-login.py` script:
+Each web platform has a login command under its vertical package:
 
 1. It opens an isolated Chromium instance (via Playwright) pointing to
    the platform's login page.
@@ -120,7 +120,7 @@ specific platform:
 
 ```bash
 rm -rf .storage/<platform>-profile-<account>
-PYTHONPATH=. .venv/bin/python scripts/<platform>-login.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.<source_id>.commands.login
 ```
 
 ### Before sharing a machine or backup

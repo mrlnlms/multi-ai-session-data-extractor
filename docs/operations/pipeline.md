@@ -1,6 +1,8 @@
 # Pipeline operations
 
-Comandos cotidianos para capturar, processar e materializar os dados. Para
+Comandos cotidianos para capturar, processar e materializar os dados. O
+[mapa de comandos](commands.md) tambem registra operacoes menos frequentes,
+como manual saves e snapshots de configuracao. Para
 instalacao e login, use [SETUP.md](../SETUP.md). Para uma rodada web segura,
 use [web-collection.md](web-collection.md). Regras de DVC e publicacao ficam
 em [dvc-runbook.md](dvc-runbook.md).
@@ -114,7 +116,7 @@ real deve permanecer em `.storage/` e nunca ser adicionado ao Git.
 Depois de uma ou mais fontes web processadas:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/workflows/unify-parquets.py
+PYTHONPATH=. .venv/bin/python -m src.workflows.unify
 ```
 
 `data/unified/` e a saida cross-platform. A unificacao e idempotente e pode
@@ -150,10 +152,10 @@ local abaixo e nao copia nem cria symlinks dos relatorios em `static/`.
 Para servi-los localmente:
 
 ```bash
-./scripts/workflows/serve-qmds.sh start
-./scripts/workflows/serve-qmds.sh status
-./scripts/workflows/serve-qmds.sh open
-./scripts/workflows/serve-qmds.sh stop
+PYTHONPATH=. .venv/bin/python -m src.workflows.serve_reports start
+PYTHONPATH=. .venv/bin/python -m src.workflows.serve_reports status
+PYTHONPATH=. .venv/bin/python -m src.workflows.serve_reports open
+PYTHONPATH=. .venv/bin/python -m src.workflows.serve_reports stop
 ```
 
 Por padrao, os links do dashboard usam `http://localhost:8765`. Se o servidor
@@ -172,7 +174,7 @@ ocorrem quando o operador marca Publish de forma deliberada.
 
 ```bash
 # Pipeline sem Streamlit; exclui fontes que exigem janela visivel
-PYTHONPATH=. .venv/bin/python scripts/workflows/headless-pipeline.py --no-publish
+PYTHONPATH=. .venv/bin/python -m src.workflows.headless --no-publish
 ```
 
 O historico e os locks de rodadas automatizadas ficam em `.runtime/`. Consulte

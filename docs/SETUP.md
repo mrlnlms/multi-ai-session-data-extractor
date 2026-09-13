@@ -183,7 +183,7 @@ web bem-sucedido e antes da unificacao. Os syncs de CLI ja incluem o parser.
 Repita nas outras plataformas e consolide o conjunto cross-platform:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/workflows/unify-parquets.py
+PYTHONPATH=. .venv/bin/python -m src.workflows.unify
 ```
 
 Isso materializa os Parquets unificados em `data/unified/`.
@@ -274,7 +274,7 @@ Voce esqueceu de ativar `.venv` ou nao esta na raiz do projeto:
 ```bash
 source .venv/bin/activate
 cd /path/to/multi-ai-session-data-extractor
-PYTHONPATH=. .venv/bin/python scripts/<script>.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.<source_id>.commands.<action>
 ```
 
 ### Perplexity retorna HTTP 403 no sync

@@ -59,16 +59,15 @@ arquivo.
   modulos em `commands/` para login, sync e parse; fontes CLI expoem sync e
   parse. Probes empiricos ficam em `src/platforms/<source>/probes/`;
   ferramentas excepcionais especificas tambem ficam junto da plataforma.
-  Entry points de fluxos transversais ficam em
-  `scripts/workflows/`; sua implementacao fica em `src/workflows/`; comandos opcionais do operador ficam em
-  `scripts/tools/` e nao integram o pipeline normal.
-- `scripts/` contem apenas entrypoints finos para workflows transversais e
-  ferramentas opcionais do operador. A implementacao importavel dos workflows
-  fica em `src/workflows/`; dashboard, entrypoints e testes reutilizam `src/`.
+  Comandos e implementacao de fluxos transversais ficam em
+  `src/workflows/`; operacoes excepcionais do repositorio ficam em
+  `src/operations/` e nao integram o pipeline normal.
+- Interfaces Python executaveis, dashboard, entrypoints e testes reutilizam
+  `src/`; nao manter uma arvore paralela em `scripts/`.
 - Os modulos `src.platforms.<source>.commands.sync` das fontes web fazem captura + assets +
   reconcile e nao chamam o parser quando executados diretamente. O pipeline
   do dashboard/headless executa automaticamente o `parse.py` da fonte depois
-  de cada sync web bem-sucedido e antes de `scripts/workflows/unify-parquets.py`.
+  de cada sync web bem-sucedido e antes de `python -m src.workflows.unify`.
 - Os syncs das 4 CLIs ja fazem copy + parse.
 - Este projeto publica o contrato de dados unificado. Mudancas de schema ou
   de Parquets publicados devem ter seus impactos em consumidores downstream

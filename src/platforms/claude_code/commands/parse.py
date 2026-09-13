@@ -37,7 +37,7 @@ PROCESSED_DIR = PROJECT_ROOT / "data" / "processed" / "Claude Code"
 def main() -> int:
     if not RAW_DIR.exists():
         logger.error(f"Raw nao existe: {RAW_DIR}")
-        logger.error("Rode primeiro: scripts/workflows/copy-cli-data.py --source claude_code")
+        logger.error("Rode primeiro: python -m src.platforms.claude_code.commands.sync")
         return 1
 
     logger.info(f"Parsing {RAW_DIR}...")

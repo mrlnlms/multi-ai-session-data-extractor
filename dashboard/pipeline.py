@@ -16,7 +16,6 @@ isso depende do estado agregado, nao da plat sincronizada.
 """
 from __future__ import annotations
 
-import subprocess
 import webbrowser
 from datetime import datetime, timezone
 from typing import Optional
@@ -43,6 +42,7 @@ from src.workflows.pipeline import (
     persist_run,
     recent_runs,
 )
+from src.workflows.serve_reports import start_server
 
 # Mapeamento centralizado pra evitar bugs de inconsistencia entre painel
 # macro e summary expander. "aborted" = nao rodou por causa de falha anterior;
@@ -393,7 +393,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
             # Auto-open report in a new tab (intelligent routing)
             try:
                 # 1. Start/Ensure server is up
-                subprocess.run(["./scripts/workflows/serve-qmds.sh", "start"], cwd=str(PROJECT_ROOT), check=False)
+                start_server()
                 # 2. Determine target URL
                 url = _get_auto_open_url(scope)
                 # 3. Open in browser

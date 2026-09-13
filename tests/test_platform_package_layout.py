@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from tests.test_script_layout import (
+from src.platforms.registry import SCRIPT_PREFIX
+from tests.test_architecture_layout import (
     MIGRATED_PLATFORMS,
     PLATFORM_ACTIONS,
     PLATFORM_PACKAGE,
     PLATFORM_TOOLS,
-    SCRIPT_PREFIX,
 )
 
 

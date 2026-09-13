@@ -6,14 +6,14 @@ Perplexity, que precisam de Cloudflare interativo.
 
 Uso:
     # Fontes headless + publish (default)
-    PYTHONPATH=. .venv/bin/python scripts/workflows/headless-pipeline.py
+    PYTHONPATH=. .venv/bin/python -m src.workflows.headless
 
     # Subset especifico, sem publish
-    PYTHONPATH=. .venv/bin/python scripts/workflows/headless-pipeline.py \\
+    PYTHONPATH=. .venv/bin/python -m src.workflows.headless \\
         --plats=Claude.ai,Gemini --no-publish
 
     # Inclui ChatGPT (vai abrir browser — so funciona com $DISPLAY OK)
-    PYTHONPATH=. .venv/bin/python scripts/workflows/headless-pipeline.py \\
+    PYTHONPATH=. .venv/bin/python -m src.workflows.headless \\
         --plats=ChatGPT,Claude.ai
 
 Exit codes:

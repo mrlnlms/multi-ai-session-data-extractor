@@ -1,14 +1,17 @@
 """Snapshot blob de configs/skills/commands/hooks dos 3 CLIs.
 
-Roda como passo final do cli-copy.py. Idempotente via content-hash:
-se o conjunto sanitizado nao mudou desde o ultimo snapshot, no-op.
+Execute with ``python -m src.capture.cli.snapshot``. Idempotente via
+content-hash: se o conjunto sanitizado nao mudou desde o ultimo snapshot,
+no-op.
 """
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import logging
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -188,10 +191,22 @@ def snapshot_configs() -> None:
     """Snapshot dos 3 CLIs em data/external/<cli>-config-snapshots/<date>/.
 
     Idempotente: hash do payload sanitizado vs ultimo snapshot. Se igual, no-op.
-    Roda como passo final do cli-copy.py.
+    This is independent from the per-source sync commands because it captures
+    sanitized operator configuration, not session data.
     """
     for cli in ("claude_code", "codex", "gemini"):
         try:
             _snapshot_one_cli(cli)
         except Exception as e:
             logger.error(f"snapshot {cli} failed: {e}", exc_info=True)
+
+
+def main() -> int:
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    snapshot_configs()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

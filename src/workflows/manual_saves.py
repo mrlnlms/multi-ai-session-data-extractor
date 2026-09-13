@@ -11,11 +11,12 @@ Onde:
 capture_method da Conversation indica origem do clip:
     'manual_clipping_obsidian', 'manual_copypaste', 'manual_terminal_cc'
 
-Uso: PYTHONPATH=. .venv/bin/python scripts/workflows/manual-saves-sync.py
+Uso: PYTHONPATH=. .venv/bin/python -m src.workflows.manual_saves
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import sys
@@ -176,6 +177,7 @@ def append_capture_log(external_dir: Path, summary: dict[str, object]) -> Path:
 
 
 def main() -> int:
+    argparse.ArgumentParser(description=__doc__).parse_args()
     summary = run_manual_saves(EXT_DIR, PROCESSED_DIR)
     append_capture_log(EXT_DIR, summary)
 
