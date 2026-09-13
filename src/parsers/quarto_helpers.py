@@ -127,7 +127,7 @@ def setup_notebook(
     """Setup completo de views pro notebook descritivo.
 
     1. Carrega views via setup_views_with_manual (UNION com manual saves)
-    2. Carrega aux tables (com UNION manual quando aplicavel — NotebookLM legacy)
+    2. Carrega aux tables (tambem com UNION manual quando aplicavel)
     3. Aplica filtro de conta quando account_filter != None — recria views
        lendo dos parquets com WHERE account = '<val>'
        (NAO usa CREATE VIEW X AS SELECT FROM X — daria recursao no DuckDB)
@@ -140,8 +140,7 @@ def setup_notebook(
     aux_tables = aux_tables or []
     detected = setup_views_with_manual(con, source_slug, processed_dir, tables)
 
-    # Aux tables: tambem suportam UNION com manual saves (NotebookLM legacy
-    # tem notebooklm_manual_sources/notes/outputs/etc)
+    # Aux tables tambem suportam UNION com capturas manuais quando existirem.
     for t in aux_tables:
         p_ext = processed_dir / f"{source_slug}_{t}.parquet"
         p_manual = processed_dir / f"{source_slug}_manual_{t}.parquet"

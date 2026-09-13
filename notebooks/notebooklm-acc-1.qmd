@@ -25,6 +25,7 @@ from src.parsers.quarto_helpers import (
     fmt_pct, fmt_int, safe_int, show_df, show_md, plotly_bar,
     has_col, has_view, table_count, setup_notebook,
 )
+from src.accounts import account_email
 
 SOURCE_KEY     = "notebooklm"
 SOURCE_TITLE   = "NotebookLM (account-1)"
@@ -33,14 +34,14 @@ MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "NotebookLM"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
 AUX_TABLES     = ["sources", "notes", "outputs", "guide_questions", "source_guides"]
-ACCOUNT_FILTER = "1"
+ACCOUNT_FILTER = account_email("notebooklm", "account-1") or "1"
 
 con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
 > **NotebookLM account-1** (en). Filtered view of the
-> consolidated folder. For the 3-account view: [`notebooklm.qmd`](notebooklm.html).
+> consolidated folder. For the complete view: [`notebooklm.qmd`](notebooklm.html).
 > account-2: [`notebooklm-acc-2.qmd`](notebooklm-acc-2.html). legacy:
 > [`notebooklm-legacy.qmd`](notebooklm-legacy.html).
 

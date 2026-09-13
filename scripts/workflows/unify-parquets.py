@@ -61,7 +61,7 @@ def _identify_table(parquet_path: Path) -> str | None:
 
     >>> _identify_table(Path('chatgpt_conversations.parquet'))
     'conversations'
-    >>> _identify_table(Path('notebooklm_manual_messages.parquet'))
+    >>> _identify_table(Path('chatgpt_manual_messages.parquet'))
     'messages'
     >>> _identify_table(Path('notebooklm_source_guides.parquet'))
     'source_guides'

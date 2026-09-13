@@ -1,6 +1,6 @@
-"""Tests pro parser v3 do NotebookLM (Chunk 8 do plan).
+"""Tests pro parser v3 do NotebookLM.
 
-Cobertura: 8 parquets canonicos+auxiliares + idempotencia + system summary.
+Cobertura: 9 parquets canonicos+auxiliares + idempotencia + system summary.
 """
 
 import json
@@ -190,6 +190,18 @@ def test_outputs_includes_artifact_types(tmp_path):
     blog_row = df[df["output_type"] == 2].iloc[0]
     assert blog_row["content"] is not None
     assert "Conteudo do blog" in blog_row["content"]
+
+
+def test_duplicate_artifact_rows_are_not_emitted(tmp_path):
+    merged = _build_minimal_merged()
+    merged["notebooks"][0]["audios"][0].append(
+        ["art-1", "Audio teste", 1, [], "ARTIFACT_STATUS_READY"]
+    )
+
+    NotebookLMParser().parse(merged, output_dir=tmp_path)
+    df = pd.read_parquet(tmp_path / "notebooklm_outputs.parquet")
+
+    assert len(df[df["output_id"] == "art-1"]) == 1
 
 
 def test_sources_with_content(tmp_path):

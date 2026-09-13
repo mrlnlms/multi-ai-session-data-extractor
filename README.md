@@ -234,12 +234,19 @@ PYTHONPATH=. .venv/bin/pytest tests/parsers/     # parsers only
    stays local. Reruns only fetch new items.
 2. **Preservation above all.** Conversations/files deleted on the
    server remain local with the `is_preserved_missing=True` flag.
+   Losing or retiring an upstream account also does not remove its captured
+   archive: the last raw/merged state, or an immutable external snapshot for
+   an older format, remains parseable with explicit historical provenance.
 3. **The canonical schema is the boundary.** Parsers deliver parquet in
    a unified schema; analysis consumes parquet. No platform
    particularities leak into the analysis stage.
 4. **Fall back safely in suspicious cases.** If a discovery listing drops
    materially versus known history, the extractor must not trust it blindly;
    the applicable platform guardrail preserves or refetches known records.
+
+Preservation can only protect material captured before access is lost. It
+cannot recover records that existed only on an upstream server after the
+account was deleted or became inaccessible.
 
 ## License
 

@@ -86,6 +86,12 @@ def test_no_legacy_root_entrypoints():
     assert not list(SCRIPTS_DIR.glob("*-parse.py"))
 
 
+def test_recovery_directory_is_not_used_for_platform_imports():
+    recovery_dir = SCRIPTS_DIR / "recovery"
+    if recovery_dir.exists():
+        assert not list(recovery_dir.glob("notebooklm*.py"))
+
+
 def test_probes_live_inside_platform_directories():
     assert not (SCRIPTS_DIR / "probes").exists()
     for probes_dir in SCRIPTS_DIR.glob("platform/*/probes"):

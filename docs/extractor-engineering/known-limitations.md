@@ -120,6 +120,13 @@ These validations require a Pro Max account and remain open until someone tests:
 ### NotebookLM
 
 - **No pin feature** upstream — `is_pinned` field stays `None`.
+- **Historical snapshots cannot be refreshed.** The preserved corporate
+  archive remains parseable and unified, but the upstream account is no longer
+  accessible. It contains notebook/source metadata and captured chats/assets;
+  source body text that was not captured at the time cannot be reconstructed.
+  The official parser fails if its configured snapshot root is missing, empty,
+  or malformed unless current-only output is explicitly requested with
+  `--without-historical`.
 - **`update_time` in the listing is volatile** — the server reindexes
   periodically and bumps the timestamp without an actual content change. The
   reconciler uses semantic hash (not timestamp) to decide refetch —
@@ -235,5 +242,6 @@ These validations require a Pro Max account and remain open until someone tests:
 - **Profile/cookies** live at `.storage/<plat>-profile-<account>/`. This
   directory is gitignored — never committed. If you delete it, you need to
   redo the login.
-- **Multi-account:** only Gemini (2 accounts) and NotebookLM (up to 3 accounts)
-  have explicit support. Other platforms: 1 account per installation.
+- **Multi-account:** Gemini and NotebookLM support three active account
+  profiles. Several other web platforms support additional named profiles as
+  documented in the pipeline guide; coverage varies by source.

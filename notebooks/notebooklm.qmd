@@ -1,6 +1,6 @@
 ---
 title: "NotebookLM — Data Profile (consolidated, multi-account)"
-subtitle: "Descriptive catalog of parser v3 parquets (account-1 + account-2 + account-3 legacy)"
+subtitle: "Three active accounts plus one immutable historical archive"
 source-title: "NotebookLM (consolidated)"
 jupyter: python3
 ---
@@ -39,13 +39,13 @@ con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
 ```
 
-> **About NotebookLM (consolidated):** aggregates 3 accounts:
+> **About NotebookLM (consolidated):** aggregates three active accounts plus
+> one historical archive:
 >
-> - **account-1** (en)
-> - **account-2** (pt-BR)
-> - **account-3** (legacy account), captured in
->   Mar/2026 by the old extractor. Its snapshot and legacy-parser parquets
->   remain part of the local archive.
+> - **account-1**, **account-2**, and **account-3**: current capture profiles
+> - **historical corporate archive**: captured in Mar/2026 by the old
+>   extractor before upstream access was lost. The official parser converts
+>   its immutable DVC snapshot alongside the current accounts.
 >
 > NotebookLM is not pure chat — each notebook generates up to 9 types of
 > outputs (audio, blog, video, flashcards, quiz, data table, slide deck,

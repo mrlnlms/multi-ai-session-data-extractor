@@ -15,6 +15,10 @@ slide deck PDF+PPTX, infographic, mind map).
   `scripts/platform/notebooklm/sync.py` — capture per-account + assets + reconcile
   per-account.
 - **Headless capture.**
+- **Historical archive** — immutable old-format snapshots live in
+  `data/external/notebooklm-snapshots/<archive>-YYYY-MM-DD/`. The official
+  `parse.py` converts them alongside all current merged accounts; they are not
+  manual saves and require no live login.
 
 ## Outputs e tabelas auxiliares
 
@@ -167,13 +171,37 @@ discovery refaz os 94 notebooks, parseia `gArtLc` (artifacts), e qualquer
 type=1 (audio) novo com URL vira target. **Nao requer captura "do zero"**
 nem invalidacao manual.
 
-## Account-3 legacy (extinct snapshot)
+## Historical corporate archive (inaccessible account)
 
-11 notebooks / 33 msgs / 27 outputs / 6 briefs via legacy parser
-`src/parsers/manual/notebooklm_legacy_more_design.py`,
-`capture_method='legacy_notebooklm_<source>'`. Raw snapshot in
-`data/external/notebooklm-snapshots/<source>/`. Quarto:
-`notebooks/notebooklm-legacy.qmd`.
+This archive is separate from the three active account profiles. It contains
+11 notebooks / 33 messages / 228 source metadata rows / 27 outputs / 6 briefs
+and 33 guide questions from an old extractor capture.
+
+- Immutable input: `data/external/notebooklm-snapshots/<archive>-YYYY-MM-DD/`
+- Format adapter: `src/parsers/notebooklm_historical.py`
+- Official entry point: `scripts/platform/notebooklm/parse.py`
+- Provenance: `capture_method='historical_notebooklm_snapshot'`
+- Account identity: stable `archive:<snapshot-directory>` key, which cannot be
+  confused with active `account-1`, `account-2`, or `account-3` profiles.
+- Output: the same nine `notebooklm_*.parquet` files as current accounts; no
+  parallel `_manual_` Parquet family.
+
+Every fallback ID is deterministic. Because filesystem mtimes change after a
+DVC restore, inferred timestamps use the `YYYY-MM-DD` capture date encoded in
+the snapshot directory name; real timestamps present in chat turns are kept.
+The 228 source rows contain preserved metadata but empty body content because
+the old capture did not retain source text.
+
+The parse command validates the configured historical root and every notebook
+before writing. If the DVC snapshot is absent, empty, or malformed, it exits
+without shrinking `processed/`. The operator can request a deliberately
+current-only rebuild with `--without-historical`.
+
+This is also the account-retirement pattern for future sources: a current
+account that becomes inaccessible remains in its cumulative `raw/merged`
+tree and must no longer be synced; an older incompatible capture belongs in
+`data/external/` with a platform-owned adapter. Data never captured before
+access loss cannot be recovered afterward.
 
 ## Operational observation — 2026-08-30
 
@@ -233,6 +261,7 @@ PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/sync.py             # 
 PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/sync.py --account 1 # only account 1
 PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/sync.py --account 3 # only account 3
 PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/parse.py --without-historical  # explicit current-only rebuild
 for f in notebooklm notebooklm-acc-1 notebooklm-acc-2; do
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd
 done

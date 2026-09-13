@@ -7,4 +7,7 @@ manual_terminal_cc).
 Output via orquestrador `scripts/workflows/manual-saves-sync.py`: agrupa por source
 destino e escreve `<source>_manual_<table>.parquet` em cada
 `data/processed/<Plataforma>/`.
+
+Frozen extractor snapshots are not manual saves. Platform-specific historical
+format adapters live beside the canonical platform parsers.
 """

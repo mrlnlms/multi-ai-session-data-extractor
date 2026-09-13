@@ -237,7 +237,7 @@ if len(_mph):
 
 Distinguishes data captured by the automatic extractor vs imported via manual
 parsers (clippings_obsidian, copypaste_web, terminal_claude_code,
-legacy_notebooklm).
+historical_notebooklm_snapshot).
 
 ```{python}
 #| label: capture-method-cross

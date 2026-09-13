@@ -1,7 +1,8 @@
-"""Parse merged → 8 parquets canonicos+auxiliares (multi-conta).
+"""Parse current and historical NotebookLM data into canonical Parquets.
 
-Le data/merged/NotebookLM/account-{1,2}/ e escreve data/processed/NotebookLM/
-(8 parquets agregando ambas contas). Idempotente.
+Reads every account under data/merged/NotebookLM/ plus immutable old-format
+snapshots under data/external/notebooklm-snapshots/. Writes one family of nine
+Parquets under data/processed/NotebookLM/. Idempotent.
 
 Uso: PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/parse.py
 """
@@ -12,10 +13,15 @@ from pathlib import Path
 
 from src.accounts import account_email
 from src.parsers.notebooklm import NotebookLMParser
+from src.parsers.notebooklm_historical import (
+    NotebookLMHistoricalResult,
+    parse_historical_archives,
+)
 
 
 MERGED_BASE = Path("data/merged/NotebookLM")
 PROCESSED_DIR = Path("data/processed/NotebookLM")
+HISTORICAL_ROOT = Path("data/external/notebooklm-snapshots")
 
 
 def _load_account(account_dir: Path, account_key: str, account_label: str) -> dict:
@@ -143,13 +149,32 @@ def main(argv: list[str] | None = None):
     ap.add_argument("--merged-root", type=Path, default=MERGED_BASE)
     ap.add_argument("--output-dir", type=Path, default=PROCESSED_DIR)
     ap.add_argument("--accounts-file", type=Path, default=Path(".storage/accounts.json"))
+    ap.add_argument(
+        "--historical-root",
+        type=Path,
+        default=HISTORICAL_ROOT,
+        help="directory containing immutable old-format snapshot directories",
+    )
+    ap.add_argument(
+        "--without-historical",
+        action="store_true",
+        help="explicitly rebuild current accounts without historical snapshots",
+    )
     args = ap.parse_args(argv)
-    args.output_dir.mkdir(parents=True, exist_ok=True)
     merged_combined = {"notebooks": [], "sources": {}, "source_guides": {}}
 
     if not args.merged_root.exists():
         print(f"ERRO: merged base nao existe: {args.merged_root}")
         return 1
+
+    historical = NotebookLMHistoricalResult()
+    if not args.without_historical:
+        try:
+            historical = parse_historical_archives(args.historical_root)
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"ERRO: {exc}")
+            print("Restaure o snapshot via DVC ou use --without-historical conscientemente.")
+            return 1
 
     for account_dir in sorted(args.merged_root.glob("account-*")):
         account_key = account_dir.name.replace("account-", "")
@@ -161,8 +186,17 @@ def main(argv: list[str] | None = None):
         print(f"  {account_dir.name}: {len(data['notebooks'])} notebooks, "
               f"{len(data['sources'])} sources, {len(data.get('source_guides', {}))} source guides")
 
+    print(
+        f"  historical archives: {len(historical.conversations)} notebooks, "
+        f"{len(historical.messages)} messages, {len(historical.sources)} sources"
+    )
+
     parser = NotebookLMParser()
-    stats = parser.parse(merged_combined, output_dir=args.output_dir)
+    stats = parser.parse(
+        merged_combined,
+        output_dir=args.output_dir,
+        historical=historical,
+    )
     print()
     print("=== STATS ===")
     for k, v in stats.items():

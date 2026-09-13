@@ -45,6 +45,7 @@ class Conversation:
     # 'manual_clipping_obsidian': clip do Obsidian Web Clipper
     # 'manual_copypaste': copy-paste manual de webpage
     # 'manual_terminal_cc': output renderizado do terminal Claude Code
+    # 'historical_notebooklm_snapshot': snapshot de extractor antigo sem acesso upstream
     # 'external_gdpr': export GDPR oficial (futuro)
     capture_method: str = "extractor"
 

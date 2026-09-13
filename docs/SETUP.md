@@ -191,8 +191,10 @@ Isso materializa os Parquets unificados em `data/unified/`.
 ## 5. Multiplas contas (Gemini, NotebookLM)
 
 Gemini e NotebookLM tem tres contas interativas suportadas (`1`, `2` e `3`).
-(`1`, `2` e `3`). O acervo legacy do NotebookLM continua preservado e
-processado pelo fluxo dedicado, separado das contas de login atuais.
+O NotebookLM tambem possui um arquivo corporativo historico, separado das
+contas de login atuais. O `parse.py` oficial inclui esse snapshot quando ele
+esta restaurado pelo DVC e falha com seguranca quando o diretorio esperado esta
+ausente; `--without-historical` e uma exclusao deliberada, nao o padrao.
 
 Para Gemini:
 

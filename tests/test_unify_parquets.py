@@ -54,7 +54,7 @@ class TestIdentifyTable:
 
     def test_manual_suffix(self):
         assert unify_module._identify_table(Path("chatgpt_manual_messages.parquet")) == "messages"
-        assert unify_module._identify_table(Path("notebooklm_manual_source_guides.parquet")) == "source_guides"
+        assert unify_module._identify_table(Path("example_manual_source_guides.parquet")) == "source_guides"
 
     def test_unknown_returns_none(self):
         assert unify_module._identify_table(Path("chatgpt_random_thing.parquet")) is None

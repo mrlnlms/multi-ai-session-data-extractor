@@ -26,6 +26,11 @@ historico.
 3. Discovery parcial aciona `refetch_known`; nao deve contaminar o raw.
 4. O schema em `src/schema/models.py` e a fronteira entre captura e analise.
 5. Dados pessoais ficam fora do Git; `data/` e `.storage/` exigem cuidado.
+6. Perder, excluir ou abandonar uma conta upstream encerra novas capturas, mas
+   nao autoriza remover seu acervo ja preservado. Mantenha o ultimo `raw` e
+   `merged`, ou um snapshot imutavel em `data/external/` quando o formato for
+   anterior ao pipeline atual; o parser oficial deve continuar materializando
+   esse acervo com proveniencia historica explicita.
 
 ## Acervo privado
 
@@ -56,8 +61,6 @@ arquivo.
   em `scripts/platform/<source>/probes/`; ferramentas excepcionais especificas
   tambem ficam junto da plataforma. Fluxos transversais ficam em
   `scripts/workflows/`; manutencao transversal fica em `scripts/maintenance/`.
-  `scripts/recovery/` preserva temporariamente apenas a importacao legacy do
-  NotebookLM, pendente de classificacao separada.
 - Os scripts `scripts/platform/<source>/sync.py` das fontes web fazem captura + assets +
   reconcile e nao chamam o parser quando executados diretamente. O pipeline
   do dashboard/headless executa automaticamente o `parse.py` da fonte depois

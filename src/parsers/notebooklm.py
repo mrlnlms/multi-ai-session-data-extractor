@@ -18,7 +18,7 @@ Decisoes de design:
 
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import pandas as pd
 
@@ -37,17 +37,25 @@ from src.parsers._notebooklm_helpers import (
     extract_mind_map_tree, extract_source_guide, parse_source_content, parse_timestamp,
 )
 
+if TYPE_CHECKING:
+    from src.parsers.notebooklm_historical import NotebookLMHistoricalResult
+
 
 SOURCE = "notebooklm"
 
 
 class NotebookLMParser:
-    """Parser merged → 8 parquets canonicos+auxiliares."""
+    """Parser for current merged data plus optional historical rows."""
 
     source_name = SOURCE
 
-    def parse(self, merged: dict, output_dir: Path) -> dict:
-        """Parse merged dict, escreve 8 parquets em output_dir.
+    def parse(
+        self,
+        merged: dict,
+        output_dir: Path,
+        historical: "NotebookLMHistoricalResult | None" = None,
+    ) -> dict:
+        """Parse the merged payload and write nine Parquets to output_dir.
 
         merged dict format:
             {
@@ -93,6 +101,24 @@ class NotebookLMParser:
                 convs, msgs, events, branches,
                 sources, notes, outputs, questions, source_guides,
             )
+
+        if historical is not None:
+            convs.extend(historical.conversations)
+            msgs.extend(historical.messages)
+            events.extend(historical.tool_events)
+            branches.extend(historical.branches)
+            sources.extend(historical.sources)
+            notes.extend(historical.notes)
+            outputs.extend(historical.outputs)
+            questions.extend(historical.guide_questions)
+
+        # Enforce the published output PK at the parser boundary. NotebookLM's
+        # artifact RPC can repeat an artifact row; keep the last representation,
+        # matching the unifier's existing collision policy.
+        outputs = list({
+            (item.source, item.conversation_id, item.output_id): item
+            for item in outputs
+        }.values())
 
         # Write parquets (idempotente — overwrite)
         conversations_to_df(convs).to_parquet(

@@ -63,6 +63,20 @@ PYTHONPATH=. .venv/bin/python scripts/platform/antigravity-cli/recover-legacy.py
 PYTHONPATH=. .venv/bin/python scripts/platform/antigravity-cli/parse.py
 ```
 
+O parse oficial do NotebookLM tambem inclui todos os snapshots historicos em
+`data/external/notebooklm-snapshots/`. Se esse diretorio DVC esperado nao
+estiver restaurado, o comando falha antes de regravar `processed/`, evitando
+que uma reconstrucao parcial apague o arquivo historico silenciosamente. Use
+`--without-historical` somente quando quiser deliberadamente uma saida com as
+contas atuais.
+
+Perder acesso a uma conta nao apaga seu acervo capturado. Para contas no
+formato atual, preserve os respectivos `raw/` e `merged/` e pare de sincronizar
+o profile inacessivel; o parser continua lendo sua arvore cumulativa. Snapshots
+de formatos antigos ficam imutaveis em `data/external/` e entram por um
+adaptador da propria plataforma. Nenhum desses mecanismos recupera registros
+que nunca foram capturados antes da perda de acesso.
+
 Cada plataforma tem flags e requisitos proprios. Consulte seu `state.md`
 antes de usar `--full`, `--dry-run`, `--account`, `--headed` ou flags de
 assets. ChatGPT e Perplexity exigem janela visivel durante captura; as demais

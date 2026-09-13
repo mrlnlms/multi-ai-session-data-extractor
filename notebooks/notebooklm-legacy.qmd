@@ -1,6 +1,6 @@
 ---
 title: "NotebookLM — legacy account — Data Profile"
-subtitle: "Legacy capture from 2026-03-30 (extinct account). _manual_ parquets via legacy parser."
+subtitle: "Immutable historical capture from an inaccessible corporate account"
 source-title: "NotebookLM legacy account"
 jupyter: python3
 ---
@@ -33,7 +33,7 @@ MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "NotebookLM"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
 AUX_TABLES     = ["sources", "notes", "outputs", "guide_questions", "source_guides"]
-ACCOUNT_FILTER = "3"  # account-3 = legacy account
+ACCOUNT_FILTER = "archive:more-design-2026-03-30"
 
 con = duckdb.connect()
 _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_FILTER)
@@ -41,11 +41,12 @@ _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_
 
 > **NotebookLM legacy account.** Extinct account (pt-BR),
 > captured on 2026-03-30 by the old extractor of the parent project. Raw
-> snapshot and `notebooklm_manual_*.parquet` remain part of the local archive
-> via the legacy parser. 11 notebooks /
+> snapshot remains in DVC and the official NotebookLM parser converts it into
+> the standard `notebooklm_*.parquet` family with explicit historical
+> provenance. 11 notebooks /
 > 33 msgs / 27 outputs / 6 briefs.
 >
-> For the 3-account view: [`notebooklm.qmd`](notebooklm.html).
+> For the consolidated view: [`notebooklm.qmd`](notebooklm.html).
 > account-1: [`notebooklm-acc-1.qmd`](notebooklm-acc-1.html). account-2:
 > [`notebooklm-acc-2.qmd`](notebooklm-acc-2.html).
 
