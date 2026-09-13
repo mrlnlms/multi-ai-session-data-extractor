@@ -91,10 +91,25 @@ fontes web usam o modo documentado no estado tecnico.
 
 Os parsers web leem opcionalmente `.storage/accounts.json`, um arquivo local
 ignorado pelo Git que associa uma plataforma e um profile tecnico ao e-mail da
-conta. Copie `config/accounts.example.json`, preencha apenas os profiles que
-existem na maquina e mantenha o arquivo em `.storage/`. O parser grava esse
-e-mail na coluna canonica `account`; se nao houver mapeamento, o valor continua
-nulo. Os IDs historicos de conversa nao mudam por causa dessa etiquetagem.
+conta. O formato e `plataforma -> profile -> e-mail`; inclua apenas os profiles
+que existem na maquina:
+
+```json
+{
+  "chatgpt": {
+    "default": "name@example.com"
+  },
+  "gemini": {
+    "account-1": "name@example.com",
+    "account-2": "other@example.com"
+  }
+}
+```
+
+O parser grava o e-mail na coluna canonica `account`; se o arquivo ou o
+mapeamento nao existir, o valor continua nulo. Os IDs historicos de conversa
+nao mudam por causa dessa etiquetagem. Por conter dados pessoais, o arquivo
+real deve permanecer em `.storage/` e nunca ser adicionado ao Git.
 
 Depois de uma ou mais fontes web processadas:
 
