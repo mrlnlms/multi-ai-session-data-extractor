@@ -83,6 +83,7 @@ def parse_agent_memory_file(
     project_path: Optional[str],
     project_key: Optional[str],
     is_preserved_missing: bool,
+    timestamp_ns: Optional[int] = None,
 ) -> AgentMemory:
     """Le 1 arquivo .md, retorna AgentMemory."""
     content = path.read_text(encoding="utf-8")
@@ -91,8 +92,10 @@ def parse_agent_memory_file(
     name = fm.get("name") if isinstance(fm.get("name"), str) else None
     description = fm.get("description") if isinstance(fm.get("description"), str) else None
 
-    stat = path.stat()
-    mtime = pd.Timestamp.fromtimestamp(stat.st_mtime, tz="UTC")
+    if timestamp_ns is None:
+        mtime = pd.Timestamp.fromtimestamp(path.stat().st_mtime, tz="UTC")
+    else:
+        mtime = pd.Timestamp(timestamp_ns, unit="ns", tz="UTC")
     return AgentMemory(
         memory_id=f"{source}:{project_key or ''}:{path.name}",
         source=source,
@@ -157,7 +160,10 @@ def parse_memories_for_source(
     if not raw_root.exists():
         return []
 
+    from src.capture.cli.memory_metadata import load_memory_metadata
+
     items: list[AgentMemory] = []
+    timestamps = load_memory_metadata(raw_root)
 
     if source == "claude_code":
         for project_dir in sorted(raw_root.iterdir()):
@@ -178,6 +184,7 @@ def parse_memories_for_source(
                         project_path=project_path,
                         project_key=project_key,
                         is_preserved_missing=preserved,
+                        timestamp_ns=timestamps.get(rel),
                     ))
                 except Exception as e:
                     logger.warning(f"agent_memory: failed to parse {md}: {e}")
@@ -195,6 +202,7 @@ def parse_memories_for_source(
                         project_path=None,
                         project_key=None,
                         is_preserved_missing=preserved,
+                        timestamp_ns=timestamps.get(rel),
                     ))
                 except Exception as e:
                     logger.warning(f"agent_memory: failed to parse {md}: {e}")

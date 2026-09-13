@@ -42,6 +42,10 @@ same way — sessions are JSONL files in the user's filesystem.
 - `claude_code_tool_events.parquet` — tool calls/results
 - `claude_code_branches.parquet` — 1 _main por sessao
 - `claude_code_agent_memories.parquet` — parser le `<encoded-cwd>/memory/*.md` por projeto, materializa parquet com kind/name/description da frontmatter; preservation tracked via `home_memory_files` do `current_source_files("claude_code")`
+- `_memory_metadata.json` no raw preserva o `mtime_ns` observado na fonte para
+  que `created_at`/`updated_at` das memorias sejam reproduziveis apos um
+  checkout DVC. Entradas de arquivos ausentes permanecem no sidecar junto do
+  conteudo preservado.
 
 ## Where the real info lives
 

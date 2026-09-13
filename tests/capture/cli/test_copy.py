@@ -61,6 +61,7 @@ def test_copy_claude_code_includes_memory_files(tmp_path, monkeypatch):
     assert any("session.jsonl" in p for p in new_paths)
     assert any("MEMORY.md" in p for p in new_paths)
     assert any("user_profile.md" in p for p in new_paths)
+    assert (tmp_path / "raw" / "Claude Code" / "_memory_metadata.json").is_file()
 
 
 def test_current_source_files_codex_includes_memories_prefix(tmp_path, monkeypatch):

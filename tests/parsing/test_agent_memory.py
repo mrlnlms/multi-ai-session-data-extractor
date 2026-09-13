@@ -1,5 +1,7 @@
 import pytest
 import pandas as pd
+import json
+import os
 from pathlib import Path
 from src.parsing.agent_memory import (
     parse_agent_memory_file,
@@ -172,6 +174,38 @@ def test_parse_memories_claude_code_per_project(tmp_path):
     assert by_name["feedback_x.md"].is_preserved_missing is True
     assert by_name["user_profile.md"].is_preserved_missing is False
     assert all(m.project_path == "/Users/x/proj" for m in items)
+
+
+def test_parse_memories_uses_manifest_timestamp_instead_of_raw_mtime(tmp_path):
+    raw_root = tmp_path / "Claude Code"
+    memory = raw_root / "-Users-x-proj" / "memory" / "MEMORY.md"
+    memory.parent.mkdir(parents=True)
+    memory.write_text("# index\n")
+    os.utime(memory, ns=(900_000_000_000, 900_000_000_000))
+    timestamp_ns = 123_456_789_000
+    (raw_root / "_memory_metadata.json").write_text(json.dumps({
+        "version": 1,
+        "files": {"-Users-x-proj/memory/MEMORY.md": timestamp_ns},
+    }))
+
+    [item] = parse_memories_for_source(raw_root, "claude_code", set())
+
+    expected = pd.Timestamp(timestamp_ns, unit="ns", tz="UTC")
+    assert item.created_at == expected
+    assert item.updated_at == expected
+
+
+def test_parse_memories_without_manifest_falls_back_to_raw_mtime(tmp_path):
+    raw_root = tmp_path / "Codex"
+    memory = raw_root / "memories" / "global.md"
+    memory.parent.mkdir(parents=True)
+    memory.write_text("# memory\n")
+    timestamp_ns = 234_567_890_000
+    os.utime(memory, ns=(timestamp_ns, timestamp_ns))
+
+    [item] = parse_memories_for_source(raw_root, "codex", set())
+
+    assert item.updated_at == pd.Timestamp(timestamp_ns, unit="ns", tz="UTC")
 
 
 def test_parse_memories_codex_global_dir(tmp_path):

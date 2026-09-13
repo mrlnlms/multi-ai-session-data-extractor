@@ -7,6 +7,8 @@ Coleta:
 
 Regras:
 - Copia arquivos novos (nao existem no destino) ou modificados (mtime maior)
+- Preserva mtimes de memorias em `_memory_metadata.json`, pois DVC nao mantem
+  metadados de filesystem ao materializar o raw
 - NUNCA deleta do destino — dados locais que user apagou de ~ permanecem aqui
 - Retorna {"new": [...], "updated": [...]}
 """
@@ -131,8 +133,9 @@ def copy_claude_code() -> dict[str, list[Path]]:
                 elif md.stat().st_mtime > dst_file.stat().st_mtime:
                     shutil.copy2(md, dst_file)
                     updated_files.append(dst_file)
+    from src.capture.cli.memory_metadata import update_memory_metadata
 
-
+    update_memory_metadata(dst, src, "claude_code")
     return {"new": new_files, "updated": updated_files}
 
 
@@ -141,7 +144,8 @@ def copy_codex_memories() -> dict[str, list[Path]]:
 
     No-op se source nao existe ou esta vazio. Idempotente via mtime.
     """
-    src_root = Path.home() / ".codex" / "memories"
+    codex_root = Path.home() / ".codex"
+    src_root = codex_root / "memories"
     dst_root = RAW / "Codex" / "memories"
     new_files: list[Path] = []
     updated_files: list[Path] = []
@@ -162,6 +166,9 @@ def copy_codex_memories() -> dict[str, list[Path]]:
         elif src_file.stat().st_mtime > dst_file.stat().st_mtime:
             shutil.copy2(src_file, dst_file)
             updated_files.append(dst_file)
+    from src.capture.cli.memory_metadata import update_memory_metadata
+
+    update_memory_metadata(RAW / "Codex", codex_root, "codex")
     return {"new": new_files, "updated": updated_files}
 
 
