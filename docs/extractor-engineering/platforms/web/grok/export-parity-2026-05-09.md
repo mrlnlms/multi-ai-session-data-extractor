@@ -167,7 +167,7 @@ Ambos vazios na conta atual. `media_posts` parece ser entidade nova
 ## Schedule de re-export
 
 **Nao necessario pro pipeline canonico.** asset_downloader via API
-mantem `data/raw/Grok/assets/` atualizado a cada `grok-sync.py` —
+mantem `data/raw/Grok/assets/` atualizado a cada `scripts/platform/grok/sync.py` —
 asset novo aparece em `/rest/assets`, downloader pega.
 
 Re-export so faz sentido se quiser refrescar os blobs preservados

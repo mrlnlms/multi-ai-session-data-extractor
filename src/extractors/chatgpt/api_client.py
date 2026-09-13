@@ -150,14 +150,14 @@ class ChatGPTAPIClient:
         if not response.ok:
             raise RuntimeError(
                 f"Falha autenticacao em {TOKEN_URL} (HTTP {response.status}). "
-                "Rode 'python scripts/chatgpt-login.py'."
+                "Rode 'PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/login.py'."
             )
         data = await response.json()
         token = data.get("accessToken")
         if not token:
             raise RuntimeError(
                 "Sessao sem accessToken. Refresh chatgpt.com no browser e "
-                "rode 'python scripts/chatgpt-login.py' de novo."
+                "rode 'PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/login.py' de novo."
             )
         self._cached_token = token
         return token
@@ -230,7 +230,7 @@ class ChatGPTAPIClient:
 
             if response.status in (401, 403):
                 raise RuntimeError(
-                    "Sessao ChatGPT expirou. Rode 'python scripts/chatgpt-login.py'."
+                    "Sessao ChatGPT expirou. Rode 'PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/login.py'."
                 )
 
             if response.status == 429:

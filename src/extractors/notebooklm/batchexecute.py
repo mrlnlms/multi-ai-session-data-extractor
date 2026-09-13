@@ -30,7 +30,7 @@ async def extract_session_params(page) -> dict:
     if "at" not in params:
         raise RuntimeError(
             "Nao consegui extrair SNlM0e do HTML NotebookLM. "
-            "Sessao pode ter expirado — rode scripts/notebooklm-login.py"
+            "Sessao pode ter expirado — rode scripts/platform/notebooklm/login.py"
         )
     return params
 

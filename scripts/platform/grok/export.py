@@ -1,10 +1,10 @@
 """Captura conversas Grok.
 
 Uso:
-  python scripts/platform/grok/export.py             # incremental
-  python scripts/platform/grok/export.py --full      # ignora estado anterior, refetcha tudo
-  python scripts/platform/grok/export.py --smoke 5   # apenas 5 convs (smoke test)
-  python scripts/platform/grok/export.py --headed    # abre browser visivel
+  PYTHONPATH=. .venv/bin/python scripts/platform/grok/export.py             # incremental
+  PYTHONPATH=. .venv/bin/python scripts/platform/grok/export.py --full      # ignora estado anterior, refetcha tudo
+  PYTHONPATH=. .venv/bin/python scripts/platform/grok/export.py --smoke 5   # apenas 5 convs (smoke test)
+  PYTHONPATH=. .venv/bin/python scripts/platform/grok/export.py --headed    # abre browser visivel
 """
 
 import argparse

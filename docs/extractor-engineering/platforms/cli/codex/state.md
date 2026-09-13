@@ -47,4 +47,4 @@ silenciosamente.
 - **Parser:** `src/parsers/codex.py`
 - **Copy script:** `src/extractors/cli/copy.py`
 - **Quarto data profile:** `notebooks/codex.qmd`
-- **Sync orchestrator:** `scripts/codex-sync.py`
+- **Sync orchestrator:** `scripts/platform/codex/sync.py`

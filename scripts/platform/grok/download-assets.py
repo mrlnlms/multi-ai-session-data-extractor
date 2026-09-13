@@ -3,8 +3,8 @@
 Pre-requisito: scripts/platform/grok/export.py rodou e populou assets.json.
 
 Uso:
-    python scripts/platform/grok/download-assets.py
-    python scripts/platform/grok/download-assets.py --no-skip   # re-baixa tudo
+    PYTHONPATH=. .venv/bin/python scripts/platform/grok/download-assets.py
+    PYTHONPATH=. .venv/bin/python scripts/platform/grok/download-assets.py --no-skip   # re-baixa tudo
 """
 
 import argparse

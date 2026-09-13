@@ -1,7 +1,7 @@
 """Baixa user uploads + assets gerados (t2i/t2v) + project files do raw Qwen.
 
 Uso:
-  python scripts/platform/qwen/download-assets.py [raw_dir]
+  PYTHONPATH=. .venv/bin/python scripts/platform/qwen/download-assets.py [raw_dir]
 
 Sem argumento, usa pasta unica data/raw/Qwen/.
 """

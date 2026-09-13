@@ -120,7 +120,7 @@ specific platform:
 
 ```bash
 rm -rf .storage/<platform>-profile-<account>
-python scripts/<platform>-login.py
+PYTHONPATH=. .venv/bin/python scripts/<platform>-login.py
 ```
 
 ### Before sharing a machine or backup

@@ -43,7 +43,7 @@ async def load_context(account: str = "default", headless: bool = True) -> Brows
     profile_dir = get_profile_dir(account)
     if not profile_dir.exists():
         raise RuntimeError(
-            f"Profile nao existe: {profile_dir}. Rode scripts/grok-login.py"
+            f"Profile nao existe: {profile_dir}. Rode scripts/platform/grok/login.py"
         )
     pw = await async_playwright().start()
     context = await pw.chromium.launch_persistent_context(

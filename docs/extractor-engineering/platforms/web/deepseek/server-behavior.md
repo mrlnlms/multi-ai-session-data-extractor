@@ -110,7 +110,7 @@ which is why sync ran clean on the first attempt:
 3. **`--full` in sync did not propagate to the reconciler.** `--full` only
    forced the extractor to refetch; the reconciler still used stale merged
    cache. Fix: pass `full=args.full` to `run_reconciliation`. Applied in
-   `scripts/deepseek-sync.py`.
+   `scripts/platform/deepseek/sync.py`.
 
 ## Other pending items (non-blocking — feature edges)
 

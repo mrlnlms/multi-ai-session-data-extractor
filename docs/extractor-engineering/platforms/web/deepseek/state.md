@@ -4,11 +4,11 @@
 
 - **Pastas cumulativas por conta:** a conta padrao usa `data/raw/DeepSeek/`
   e `data/merged/DeepSeek/`; as demais usam `account-<n>/` sob essas raizes.
-- **Sync orchestrator (2 steps):** `scripts/deepseek-sync.py` (capture +
+- **Sync orchestrator (2 steps):** `scripts/platform/deepseek/sync.py` (capture +
   reconcile).
 - **Headless capture.**
 - **Auth:** perfis persistentes em `.storage/deepseek-profile-<account>/`
-  (gerados via `scripts/deepseek-login.py --account <account>`). A profile can remain present
+  (gerados via `scripts/platform/deepseek/login.py --account <account>`). A profile can remain present
   after its `userToken` expires, so validate a minimal API request first.
 
 ## Coverage
@@ -89,8 +89,8 @@ projects (DeepSeek does not expose them).
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/deepseek-sync.py
-PYTHONPATH=. .venv/bin/python scripts/deepseek-parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/sync.py
+PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/parse.py
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/deepseek.qmd
 ```
 
@@ -99,7 +99,7 @@ as arvores e registra o email configurado em `.storage/accounts.json` no campo
 `account` dos Parquets:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/deepseek-login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/deepseek-sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/deepseek-parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/login.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/parse.py
 ```

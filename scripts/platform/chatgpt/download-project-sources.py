@@ -1,6 +1,6 @@
 """Baixa knowledge files (sources) de todos os projects ChatGPT.
 
-Uso: python scripts/platform/chatgpt/download-project-sources.py [raw_dir]
+Uso: PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/download-project-sources.py [raw_dir]
 Se nao passar raw_dir, usa o mais recente em data/raw/ChatGPT Data*/.
 
 Descoberto empiricamente em 24/abr/2026 — endpoint

@@ -4,7 +4,7 @@ Estrategia:
   1. detect_voice_candidates: heuristica no raw (>= threshold% msgs sem text)
   2. capture_voice_dom: pra cada candidato, abre Playwright page e extrai texto
 
-Fase 0 (pre-requisito): rodar scripts/probes/chatgpt/inspect-voice-dom.py
+Fase 0 (pre-requisito): rodar scripts/platform/chatgpt/probes/inspect-voice-dom.py
 pra descobrir seletores CSS corretos. Popular SELECTORS abaixo com resultado.
 """
 

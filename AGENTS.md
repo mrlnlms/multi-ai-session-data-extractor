@@ -50,15 +50,18 @@ arquivo.
 
 ## Pipeline e validacao
 
-- `scripts/` e a interface operacional: comandos normais
-  `<source>-login.py`, `<source>-sync.py` e `<source>-parse.py` ficam na raiz.
-  Helpers internos ficam em `scripts/platform/<source>/`; probes empiricos em
-  `scripts/probes/<source>/`; manutencao e recuperacao excepcional ficam em
-  `scripts/maintenance/` e `scripts/recovery/`, respectivamente.
-- Os scripts `<source>-sync.py` das fontes web fazem captura + assets +
+- `scripts/` e a interface operacional: cada fonte fica inteira em
+  `scripts/platform/<source>/`. Fontes web expoem `login.py`, `sync.py` e
+  `parse.py`; fontes CLI expoem `sync.py` e `parse.py`. Probes empiricos ficam
+  em `scripts/platform/<source>/probes/`; ferramentas excepcionais especificas
+  tambem ficam junto da plataforma. Fluxos transversais ficam em
+  `scripts/workflows/`; manutencao transversal fica em `scripts/maintenance/`.
+  `scripts/recovery/` preserva temporariamente apenas a importacao legacy do
+  NotebookLM, pendente de classificacao separada.
+- Os scripts `scripts/platform/<source>/sync.py` das fontes web fazem captura + assets +
   reconcile e nao chamam o parser quando executados diretamente. O pipeline
-  do dashboard/headless executa automaticamente o `<source>-parse.py` depois
-  de cada sync web bem-sucedido e antes de `scripts/unify-parquets.py`.
+  do dashboard/headless executa automaticamente o `parse.py` da fonte depois
+  de cada sync web bem-sucedido e antes de `scripts/workflows/unify-parquets.py`.
 - Os syncs das 4 CLIs ja fazem copy + parse.
 - Este projeto publica o contrato de dados unificado. Mudancas de schema ou
   de Parquets publicados devem ter seus impactos em consumidores downstream

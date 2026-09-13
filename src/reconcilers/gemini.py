@@ -15,7 +15,7 @@ Layout:
         reconcile_log.jsonl
 
 Multi-conta: reconciler cobre 1 conta por chamada. Sync orchestrator
-(`scripts/gemini-sync.py`) itera ambas e gera summary agregado.
+(`scripts/platform/gemini/sync.py`) itera ambas e gera summary agregado.
 
 Limitacao: Gemini nao expoe updated_at (so created_at_secs). Novas msgs
 numa conv existente NAO bumpam created_at — pra forcar refetch nesses

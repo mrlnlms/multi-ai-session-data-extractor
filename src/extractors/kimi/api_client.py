@@ -35,7 +35,7 @@ class KimiAPIClient:
         if not tok:
             raise RuntimeError(
                 "access_token nao encontrado em localStorage. "
-                "Profile pode estar deslogado — rode scripts/kimi-login.py"
+                "Profile pode estar deslogado — rode scripts/platform/kimi/login.py"
             )
         self.token = tok
 

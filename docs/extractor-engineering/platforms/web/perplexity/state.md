@@ -4,13 +4,13 @@
 
 - **Pastas cumulativas por conta:** a conta padrao usa `data/raw/Perplexity/`
   e `data/merged/Perplexity/`; as demais usam `account-<n>/` sob essas raizes.
-- **Sync orchestrator (2 steps):** `scripts/perplexity-sync.py`
+- **Sync orchestrator (2 steps):** `scripts/platform/perplexity/sync.py`
   (capture + reconcile). Captures everything in one shot (no separate
   asset step).
 - **Capture:** **headed** (Cloudflare 403 in headless — documented by
   design in `perplexity/api_client.py:12-13`).
 - **Auth:** persistent profile in `.storage/perplexity-profile-<account>/`
-  (generated via `scripts/perplexity-login.py`).
+  (generated via `scripts/platform/perplexity/login.py`).
 
 ## Coverage
 
@@ -74,13 +74,13 @@ recent capture timestamp.
 
 ## Related documents
 
-- Probes: engineering commands in `scripts/probes/perplexity/`.
+- Probes: engineering commands in `scripts/platform/perplexity/probes/`.
 
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/perplexity-sync.py
-PYTHONPATH=. .venv/bin/python scripts/perplexity-parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/sync.py
+PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/parse.py
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/perplexity.qmd
 ```
 
@@ -89,7 +89,7 @@ as arvores e grava o e-mail configurado em `.storage/accounts.json` no campo
 `account` dos Parquets:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/perplexity-login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/perplexity-sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/perplexity-parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/login.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/parse.py
 ```

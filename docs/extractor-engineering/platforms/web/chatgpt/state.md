@@ -5,12 +5,12 @@
 - **Per-account cumulative folders:** the legacy `default` account remains in
   `data/raw/ChatGPT/` and `data/merged/ChatGPT/`; another profile key uses
   `account-<key>/` below each tree.
-- **Sync orchestrator (4 steps):** `scripts/chatgpt-sync.py` — capture +
+- **Sync orchestrator (4 steps):** `scripts/platform/chatgpt/sync.py` — capture +
   assets + project_sources + reconcile.
 - **Capture:** **headed** (Cloudflare detects headless). Project discovery is
   API-first via the sidebar index; DOM is a compatibility fallback only.
 - **Auth:** persistent profile in `.storage/chatgpt-profile-<account>/`
-  (generated via `scripts/chatgpt-login.py`).
+  (generated via `scripts/platform/chatgpt/login.py`).
 - **Fail-fast against flakey discovery** — `_get_max_known_discovery` recursive
   rglob, 20% threshold (aborts before save if current discovery is <80% of
   the largest historical value).
@@ -64,11 +64,11 @@ the source's volatile server fields are normalized by the pipeline.
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --no-voice-pass
+PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/sync.py --no-voice-pass
 # Login and sync an additional account once; its parser output is combined.
-PYTHONPATH=. .venv/bin/python scripts/chatgpt-login.py --profile account-2
-PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --account account-2 --no-voice-pass
-PYTHONPATH=. .venv/bin/python scripts/chatgpt-parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/login.py --profile account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/sync.py --account account-2 --no-voice-pass
+PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/parse.py
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/chatgpt.qmd
 ```
 

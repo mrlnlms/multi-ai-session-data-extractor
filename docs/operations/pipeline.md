@@ -21,41 +21,46 @@ bem-sucedido. Os quatro syncs de CLI ja fazem copy e parse.
 
 ```bash
 # Fonte web: exemplo ChatGPT
-PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --no-voice-pass
-# Outra conta ChatGPT, depois de executar chatgpt-login.py --profile account-2
-PYTHONPATH=. .venv/bin/python scripts/chatgpt-sync.py --account account-2 --no-voice-pass
-PYTHONPATH=. .venv/bin/python scripts/chatgpt-parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/sync.py --no-voice-pass
+# Outra conta ChatGPT, depois de executar scripts/platform/chatgpt/login.py --profile account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/sync.py --account account-2 --no-voice-pass
+PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/parse.py
 
-# Outra conta Claude.ai, depois de executar claude-login.py --profile account-2
-PYTHONPATH=. .venv/bin/python scripts/claude-sync.py --profile account-2
-PYTHONPATH=. .venv/bin/python scripts/claude-parse.py
+# Outra conta Claude.ai, depois de executar scripts/platform/claude/login.py --profile account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/claude/sync.py --profile account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/claude/parse.py
 
-# Outra conta Kimi, depois de executar kimi-login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/kimi-sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/kimi-parse.py
+# Outra conta Kimi, depois de executar scripts/platform/kimi/login.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/kimi/sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/kimi/parse.py
 
-# Outra conta DeepSeek, depois de executar deepseek-login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/deepseek-sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/deepseek-parse.py
+# Outra conta DeepSeek, depois de executar scripts/platform/deepseek/login.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/parse.py
 
-# Outra conta Qwen, depois de executar qwen-login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/qwen-sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/qwen-parse.py
+# Outra conta Qwen, depois de executar scripts/platform/qwen/login.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/qwen/sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/qwen/parse.py
 
 # Outra conta Grok ou Perplexity, depois do login no perfil separado
-PYTHONPATH=. .venv/bin/python scripts/grok-sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/grok-parse.py
-PYTHONPATH=. .venv/bin/python scripts/perplexity-sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/perplexity-parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/grok/sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/grok/parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/parse.py
 
 # Gemini e NotebookLM: tres contas ativas
-PYTHONPATH=. .venv/bin/python scripts/gemini-sync.py
-PYTHONPATH=. .venv/bin/python scripts/gemini-parse.py
-PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py
-PYTHONPATH=. .venv/bin/python scripts/notebooklm-parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/gemini/sync.py
+PYTHONPATH=. .venv/bin/python scripts/platform/gemini/parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/sync.py
+PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/parse.py
 
 # Fonte CLI: sync ja inclui parse
-PYTHONPATH=. .venv/bin/python scripts/codex-sync.py
+PYTHONPATH=. .venv/bin/python scripts/platform/codex/sync.py
+
+# Antigravity CLI: recuperacao legacy e excepcional; sidecars passam a ser
+# consumidos pelos parses seguintes
+PYTHONPATH=. .venv/bin/python scripts/platform/antigravity-cli/recover-legacy.py --all-opaque
+PYTHONPATH=. .venv/bin/python scripts/platform/antigravity-cli/parse.py
 ```
 
 Cada plataforma tem flags e requisitos proprios. Consulte seu `state.md`
@@ -75,7 +80,7 @@ nulo. Os IDs historicos de conversa nao mudam por causa dessa etiquetagem.
 Depois de uma ou mais fontes web processadas:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/unify-parquets.py
+PYTHONPATH=. .venv/bin/python scripts/workflows/unify-parquets.py
 ```
 
 `data/unified/` e a saida cross-platform. A unificacao e idempotente e pode
@@ -111,10 +116,10 @@ local abaixo e nao copia nem cria symlinks dos relatorios em `static/`.
 Para servi-los localmente:
 
 ```bash
-./scripts/serve-qmds.sh start
-./scripts/serve-qmds.sh status
-./scripts/serve-qmds.sh open
-./scripts/serve-qmds.sh stop
+./scripts/workflows/serve-qmds.sh start
+./scripts/workflows/serve-qmds.sh status
+./scripts/workflows/serve-qmds.sh open
+./scripts/workflows/serve-qmds.sh stop
 ```
 
 Por padrao, os links do dashboard usam `http://localhost:8765`. Se o servidor
@@ -133,7 +138,7 @@ ocorrem quando o operador marca Publish de forma deliberada.
 
 ```bash
 # Pipeline sem Streamlit; exclui fontes que exigem janela visivel
-PYTHONPATH=. .venv/bin/python scripts/headless-pipeline.py --no-publish
+PYTHONPATH=. .venv/bin/python scripts/workflows/headless-pipeline.py --no-publish
 ```
 
 O historico e os locks de rodadas automatizadas ficam em `.runtime/`. Consulte

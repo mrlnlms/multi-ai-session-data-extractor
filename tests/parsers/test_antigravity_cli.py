@@ -35,6 +35,45 @@ def _setup_raw(tmp_path: Path) -> Path:
     return raw
 
 
+def _write_recovered_trajectory(root: Path, conversation_id: str = "conv-legacy") -> Path:
+    recovered = root / "recovered"
+    recovered.mkdir(parents=True, exist_ok=True)
+    trajectory = {
+        "cascadeId": conversation_id,
+        "generatorMetadata": [{
+            "plannerConfig": {"modelName": "legacy-model"},
+            "chatModel": {"model": "legacy-chat-model"},
+        }],
+        "steps": [
+            {
+                "type": "CORTEX_STEP_TYPE_USER_INPUT",
+                "status": "CORTEX_STEP_STATUS_DONE",
+                "metadata": {"createdAt": "2026-08-29T12:00:00Z"},
+                "userInput": {"userResponse": "Legacy question"},
+            },
+            {
+                "type": "CORTEX_STEP_TYPE_PLANNER_RESPONSE",
+                "status": "CORTEX_STEP_STATUS_DONE",
+                "metadata": {"createdAt": "2026-08-29T12:00:01Z"},
+                "plannerResponse": {
+                    "content": "Legacy answer",
+                    "thinking": "Legacy reasoning",
+                    "toolCalls": [{"name": "view_file", "args": {"path": "README.md"}}],
+                },
+            },
+            {
+                "type": "CORTEX_STEP_TYPE_ERROR_MESSAGE",
+                "status": "CORTEX_STEP_STATUS_ERROR",
+                "metadata": {"createdAt": "2026-08-29T12:00:02Z"},
+                "errorMessage": {"error": {"userMessage": "Legacy operation failed"}},
+            },
+        ],
+    }
+    path = recovered / f"{conversation_id}.trajectory.json"
+    path.write_text(json.dumps(trajectory))
+    return path
+
+
 def test_antigravity_parses_readable_trajectory_and_opaque_stub(tmp_path, monkeypatch):
     raw = _setup_raw(tmp_path)
     monkeypatch.setattr("src.extractors.cli.preservation.mark_cli_preservation", lambda parser: 0)
@@ -68,3 +107,48 @@ def test_antigravity_writes_four_canonical_parquets(tmp_path, monkeypatch):
     assert stats == {"conversations": 2, "messages": 2, "tool_events": 2, "branches": 2}
     for table in ("conversations", "messages", "tool_events", "branches"):
         assert (output / f"antigravity_cli_{table}.parquet").exists()
+
+
+def test_antigravity_parses_recovered_legacy_trajectory(tmp_path, monkeypatch):
+    raw = tmp_path / "Antigravity CLI"
+    conversations = raw / "conversations"
+    conversations.mkdir(parents=True)
+    (conversations / "conv-legacy.pb").write_bytes(b"opaque")
+    recovered = _write_recovered_trajectory(raw)
+    monkeypatch.setattr("src.extractors.cli.preservation.mark_cli_preservation", lambda parser: 0)
+
+    parser = AntigravityCLIParser()
+    parser.parse(raw)
+
+    assert len(parser.conversations) == 1
+    conversation = parser.conversations[0]
+    assert conversation.conversation_id == "conv-legacy"
+    assert conversation.message_count == 2
+    assert conversation.model == "legacy-model"
+    assert conversation.capture_method == "legacy_antigravity_daemon"
+    assert [message.role for message in parser.messages] == ["user", "assistant"]
+    assert parser.messages[0].content == "Legacy question"
+    assert parser.messages[1].content == "Legacy answer"
+    assert parser.messages[1].thinking == "Legacy reasoning"
+    assert {event.event_type for event in parser.events} == {"tool_call", "error_message"}
+    assert next(event for event in parser.events if event.event_type == "error_message").success is False
+    assert parser._conv_source_files["conv-legacy"] == {
+        "conversations/conv-legacy.pb",
+        str(recovered.relative_to(raw)),
+    }
+    assert parser.branches[0].root_message_id == parser.messages[0].message_id
+    assert parser.branches[0].leaf_message_id == parser.messages[-1].message_id
+
+
+def test_current_transcript_takes_priority_over_recovered_trajectory(tmp_path, monkeypatch):
+    raw = _setup_raw(tmp_path)
+    _write_recovered_trajectory(raw, CONVERSATION_ID)
+    monkeypatch.setattr("src.extractors.cli.preservation.mark_cli_preservation", lambda parser: 0)
+
+    parser = AntigravityCLIParser()
+    parser.parse(raw)
+
+    conversation = next(c for c in parser.conversations if c.conversation_id == CONVERSATION_ID)
+    assert conversation.capture_method == "extractor"
+    assert conversation.message_count == 2
+    assert all(message.content != "Legacy question" for message in parser.messages)

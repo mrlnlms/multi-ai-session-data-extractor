@@ -1,5 +1,5 @@
 # tests/test_unify_parquets.py
-"""Testes pro scripts/unify-parquets.py.
+"""Testes pro scripts/workflows/unify-parquets.py.
 
 Cobre os 5 helpers + fluxo end-to-end:
 - `_identify_table` — sufixo simples e composto (source_guides vs sources)
@@ -28,7 +28,7 @@ import pandas as pd
 import pytest
 
 # Carregar o script (nao eh modulo Python normal — fica em scripts/)
-_unify_path = Path(__file__).parent.parent / "scripts" / "unify-parquets.py"
+_unify_path = Path(__file__).parent.parent / "scripts" / "workflows" / "unify-parquets.py"
 _spec = importlib.util.spec_from_file_location("unify_parquets", _unify_path)
 unify_module = importlib.util.module_from_spec(_spec)
 sys.modules["unify_parquets"] = unify_module

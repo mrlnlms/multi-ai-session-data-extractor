@@ -27,4 +27,4 @@ the "preservation at the raw level via cli-copy" pattern.
 - **Parser:** `src/parsers/gemini_cli.py`
 - **Copy script:** `src/extractors/cli/copy.py`
 - **Quarto data profile:** `notebooks/gemini-cli.qmd`
-- **Sync orchestrator:** `scripts/gemini-cli-sync.py`
+- **Sync orchestrator:** `scripts/platform/gemini-cli/sync.py`

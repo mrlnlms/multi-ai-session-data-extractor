@@ -3,11 +3,11 @@
 ## Pipeline
 
 - **Multi-account** — 3 Google accounts. Profiles in
-  `.storage/gemini-profile-{1,2,3}/` (generated via `scripts/gemini-login.py`).
+  `.storage/gemini-profile-{1,2,3}/` (generated via `scripts/platform/gemini/login.py`).
 - **Single cumulative folder per-account:** `data/raw/Gemini/account-{N}/` and
   `data/merged/Gemini/account-{N}/`.
 - **Sync orchestrator (3 multi-account steps):**
-  `scripts/gemini-sync.py` — capture per-account + assets + reconcile
+  `scripts/platform/gemini/sync.py` — capture per-account + assets + reconcile
   per-account. Iterates over all active accounts in sequence (default) or
   `--account N` to run just one.
 - **Headless capture** (no Cloudflare at runtime).
@@ -55,7 +55,7 @@ Conversations + assistant messages + tool events + images
 `src/parsers/gemini.py` + `_gemini_helpers.py`.
 
 The raw schema is **positional** (Google batchexecute, no keys) — paths
-discovered via probe (`scripts/probes/gemini/schema.py`):
+discovered via probe (`scripts/platform/gemini/probes/schema.py`):
 
 - `turn[2][0][0]` → user text.
 - `turn[3][0][0][1]` → assistant text (chunks).
@@ -97,15 +97,15 @@ discovered via probe (`scripts/probes/gemini/schema.py`):
 ## Related documents
 
 - `docs/extractor-engineering/platforms/web/gemini/server-behavior.md` — upstream behavior.
-- Probes: `scripts/probes/gemini/schema.py`,
-  `scripts/probes/gemini/pin-share.py`.
+- Probes: `scripts/platform/gemini/probes/schema.py`,
+  `scripts/platform/gemini/probes/pin-share.py`.
 
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/gemini-sync.py             # all accounts
-PYTHONPATH=. .venv/bin/python scripts/gemini-sync.py --account 1 # account 1 only
-PYTHONPATH=. .venv/bin/python scripts/gemini-parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/gemini/sync.py             # all accounts
+PYTHONPATH=. .venv/bin/python scripts/platform/gemini/sync.py --account 1 # account 1 only
+PYTHONPATH=. .venv/bin/python scripts/platform/gemini/parse.py
 for f in gemini gemini-acc-1 gemini-acc-2 gemini-acc-3; do
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd
 done

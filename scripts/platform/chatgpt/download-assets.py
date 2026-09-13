@@ -1,15 +1,15 @@
 """Download de imagens + project files do ChatGPT via Playwright intercept.
 
 Uso:
-    python scripts/platform/chatgpt/download-assets.py [raw_dir]
+    PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/download-assets.py [raw_dir]
                                               [--only-conv ID] [--include-projects]
 
 Exemplos:
     # Todas as convs com imagens do raw mais recente
-    python scripts/platform/chatgpt/download-assets.py "data/raw/ChatGPT Data 2026-04-23T12-40"
+    PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/download-assets.py "data/raw/ChatGPT Data 2026-04-23T12-40"
 
     # So 1 conv (pra teste)
-    python scripts/platform/chatgpt/download-assets.py "data/raw/ChatGPT Data ..." \\
+    PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/download-assets.py "data/raw/ChatGPT Data ..." \\
         --only-conv 69e77b68-23b8-83e9-bca7-924256fc8e67
 """
 

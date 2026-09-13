@@ -1,8 +1,8 @@
 """Reconciler Kimi standalone.
 
 Uso:
-    python scripts/platform/kimi/reconcile.py
-    python scripts/platform/kimi/reconcile.py --full
+    PYTHONPATH=. .venv/bin/python scripts/platform/kimi/reconcile.py
+    PYTHONPATH=. .venv/bin/python scripts/platform/kimi/reconcile.py --full
 """
 
 import argparse

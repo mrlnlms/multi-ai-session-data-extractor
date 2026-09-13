@@ -86,7 +86,7 @@ to force body refetch.
     - Same pattern as Perplexity Enterprise-only archive
     - **Not an extractor gap** — canonical schema has `is_archived`
       field, just never True on Pro/free account
-    - Probe: `scripts/probes/qwen/archived.py`
+    - Probe: `scripts/platform/qwen/probes/archived.py`
 
 ## Bugs discovered+fixed in this battery
 
@@ -104,11 +104,11 @@ to force body refetch.
    `persist_discovery()` (called by the orchestrator after fail-fast).
    Applied to qwen.
 
-3. **`qwen-sync.py --full` did not propagate to reconcile.** `--full`
+3. **`scripts/platform/qwen/sync.py --full` did not propagate to reconcile.** `--full`
    only forced extractor refetch. Reconciler used `to_copy` (read prior
    merged) for chats without updated_at diff, keeping stale bodies.
    Fix: pass `full=args.full` to `run_reconciliation`. Applied to
-   qwen-sync.py + deepseek-sync.py + claude-sync.py.
+   scripts/platform/qwen/sync.py + scripts/platform/deepseek/sync.py + scripts/platform/claude/sync.py.
 
 ## Other observed features (not tested via parser in this battery)
 

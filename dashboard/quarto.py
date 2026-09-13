@@ -8,7 +8,7 @@ Helpers pra:
 - gerar URLs pro servidor local dos relatórios
 
 `notebooks/_output/` e a fonte unica dos HTMLs renderizados. O script
-`scripts/serve-qmds.sh` serve esse diretorio diretamente; o dashboard apenas
+`scripts/workflows/serve-qmds.sh` serve esse diretorio diretamente; o dashboard apenas
 gera URLs para esse servidor, sem copiar ou linkar arquivos em `static/`.
 """
 from __future__ import annotations

@@ -40,7 +40,7 @@ async def extract_session_params(page) -> dict:
     if "at" not in params:
         raise RuntimeError(
             "Nao consegui extrair SNlM0e (XSRF token) do HTML do Gemini. "
-            "Sessao pode estar expirada — rode scripts/gemini-login.py"
+            "Sessao pode estar expirada — rode scripts/platform/gemini/login.py"
         )
     return params
 

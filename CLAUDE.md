@@ -50,15 +50,18 @@ Nao conclua que houve consolidacao apenas pelo nome, idade ou status do arquivo.
 
 ## Pipeline e validacao
 
-- `scripts/` e a interface operacional: comandos normais
-  `<source>-login.py`, `<source>-sync.py` e `<source>-parse.py` ficam na raiz.
-  Helpers internos ficam em `scripts/platform/<source>/`; probes empiricos em
-  `scripts/probes/<source>/`; manutencao e recuperacao excepcional ficam em
-  `scripts/maintenance/` e `scripts/recovery/`, respectivamente.
-- Scripts `<source>-sync.py` web fazem captura + assets + reconcile, mas nao
+- `scripts/` e a interface operacional: cada fonte fica inteira em
+  `scripts/platform/<source>/`. Fontes web expoem `login.py`, `sync.py` e
+  `parse.py`; fontes CLI expoem `sync.py` e `parse.py`. Probes empiricos ficam
+  em `scripts/platform/<source>/probes/`; ferramentas excepcionais especificas
+  tambem ficam junto da plataforma. Fluxos transversais ficam em
+  `scripts/workflows/`; manutencao transversal fica em `scripts/maintenance/`.
+  `scripts/recovery/` preserva temporariamente apenas a importacao legacy do
+  NotebookLM, pendente de classificacao separada.
+- Scripts `scripts/platform/<source>/sync.py` web fazem captura + assets + reconcile, mas nao
   chamam o parser quando executados diretamente.
-- O dashboard/headless executa o `<source>-parse.py` depois de sync web
-  bem-sucedido e antes de `scripts/unify-parquets.py`.
+- O dashboard/headless executa o `parse.py` da fonte depois de sync web
+  bem-sucedido e antes de `scripts/workflows/unify-parquets.py`.
 - Os syncs das CLIs ja fazem copy + parse.
 - Alteracoes no schema unificado e nos Parquets publicados exigem revisao dos
   impactos em consumidores downstream antes da publicacao.
@@ -132,7 +135,7 @@ para bloquear coleta ou publicacao normal.
 PYTHONPATH=. .venv/bin/pytest
 
 # Materializar Parquets unificados apos parses
-PYTHONPATH=. .venv/bin/python scripts/unify-parquets.py
+PYTHONPATH=. .venv/bin/python scripts/workflows/unify-parquets.py
 ```
 
 Comandos de captura, login e diagnostico ficam no `state.md` de cada fonte.

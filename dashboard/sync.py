@@ -30,6 +30,8 @@ _NONINTERACTIVE_ENV = {
 }
 
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
+PLATFORM_SCRIPTS_DIR = SCRIPTS_DIR / "platform"
+WORKFLOWS_DIR = SCRIPTS_DIR / "workflows"
 RUNTIME_DIR = PROJECT_ROOT / ".runtime"
 LOCK_PATH = RUNTIME_DIR / "locks" / "pipeline.lock"
 
@@ -74,37 +76,30 @@ def _safe_env() -> dict[str, str]:
     return dict(os.environ)
 
 
+def platform_script(platform: str, action: str) -> Optional[Path]:
+    prefix = SCRIPT_PREFIX.get(platform)
+    if not prefix:
+        return None
+    return PLATFORM_SCRIPTS_DIR / prefix / f"{action}.py"
+
+
 def has_sync_script(platform: str) -> bool:
-    prefix = SCRIPT_PREFIX.get(platform)
-    if not prefix:
-        return False
-    return (SCRIPTS_DIR / f"{prefix}-sync.py").exists()
-
-
-def has_export_script(platform: str) -> bool:
-    prefix = SCRIPT_PREFIX.get(platform)
-    if not prefix:
-        return False
-    return (SCRIPTS_DIR / f"{prefix}-export.py").exists()
+    script = platform_script(platform, "sync")
+    return script is not None and script.exists()
 
 
 def sync_command(platform: str) -> Optional[list[str]]:
     """Retorna o comando preferido pra capturar a plataforma.
 
-    Prefere o sync orquestrador. Cai no export
-    standalone se nao houver sync. Retorna None se nem export existe.
+    Retorna o sync orquestrador ou None se a plataforma nao o possuir.
     """
-    prefix = SCRIPT_PREFIX.get(platform)
-    if not prefix:
-        return None
     python = sys.executable
-    if has_sync_script(platform):
-        cmd = [python, str(SCRIPTS_DIR / f"{prefix}-sync.py")]
+    script = platform_script(platform, "sync")
+    if script is not None and script.exists():
+        cmd = [python, str(script)]
         if platform == "ChatGPT":
             cmd.append("--no-voice-pass")
         return cmd
-    if has_export_script(platform):
-        return [python, str(SCRIPTS_DIR / f"{prefix}-export.py")]
     return None
 
 
@@ -112,11 +107,8 @@ def parse_command(platform: str) -> Optional[list[str]]:
     """Return the mandatory post-sync parser command for a web platform."""
     if platform not in WEB_PLATFORMS:
         return None
-    prefix = SCRIPT_PREFIX.get(platform)
-    if not prefix:
-        return None
-    script = SCRIPTS_DIR / f"{prefix}-parse.py"
-    if not script.exists():
+    script = platform_script(platform, "parse")
+    if script is None or not script.exists():
         return None
     return [sys.executable, str(script)]
 
@@ -184,9 +176,9 @@ def run_sync_streaming(
 
 
 def run_unify(capture_output: bool = True) -> subprocess.CompletedProcess:
-    """Roda scripts/unify-parquets.py — materializa data/unified/ a partir
+    """Roda scripts/workflows/unify-parquets.py — materializa data/unified/ a partir
     de data/processed/<plat>/. Idempotente, sem args. Bloqueante."""
-    cmd = [sys.executable, str(SCRIPTS_DIR / "unify-parquets.py")]
+    cmd = [sys.executable, str(WORKFLOWS_DIR / "unify-parquets.py")]
     return subprocess.run(
         cmd,
         cwd=str(PROJECT_ROOT),
@@ -201,7 +193,7 @@ def run_unify_streaming(
     timeout: float = 30 * 60.0,
 ) -> tuple[int, str]:
     """Versao streaming do unify pro pipeline. UI uniforme com os outros stages."""
-    cmd = [sys.executable, str(SCRIPTS_DIR / "unify-parquets.py")]
+    cmd = [sys.executable, str(WORKFLOWS_DIR / "unify-parquets.py")]
     return _stream(cmd, on_line, tail_size=30, timeout=timeout)
 
 

@@ -8,7 +8,7 @@ Layout:
         LAST_CAPTURE.md
 
 Multi-conta: orchestrator cobre 1 conta por chamada (`account=1` ou `account=2`).
-Sync orchestrador (`scripts/gemini-sync.py`) itera ambas.
+Sync orchestrador (`scripts/platform/gemini/sync.py`) itera ambas.
 
 Modo default: incremental (re-fetch so convs com created_at_secs != conhecido OR
 arquivo nao existe).

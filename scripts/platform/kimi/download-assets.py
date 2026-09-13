@@ -3,8 +3,8 @@
 Pre-requisito: scripts/platform/kimi/export.py rodou e populou conversations/.
 
 Uso:
-    python scripts/platform/kimi/download-assets.py
-    python scripts/platform/kimi/download-assets.py --no-skip
+    PYTHONPATH=. .venv/bin/python scripts/platform/kimi/download-assets.py
+    PYTHONPATH=. .venv/bin/python scripts/platform/kimi/download-assets.py --no-skip
 """
 
 import argparse

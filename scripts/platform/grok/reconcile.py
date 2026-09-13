@@ -1,8 +1,8 @@
 """Reconciler Grok standalone (pasta unica).
 
 Uso:
-    python scripts/platform/grok/reconcile.py            # raw=data/raw/Grok/
-    python scripts/platform/grok/reconcile.py --full
+    PYTHONPATH=. .venv/bin/python scripts/platform/grok/reconcile.py            # raw=data/raw/Grok/
+    PYTHONPATH=. .venv/bin/python scripts/platform/grok/reconcile.py --full
 """
 
 import argparse

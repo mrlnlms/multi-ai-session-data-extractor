@@ -1,6 +1,6 @@
 """Playwright login persistente pra ChatGPT.
 
-Pattern espelha scripts/gemini-login.py — launch_persistent_context mantem
+Pattern espelha scripts/platform/gemini/login.py — launch_persistent_context mantem
 cookies no profile, login feito 1x dura ate expirar no servidor.
 """
 
@@ -34,4 +34,4 @@ async def login(profile_name: str = "default") -> None:
         await context.wait_for_event("close", timeout=0)
 
     print(f"Browser fechado. Sessao salva em {profile_dir}")
-    print("Agora rode: python scripts/platform/chatgpt/export.py")
+    print("Agora rode: PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/export.py")

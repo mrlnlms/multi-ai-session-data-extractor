@@ -8,11 +8,11 @@ slide deck PDF+PPTX, infographic, mind map).
 
 - **Multi-account** — three active accounts (acc-1, acc-2, acc-3). Profiles
   in `.storage/notebooklm-profile-{1,2,3}/` (generated via
-  `scripts/notebooklm-login.py`).
+  `scripts/platform/notebooklm/login.py`).
 - **Single cumulative folder per-account:** `data/raw/NotebookLM/account-{N}/`
   and `data/merged/NotebookLM/account-{N}/`.
 - **Sync orchestrator (3 steps multi-account):**
-  `scripts/notebooklm-sync.py` — capture per-account + assets + reconcile
+  `scripts/platform/notebooklm/sync.py` — capture per-account + assets + reconcile
   per-account.
 - **Headless capture.**
 
@@ -229,10 +229,10 @@ also without removal or overwrite. The NotebookLM parser then completed with
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py             # all active accounts
-PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py --account 1 # only account 1
-PYTHONPATH=. .venv/bin/python scripts/notebooklm-sync.py --account 3 # only account 3
-PYTHONPATH=. .venv/bin/python scripts/notebooklm-parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/sync.py             # all active accounts
+PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/sync.py --account 1 # only account 1
+PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/sync.py --account 3 # only account 3
+PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/parse.py
 for f in notebooklm notebooklm-acc-1 notebooklm-acc-2; do
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd
 done

@@ -1,10 +1,10 @@
 """Captura conversas Kimi.
 
 Uso:
-  python scripts/platform/kimi/export.py             # incremental
-  python scripts/platform/kimi/export.py --full      # ignora estado anterior
-  python scripts/platform/kimi/export.py --smoke 3   # apenas 3 chats
-  python scripts/platform/kimi/export.py --headed
+  PYTHONPATH=. .venv/bin/python scripts/platform/kimi/export.py             # incremental
+  PYTHONPATH=. .venv/bin/python scripts/platform/kimi/export.py --full      # ignora estado anterior
+  PYTHONPATH=. .venv/bin/python scripts/platform/kimi/export.py --smoke 3   # apenas 3 chats
+  PYTHONPATH=. .venv/bin/python scripts/platform/kimi/export.py --headed
 """
 
 import argparse

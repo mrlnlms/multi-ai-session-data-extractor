@@ -114,7 +114,7 @@ These validations require a Pro Max account and remain open until someone tests:
   URL and keeps it isolated). Not an extractor gap — not capturable.
 - **Multi-account:** three active Google accounts are configured (acc-1,
   acc-2, acc-3); the parser discovers `account-N` directories automatically.
-  For more accounts, you would need to adjust `gemini-sync.py` and the
+  For more accounts, you would need to adjust `scripts/platform/gemini/sync.py` and the
   Quarto template.
 
 ### NotebookLM
@@ -186,8 +186,8 @@ These validations require a Pro Max account and remain open until someone tests:
 
 - **Two local storage generations.** Legacy `.pb` containers are opaque and
   current SQLite containers hold undocumented Protobuf payloads. Both are
-  preserved in raw; canonical parsing uses the readable JSONL trajectories in
-  `brain/<id>/.system_generated/logs/transcript.jsonl`.
+  preserved in raw; canonical parsing uses current JSONL trajectories or a
+  daemon-decoded legacy trajectory sidecar when one has been recovered.
 - **Opaque legacy containers.** When no readable trajectory exists, the
   canonical output contains a zero-message Conversation stub. It is not a
   claim that the conversation was empty; it makes the preserved-but-not-yet-

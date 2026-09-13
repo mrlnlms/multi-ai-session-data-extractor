@@ -1,7 +1,7 @@
 """Captura ChatGPT em Python.
 
 Uso:
-    python scripts/platform/chatgpt/export.py [--output-dir PATH] [--no-voice-pass] [--dry-run] [--full]
+    PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/export.py [--output-dir PATH] [--no-voice-pass] [--dry-run] [--full]
 
 Modos (auto-detectados):
     Primeira run (sem captura anterior): brute force — fetcha todas as convs
@@ -11,7 +11,7 @@ Modos (auto-detectados):
     --full: forca brute force mesmo tendo captura anterior (sanity check periodico).
 
 Requer login previo via:
-    python scripts/chatgpt-login.py
+    PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/login.py
 """
 
 import argparse

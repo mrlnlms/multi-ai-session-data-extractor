@@ -2,7 +2,7 @@
 
 Suporta multiplas contas via sufixo (account-1, account-2, etc). Cada conta
 tem profile persistente em .storage/notebooklm-profile-<N>/ gerado via
-scripts/notebooklm-login.py.
+scripts/platform/notebooklm/login.py.
 """
 
 from pathlib import Path
@@ -52,7 +52,7 @@ async def load_context(account: str, headless: bool = True) -> BrowserContext:
     if not profile_dir.exists():
         raise RuntimeError(
             f"Profile nao existe: {profile_dir}. "
-            f"Rode scripts/notebooklm-login.py --account {account}"
+            f"Rode scripts/platform/notebooklm/login.py --account {account}"
         )
     pw = await async_playwright().start()
     context = await pw.chromium.launch_persistent_context(

@@ -12,7 +12,7 @@ HOME_URL = "https://www.perplexity.ai/"
 
 
 def get_profile_dir(account: str = "default") -> Path:
-    # Match com script legacy scripts/perplexity-login.py (profile sem suffix).
+    # Match com script legacy scripts/platform/perplexity/login.py (profile sem suffix).
     # Se o user ja rodou o login antigo, aproveita.
     if account == "default":
         legacy = Path(".storage/perplexity-profile")
@@ -48,7 +48,7 @@ async def load_context(account: str = "default", headless: bool = True) -> Brows
     profile_dir = get_profile_dir(account)
     if not profile_dir.exists():
         raise RuntimeError(
-            f"Profile nao existe: {profile_dir}. Rode scripts/perplexity-login.py"
+            f"Profile nao existe: {profile_dir}. Rode scripts/platform/perplexity/login.py"
         )
     pw = await async_playwright().start()
     context = await pw.chromium.launch_persistent_context(

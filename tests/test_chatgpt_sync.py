@@ -1,4 +1,4 @@
-"""Testes do scripts/chatgpt-sync.py.
+"""Testes do scripts/platform/chatgpt/sync.py.
 
 Antes do refactor pasta-unica (2026-04-27), este arquivo cobria
 hardlink_existing_binaries — funcao removida quando o sync passou a mutar

@@ -1,8 +1,8 @@
 """Reconciler Qwen standalone (pasta unica).
 
 Uso:
-    python scripts/platform/qwen/reconcile.py            # raw=data/raw/Qwen/
-    python scripts/platform/qwen/reconcile.py --full
+    PYTHONPATH=. .venv/bin/python scripts/platform/qwen/reconcile.py            # raw=data/raw/Qwen/
+    PYTHONPATH=. .venv/bin/python scripts/platform/qwen/reconcile.py --full
 """
 
 import argparse

@@ -91,7 +91,7 @@ async def refetch(account: str, batch_size: int = DEFAULT_BATCH_SIZE) -> None:
     print(f"capture_log.jsonl atualizado")
     print("\nProximo passo:")
     print(f"  PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/reconcile.py {raw_dir}")
-    print("  PYTHONPATH=. .venv/bin/python scripts/chatgpt-parse.py")
+    print("  PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/parse.py")
 
 
 if __name__ == "__main__":

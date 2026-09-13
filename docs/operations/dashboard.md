@@ -82,10 +82,10 @@ O equivalente para terminal é:
 
 ```bash
 # Exclui por padrão ChatGPT e Perplexity, que exigem browser visível.
-PYTHONPATH=. .venv/bin/python scripts/headless-pipeline.py --no-publish
+PYTHONPATH=. .venv/bin/python scripts/workflows/headless-pipeline.py --no-publish
 
 # Para um subconjunto explícito:
-PYTHONPATH=. .venv/bin/python scripts/headless-pipeline.py \
+PYTHONPATH=. .venv/bin/python scripts/workflows/headless-pipeline.py \
   --plats=Claude.ai,Gemini --no-publish
 ```
 

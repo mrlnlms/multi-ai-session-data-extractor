@@ -46,6 +46,18 @@ The technical playbook for adding or substantially promoting a platform is
 It covers discovery, capture, reconciliation, fixtures, parser, validation and
 documentation.
 
+Keep all operational commands for a source together:
+
+```text
+scripts/platform/<source>/login.py   # web platforms only
+scripts/platform/<source>/sync.py
+scripts/platform/<source>/parse.py
+```
+
+A promoted source must also be registered in `KNOWN_PLATFORMS` and
+`SCRIPT_PREFIX`, in `WEB_PLATFORMS` when it is a web source, in the dashboard
+and Quarto reports, in its `state.md`, and in `tests/test_script_layout.py`.
+
 ## Project conventions
 
 - Code and identifiers are English. Documentation may use Portuguese or

@@ -46,7 +46,7 @@ async def login(profile_name: str = "default") -> None:
         await context.wait_for_event("close", timeout=0)
 
     print(f"Browser fechado. Sessao salva em {profile_dir}")
-    print("Agora rode: python scripts/platform/claude-ai/export.py")
+    print("Agora rode: PYTHONPATH=. .venv/bin/python scripts/platform/claude/export.py")
 
 
 async def load_context(profile_name: str = "default", headless: bool = True) -> tuple[BrowserContext, str]:
@@ -58,7 +58,7 @@ async def load_context(profile_name: str = "default", headless: bool = True) -> 
     profile_dir = get_profile_dir(profile_name)
     if not profile_dir.exists():
         raise RuntimeError(
-            f"Profile nao existe: {profile_dir}. Rode scripts/claude-login.py primeiro."
+            f"Profile nao existe: {profile_dir}. Rode scripts/platform/claude/login.py primeiro."
         )
 
     pw = await async_playwright().start()
@@ -82,7 +82,7 @@ async def load_context(profile_name: str = "default", headless: bool = True) -> 
             await context.close()
             raise RuntimeError(
                 "Nao foi possivel capturar org_id (cookie lastActiveOrg ausente). "
-                "Faca login novamente: scripts/claude-login.py"
+                "Faca login novamente: scripts/platform/claude/login.py"
             )
         org_id_cache.write_text(org_id)
 

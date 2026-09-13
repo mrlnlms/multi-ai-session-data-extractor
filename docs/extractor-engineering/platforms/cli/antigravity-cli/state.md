@@ -6,8 +6,9 @@ Source: `antigravity_cli`. Mode: `cli`. Local data from
 ## Storage generations
 
 - **Legacy:** `conversations/<id>.pb`. These containers are encrypted/opaque
-  and are preserved raw. When there is no readable trajectory, the parser
-  emits a zero-message Conversation stub instead of discarding it.
+  and are preserved raw. A decoded `recovered/<id>.trajectory.json` sidecar,
+  when available, is converted into the canonical schema; otherwise the
+  parser emits a zero-message Conversation stub instead of discarding it.
 - **Current:** `conversations/<id>.db`, a SQLite database per conversation.
   Its payload columns are undocumented Protobuf blobs, so they are preserved
   as raw rather than parsed directly.
@@ -19,22 +20,23 @@ The incremental copy takes a consistent SQLite backup for `.db` containers;
 this safely incorporates an active WAL without copying credentials or general
 configuration files.
 
-## Recuperação manual de legados opacos
+## Recuperação de legados opacos
 
-Esta não é uma etapa do sync. Em um caso pontual, quando o `agy` está aberto,
-o daemon local dele pode devolver a trajetória já decriptada de um `.pb`. O
-helper consulta somente `127.0.0.1`, não altera `~/.gemini/antigravity-cli` e
-guarda o resultado em `data/raw/Antigravity CLI/recovered/`:
+Esta é uma ferramenta excepcional da plataforma, não uma etapa automática do
+sync. Quando o `agy` está aberto, o daemon local pode devolver a trajetória já
+decriptada de um `.pb`. O comando consulta somente `127.0.0.1`, não altera
+`~/.gemini/antigravity-cli` e guarda o resultado em
+`data/raw/Antigravity CLI/recovered/`:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/recovery/antigravity-recover-legacy.py --all-opaque
+PYTHONPATH=. .venv/bin/python scripts/platform/antigravity-cli/recover-legacy.py --all-opaque
 ```
 
 `recovery_manifest.jsonl` registra os SHA-256 do PB e da trajetória. Uma
 recuperação bem-sucedida com o mesmo hash é ignorada nas execuções seguintes;
-use `--force` somente para consultar novamente de propósito. Os sidecars
-recuperados ficam preservados fora do parser regular até que exista uma
-conversão de schema revisada para eles.
+use `--force` somente para consultar novamente de propósito. O parser normal
+consome os sidecars automaticamente. A prioridade é transcript atual,
+trajetória legacy recuperada e, por último, stub opaco.
 
 ## Schema specifics
 
@@ -46,6 +48,8 @@ conversão de schema revisada para eles.
 - `history.jsonl`, `conversation_summaries.db` and cache metadata enrich title,
   workspace and summary when available; none is treated as authoritative for
   discovery because the indexes can lag behind the physical conversations.
+- Recovered legacy steps use the same canonical records as current
+  trajectories and set `capture_method='legacy_antigravity_daemon'`.
 
 ## Parquets generated
 
@@ -58,5 +62,6 @@ conversão de schema revisada para eles.
 
 - **Parser:** `src/parsers/antigravity_cli.py`
 - **Copy script:** `src/extractors/cli/copy.py`
-- **Sync orchestrator:** `scripts/antigravity-cli-sync.py`
+- **Legacy recovery:** `src/extractors/antigravity_cli/legacy_recovery.py`
+- **Sync orchestrator:** `scripts/platform/antigravity-cli/sync.py`
 - **Quarto data profile:** `notebooks/antigravity-cli.qmd`

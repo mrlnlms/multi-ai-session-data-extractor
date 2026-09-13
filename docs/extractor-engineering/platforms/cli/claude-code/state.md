@@ -48,4 +48,4 @@ same way — sessions are JSONL files in the user's filesystem.
 - **Parser:** `src/parsers/claude_code.py`
 - **Copy script:** `src/extractors/cli/copy.py`
 - **Quarto data profile:** `notebooks/claude-code.qmd`
-- **Sync orchestrator:** `scripts/claude-code-sync.py`
+- **Sync orchestrator:** `scripts/platform/claude-code/sync.py`

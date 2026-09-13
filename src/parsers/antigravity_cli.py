@@ -2,10 +2,10 @@
 
 Antigravity stores durable conversation containers in two generations:
 legacy encrypted ``conversations/<id>.pb`` files and current per-conversation
-SQLite databases. Both are preserved in raw. The readable, lossless transcript
-for supported conversations is ``brain/<id>/.system_generated/logs/``
-``transcript.jsonl``; this parser deliberately uses it instead of depending on
-the undocumented protobuf BLOBs in SQLite.
+SQLite databases. Both are preserved in raw. Current readable transcripts live
+under ``brain/<id>/.system_generated/logs/transcript.jsonl``. Legacy PBs can
+also have a decoded ``recovered/<id>.trajectory.json`` sidecar produced through
+Antigravity's local daemon; the current transcript always takes precedence.
 """
 
 from __future__ import annotations
@@ -66,9 +66,18 @@ class AntigravityCLIParser(BaseParser):
         self._summaries = self._load_sqlite_summaries(input_path / "conversation_summaries.db")
 
         brain = input_path / "brain"
+        current_ids: set[str] = set()
         if brain.is_dir():
             for transcript in sorted(brain.glob("*/.system_generated/logs/transcript.jsonl")):
+                current_ids.add(transcript.parent.parent.parent.name)
                 self._parse_transcript(transcript)
+
+        recovered = input_path / "recovered"
+        if recovered.is_dir():
+            for trajectory in sorted(recovered.glob("*.trajectory.json")):
+                conversation_id = trajectory.name.removesuffix(".trajectory.json")
+                if conversation_id not in current_ids:
+                    self._parse_recovered_trajectory(trajectory)
 
         self._add_opaque_conversation_stubs(input_path / "conversations")
         self._build_branches()
@@ -152,10 +161,20 @@ class AntigravityCLIParser(BaseParser):
         if not isinstance(status, str):
             return None
         normalized = status.upper()
-        if normalized in {"DONE", "SUCCESS", "COMPLETED"}:
+        if normalized in {"DONE", "SUCCESS", "COMPLETED"} or normalized.endswith(("_DONE", "_SUCCESS", "_COMPLETED")):
             return True
-        if normalized in {"ERROR", "FAILED", "CANCELLED"}:
+        if normalized in {"ERROR", "FAILED", "CANCELLED"} or normalized.endswith(("_ERROR", "_FAILED", "_CANCELLED")):
             return False
+        return None
+
+    @staticmethod
+    def _first_string(mapping: Any, *keys: str) -> Optional[str]:
+        if not isinstance(mapping, dict):
+            return None
+        for key in keys:
+            value = mapping.get(key)
+            if isinstance(value, str) and value:
+                return value
         return None
 
     @staticmethod
@@ -298,6 +317,138 @@ class AntigravityCLIParser(BaseParser):
             mode="cli",
             project=project,
             summary=description,
+        ))
+        self.messages.extend(messages)
+        self.events.extend(events)
+
+    def _parse_recovered_trajectory(self, path: Path) -> None:
+        """Parse one daemon-decoded legacy trajectory sidecar."""
+        try:
+            trajectory = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            logger.warning("  Antigravity CLI: recovered trajectory unreadable %s: %s", path.name, error)
+            return
+        if not isinstance(trajectory, dict):
+            logger.warning("  Antigravity CLI: recovered trajectory is not an object: %s", path.name)
+            return
+        conv_id = trajectory.get("cascadeId")
+        if not isinstance(conv_id, str) or not conv_id:
+            conv_id = path.name.removesuffix(".trajectory.json")
+        steps = trajectory.get("steps")
+        if not isinstance(steps, list):
+            logger.warning("  Antigravity CLI: recovered trajectory has no steps: %s", path.name)
+            return
+
+        rel = self._relative_path(path)
+        if rel:
+            self._conv_source_files.setdefault(conv_id, set()).add(rel)
+        title, project, description = self._conversation_hints(conv_id)
+        model: Optional[str] = None
+        generators = trajectory.get("generatorMetadata")
+        if isinstance(generators, list) and generators and isinstance(generators[0], dict):
+            generator = generators[0]
+            model = (
+                self._first_string(generator.get("plannerConfig"), "modelName")
+                or self._first_string(generator.get("chatModel"), "model")
+            )
+
+        messages: list[Message] = []
+        events: list[ToolEvent] = []
+        timestamps: list[pd.Timestamp] = []
+        for step_index, step in enumerate(steps):
+            if not isinstance(step, dict):
+                continue
+            raw_kind = step.get("type") if isinstance(step.get("type"), str) else "UNKNOWN"
+            kind = raw_kind.removeprefix("CORTEX_STEP_TYPE_")
+            status = step.get("status")
+            metadata = step.get("metadata") if isinstance(step.get("metadata"), dict) else {}
+            timestamp = self._ts(metadata.get("createdAt"))
+            if not pd.isna(timestamp):
+                timestamps.append(timestamp)
+            message_id = f"{conv_id}_legacy_step_{step_index}"
+
+            if kind == "USER_INPUT":
+                content = self._first_string(
+                    step.get("userInput"), "userResponse", "content", "text", "message"
+                )
+                if content is not None:
+                    messages.append(Message(
+                        message_id=message_id, conversation_id=conv_id,
+                        source=self.source_name, sequence=len(messages) + 1,
+                        role="user", content=content, model=None,
+                        created_at=timestamp, account=self.account, content_types="text",
+                    ))
+                continue
+
+            if kind == "PLANNER_RESPONSE":
+                response = step.get("plannerResponse")
+                content = self._first_string(response, "content", "response", "text", "message")
+                thinking = self._first_string(response, "thinking", "reasoning")
+                tool_calls: list[Any] = []
+                if isinstance(response, dict):
+                    candidate_calls = response.get("toolCalls", response.get("tool_calls"))
+                    if isinstance(candidate_calls, list):
+                        tool_calls = candidate_calls
+                if content is not None or thinking is not None or tool_calls:
+                    content_types = ["text"]
+                    if thinking:
+                        content_types.insert(0, "thinking")
+                    if tool_calls:
+                        content_types.append("tool_use")
+                    messages.append(Message(
+                        message_id=message_id, conversation_id=conv_id,
+                        source=self.source_name, sequence=len(messages) + 1,
+                        role="assistant", content=content or "", model=model,
+                        created_at=timestamp, account=self.account, thinking=thinking,
+                        content_types=",".join(content_types),
+                    ))
+                    for tool_index, tool_call in enumerate(tool_calls):
+                        tool_name, file_path, command, metadata_json = self._tool_details(tool_call)
+                        events.append(ToolEvent(
+                            event_id=f"{message_id}_tool_{tool_index}",
+                            conversation_id=conv_id, message_id=message_id,
+                            source=self.source_name, event_type="tool_call",
+                            tool_name=tool_name, file_path=file_path, command=command,
+                            success=self._success_from_status(status), metadata_json=metadata_json,
+                        ))
+                continue
+
+            if kind == "ERROR_MESSAGE":
+                error_message = step.get("errorMessage")
+                error_payload = error_message.get("error") if isinstance(error_message, dict) else None
+                result = self._first_string(
+                    error_payload, "userMessage", "message", "errorMessage", "details", "executionError"
+                )
+                events.append(ToolEvent(
+                    event_id=f"{message_id}_event", conversation_id=conv_id,
+                    message_id=message_id, source=self.source_name,
+                    event_type="error_message", tool_name="ERROR_MESSAGE", success=False,
+                    metadata_json=json.dumps({"legacy_type": raw_kind, "status": status}),
+                    result=result,
+                ))
+                continue
+
+            events.append(ToolEvent(
+                event_id=f"{message_id}_event", conversation_id=conv_id,
+                message_id=message_id, source=self.source_name,
+                event_type=kind.lower(), tool_name=kind,
+                success=self._success_from_status(status),
+                metadata_json=json.dumps({"legacy_type": raw_kind, "status": status}),
+            ))
+
+        root_metadata = trajectory.get("metadata") if isinstance(trajectory.get("metadata"), dict) else {}
+        root_timestamp = self._ts(root_metadata.get("createdAt"))
+        if not pd.isna(root_timestamp):
+            timestamps.append(root_timestamp)
+        fallback = self._ts(path.stat().st_mtime)
+        created_at = min(timestamps) if timestamps else fallback
+        updated_at = max(timestamps) if timestamps else fallback
+        self.conversations.append(Conversation(
+            conversation_id=conv_id, source=self.source_name, title=title,
+            created_at=created_at, updated_at=updated_at,
+            message_count=len(messages), model=model, account=self.account,
+            mode="cli", project=project, summary=description,
+            capture_method="legacy_antigravity_daemon",
         ))
         self.messages.extend(messages)
         self.events.extend(events)

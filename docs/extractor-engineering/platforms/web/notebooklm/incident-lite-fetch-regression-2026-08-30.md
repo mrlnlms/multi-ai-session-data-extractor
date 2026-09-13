@@ -69,7 +69,7 @@ comparando corpos completos e preservando registros ausentes como
 notas (`cFji9`), artifacts (`gArtLc`), conteúdo capturado ou qualquer outro
 campo de metadata. Esses podem representar uma alteração real.
 
-Também foi corrigido `scripts/notebooklm-sync.py` para que erros de download
+Também foi corrigido `scripts/platform/notebooklm/sync.py` para que erros de download
 de assets não sejam sobrescritos ao combinar as estatísticas de assets, notas
 e text artifacts.
 

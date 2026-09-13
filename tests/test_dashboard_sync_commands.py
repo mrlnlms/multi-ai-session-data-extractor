@@ -5,11 +5,14 @@ from __future__ import annotations
 from dashboard import sync
 
 
+PROJECT_ROOT = sync.PROJECT_ROOT
+
+
 def test_parse_command_exists_for_every_web_platform():
     for platform in sync.WEB_PLATFORMS:
         command = sync.parse_command(platform)
         assert command is not None
-        assert command[-1].endswith("-parse.py")
+        assert command[-1].endswith("/parse.py")
 
 
 def test_parse_command_is_none_for_cli_platforms():
@@ -28,8 +31,20 @@ def test_streaming_web_sync_runs_parser_after_success(monkeypatch):
     rc, _tail = sync.run_sync_streaming("Claude.ai", lambda _line: None)
 
     assert rc == 0
-    assert calls[0][-1].endswith("claude-sync.py")
-    assert calls[1][-1].endswith("claude-parse.py")
+    assert calls[0][-1].endswith("/claude/sync.py")
+    assert calls[1][-1].endswith("/claude/parse.py")
+
+
+def test_sync_command_uses_platform_directory():
+    assert sync.sync_command("ChatGPT")[1] == str(
+        PROJECT_ROOT / "scripts" / "platform" / "chatgpt" / "sync.py"
+    )
+
+
+def test_cli_sync_command_uses_platform_directory():
+    assert sync.sync_command("Codex")[1] == str(
+        PROJECT_ROOT / "scripts" / "platform" / "codex" / "sync.py"
+    )
 
 
 def test_streaming_failed_sync_does_not_parse(monkeypatch):

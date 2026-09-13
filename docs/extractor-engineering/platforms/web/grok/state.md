@@ -4,11 +4,11 @@
 
 - **Pastas cumulativas por conta:** a conta padrao usa `data/raw/Grok/` e
   `data/merged/Grok/`; as demais usam `account-<n>/` sob essas raizes.
-- **Sync orchestrator (3 steps):** `scripts/grok-sync.py` (capture +
+- **Sync orchestrator (3 steps):** `scripts/platform/grok/sync.py` (capture +
   assets + reconcile).
 - **Headless capture** (Cloudflare did not block on smoke 2026-05-09).
 - **Auth:** persistent profile in `.storage/grok-profile-<account>/`
-  (generated via `scripts/grok-login.py`). Login via grok.com (SSO da
+  (generated via `scripts/platform/grok/login.py`). Login via grok.com (SSO da
   conta X). Cookies bastam — sem token em localStorage.
 
 ## Coverage
@@ -146,7 +146,7 @@ arvores e grava o e-mail configurado em `.storage/accounts.json` no campo
 `account` dos Parquets:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/grok-login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/grok-sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/grok-parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/grok/login.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/grok/sync.py --account account-2
+PYTHONPATH=. .venv/bin/python scripts/platform/grok/parse.py
 ```

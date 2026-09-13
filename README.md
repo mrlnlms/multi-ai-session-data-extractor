@@ -62,7 +62,7 @@ canonical parsing, and descriptive visualization (Quarto):
 | **Claude Code** | CLI | local sessions (`~/.claude/projects/`), subagents |
 | **Codex** | CLI | local sessions (`~/.codex/sessions/`), exact latency per tool call |
 | **Gemini CLI** | CLI | local sessions (`~/.gemini/tmp/`) |
-| **Antigravity CLI** | CLI | local trajectories (`~/.gemini/antigravity-cli/brain/`) |
+| **Antigravity CLI** | CLI | current trajectories plus decoded legacy `.pb` sidecars |
 
 The automated test suite covers extractors, reconcilers, parsers, the
 canonical schema, dashboard, and unification. Known limitations and gaps are
@@ -84,14 +84,14 @@ playwright install chromium
 Login (once per platform — opens a browser, you log in manually, close):
 
 ```bash
-python scripts/chatgpt-login.py
+PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/login.py
 ```
 
 Sync web data (capture + consolidation), then parse it:
 
 ```bash
-python scripts/chatgpt-sync.py
-python scripts/chatgpt-parse.py
+PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/sync.py
+PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/parse.py
 ```
 
 Result:
@@ -103,9 +103,10 @@ Result:
 
 ![ChatGPT platform drill-down — capture status, content metrics, monthly creation chart, models, projects, knowledge files, and reconcile history](docs/assets/quickstart-02-platform.png)
 
-Repeat the 2 commands for other web platforms (`claude-login.py`,
-`gemini-sync.py`, etc.). CLI sources are copied and parsed by their respective
-`*-sync.py` commands. Details in [docs/SETUP.md](docs/SETUP.md).
+Repeat the commands for other web platforms under their respective
+`scripts/platform/<source>/` directories. CLI sources are copied and parsed
+by their respective `sync.py` commands. Details in
+[docs/SETUP.md](docs/SETUP.md).
 
 If you are restoring an existing personal archive rather than starting a new
 one, first restore your private DVC configuration and run `dvc pull`. The
@@ -149,12 +150,12 @@ For ChatGPT/Perplexity: expected behavior.
 
 ## Commands per platform
 
-Each web platform exposes stable operational commands at the `scripts/` root:
+Each web platform keeps its operational commands together in one directory:
 
 ```bash
-python scripts/<plat>-login.py    # once — manual login in the browser
-python scripts/<plat>-sync.py     # capture + consolidation
-python scripts/<plat>-parse.py    # merged -> canonical parquet
+PYTHONPATH=. .venv/bin/python scripts/platform/<source>/login.py    # once — manual login in the browser
+PYTHONPATH=. .venv/bin/python scripts/platform/<source>/sync.py     # capture + consolidation
+PYTHONPATH=. .venv/bin/python scripts/platform/<source>/parse.py    # merged -> canonical parquet
 ```
 
 Common web-sync flags (availability varies by source):
@@ -198,7 +199,7 @@ QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview.qmd
 To view the generated HTMLs locally:
 
 ```bash
-./scripts/serve-qmds.sh open
+./scripts/workflows/serve-qmds.sh open
 ```
 
 This server exposes `notebooks/_output/` directly at

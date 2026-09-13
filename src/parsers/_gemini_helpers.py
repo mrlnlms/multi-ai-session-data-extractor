@@ -2,7 +2,7 @@
 
 Schema raw eh **posicional** (Google batchexecute / protobuf-like) — sem
 keys. Caminhos descobertos empiricamente em 2026-05-02 (probe via
-scripts/probes/gemini/schema.py em 80 convs):
+scripts/platform/gemini/probes/schema.py em 80 convs):
 
     raw                 — list[4] = [turns_wrapper, ?, None, ?]
     raw[0]              — list de turns

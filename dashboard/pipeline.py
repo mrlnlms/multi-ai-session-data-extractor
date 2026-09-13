@@ -491,7 +491,7 @@ def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: 
             # Auto-open report in a new tab (intelligent routing)
             try:
                 # 1. Start/Ensure server is up
-                subprocess.run(["./scripts/serve-qmds.sh", "start"], cwd=str(PROJECT_ROOT), check=False)
+                subprocess.run(["./scripts/workflows/serve-qmds.sh", "start"], cwd=str(PROJECT_ROOT), check=False)
                 # 2. Determine target URL
                 url = _get_auto_open_url(scope)
                 # 3. Open in browser
