@@ -13,14 +13,14 @@ from dashboard.components import (
     format_datetime,
     relative_time,
 )
-from dashboard.data import PlatformState
-from dashboard.metrics import compute_merged_stats, discovery_drop_flag
+from src.application.platforms import PlatformState
+from src.application.profiles import compute_merged_stats, discovery_drop_flag
 from dashboard.pipeline import (
     render_last_run_summary,
     render_recent_runs_section,
     run_full_pipeline,
 )
-from dashboard.sync import sync_command
+from src.workflows.execution import sync_command
 
 
 @st.cache_data(show_spinner=False)
@@ -30,7 +30,7 @@ def _cached_merged_stats(merged_path_str: str, mtime: float):
 
 @st.cache_data(show_spinner=False)
 def _cached_processed_stats(parquet_path_str: str, mtime: float):
-    from dashboard.metrics import compute_processed_stats
+    from src.application.profiles import compute_processed_stats
     return compute_processed_stats(Path(parquet_path_str))
 
 

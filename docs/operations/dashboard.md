@@ -5,6 +5,10 @@ assistida de executar o pipeline. Ele descobre as 13 fontes a partir de
 `data/`; uma plataforma sem captura continua aparecendo, mas sem métricas ou
 histórico.
 
+Streamlit e a camada de apresentacao atual. A interface le observacoes e
+metricas de `src/application/` e acompanha o runner de `src/workflows/pipeline.py`;
+regras operacionais, subprocessos, locks e publicacao nao dependem do frontend.
+
 Para instalação, login e perfis de navegador, consulte [SETUP.md](../SETUP.md).
 Para rodar scripts manualmente, consulte [pipeline.md](pipeline.md).
 

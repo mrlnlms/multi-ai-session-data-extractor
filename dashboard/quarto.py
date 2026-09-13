@@ -19,7 +19,7 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-from dashboard.data import PROJECT_ROOT
+from src.application.platforms import PROJECT_ROOT
 
 NOTEBOOKS_DIR = PROJECT_ROOT / "notebooks"
 QUARTO_OUTPUT_DIR = NOTEBOOKS_DIR / "_output"

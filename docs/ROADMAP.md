@@ -119,8 +119,15 @@ access exist, but the preserved messages themselves cannot be inspected
 comfortably. It also becomes a feedback surface for finding capture, parser,
 schema and presentation gaps that remain invisible in aggregate dashboards.
 
-Build a local-first, read-only interface distinct from the operational
-Streamlit dashboard:
+The current Streamlit UI is a replaceable presentation adapter. Platform
+observation and data-profile services live under `src/application/`; pipeline
+order, gating, locks and optional publication live under `src/workflows/`.
+Account management, dynamic replacements for standardized Quarto profiles and
+separate publication controls remain product work, not behavior implied by
+this refactor.
+
+Build a local-first, read-only reader area beyond the current operational
+Streamlit views:
 
 - conversation list, source filters and search in a sidebar;
 - selected conversation rendered as a chat timeline;

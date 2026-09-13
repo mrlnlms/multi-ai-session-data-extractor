@@ -64,6 +64,9 @@ Nao conclua que houve consolidacao apenas pelo nome, idade ou status do arquivo.
   `src/operations/` e nao integram o pipeline normal.
 - Interfaces Python executaveis, dashboard, entrypoints e testes reutilizam
   `src/`; nao manter uma arvore paralela em `scripts/`.
+- O Streamlit em `dashboard/` e apenas o adaptador de apresentacao. Estado e
+  perfis de dados ficam em `src/application/`; orquestracao do pipeline fica em
+  `src/workflows/`. `src/` nao importa `streamlit` nem `dashboard`.
 - Modulos `src.platforms.<source>.commands.sync` web fazem captura + assets + reconcile, mas nao
   chamam o parser quando executados diretamente.
 - O dashboard/headless executa o `parse.py` da fonte depois de sync web
@@ -71,7 +74,7 @@ Nao conclua que houve consolidacao apenas pelo nome, idade ou status do arquivo.
 - Os syncs das CLIs ja fazem copy + parse.
 - Alteracoes no schema unificado e nos Parquets publicados exigem revisao dos
   impactos em consumidores downstream antes da publicacao.
-- Ao promover uma fonte, atualize `dashboard/data.py`, valide o dashboard
+- Ao promover uma fonte, atualize `src/platforms/registry.py`, valide o dashboard
   Streamlit e os relatorios Quarto. Nao declare a pipeline verde se o parquet
   estiver anterior a `raw` ou `merged`.
 - Rode a suite de testes antes de merge; nao fixe quantidades de testes na

@@ -13,8 +13,9 @@ from pathlib import Path
 from typing import Optional
 
 from src.platforms.registry import KNOWN_PLATFORMS, SCRIPT_PREFIX
+from src.runtime.project import find_project_root
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = find_project_root(Path(__file__))
 DATA_RAW = PROJECT_ROOT / "data" / "raw"
 DATA_MERGED = PROJECT_ROOT / "data" / "merged"
 DATA_PROCESSED = PROJECT_ROOT / "data" / "processed"

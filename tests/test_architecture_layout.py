@@ -1,9 +1,10 @@
 from pathlib import Path
+import ast
 
 import pytest
 
-from dashboard.data import KNOWN_PLATFORMS
-from dashboard.sync import WEB_PLATFORMS, parse_command, sync_command
+from src.platforms.registry import KNOWN_PLATFORMS
+from src.workflows.execution import WEB_PLATFORMS, parse_command, sync_command
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -97,6 +98,42 @@ def test_exceptional_operation_is_importable():
 
 def test_generic_tools_namespace_is_absent():
     assert not (PROJECT_ROOT / "src" / "tools").exists()
+
+
+def test_src_is_independent_from_presentation_frameworks():
+    offenders = []
+    for path in (PROJECT_ROOT / "src").rglob("*.py"):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                names = [node.module or ""]
+            else:
+                continue
+            if any(name == "streamlit" or name.startswith("dashboard") for name in names):
+                offenders.append(path.relative_to(PROJECT_ROOT))
+                break
+    assert offenders == []
+
+
+def test_dashboard_does_not_import_mutating_workflow_execution_primitives():
+    forbidden = {
+        "acquire_pipeline_lock", "release_pipeline_lock", "run_sync_streaming",
+        "run_unify_streaming", "run_quarto_streaming", "run_publish_streaming",
+    }
+    offenders = []
+    for path in (PROJECT_ROOT / "dashboard").rglob("*.py"):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module == "src.workflows.execution"
+                and any(alias.name in forbidden for alias in node.names)
+            ):
+                offenders.append(path.relative_to(PROJECT_ROOT))
+                break
+    assert offenders == []
 
 
 def test_operational_command_map_covers_nonroutine_commands():

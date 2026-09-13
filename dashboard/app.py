@@ -11,9 +11,9 @@ import webbrowser
 
 import streamlit as st
 
-from dashboard.data import discover_platforms, load_platform_state
 from dashboard.pages import overview, platform
-from dashboard.sync import quarto_installed
+from src.application.platforms import discover_platforms, load_platform_state
+from src.workflows.execution import quarto_installed
 from src.workflows.serve_reports import DEFAULT_PORT, is_running, start_server, stop_server
 
 

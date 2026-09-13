@@ -2,7 +2,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 
-from dashboard.data import CaptureRun, PlatformState, _load_capture_log
+from src.application.platforms import CaptureRun, PlatformState, _load_capture_log
 
 
 def _capture(*, days_ago: int = 0, errors: int = 0) -> CaptureRun:

@@ -67,6 +67,11 @@ configuração operacional, não a estrutura principal de navegação do arquivo
    melhora os dados que essas análises consomem, sem tentar predeterminar seus
    métodos.
 
+O Streamlit atual e um frontend de prototipacao, nao a fronteira do dominio.
+Ele consome servicos importaveis de observacao, metricas e execucao em `src/`.
+Essa separacao preserva a experiencia operacional existente e permite trocar a
+interface no futuro sem reimplementar o pipeline ou suas regras de preservacao.
+
 ## 3. Camadas de dados
 
 ```text
@@ -347,9 +352,12 @@ paralelo.
 
 ## 7. Análise exploratória com Quarto
 
-Depois da curadoria, os dados organizados ficam disponíveis para análises em
-Quarto/notebooks neste repositório, como já ocorre hoje aqui e no projeto de
-referência. A análise não é uma quarta área fechada da aplicação.
+Depois da curadoria, os dados organizados podem ficar disponíveis para análises
+autorais em Quarto/notebooks, como ocorre no projeto de referência. Os perfis
+padronizados existentes neste repositório não obrigam a aplicação futura a usar
+uma página estática por plataforma ou conta; visualizações estáveis podem ser
+páginas dinâmicas. A análise exploratória não é uma quarta área fechada da
+aplicação.
 
 A fronteira é funcional:
 

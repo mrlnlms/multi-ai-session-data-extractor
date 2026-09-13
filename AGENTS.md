@@ -64,6 +64,10 @@ arquivo.
   `src/operations/` e nao integram o pipeline normal.
 - Interfaces Python executaveis, dashboard, entrypoints e testes reutilizam
   `src/`; nao manter uma arvore paralela em `scripts/`.
+- O Streamlit em `dashboard/` e um adaptador de apresentacao: chamadas `st.*`
+  ficam ali. Observacao de plataformas e perfis de dados ficam em
+  `src/application/`; ordem, gating, locks e publicacao do pipeline ficam em
+  `src/workflows/`. Modulos em `src/` nao importam `streamlit` nem `dashboard`.
 - Os modulos `src.platforms.<source>.commands.sync` das fontes web fazem captura + assets +
   reconcile e nao chamam o parser quando executados diretamente. O pipeline
   do dashboard/headless executa automaticamente o `parse.py` da fonte depois
@@ -72,7 +76,7 @@ arquivo.
 - Este projeto publica o contrato de dados unificado. Mudancas de schema ou
   de Parquets publicados devem ter seus impactos em consumidores downstream
   revisados antes da publicacao.
-- Toda plataforma promovida deve aparecer em `dashboard/data.py`, no dashboard
+- Toda plataforma promovida deve aparecer em `src/platforms/registry.py`, no dashboard
   Streamlit e nos relatorios Quarto. O dashboard e iniciado por
   `PYTHONPATH=. .venv/bin/streamlit run dashboard/app.py`.
 - Nao declarar uma pipeline verde se o parquet for anterior ao raw/merged.

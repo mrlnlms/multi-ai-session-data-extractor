@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from dashboard.data import PlatformState, directory_size_bytes
+from src.application.platforms import PlatformState, directory_size_bytes
 
 
 @dataclass

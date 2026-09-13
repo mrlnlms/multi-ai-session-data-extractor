@@ -15,8 +15,8 @@ from dashboard.components import (
     relative_time,
 )
 from dashboard import quarto
-from dashboard.data import PlatformState, directory_size_bytes
-from dashboard.metrics import (
+from src.application.platforms import PlatformState, directory_size_bytes
+from src.application.profiles import (
     compute_merged_stats,
     compute_account_summary,
     compute_processed_stats,
@@ -24,7 +24,7 @@ from dashboard.metrics import (
     discovery_drop_flag,
 )
 from dashboard.pipeline import render_last_run_summary, run_full_pipeline
-from dashboard.sync import has_sync_script, sync_command
+from src.workflows.execution import has_sync_script, sync_command
 
 
 @st.cache_data(show_spinner=False)

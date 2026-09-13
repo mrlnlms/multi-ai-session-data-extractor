@@ -1,19 +1,4 @@
-"""Pipeline 4-stage: sync + parse (1+ plats) -> unify -> quarto -> publish.
-
-Reusado por:
-- `pages/overview.py` — "Update all" com todas plataformas
-- `pages/platform.py` — "Run full pipeline (this platform)" com 1 plat
-
-Side-effects Streamlit (st.markdown, st.empty, etc) — chamar de dentro de
-um render(). Lockfile (`.runtime/locks/pipeline.lock`) previne segunda execucao
-concorrente. Gating: stages 2-4 abortam se anterior falhou (exceto Stage 3
-quarto-missing = skipped benigno).
-
-A unica diferenca entre "Update all" e "1 plat" eh o tamanho de `targets`.
-Stages 2-4 rodam sempre que algum sync (>= 1) deu OK — porque eles
-materializam `data/unified/`, renderizam Quarto e versionam via DVC, e
-isso depende do estado agregado, nao da plat sincronizada.
-"""
+"""Streamlit presentation adapter for the UI-neutral operational pipeline."""
 from __future__ import annotations
 
 import webbrowser
@@ -23,31 +8,20 @@ from typing import Optional
 import pandas as pd
 import streamlit as st
 
-from dashboard.data import PROJECT_ROOT, PlatformState
 from dashboard.progress import parse_progress
 from dashboard.quarto import report_server_base_url
-from src.workflows.execution import (
-    acquire_pipeline_lock,
-    quarto_installed,
-    release_pipeline_lock,
-    run_publish_streaming,
-    run_quarto_streaming,
-    run_sync_streaming,
-    run_unify_streaming,
-)
+from src.application.platforms import PlatformState
 from src.workflows.pipeline import (
-    STAGE_KEYS,
     STAGE_NAMES,
-    commit_msg_for_scope,
-    persist_run,
+    PipelineEvent,
+    PipelineRequest,
+    PipelineResult,
     recent_runs,
+    run_pipeline,
 )
 from src.workflows.serve_reports import start_server
 
-# Mapeamento centralizado pra evitar bugs de inconsistencia entre painel
-# macro e summary expander. "aborted" = nao rodou por causa de falha anterior;
-# "skipped" = pulou intencionalmente (sem prejuizo, ex: quarto nao instalado).
-BADGES: dict[str, str] = {
+BADGES = {
     "pending": "⚪",
     "running": "⏳",
     "done": "✅",
@@ -61,84 +35,74 @@ BADGES: dict[str, str] = {
 
 def _stages_markdown(status: list[str], current_idx: Optional[int]) -> str:
     lines = ["**Pipeline progress**", ""]
-    for i, name in enumerate(STAGE_NAMES):
-        marker = "▶" if i == current_idx else " "
-        lines.append(f"{marker} {BADGES.get(status[i], '•')} Stage {i+1}/4 — {name}")
+    for index, name in enumerate(STAGE_NAMES):
+        marker = "▶" if index == current_idx else " "
+        lines.append(
+            f"{marker} {BADGES.get(status[index], '•')} "
+            f"Stage {index + 1}/4 — {name}"
+        )
     return "\n\n".join(lines)
 
 
-def _save_summary(stage_status: list[str], results: list[dict], publish_after: bool, scope: str) -> None:
-    """Persiste resumo da ultima execucao em session_state pra render
-    posterior. `scope` = 'all' | 'platform:<name>' identifica origem.
-    Tambem grava em `.runtime/pipeline-runs.jsonl` pra historico."""
-    summary = {
+def _save_summary(result: PipelineResult, publish_after: bool, scope: str) -> None:
+    st.session_state["pipeline_summary"] = {
         "at": datetime.now(timezone.utc).isoformat(),
-        "stage_status": list(stage_status),
+        "stage_status": list(result.stage_status),
         "stage_names": list(STAGE_NAMES),
-        "results": results,
+        "results": list(result.results),
         "publish": publish_after,
         "scope": scope,
     }
-    st.session_state["pipeline_summary"] = summary
-    persist_run(stage_status, results, publish_after, scope)
 
 
 def render_recent_runs_section(limit: int = 10) -> None:
-    """Renderiza tabela das ultimas N runs (overview/platform). Skip se vazio."""
     runs = recent_runs(limit)
     if not runs:
         return
     st.subheader("Recent pipeline runs")
-    rows = []
-    for r in runs:
-        stages = " ".join(BADGES.get(s, "•") for s in r.get("stage_status", []))
-        rows.append({
-            "When": r.get("at", "")[:19].replace("T", " "),
-            "Scope": r.get("scope", ""),
-            "Stages": stages,
-            "Publish": "✓" if r.get("publish") else "—",
-        })
+    rows = [
+        {
+            "When": run.get("at", "")[:19].replace("T", " "),
+            "Scope": run.get("scope", ""),
+            "Stages": " ".join(
+                BADGES.get(status, "•") for status in run.get("stage_status", [])
+            ),
+            "Publish": "✓" if run.get("publish") else "—",
+        }
+        for run in runs
+    ]
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
 
 def render_last_run_summary() -> None:
-    """Mostra resumo da ultima execucao do pipeline (persistido via
-    session_state). Aparece tanto em overview quanto em platform page."""
     summary = st.session_state.get("pipeline_summary")
     if not summary:
         return
-    stage_status = summary.get("stage_status", [])
-    stage_names = summary.get("stage_names", STAGE_NAMES)
-    results = summary.get("results", [])
+    statuses = summary.get("stage_status", [])
     scope = summary.get("scope", "all")
-    any_fail = any(s in ("failed", "error", "aborted") for s in stage_status)
+    failed = any(status in ("failed", "error", "aborted") for status in statuses)
     scope_label = "all platforms" if scope == "all" else scope.replace("platform:", "")
-    header_base = f"Last pipeline run ({scope_label})"
-    header = f"{header_base} — completed with errors" if any_fail else f"{header_base} — completed"
-    icon = "⚠️" if any_fail else "✅"
-    with st.expander(f"{icon} {header}", expanded=any_fail):
-        # Painel macro: 4 stages
+    ending, icon = ("completed with errors", "⚠️") if failed else ("completed", "✅")
+    with st.expander(f"{icon} Last pipeline run ({scope_label}) — {ending}", expanded=failed):
         st.markdown("**Pipeline progress**")
-        for i, (name, status) in enumerate(zip(stage_names, stage_status)):
-            st.write(f"{BADGES.get(status, '•')} Stage {i+1}/4 — {name}")
-        # Detalhes por stage
+        stage_rows = zip(summary.get("stage_names", STAGE_NAMES), statuses)
+        for index, (name, status) in enumerate(stage_rows):
+            st.write(f"{BADGES.get(status, '•')} Stage {index + 1}/4 — {name}")
+        results = summary.get("results", [])
         if results:
             st.markdown("---")
             st.caption("Details:")
-            by_stage: dict[str, list[dict]] = {}
-            for r in results:
-                by_stage.setdefault(r.get("stage", "?"), []).append(r)
-            for stage_key, items in by_stage.items():
-                st.markdown(f"**{stage_key}**")
-                for r in items:
-                    badge = BADGES.get(r["status"], "•")
-                    detail = f" — {r['detail']}" if r.get("detail") else ""
-                    st.write(f"{badge} {r['step']}{detail}")
-                    tail = r.get("tail", "")
-                    # Expander com tail so pra falhas — diagnostico
-                    if tail and r["status"] in ("failed", "error"):
-                        with st.expander(f"  ↳ tail of {r['step']}", expanded=False):
-                            st.code(tail, language=None)
+            grouped: dict[str, list[dict]] = {}
+            for row in results:
+                grouped.setdefault(row.get("stage", "?"), []).append(row)
+            for stage, items in grouped.items():
+                st.markdown(f"**{stage}**")
+                for row in items:
+                    detail = f" — {row['detail']}" if row.get("detail") else ""
+                    st.write(f"{BADGES.get(row['status'], '•')} {row['step']}{detail}")
+                    if row.get("tail") and row["status"] in ("failed", "error"):
+                        with st.expander(f"  ↳ tail of {row['step']}", expanded=False):
+                            st.code(row["tail"], language=None)
         col1, col2, _ = st.columns([1, 1, 4])
         if col1.button("🔄 Reload dashboard data", key="reload_after_pipeline"):
             st.cache_data.clear()
@@ -149,350 +113,142 @@ def render_last_run_summary() -> None:
             st.rerun()
 
 
-def run_full_pipeline(
-    targets: list[PlatformState],
-    publish_after: bool,
-    scope: str = "all",
-) -> None:
-    """Roda o pipeline completo: sync (1+ plats) -> unify -> quarto -> publish.
+class _StreamlitPipelineView:
+    """Translate workflow events into live Streamlit widgets."""
 
-    - `targets`: 1 ou N plats com `sync_command` disponivel.
-    - `publish_after`: liga/desliga Stage 4.
-    - `scope`: 'all' ou 'platform:<name>' — pra summary saber o contexto.
+    def __init__(self, statuses: list[str], scope: str) -> None:
+        self.statuses, self.scope = statuses, scope
+        self.warning_box, self.stages_box = st.empty(), st.empty()
+        self.boxes: dict[tuple[int, str], object] = {}
+        self.tails: dict[tuple[int, str], list[str]] = {}
+        self.bars: dict[int, object] = {}
+        self.sync_rows: list[dict[str, str]] = []
+        self.sync_bar = None
 
-    Lockfile protege contra duplo-run. Gating de stages aborta pipeline
-    cedo se algo critico falhar — nao commita estado quebrado.
-    """
-    lock_err = acquire_pipeline_lock()
-    if lock_err:
-        st.error(f"❌ {lock_err}")
-        return
+    def __call__(self, event: PipelineEvent) -> None:
+        if event.kind == "lock_error":
+            st.error(f"❌ {event.message}")
+            return
+        if event.kind == "started":
+            self.warning_box.warning(
+                "⚠️ Pipeline running (4 stages) — don't close this tab."
+            )
+            self.stages_box.markdown(_stages_markdown(self.statuses, None))
+            count = event.total or 0
+            suffix = "s" if count != 1 else ""
+            st.markdown(f"### Stage 1/4 — Sync + parse ({count} platform{suffix})")
+            self.sync_bar = st.progress(0.0, text=f"0 / {count} platforms")
+            return
+        if event.kind == "stage_started" and event.stage_index is not None:
+            st.markdown(
+                f"### Stage {event.stage_index + 1}/4 — {STAGE_NAMES[event.stage_index]}"
+            )
+            return
+        if event.kind == "stage_status" and event.stage_index is not None:
+            self.statuses[event.stage_index] = event.status or "pending"
+            current = event.stage_index if event.status == "running" else None
+            self.stages_box.markdown(_stages_markdown(self.statuses, current))
+            return
+        if event.kind == "output" and event.stage_index is not None:
+            self._output(event)
+            return
+        if event.kind == "sync_progress" and self.sync_bar is not None:
+            done, total = event.completed or 0, event.total or 1
+            self.sync_bar.progress(done / total, text=f"{done} / {total} platforms")
+            return
+        if event.kind == "step_result":
+            self._result(event)
+            return
+        if event.kind == "report_ready":
+            try:
+                start_server()
+                webbrowser.open(_get_auto_open_url(self.scope))
+            except Exception as exc:  # noqa: BLE001
+                st.warning(f"⚠️ Quarto ok, but failed to auto-open browser: {exc}")
+            return
+        if event.kind == "finished":
+            if self.sync_bar is not None:
+                self.sync_bar.empty()
+            if self.sync_rows:
+                st.markdown("**Stage 1 results**")
+                st.dataframe(
+                    pd.DataFrame(self.sync_rows), hide_index=True, width="stretch"
+                )
+            for widget in (*self.boxes.values(), *self.bars.values()):
+                widget.empty()
+            self.warning_box.empty()
 
-    try:
-        _execute_pipeline(targets, publish_after, scope)
-    finally:
-        release_pipeline_lock()
-
-
-def _execute_pipeline(targets: list[PlatformState], publish_after: bool, scope: str) -> None:
-    needs_browser = [s.name for s in targets if s.name in ("ChatGPT", "Perplexity")]
-    if needs_browser:
-        st.info(
-            f"ℹ️ {', '.join(needs_browser)} vai abrir browser visivel "
-            f"(Cloudflare). Acompanhe — pode precisar interacao manual."
+    def _output(self, event: PipelineEvent) -> None:
+        label, stage = event.platform or "stage", event.stage_index or 0
+        key = (stage, label)
+        tail = self.tails.setdefault(key, [])
+        tail.append(event.line or "")
+        del tail[:-20]
+        box = self.boxes.setdefault(key, st.empty())
+        progress, progress_text = parse_progress(event.line or ""), ""
+        if progress is not None:
+            done, total = progress
+            ratio = min(done / total, 1)
+            progress_text = f"\n\nProgress: {done} / {total} ({int(ratio * 100)}%)"
+            if stage in (2, 3):
+                bar = self.bars.setdefault(
+                    stage,
+                    st.progress(0.0, text=f"stage {stage + 1}: starting…"),
+                )
+                bar.progress(ratio, text=f"stage {stage + 1}: {done} / {total}")
+        tail_text = "\n".join(tail[-12:])
+        box.markdown(
+            f"**Stage {stage + 1} — running: `{label}`**{progress_text}"
+            f"\n\n```\n{tail_text}\n```"
         )
 
-    warning_box = st.empty()
-    warning_box.warning("⚠️ Pipeline running (4 stages) — don't close this tab.")
+    def _result(self, event: PipelineEvent) -> None:
+        if event.stage_index == 0 and event.platform:
+            ok = event.status == "ok"
+            self.sync_rows.append(
+                {
+                    " ": BADGES["ok" if ok else "failed"],
+                    "Platform": event.platform,
+                    "Status": "ok" if ok else f"failed ({event.message})",
+                }
+            )
+        elif event.status == "ok":
+            st.success(f"✅ {STAGE_NAMES[event.stage_index or 0]} ok")
+        elif event.status == "skipped":
+            st.info(event.message or "Stage skipped")
+        elif event.status == "aborted":
+            st.warning(f"⏭️ {event.message}")
+        elif event.status == "failed":
+            st.error(f"❌ {event.message or 'Stage failed'}")
 
-    stage_status: list[str] = ["pending"] * 4
+
+def run_full_pipeline(
+    targets: list[PlatformState], publish_after: bool, scope: str = "all"
+) -> None:
+    headed = [
+        state.name for state in targets if state.name in ("ChatGPT", "Perplexity")
+    ]
+    if headed:
+        st.info(
+            f"ℹ️ {', '.join(headed)} vai abrir browser visivel (Cloudflare). "
+            "Acompanhe — pode precisar interacao manual."
+        )
+    statuses = ["pending"] * 4
     if not publish_after:
-        stage_status[3] = "skipped"
-    stages_box = st.empty()
-    stages_box.markdown(_stages_markdown(stage_status, current_idx=None))
-
-    results: list[dict] = []
-
-    def _set_stage(idx: int, status: str) -> None:
-        stage_status[idx] = status
-        current = idx if status == "running" else None
-        stages_box.markdown(_stages_markdown(stage_status, current_idx=current))
-
-    # =================== Stage 1/4 — Sync + parse platforms ===================
-    stage1_title = (
-        f"### Stage 1/4 — Sync + parse ({len(targets)} platform{'s' if len(targets) != 1 else ''})"
+        statuses[3] = "skipped"
+    result = run_pipeline(
+        PipelineRequest(tuple(state.name for state in targets), publish_after, scope),
+        emit=_StreamlitPipelineView(statuses, scope),
     )
-    st.markdown(stage1_title)
-    _set_stage(0, "running")
-    stage1_bar = st.progress(0.0, text=f"0 / {len(targets)} platforms")
-    current_plat_box = st.empty()
-
-    sync_rows: list[dict] = []
-    any_sync_ok = False
-    any_sync_fail = False
-
-    for i, s in enumerate(targets):
-        tail_lines: list[str] = []
-
-        def _on_line(line: str, _tail=tail_lines, _name=s.name, _box=current_plat_box):
-            _tail.append(line)
-            if len(_tail) > 15:
-                del _tail[:-15]
-            p = parse_progress(line)
-            progress_str = ""
-            if p is not None:
-                done, total = p
-                pct = int(min(done / total, 1.0) * 100)
-                progress_str = f"\n\nProgress: {done} / {total} ({pct}%)"
-            tail_text = "\n".join(_tail[-8:])
-            _box.markdown(
-                f"**Stage 1 — running:** `{_name}`{progress_str}\n\n```\n{tail_text}\n```"
-            )
-
-        try:
-            rc, tail = run_sync_streaming(s.name, on_line=_on_line)
-        except Exception as e:  # noqa: BLE001
-            rc, tail = -1, f"exception: {e}"
-
-        status = "ok" if rc == 0 else "failed"
-        sync_rows.append({
-            " ": BADGES["ok"] if rc == 0 else BADGES["failed"],
-            "Platform": s.name,
-            "Status": "ok" if rc == 0 else f"failed (rc={rc})",
-        })
-        results.append({
-            "stage": STAGE_KEYS[0],
-            "step": s.name,
-            "status": status,
-            "detail": "" if rc == 0 else f"rc={rc}",
-            "tail": tail[-10000:],
-        })
-        if rc == 0:
-            any_sync_ok = True
-        else:
-            any_sync_fail = True
-
-        stage1_bar.progress((i + 1) / len(targets), text=f"{i+1} / {len(targets)} platforms")
-
-    current_plat_box.empty()
-    stage1_bar.empty()
-
-    st.markdown("**Stage 1 results**")
-    st.dataframe(pd.DataFrame(sync_rows), hide_index=True, width="stretch")
-
-    # Aborta pipeline so se TODAS plats falharam — falhas parciais sao
-    # toleradas, parquets das plats OK ainda valem unify.
-    if not any_sync_ok:
-        _set_stage(0, "failed")
-        st.error("❌ All platforms failed in Stage 1 — aborting Stages 2-4.")
-        for idx, stage_name in [(1, "2/4 Unify"), (2, "3/4 Quarto")]:
-            _set_stage(idx, "aborted")
-            results.append({
-                "stage": stage_name, "step": "abort", "status": "aborted",
-                "detail": "all stage 1 platforms failed", "tail": "",
-            })
-        if publish_after:
-            _set_stage(3, "aborted")
-            results.append({
-                "stage": STAGE_KEYS[3], "step": "abort", "status": "aborted",
-                "detail": "all stage 1 platforms failed", "tail": "",
-            })
-        warning_box.empty()
-        _save_summary(stage_status, results, publish_after, scope)
-        return
-
-    _set_stage(0, "failed" if any_sync_fail else "done")
-
-    # =================== Stage 2/4 — Unify parquets ===================
-    st.markdown(f"### Stage 2/4 — {STAGE_NAMES[1]}")
-    _set_stage(1, "running")
-    unify_box = st.empty()
-    unify_tail: list[str] = []
-
-    def _unify_on_line(line: str, _tail=unify_tail, _box=unify_box):
-        _tail.append(line)
-        if len(_tail) > 20:
-            del _tail[:-20]
-        tail_text = "\n".join(_tail[-12:])
-        _box.markdown(f"**Stage 2 — unify-parquets**\n\n```\n{tail_text}\n```")
-
-    try:
-        rc, unify_full_tail = run_unify_streaming(_unify_on_line)
-    except Exception as e:  # noqa: BLE001
-        rc, unify_full_tail = -1, f"exception: {e}"
-    unify_box.empty()
-
-    if rc != 0:
-        st.error(f"❌ unify failed (rc={rc}). tail:\n```\n{unify_full_tail[-800:]}\n```")
-        results.append({
-            "stage": STAGE_KEYS[1], "step": "unify-parquets", "status": "failed",
-            "detail": f"rc={rc}", "tail": unify_full_tail[-10000:],
-        })
-        _set_stage(1, "failed")
-        _set_stage(2, "aborted")
-        results.append({
-            "stage": STAGE_KEYS[2], "step": "quarto-render", "status": "aborted",
-            "detail": "stage 2 unify failed", "tail": "",
-        })
-        if publish_after:
-            _set_stage(3, "aborted")
-            results.append({
-                "stage": STAGE_KEYS[3], "step": "publish", "status": "aborted",
-                "detail": "stage 2 unify failed", "tail": "",
-            })
-        warning_box.empty()
-        _save_summary(stage_status, results, publish_after, scope)
-        return
-
-    st.success("✅ unify ok")
-    results.append({
-        "stage": STAGE_KEYS[1], "step": "unify-parquets", "status": "ok",
-        "detail": "", "tail": "",
-    })
-    _set_stage(1, "done")
-
-    # =================== Stage 3/4 — Quarto render ===================
-    st.markdown(f"### Stage 3/4 — {STAGE_NAMES[2]}")
-    stage3_ok = True
-    # Filter incremental: sync de 1 plat re-renderiza so qmds dela + cross-
-    # overview. Update all (scope='all') re-renderiza tudo.
-    quarto_filter: Optional[list[str]] = (
-        [t.name for t in targets] if scope.startswith("platform:") else None
-    )
-    if not quarto_installed():
-        st.info("Quarto CLI not in PATH — skipping render. Install: `brew install quarto-cli`.")
-        results.append({
-            "stage": STAGE_KEYS[2], "step": "quarto-render", "status": "skipped",
-            "detail": "quarto CLI not installed", "tail": "",
-        })
-        _set_stage(2, "skipped")
-    else:
-        _set_stage(2, "running")
-        if quarto_filter:
-            st.caption(
-                f"Incremental: rendering qmds of `{', '.join(quarto_filter)}` + cross-overviews."
-            )
-        q_bar = st.progress(0.0, text="quarto: starting…")
-        q_box = st.empty()
-        q_tail: list[str] = []
-
-        def _q_on_line(line: str, _bar=q_bar, _box=q_box, _tail=q_tail):
-            _tail.append(line)
-            if len(_tail) > 20:
-                del _tail[:-20]
-            tail_text = "\n".join(_tail[-12:])
-            _box.markdown(f"**Stage 3 — quarto render**\n\n```\n{tail_text}\n```")
-            p = parse_progress(line)
-            if p is not None:
-                done, total = p
-                pct = min(done / total, 1.0)
-                _bar.progress(pct, text=f"quarto: {done} / {total} qmds ({int(pct*100)}%)")
-
-        try:
-            rc, q_summary = run_quarto_streaming(_q_on_line, platforms_filter=quarto_filter)
-        except Exception as e:  # noqa: BLE001
-            rc, q_summary = -1, f"exception: {e}"
-        q_bar.empty(); q_box.empty()
-
-        if rc != 0:
-            st.error(f"❌ quarto render had failures: {q_summary}")
-            results.append({
-                "stage": STAGE_KEYS[2], "step": "quarto-render", "status": "failed",
-                "detail": q_summary[:300], "tail": q_summary[-10000:],
-            })
-            _set_stage(2, "failed")
-            stage3_ok = False
-        else:
-            st.success(f"✅ quarto ok — {q_summary}")
-            results.append({
-                "stage": STAGE_KEYS[2], "step": "quarto-render", "status": "ok",
-                "detail": q_summary, "tail": "",
-            })
-            _set_stage(2, "done")
-
-            # Auto-open report in a new tab (intelligent routing)
-            try:
-                # 1. Start/Ensure server is up
-                start_server()
-                # 2. Determine target URL
-                url = _get_auto_open_url(scope)
-                # 3. Open in browser
-                webbrowser.open(url)
-            except Exception as e:
-                st.warning(f"⚠️ Quarto ok, but failed to auto-open browser: {e}")
-
-    _run_publish_stage(
-        publish_after=publish_after,
-        stage3_ok=stage3_ok,
-        results=results,
-        set_stage=_set_stage,
-        scope=scope,
-    )
-
-    warning_box.empty()
-    _save_summary(stage_status, results, publish_after, scope)
+    if result.lock_error is None:
+        _save_summary(result, publish_after, scope)
 
 
 def _get_auto_open_url(scope: str) -> str:
-    """Retorna a URL do localhost:8765 baseada no escopo da run.
-    'all' -> 00-overview.html
-    'platform:ChatGPT' -> chatgpt.html
-    """
     base_url = report_server_base_url()
     if scope == "all":
         return f"{base_url}/00-overview.html"
     if scope.startswith("platform:"):
-        plat = scope.split(":", 1)[1]
-        # 'Claude.ai' -> 'claude-ai', 'Gemini CLI' -> 'gemini-cli'
-        slug = plat.lower().replace(".", "-").replace(" ", "-")
+        slug = scope.split(":", 1)[1].lower().replace(".", "-").replace(" ", "-")
         return f"{base_url}/{slug}.html"
     return f"{base_url}/00-overview.html"
-
-
-def _run_publish_stage(
-    publish_after: bool,
-    stage3_ok: bool,
-    results: list[dict],
-    set_stage,
-    scope: str,
-) -> None:
-    # =================== Stage 4/4 — Publish (DVC + git) ===================
-    st.markdown(f"### Stage 4/4 — {STAGE_NAMES[3]}")
-    if not publish_after:
-        st.info(
-            "Publish skipped (checkbox unchecked). The consumer project won't see "
-            "new data via `dvc import` until you run it."
-        )
-        results.append({
-            "stage": STAGE_KEYS[3], "step": "publish", "status": "skipped",
-            "detail": "checkbox unchecked", "tail": "",
-        })
-    elif not stage3_ok:
-        st.warning(
-            "⏭️ Publish aborted — Quarto stage failed. Resolve quarto issues then re-run."
-        )
-        results.append({
-            "stage": STAGE_KEYS[3], "step": "publish", "status": "aborted",
-            "detail": "stage 3 quarto failed", "tail": "",
-        })
-        set_stage(3, "aborted")
-    else:
-        set_stage(3, "running")
-        pub_bar = st.progress(0.0, text="publish: starting…")
-        pub_box = st.empty()
-        pub_tail: list[str] = []
-
-        def _pub_on_line(line: str, _bar=pub_bar, _box=pub_box, _tail=pub_tail):
-            _tail.append(line)
-            if len(_tail) > 20:
-                del _tail[:-20]
-            tail_text = "\n".join(_tail[-12:])
-            _box.markdown(f"**Stage 4 — publish**\n\n```\n{tail_text}\n```")
-            p = parse_progress(line)
-            if p is not None:
-                done, total = p
-                pct = min(done / total, 1.0)
-                _bar.progress(pct, text=f"publish: step {done} / {total}")
-
-        try:
-            rc, pub_summary = run_publish_streaming(
-                _pub_on_line, commit_msg=commit_msg_for_scope(scope)
-            )
-        except Exception as e:  # noqa: BLE001
-            rc, pub_summary = -1, f"exception: {e}"
-        pub_bar.empty(); pub_box.empty()
-
-        if rc != 0:
-            st.error(f"❌ publish failed:\n```\n{pub_summary[-800:]}\n```")
-            results.append({
-                "stage": STAGE_KEYS[3], "step": "publish", "status": "failed",
-                "detail": pub_summary[:200], "tail": pub_summary[-10000:],
-            })
-            set_stage(3, "failed")
-        else:
-            st.success(f"✅ publish ok — {pub_summary}")
-            results.append({
-                "stage": STAGE_KEYS[3], "step": "publish", "status": "ok",
-                "detail": pub_summary, "tail": "",
-            })
-            set_stage(3, "done")

@@ -1,4 +1,4 @@
-"""Tests do dashboard.metrics — foco em discovery_drop_flag.
+"""Tests for the UI-neutral data profile service.
 
 Bug historico (2026-05-11): discovery_drop_flag misturava runs de contas
 diferentes em plataformas multi-conta (Gemini/NotebookLM). Comparava
@@ -9,9 +9,8 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-from dashboard.data import CaptureRun, PlatformState
-from dashboard.metrics import discovery_drop_flag
-from dashboard.metrics import compute_account_summary
+from src.application.platforms import CaptureRun, PlatformState
+from src.application.profiles import compute_account_summary, discovery_drop_flag
 
 
 def _run(started: datetime, total: int, mode: str = "incremental", account: str | None = None) -> CaptureRun:
@@ -105,7 +104,7 @@ def test_load_capture_log_parses_notebooklm_schema(tmp_path):
     None — drop_flag nunca disparava pra NotebookLM mesmo com drop real.
     """
     import json as _json
-    from dashboard.data import _load_capture_log
+    from src.application.platforms import _load_capture_log
 
     log = tmp_path / "capture_log.jsonl"
     log.write_text(_json.dumps({
