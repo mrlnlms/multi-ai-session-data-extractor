@@ -1,8 +1,8 @@
 """Reconciler Grok standalone (pasta unica).
 
 Uso:
-    python scripts/grok-reconcile.py            # raw=data/raw/Grok/
-    python scripts/grok-reconcile.py --full
+    python scripts/platform/grok/reconcile.py            # raw=data/raw/Grok/
+    python scripts/platform/grok/reconcile.py --full
 """
 
 import argparse
@@ -27,7 +27,7 @@ def main():
 
     raw = Path(args.raw_dir) if args.raw_dir else account_data_dir(RAW_DIR, args.account)
     if not raw.exists() or not (raw / "discovery_ids.json").exists():
-        print(f"ERRO: raw nao encontrado em {raw}. Rode scripts/grok-export.py primeiro.")
+        print(f"ERRO: raw nao encontrado em {raw}. Rode scripts/platform/grok/export.py primeiro.")
         sys.exit(1)
     print(f"Raw: {raw}")
 

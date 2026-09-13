@@ -34,4 +34,4 @@ async def login(profile_name: str = "default") -> None:
         await context.wait_for_event("close", timeout=0)
 
     print(f"Browser fechado. Sessao salva em {profile_dir}")
-    print("Agora rode: python scripts/chatgpt-export.py")
+    print("Agora rode: python scripts/platform/chatgpt/export.py")

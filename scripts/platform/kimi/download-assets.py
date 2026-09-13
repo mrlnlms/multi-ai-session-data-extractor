@@ -1,10 +1,10 @@
 """Download dos files inline em chat.files[] (Kimi).
 
-Pre-requisito: scripts/kimi-export.py rodou e populou conversations/.
+Pre-requisito: scripts/platform/kimi/export.py rodou e populou conversations/.
 
 Uso:
-    python scripts/kimi-download-assets.py
-    python scripts/kimi-download-assets.py --no-skip
+    python scripts/platform/kimi/download-assets.py
+    python scripts/platform/kimi/download-assets.py --no-skip
 """
 
 import argparse

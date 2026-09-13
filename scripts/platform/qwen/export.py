@@ -1,6 +1,6 @@
 """Export Qwen via API interna.
 
-Uso: python scripts/qwen-export.py [--full] [--smoke N]
+Uso: python scripts/platform/qwen/export.py [--full] [--smoke N]
 
 Default: incremental (compara updated_at com dump anterior).
 """

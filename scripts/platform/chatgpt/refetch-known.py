@@ -9,7 +9,7 @@ discovery cai >20% vs baseline (substitui o antigo fail-fast). Use o script
 standalone quando quiser disparar manualmente fora do sync.
 
 Uso:
-  PYTHONPATH=. .venv/bin/python scripts/chatgpt-refetch-known.py [--account default]
+  PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/refetch-known.py [--account default]
                                                                  [--batch-size 10]
 
 Limite upstream do /conversations/batch: 10 entries/request (validado
@@ -90,7 +90,7 @@ async def refetch(account: str, batch_size: int = DEFAULT_BATCH_SIZE) -> None:
     print(f"Raw atualizado: {raw_path}")
     print(f"capture_log.jsonl atualizado")
     print("\nProximo passo:")
-    print(f"  PYTHONPATH=. .venv/bin/python scripts/chatgpt-reconcile.py {raw_dir}")
+    print(f"  PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/reconcile.py {raw_dir}")
     print("  PYTHONPATH=. .venv/bin/python scripts/chatgpt-parse.py")
 
 

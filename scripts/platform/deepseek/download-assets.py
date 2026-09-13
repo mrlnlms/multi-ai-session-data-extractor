@@ -1,7 +1,7 @@
 """Baixa user uploads de um raw DeepSeek via /api/v0/file/preview.
 
 Uso:
-  python scripts/deepseek-download-assets.py [raw_dir]
+  python scripts/platform/deepseek/download-assets.py [raw_dir]
 
 Sem argumento, usa o raw mais recente em data/raw/DeepSeek Data/.
 """

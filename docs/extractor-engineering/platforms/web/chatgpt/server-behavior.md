@@ -81,7 +81,7 @@ or rate limiting at the listing endpoint. Validated empirically on
 **Pre-fix behavior** (commit `7868ddb`, 2026-04-27): orchestrator raised
 `RuntimeError("Discovery suspeita...")`. The dashboard's "Update all"
 button turned red, the user had to manually run
-`scripts/chatgpt-refetch-known.py` from the terminal. The "fail-fast"
+`scripts/platform/chatgpt/refetch-known.py` from the terminal. The "fail-fast"
 narrative and fallback were introduced in this project as a preservation
 guardrail; they are not inherited behavior from an external consumer.
 
@@ -106,7 +106,7 @@ Validated empirically: requests with 50 IDs return HTTP 422 with body
 `{"detail":[{"type":"value_error","loc":["body"],"msg":"Value error,
 conversation_ids must contain at most 10 entries"}]}`.
 
-`scripts/chatgpt-refetch-known.py` default updated 50 -> 10. The endpoint
+`scripts/platform/chatgpt/refetch-known.py` default updated 50 -> 10. The endpoint
 itself still works for state-only refresh — only the per-batch ceiling
 changed upstream.
 

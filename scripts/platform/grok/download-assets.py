@@ -1,10 +1,10 @@
 """Download dos asset binarios do Grok via assets.grok.com.
 
-Pre-requisito: scripts/grok-export.py rodou e populou assets.json.
+Pre-requisito: scripts/platform/grok/export.py rodou e populou assets.json.
 
 Uso:
-    python scripts/grok-download-assets.py
-    python scripts/grok-download-assets.py --no-skip   # re-baixa tudo
+    python scripts/platform/grok/download-assets.py
+    python scripts/platform/grok/download-assets.py --no-skip   # re-baixa tudo
 """
 
 import argparse

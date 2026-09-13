@@ -13,8 +13,8 @@ STATUS_BADGES: dict[str, str] = {
 
 STATUS_LABEL: dict[str, str] = {
     "green": "OK",
-    "yellow": "warning",
-    "red": "overdue",
+    "yellow": "attention",
+    "red": "failed",
     "gray": "never ran",
 }
 

@@ -6,7 +6,7 @@ redigido, status, formato do JSON e o tipo de rota da pagina. Nunca imprime
 cookies, headers, query strings, tokens, textos, titulos ou IDs.
 
 Uso:
-    PYTHONPATH=. .venv/bin/python scripts/dev/observe-chatgpt-traffic.py
+    PYTHONPATH=. .venv/bin/python scripts/probes/chatgpt/observe-traffic.py
 """
 
 import asyncio

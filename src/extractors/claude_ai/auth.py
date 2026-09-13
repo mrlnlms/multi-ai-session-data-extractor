@@ -46,7 +46,7 @@ async def login(profile_name: str = "default") -> None:
         await context.wait_for_event("close", timeout=0)
 
     print(f"Browser fechado. Sessao salva em {profile_dir}")
-    print("Agora rode: python scripts/claude-export.py")
+    print("Agora rode: python scripts/platform/claude-ai/export.py")
 
 
 async def load_context(profile_name: str = "default", headless: bool = True) -> tuple[BrowserContext, str]:

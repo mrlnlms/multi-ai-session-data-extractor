@@ -1,7 +1,7 @@
 """Captura ChatGPT em Python.
 
 Uso:
-    python scripts/chatgpt-export.py [--output-dir PATH] [--no-voice-pass] [--dry-run] [--full]
+    python scripts/platform/chatgpt/export.py [--output-dir PATH] [--no-voice-pass] [--dry-run] [--full]
 
 Modos (auto-detectados):
     Primeira run (sem captura anterior): brute force — fetcha todas as convs

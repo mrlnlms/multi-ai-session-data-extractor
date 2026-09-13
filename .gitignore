@@ -25,9 +25,6 @@ build/
 *.html
 notebooks/_output/
 
-# Streamlit static (HTMLs do Quarto copiados pra serving)
-static/quarto/
-
 # Positron / Playwright storage
 .storage/
 

@@ -28,10 +28,16 @@ from dvc.fs import get_cloud_fs
 from dvc.repo import Repo
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_REMOTE = "gdrive_remote"
 DEFAULT_BATCH_SIZE = 500
 DEFAULT_REQUEST_TIMEOUT = 120
-RUNTIME_ROOT = Path(".runtime/dvc-gc")
+RUNTIME_ROOT = PROJECT_ROOT / ".runtime" / "dvc-gc"
+
+
+def assert_project_root() -> None:
+    if not (PROJECT_ROOT / "src").is_dir() or not (PROJECT_ROOT / "data").is_dir():
+        raise RuntimeError(f"invalid project root resolved from script path: {PROJECT_ROOT}")
 
 
 class RequestTimedOut(TimeoutError):
@@ -297,6 +303,7 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    assert_project_root()
     args = parser().parse_args()
     if args.command == "plan":
         create_plan(args.remote)

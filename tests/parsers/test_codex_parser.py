@@ -201,3 +201,90 @@ def test_codex_idempotent(tmp_path):
     p2.write_parquets(out_dir)
     sizes_second = {p.name: p.stat().st_size for p in out_dir.glob("*.parquet")}
     assert sizes_first == sizes_second
+
+
+def test_codex_parses_response_item_messages(tmp_path):
+    lines = [
+        FIXTURE_LINES[0],
+        FIXTURE_LINES[1],
+        {"timestamp": "2026-09-12T12:35:00Z", "type": "response_item", "payload": {
+            "type": "message", "role": "developer", "content": [
+                {"type": "input_text", "text": "Internal instructions"},
+            ],
+        }},
+        {"timestamp": "2026-09-12T12:35:01Z", "type": "response_item", "payload": {
+            "type": "message", "role": "user", "content": [
+                {"type": "input_text", "text": "First paragraph"},
+                {"type": "input_image", "image_url": "data:image/png;base64,abc"},
+                {"type": "input_text", "text": "Second paragraph"},
+            ],
+        }},
+        {"timestamp": "2026-09-12T12:35:02Z", "type": "response_item", "payload": {
+            "type": "message", "role": "assistant", "content": [
+                {"type": "output_text", "text": "Current-format answer"},
+            ],
+        }},
+    ]
+    path = _write_session(tmp_path, lines)
+
+    parser = CodexParser()
+    parser.parse(path)
+
+    assert len(parser.conversations) == 1
+    assert [(m.role, m.content) for m in parser.messages] == [
+        ("user", "First paragraph\n\nSecond paragraph"),
+        ("assistant", "Current-format answer"),
+    ]
+
+
+def test_codex_legacy_messages_win_in_mixed_session(tmp_path):
+    lines = FIXTURE_LINES + [
+        {"timestamp": "2026-03-02T12:35:39.708Z", "type": "response_item", "payload": {
+            "type": "message", "role": "user", "content": [
+                {"type": "input_text", "text": "Duplicated user message"},
+            ],
+        }},
+        {"timestamp": "2026-03-02T12:36:00Z", "type": "response_item", "payload": {
+            "type": "message", "role": "assistant", "content": [
+                {"type": "output_text", "text": "Duplicated assistant message"},
+            ],
+        }},
+    ]
+    path = _write_session(tmp_path, lines)
+
+    parser = CodexParser()
+    parser.parse(path)
+
+    assert len(parser.messages) == 2
+    assert parser.messages[0].content == "Liste os arquivos do projeto."
+    assert parser.messages[1].content == "O projeto tem um README.md e uma pasta src/."
+
+
+def test_codex_reports_file_parse_coverage(tmp_path):
+    _write_session(tmp_path)
+    empty_day = tmp_path / "2026" / "03" / "03"
+    empty_day.mkdir(parents=True)
+    (empty_day / "rollout-empty.jsonl").write_text(json.dumps(FIXTURE_LINES[0]))
+
+    parser = CodexParser()
+    parser.parse(tmp_path)
+
+    assert parser.files_seen == 2
+    assert parser.files_parsed == 1
+    assert parser.files_skipped == 1
+
+
+def test_codex_uses_first_session_meta_when_rollout_contains_history(tmp_path):
+    second_meta = {
+        **FIXTURE_LINES[0],
+        "timestamp": "2026-09-12T12:35:30Z",
+        "payload": {**FIXTURE_LINES[0]["payload"], "id": "older-imported-session"},
+    }
+    lines = FIXTURE_LINES[:2] + [second_meta] + FIXTURE_LINES[2:]
+    path = _write_session(tmp_path, lines)
+
+    parser = CodexParser()
+    parser.parse(path)
+
+    assert len(parser.conversations) == 1
+    assert parser.conversations[0].conversation_id == FIXTURE_LINES[0]["payload"]["id"]

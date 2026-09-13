@@ -3,7 +3,7 @@
 IMPORTANTE: default e headless=False (janela visivel) porque Cloudflare challenge
 bloqueia headless. Use --headless se quiser tentar em bg (provavelmente falha).
 
-Uso: python scripts/perplexity-export.py [--full] [--smoke N] [--headless]
+Uso: python scripts/platform/perplexity/export.py [--full] [--smoke N] [--headless]
 """
 
 import argparse

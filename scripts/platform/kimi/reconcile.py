@@ -1,8 +1,8 @@
 """Reconciler Kimi standalone.
 
 Uso:
-    python scripts/kimi-reconcile.py
-    python scripts/kimi-reconcile.py --full
+    python scripts/platform/kimi/reconcile.py
+    python scripts/platform/kimi/reconcile.py --full
 """
 
 import argparse
@@ -25,7 +25,7 @@ def main():
 
     raw = Path(args.raw_dir) if args.raw_dir else RAW_DIR
     if not raw.exists() or not (raw / "discovery_ids.json").exists():
-        print(f"ERRO: raw nao encontrado em {raw}. Rode scripts/kimi-export.py primeiro.")
+        print(f"ERRO: raw nao encontrado em {raw}. Rode scripts/platform/kimi/export.py primeiro.")
         sys.exit(1)
     print(f"Raw: {raw}")
 

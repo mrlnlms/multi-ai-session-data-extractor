@@ -6,7 +6,7 @@ mesmo tamanho e mesmo hash) que nao compartilham o mesmo inode. Substitui
 a copia em 'merged' por um hardlink para o original em 'raw'.
 
 Uso:
-    PYTHONPATH=. .venv/bin/python scripts/deduplicate-assets.py
+    PYTHONPATH=. .venv/bin/python scripts/maintenance/deduplicate-assets.py
 """
 
 import hashlib
@@ -17,8 +17,13 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = PROJECT_ROOT / "data"
+
+
+def assert_project_root() -> None:
+    if not (PROJECT_ROOT / "src").is_dir() or not DATA_DIR.is_dir():
+        raise RuntimeError(f"invalid project root resolved from script path: {PROJECT_ROOT}")
 
 def get_file_hash(path: Path) -> str:
     """Calcula MD5 do arquivo em chunks."""
@@ -29,6 +34,7 @@ def get_file_hash(path: Path) -> str:
     return hash_md5.hexdigest()
 
 def deduplicate():
+    assert_project_root()
     raw_dir = DATA_DIR / "raw"
     merged_dir = DATA_DIR / "merged"
     

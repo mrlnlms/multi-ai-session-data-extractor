@@ -1,6 +1,6 @@
 ---
 title: "Gemini — Data Profile (consolidated)"
-subtitle: "Aggregated view of the 2 accounts, with stacked bars by account at key points"
+subtitle: "Aggregated view of the 3 accounts, with stacked bars by account at key points"
 source-title: "Gemini (consolidated)"
 jupyter: python3
 ---

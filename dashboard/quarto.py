@@ -1,17 +1,15 @@
-"""Integração Streamlit ↔ Quarto (Fase 3.2 do dashboard-plan).
+"""Integração do dashboard com os relatórios Quarto.
 
 Helpers pra:
 - detectar Quarto instalado
 - localizar .qmd e HTML rendirizado
 - detectar HTML stale (parquet mais novo que último render)
 - disparar `quarto render` via subprocess
-- expor HTML rendirizado via Streamlit static serving
+- gerar URLs pro servidor local dos relatórios
 
-Streamlit serve arquivos em PROJECT_ROOT/static/ via path /app/static/<file>.
-Por isso linkamos o HTML pra static/quarto/<source>.html apos render
-(symlink — Streamlit segue links no filesystem local). Single source of
-truth: notebooks/_output/. Pra deploy hosted (Streamlit Cloud), trocar
-symlink_to por shutil.copy2.
+`notebooks/_output/` e a fonte unica dos HTMLs renderizados. O script
+`scripts/serve-qmds.sh` serve esse diretorio diretamente; o dashboard apenas
+gera URLs para esse servidor, sem copiar ou linkar arquivos em `static/`.
 """
 from __future__ import annotations
 
@@ -25,9 +23,8 @@ from dashboard.data import PROJECT_ROOT
 
 NOTEBOOKS_DIR = PROJECT_ROOT / "notebooks"
 QUARTO_OUTPUT_DIR = NOTEBOOKS_DIR / "_output"
-STATIC_DIR = PROJECT_ROOT / "static"
-QUARTO_STATIC_SUBDIR = "quarto"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
+DEFAULT_REPORT_SERVER_URL = "http://localhost:8765"
 
 
 def quarto_installed() -> bool:
@@ -81,28 +78,19 @@ def html_output_path_for_qmd(qmd: Path) -> Path:
     return QUARTO_OUTPUT_DIR / f"{qmd.stem}.html"
 
 
-def html_static_path(platform: str) -> Path:
-    """Path do HTML servido pelo Streamlit (em static/)."""
-    return STATIC_DIR / QUARTO_STATIC_SUBDIR / f"{_slug(platform)}.html"
+def report_server_base_url() -> str:
+    """Base URL do servidor que expoe `notebooks/_output/`."""
+    return os.environ.get("QMD_REPORT_BASE_URL", DEFAULT_REPORT_SERVER_URL).rstrip("/")
 
 
-def html_static_path_for_qmd(qmd: Path) -> Path:
-    """Path do HTML servido pelo Streamlit pra um .qmd qualquer."""
-    return STATIC_DIR / QUARTO_STATIC_SUBDIR / f"{qmd.stem}.html"
+def report_url(platform: str) -> str:
+    """URL do relatorio consolidado de uma plataforma."""
+    return f"{report_server_base_url()}/{_slug(platform)}.html"
 
 
-def streamlit_static_url(platform: str) -> str:
-    """URL relativa do HTML servido pelo Streamlit.
-
-    Streamlit serve PROJECT_ROOT/static/ via /app/static/. Link relativo
-    funciona dentro do dashboard.
-    """
-    return f"/app/static/{QUARTO_STATIC_SUBDIR}/{_slug(platform)}.html"
-
-
-def streamlit_static_url_for_qmd(qmd: Path) -> str:
-    """URL relativa pra qmd qualquer (consolidado ou per-account)."""
-    return f"/app/static/{QUARTO_STATIC_SUBDIR}/{qmd.stem}.html"
+def report_url_for_qmd(qmd: Path) -> str:
+    """URL do relatorio de um QMD consolidado, por conta ou overview."""
+    return f"{report_server_base_url()}/{qmd.stem}.html"
 
 
 def is_html_stale(platform: str) -> bool:
@@ -148,34 +136,8 @@ def _render_qmd_path(qmd: Path) -> subprocess.CompletedProcess:
     )
 
 
-def _link_to_static(src: Path, dst: Path) -> Path:
-    """Cria symlink dst → src (substitui se ja existe).
-
-    Streamlit serve PROJECT_ROOT/static/ via /app/static/<file> e segue
-    symlinks no filesystem local. Symlink evita duplicacao de disco e
-    mantem static/ sempre apontando pro ultimo render.
-    """
-    if not src.exists():
-        raise FileNotFoundError(f"Rendered HTML does not exist: {src}")
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    if dst.is_symlink() or dst.exists():
-        dst.unlink()
-    dst.symlink_to(src.resolve())
-    return dst
-
-
-def copy_to_static(platform: str) -> Path:
-    """Linka static/quarto/<plat>.html → notebooks/_output/<plat>.html."""
-    return _link_to_static(html_output_path(platform), html_static_path(platform))
-
-
-def copy_to_static_for_qmd(qmd: Path) -> Path:
-    """Linka static/quarto/<qmd>.html → notebooks/_output/<qmd>.html."""
-    return _link_to_static(html_output_path_for_qmd(qmd), html_static_path_for_qmd(qmd))
-
-
 def render_and_publish(platform: str) -> tuple[bool, Optional[str]]:
-    """Render + copy do consolidado.
+    """Renderiza o consolidado no diretorio servido por `serve-qmds.sh`.
 
     Returns: (success, error_message_se_falhou).
     """
@@ -186,15 +148,11 @@ def render_and_publish(platform: str) -> tuple[bool, Optional[str]]:
     if result.returncode != 0:
         tail = (result.stderr or "")[-500:]
         return False, f"quarto render failed (exit {result.returncode}):\n{tail}"
-    try:
-        copy_to_static(platform)
-    except Exception as e:
-        return False, f"render OK but copy_to_static failed: {e}"
     return True, None
 
 
 def render_and_publish_qmd(qmd: Path) -> tuple[bool, Optional[str]]:
-    """Render + copy de um .qmd qualquer (per-account)."""
+    """Renderiza um .qmd qualquer no diretorio servido por `serve-qmds.sh`."""
     try:
         result = _render_qmd_path(qmd)
     except FileNotFoundError as e:
@@ -202,10 +160,6 @@ def render_and_publish_qmd(qmd: Path) -> tuple[bool, Optional[str]]:
     if result.returncode != 0:
         tail = (result.stderr or "")[-500:]
         return False, f"quarto render failed (exit {result.returncode}):\n{tail}"
-    try:
-        copy_to_static_for_qmd(qmd)
-    except Exception as e:
-        return False, f"render OK but copy_to_static failed: {e}"
     return True, None
 
 

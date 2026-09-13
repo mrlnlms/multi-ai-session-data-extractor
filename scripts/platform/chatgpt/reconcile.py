@@ -1,10 +1,10 @@
 """Reconcilia raw recem capturado com merged anterior.
 
 Uso:
-    python scripts/chatgpt-reconcile.py <raw_dir> [--previous-merged PATH]
+    python scripts/platform/chatgpt/reconcile.py <raw_dir> [--previous-merged PATH]
 
 Exemplo:
-    python scripts/chatgpt-reconcile.py "data/raw/ChatGPT Data 2026-04-23/"
+    python scripts/platform/chatgpt/reconcile.py "data/raw/ChatGPT Data 2026-04-23/"
 """
 
 import argparse

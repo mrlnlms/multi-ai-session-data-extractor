@@ -1,8 +1,8 @@
 """Reconciler Gemini — merge raw atual com merged anterior.
 
 Uso:
-    python scripts/gemini-reconcile.py --account 1 [raw_dir]
-    python scripts/gemini-reconcile.py --account 1 --full
+    python scripts/platform/gemini/reconcile.py --account 1 [raw_dir]
+    python scripts/platform/gemini/reconcile.py --account 1 --full
 """
 
 import argparse

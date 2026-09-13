@@ -10,10 +10,18 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
-TABLE_PKS = runpy.run_path(str(Path(__file__).with_name("unify-parquets.py")))["TABLE_PKS"]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+UNIFY_SCRIPT = PROJECT_ROOT / "scripts" / "unify-parquets.py"
+TABLE_PKS = runpy.run_path(str(UNIFY_SCRIPT))["TABLE_PKS"]
+
+
+def assert_project_root() -> None:
+    if not (PROJECT_ROOT / "src").is_dir() or not (PROJECT_ROOT / "data").is_dir():
+        raise RuntimeError(f"invalid project root resolved from script path: {PROJECT_ROOT}")
 
 
 def main() -> int:
+    assert_project_root()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--unified-dir", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)

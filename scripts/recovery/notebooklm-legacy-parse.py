@@ -7,7 +7,7 @@ Sufixo `_manual_` reusa o setup_views_with_manual nos quartos consolidados —
 not really "manual save" mas "captura externa nao-extractor", que segue o
 mesmo padrao de UNION ALL BY NAME.
 
-Uso: PYTHONPATH=. .venv/bin/python scripts/notebooklm-legacy-parse.py
+Uso: PYTHONPATH=. .venv/bin/python scripts/recovery/notebooklm-legacy-parse.py
 """
 
 from __future__ import annotations
@@ -34,12 +34,18 @@ from src.schema.models import (
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 INPUT_DIR = PROJECT_ROOT / "data" / "external" / "notebooklm-snapshots" / "more-design-2026-03-30"
 OUTPUT_DIR = PROJECT_ROOT / "data" / "processed" / "NotebookLM"
 
 
+def assert_project_root() -> None:
+    if not (PROJECT_ROOT / "src").is_dir() or not (PROJECT_ROOT / "data").is_dir():
+        raise RuntimeError(f"invalid project root resolved from script path: {PROJECT_ROOT}")
+
+
 def main() -> int:
+    assert_project_root()
     if not INPUT_DIR.exists():
         logger.error(f"Input nao existe: {INPUT_DIR}")
         return 1

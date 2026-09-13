@@ -16,7 +16,7 @@
 ## Coverage
 
 Conversations + projects discovered and captured via standard discovery.
-Automatic recovery from transient timeouts via `scripts/claude-refetch-known.py`.
+Automatic recovery from transient timeouts via `scripts/platform/claude-ai/refetch-known.py`.
 
 Binaries + artifacts (code/markdown/html/react via `tool_use`) extracted
 during asset download.
@@ -113,7 +113,7 @@ PYTHONPATH=. .venv/bin/python scripts/claude-sync.py
 PYTHONPATH=. .venv/bin/python scripts/claude-login.py --profile account-2
 PYTHONPATH=. .venv/bin/python scripts/claude-sync.py --profile account-2
 # If sync left gaps (transient timeouts):
-PYTHONPATH=. .venv/bin/python scripts/claude-refetch-known.py
+PYTHONPATH=. .venv/bin/python scripts/platform/claude-ai/refetch-known.py
 PYTHONPATH=. .venv/bin/python scripts/claude-parse.py
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/claude-ai.qmd
 ```

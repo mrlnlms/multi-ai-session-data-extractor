@@ -68,6 +68,9 @@ def main() -> int:
         "totals": {
             "files_new": n_new,
             "files_updated": n_upd,
+            "files_seen": parser.files_seen,
+            "files_parsed": parser.files_parsed,
+            "files_skipped": parser.files_skipped,
             "conversations": stats["conversations"],
             "messages": stats["messages"],
             "tool_events": stats["tool_events"],
@@ -83,6 +86,10 @@ def main() -> int:
     print("=== STATS ===")
     for k, v in stats.items():
         print(f"  {k}: {v:,}")
+    print(
+        f"  session_files: {parser.files_seen:,} seen, "
+        f"{parser.files_parsed:,} parsed, {parser.files_skipped:,} skipped"
+    )
     print(f"  duration: {duration:.1f}s, files: {n_new} new + {n_upd} updated")
     print(f"\nParquets em: {PROCESSED_DIR}")
     return 0

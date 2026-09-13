@@ -1,6 +1,6 @@
 """Export DeepSeek via API interna.
 
-Uso: python scripts/deepseek-export.py [--full] [--smoke N]
+Uso: python scripts/platform/deepseek/export.py [--full] [--smoke N]
 
 Default: incremental (compara updated_at com dump anterior).
 """

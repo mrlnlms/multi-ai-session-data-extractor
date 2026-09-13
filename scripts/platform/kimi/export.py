@@ -1,10 +1,10 @@
 """Captura conversas Kimi.
 
 Uso:
-  python scripts/kimi-export.py             # incremental
-  python scripts/kimi-export.py --full      # ignora estado anterior
-  python scripts/kimi-export.py --smoke 3   # apenas 3 chats
-  python scripts/kimi-export.py --headed
+  python scripts/platform/kimi/export.py             # incremental
+  python scripts/platform/kimi/export.py --full      # ignora estado anterior
+  python scripts/platform/kimi/export.py --smoke 3   # apenas 3 chats
+  python scripts/platform/kimi/export.py --headed
 """
 
 import argparse

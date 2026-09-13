@@ -53,7 +53,7 @@ def _global_kpis(states: list[PlatformState]) -> dict:
     last_sync = None
     most_outdated_name = None
     most_outdated_when = None
-    overdue = []
+    failed = []
     for s in states:
         t, a, p, _ = _quick_stats(s)
         total += t
@@ -67,13 +67,13 @@ def _global_kpis(states: list[PlatformState]) -> dict:
                 most_outdated_when = ts
                 most_outdated_name = s.name
             if s.status() == "red":
-                overdue.append(s.name)
+                failed.append(s.name)
     return {
         "total_convs": total,
         "active": active,
         "preserved": preserved,
         "last_sync": last_sync,
-        "overdue": overdue,
+        "failed": failed,
         "most_outdated": (most_outdated_name, most_outdated_when),
     }
 
@@ -82,10 +82,12 @@ def _platform_table(states: list[PlatformState]) -> pd.DataFrame:
     rows = []
     for s in states:
         total, active, preserved, newest_update = _quick_stats(s)
+        health = s.health()
         rows.append(
             {
-                " ": STATUS_BADGES.get(s.status(), "⚪"),
+                " ": STATUS_BADGES.get(health.color, "⚪"),
                 "Platform": s.name,
+                "Health": health.reason,
                 "Last capture": (
                     relative_time(s.last_capture.started_at) if s.last_capture else "—"
                 ),
@@ -153,8 +155,8 @@ def render(states: list[PlatformState]) -> None:
         ts, name = kpis["last_sync"]
         st.markdown(f"**Last global sync:** {relative_time(ts)} ({name}, {format_datetime(ts)})")
 
-    if kpis["overdue"]:
-        st.warning(f"⚠️ {len(kpis['overdue'])} platforms overdue: {', '.join(kpis['overdue'])}")
+    if kpis["failed"]:
+        st.error(f"🚨 {len(kpis['failed'])} platforms failed: {', '.join(kpis['failed'])}")
 
     drops = [s.name for s in states if discovery_drop_flag(s)]
     if drops:
@@ -191,7 +193,12 @@ def render(states: list[PlatformState]) -> None:
     cols = st.columns(min(len(states), 4))
     for i, s in enumerate(states):
         col = cols[i % len(cols)]
-        if col.button(f"{STATUS_BADGES.get(s.status(), '⚪')} {s.name}", key=f"goto-{s.name}"):
+        health = s.health()
+        if col.button(
+            f"{STATUS_BADGES.get(health.color, '⚪')} {s.name}",
+            key=f"goto-{s.name}",
+            help=health.reason,
+        ):
             st.session_state["view"] = "platform"
             st.session_state["selected_platform"] = s.name
             st.rerun()
@@ -214,9 +221,9 @@ def _render_overview_qmds_section() -> None:
     com filtros diferentes (todas / web / cli / rag).
     """
     from dashboard.quarto import (
-        copy_to_static_for_qmd,
         html_output_path_for_qmd,
         overview_qmds,
+        report_url_for_qmd,
         render_and_publish_qmd,
     )
 
@@ -236,11 +243,7 @@ def _render_overview_qmds_section() -> None:
         col = cols[i % len(cols)]
         html_out = html_output_path_for_qmd(qmd)
         if html_out.exists():
-            try:
-                copy_to_static_for_qmd(qmd)
-            except FileNotFoundError:
-                pass
-            url = f"/app/static/quarto/{qmd.stem}.html"
+            url = report_url_for_qmd(qmd)
             col.markdown(
                 f"📊 **{label}**  \n[View detailed data]({url}){{target=\"_blank\"}}"
             )

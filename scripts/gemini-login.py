@@ -38,7 +38,7 @@ async def login(account: int):
         await context.wait_for_event("close", timeout=0)
 
     print(f"Browser fechado. Sessao da conta {account} salva!")
-    print(f"Agora rode: python scripts/gemini-export.py --account {account}")
+    print(f"Agora rode: python scripts/platform/gemini/export.py --account {account}")
 
 
 if __name__ == "__main__":

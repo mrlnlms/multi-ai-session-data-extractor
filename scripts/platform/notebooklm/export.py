@@ -1,10 +1,10 @@
 """Export NotebookLM via batchexecute API.
 
 Uso:
-    python scripts/notebooklm-export.py --account 1                        # todos
-    python scripts/notebooklm-export.py --account 1 --notebook UUID        # só 1
-    python scripts/notebooklm-export.py --account 1 --notebook UUID1,UUID2 # só esses
-    python scripts/notebooklm-export.py --account 1 --smoke N              # primeiros N
+    python scripts/platform/notebooklm/export.py --account 1                        # todos
+    python scripts/platform/notebooklm/export.py --account 1 --notebook UUID        # só 1
+    python scripts/platform/notebooklm/export.py --account 1 --notebook UUID1,UUID2 # só esses
+    python scripts/platform/notebooklm/export.py --account 1 --smoke N              # primeiros N
 """
 
 import argparse

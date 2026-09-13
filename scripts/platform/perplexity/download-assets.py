@@ -1,7 +1,7 @@
 """Baixa user uploads + featured images de um raw Perplexity.
 
 Uso:
-  python scripts/perplexity-download-assets.py [raw_dir]
+  python scripts/platform/perplexity/download-assets.py [raw_dir]
 
 Filtra URLs: so baixa dominios da Perplexity (ppl-ai-file-upload, pplx-res.cloudinary).
 URLs externas (imagens de sites web citados em respostas) NAO sao baixadas.

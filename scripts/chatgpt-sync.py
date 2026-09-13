@@ -15,10 +15,10 @@ Uso:
        - chatgpt_merged.json sobrescreve, reconcile_log.jsonl append
 
 Pra rodar so um passo, use os scripts standalone:
-    python scripts/chatgpt-export.py
-    python scripts/chatgpt-download-assets.py data/raw/ChatGPT
-    python scripts/chatgpt-download-project-sources.py data/raw/ChatGPT
-    python scripts/chatgpt-reconcile.py data/raw/ChatGPT
+    python scripts/platform/chatgpt/export.py
+    python scripts/platform/chatgpt/download-assets.py data/raw/ChatGPT
+    python scripts/platform/chatgpt/download-project-sources.py data/raw/ChatGPT
+    python scripts/platform/chatgpt/reconcile.py data/raw/ChatGPT
 
 Requer login previo:
     python scripts/chatgpt-login.py

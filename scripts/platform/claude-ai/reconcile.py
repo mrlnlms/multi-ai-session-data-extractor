@@ -1,9 +1,9 @@
 """Reconciler Claude.ai standalone.
 
 Uso:
-    python scripts/claude-reconcile.py            # raw=data/raw/Claude.ai/, merged=data/merged/Claude.ai/
-    python scripts/claude-reconcile.py --full
-    python scripts/claude-reconcile.py --refetch-features attachments_extracted_content
+    python scripts/platform/claude-ai/reconcile.py            # raw=data/raw/Claude.ai/, merged=data/merged/Claude.ai/
+    python scripts/platform/claude-ai/reconcile.py --full
+    python scripts/platform/claude-ai/reconcile.py --refetch-features attachments_extracted_content
 
 Default: pasta unica cumulativa. claude-sync.py ja chama internamente.
 """
@@ -33,7 +33,7 @@ def main():
 
     raw = Path(args.raw_dir) if args.raw_dir else RAW_DIR
     if not raw.exists() or not (raw / "discovery_ids.json").exists():
-        print(f"ERRO: raw nao encontrado em {raw}. Rode scripts/claude-export.py primeiro.")
+        print(f"ERRO: raw nao encontrado em {raw}. Rode scripts/platform/claude-ai/export.py primeiro.")
         sys.exit(1)
     print(f"Raw: {raw}")
 

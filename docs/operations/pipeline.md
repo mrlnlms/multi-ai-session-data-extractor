@@ -105,6 +105,8 @@ QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/00-overview.qmd
 Os qmds compartilham `notebooks/_template.qmd`; a configuracao de cada fonte
 permanece curta e as tabelas auxiliares sao renderizadas quando existirem.
 Os HTMLs gerados ficam em `notebooks/_output/` e sao ignorados pelo Git.
+Esse diretorio e a fonte unica dos renders: o dashboard aponta para o servidor
+local abaixo e nao copia nem cria symlinks dos relatorios em `static/`.
 
 Para servi-los localmente:
 
@@ -114,6 +116,14 @@ Para servi-los localmente:
 ./scripts/serve-qmds.sh open
 ./scripts/serve-qmds.sh stop
 ```
+
+Por padrao, os links do dashboard usam `http://localhost:8765`. Se o servidor
+for executado com outra porta, configure tambem a base usada pelo dashboard,
+por exemplo `PORT=8766 QMD_REPORT_BASE_URL=http://localhost:8766`.
+
+Os HTMLs derivados da base real podem conter informacao sensivel. Uma eventual
+publicacao via GitHub Pages deve usar uma build separada com dados sinteticos,
+nunca `notebooks/_output/`.
 
 ## Dashboard e execucao sem interface
 

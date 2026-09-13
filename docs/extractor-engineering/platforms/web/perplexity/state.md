@@ -74,7 +74,7 @@ recent capture timestamp.
 
 ## Related documents
 
-- Probes: 7 scripts in `scripts/perplexity-probe-*.py`.
+- Probes: engineering commands in `scripts/probes/perplexity/`.
 
 ## Commands
 

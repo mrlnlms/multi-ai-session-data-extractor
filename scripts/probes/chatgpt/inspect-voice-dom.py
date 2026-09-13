@@ -4,7 +4,7 @@ Objetivo: capturar HTML + classes CSS de uma conv voice real, pra derivar
 seletores estaveis pra dom_voice.py.
 
 Uso:
-    python scripts/dev/inspect-chatgpt-voice-dom.py <conv_id>
+    python scripts/probes/chatgpt/inspect-voice-dom.py <conv_id>
 
 Requer login persistente via scripts/chatgpt-login.py antes.
 

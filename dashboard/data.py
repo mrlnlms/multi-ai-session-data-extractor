@@ -49,6 +49,21 @@ SCRIPT_PREFIX: dict[str, str] = {
     "Antigravity CLI": "antigravity-cli",
 }
 
+PARSER_INPUT_SUFFIXES: dict[str, frozenset[str]] = {
+    "Claude Code": frozenset({".jsonl"}),
+    "Codex": frozenset({".jsonl"}),
+    "Gemini CLI": frozenset({".json"}),
+    "Antigravity CLI": frozenset({".db", ".jsonl", ".pb"}),
+}
+DEFAULT_PARSER_INPUT_SUFFIXES = frozenset({".json"})
+
+
+@dataclass(frozen=True)
+class HealthStatus:
+    color: str
+    label: str
+    reason: str
+
 
 @dataclass
 class CaptureRun:
@@ -59,6 +74,9 @@ class CaptureRun:
     fetch_attempted: Optional[int]
     fetch_succeeded: Optional[int]
     errors_count: int = 0
+    files_seen: Optional[int] = None
+    files_parsed: Optional[int] = None
+    files_skipped: Optional[int] = None
     mode: Optional[str] = None  # 'full' | 'incremental' | 'refetch_known' | None
     account: Optional[str] = None  # multi-conta (Gemini/NotebookLM); None pra single
 
@@ -81,6 +99,7 @@ class PlatformState:
     processed_dir: Optional[Path] = None
     capture_runs: list[CaptureRun] = field(default_factory=list)
     reconcile_runs: list[ReconcileRun] = field(default_factory=list)
+    _health_cache: Optional[HealthStatus] = field(default=None, init=False, repr=False)
 
     @property
     def has_data(self) -> bool:
@@ -127,27 +146,76 @@ class PlatformState:
         # Ultimo recurso: so ha _manual_
         return candidates[0] if candidates else None
 
+    def newest_parser_input(self) -> Optional[Path]:
+        """Arquivo de entrada mais recente que pode alimentar o parser.
+
+        Fontes web preferem o reconciliado; CLIs, que nao possuem essa etapa,
+        usam o raw. Logs e outros metadados ficam fora pela extensao.
+        """
+        suffixes = PARSER_INPUT_SUFFIXES.get(self.name, DEFAULT_PARSER_INPUT_SUFFIXES)
+        for root in (self.merged_dir, self.raw_dir):
+            if root is None or not root.exists():
+                continue
+            candidates = (
+                path
+                for path in root.rglob("*")
+                if path.is_file() and path.suffix.lower() in suffixes
+                and path.name not in {"capture_log.jsonl", "reconcile_log.jsonl"}
+            )
+            newest = max(candidates, key=lambda path: path.stat().st_mtime, default=None)
+            if newest is not None:
+                return newest
+        return None
+
+    def health(self) -> HealthStatus:
+        """Saude da pipeline, independente da idade da ultima captura."""
+        if self._health_cache is not None:
+            return self._health_cache
+        if self.last_capture is None:
+            result = HealthStatus("gray", "never ran", "No capture has been recorded")
+        elif self.last_capture.errors_count:
+            count = self.last_capture.errors_count
+            noun = "error" if count == 1 else "errors"
+            result = HealthStatus(
+                "yellow",
+                "attention",
+                f"Last capture completed with {count} {noun}",
+            )
+        elif self.last_capture.files_skipped:
+            count = self.last_capture.files_skipped
+            noun = "session file" if count == 1 else "session files"
+            result = HealthStatus(
+                "yellow",
+                "attention",
+                f"Parser skipped {count} {noun}",
+            )
+        elif self.conversations_parquet_path is None:
+            result = HealthStatus(
+                "red",
+                "failed",
+                "Processed conversations Parquet is missing",
+            )
+        else:
+            parquet = self.conversations_parquet_path
+            newest_input = self.newest_parser_input()
+            if newest_input and parquet and parquet.stat().st_mtime < newest_input.stat().st_mtime:
+                result = HealthStatus(
+                    "red",
+                    "failed",
+                    f"{newest_input.name} is newer than the processed Parquet",
+                )
+            else:
+                result = HealthStatus("green", "OK", "Processed data is up to date")
+        self._health_cache = result
+        return result
+
     def status(self, now: Optional[datetime] = None) -> str:
-        """green | yellow | red | gray. Cadencia de sync e variavel por
-        plataforma — nao tem rotina diaria. Thresholds soltos: 7d/30d."""
-        ref = self.last_capture.started_at if self.last_capture else None
-        if ref is None:
-            return "gray"
-        # Uma captura recente com erros nao deve aparecer como totalmente
-        # saudavel; a data por si so nao prova que o pipeline ficou verde.
-        if self.last_capture and self.last_capture.errors_count:
-            return "yellow"
-        parquet = self.conversations_parquet_path
-        inputs = [p for p in (self.raw_dir, self.merged_dir) if p and p.exists()]
-        if parquet is None or (inputs and parquet.stat().st_mtime < max(p.stat().st_mtime for p in inputs)):
-            return "yellow"
-        now = now or datetime.now(timezone.utc)
-        delta = (now - ref).total_seconds()
-        if delta < 86400 * 7:
-            return "green"
-        if delta < 86400 * 30:
-            return "yellow"
-        return "red"
+        """Compatibilidade: retorna green | yellow | red | gray.
+
+        `now` e mantido na assinatura para callers antigos; recencia nao faz
+        mais parte da cor de saude.
+        """
+        return self.health().color
 
 
 def _parse_iso(s: Optional[str]) -> Optional[datetime]:
@@ -217,6 +285,9 @@ def _load_capture_log(path: Path) -> list[CaptureRun]:
                         or totals.get("notebooks_fetched")
                     ),
                     errors_count=errors_count,
+                    files_seen=totals.get("files_seen"),
+                    files_parsed=totals.get("files_parsed"),
+                    files_skipped=totals.get("files_skipped"),
                     account=(str(d["account"]) if "account" in d and d["account"] is not None else None),
                 )
             )

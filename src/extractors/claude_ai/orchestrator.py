@@ -330,7 +330,7 @@ async def run_export(
         print("=== SUMMARY ===")
         print(json.dumps(log["totals"], indent=2))
         print(f"\nRaw em: {output_dir}")
-        print("Proximo passo: python scripts/claude-download-assets.py")
+        print("Proximo passo: python scripts/platform/claude-ai/download-assets.py")
         return output_dir
     finally:
         await context.close()

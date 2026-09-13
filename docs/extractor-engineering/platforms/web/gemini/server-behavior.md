@@ -26,7 +26,7 @@ conversation discovery or a reason to discard the existing asset corpus.
 
 ## Raw schema — positional (no keys)
 
-Paths discovered via probe (`scripts/gemini-probe-schema.py`):
+Paths discovered via probe (`scripts/probes/gemini/schema.py`):
 
 ```
 raw                 — list[4] = [turns_wrapper, ?, None, ?]
@@ -150,7 +150,7 @@ The MaZiqc listing schema has 10 fields per conv:
 [9] int          (always 2 in this base)
 ```
 
-Probe: `scripts/gemini-probe-pin-share.py`. Comparison between a pinned chat
+Probe: `scripts/probes/gemini/pin-share.py`. Comparison between a pinned chat
 and normal chats revealed a difference in position [2]. Alternative RPC ids
 tested (EaipR, yQzmHb, VhQOs) returned 400 — pin has no dedicated endpoint
 (same as ChatGPT, which also doesn't expose a separate `/pinned` but uses a

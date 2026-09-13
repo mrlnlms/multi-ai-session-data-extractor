@@ -3,7 +3,7 @@
 2. Abre cada Space via URL pra capturar endpoints internos
 3. Probra endpoints REST chutados (threads/pages/files)
 
-Uso: python scripts/perplexity-probe-spaces.py
+Uso: python scripts/probes/perplexity/spaces.py
 Output: /tmp/perplexity-spaces-probe.json
 """
 

@@ -1,7 +1,7 @@
 """Probe autonomo DeepSeek: abre headless com profile logado, carrega home,
 abre 1-2 convs e dumpa XHR/fetch requests em /tmp/deepseek-probe.json.
 
-Uso: python scripts/deepseek-probe-core.py
+Uso: python scripts/probes/deepseek/core.py
 Requer profile logado previo (scripts/deepseek-login.py).
 
 Estrategia:

@@ -72,7 +72,7 @@ Chats + projects + project files captured. Reconciler v3
 
 ## Integrated asset download
 
-`scripts/qwen-download-assets.py`. URLs in msgs/projects downloaded via
+`scripts/platform/qwen/download-assets.py`. URLs in msgs/projects downloaded via
 manifest. Parser resolves `asset_paths` via `assets_manifest.json`.
 
 ## Descriptive Quarto

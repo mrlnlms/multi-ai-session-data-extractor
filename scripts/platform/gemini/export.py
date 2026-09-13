@@ -1,6 +1,6 @@
 """Export Gemini via API batchexecute (substitui o scraper DOM antigo).
 
-Uso: python scripts/gemini-export.py --account 1 [--full] [--smoke N]
+Uso: python scripts/platform/gemini/export.py --account 1 [--full] [--smoke N]
 
 Modo default: incremental — compara created_at_secs com dump anterior.
 """

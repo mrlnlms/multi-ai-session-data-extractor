@@ -4,8 +4,8 @@ Pasta unica cumulativa per-account — skip-existing nos proprios paths
 elimina necessidade de copia entre runs.
 
 Uso:
-    python scripts/notebooklm-download-assets.py --account 1
-    python scripts/notebooklm-download-assets.py --account 2
+    python scripts/platform/notebooklm/download-assets.py --account 1
+    python scripts/platform/notebooklm/download-assets.py --account 2
 """
 
 import argparse

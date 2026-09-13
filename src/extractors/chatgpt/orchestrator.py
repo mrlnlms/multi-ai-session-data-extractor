@@ -1,6 +1,6 @@
 """Orchestrator — amarra auth + discovery + fetcher + dom_voice + save.
 
-Entry point chamado por scripts/chatgpt-export.py.
+Entry point chamado por scripts/platform/chatgpt/export.py.
 """
 
 import json

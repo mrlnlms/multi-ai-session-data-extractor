@@ -26,13 +26,18 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = Path.home() / ".gemini" / "antigravity-cli"
 RAW_ROOT = PROJECT_ROOT / "data" / "raw" / "Antigravity CLI"
 RECOVERED_DIR = RAW_ROOT / "recovered"
 MANIFEST_PATH = RECOVERED_DIR / "recovery_manifest.jsonl"
 PORT_RE = re.compile(r"Language server listening on random port at (\d+) for HTTP")
 RPC_PREFIX = "/exa.language_server_pb.LanguageServerService/"
+
+
+def assert_project_root() -> None:
+    if not (PROJECT_ROOT / "src").is_dir() or not (PROJECT_ROOT / "data").is_dir():
+        raise RuntimeError(f"invalid project root resolved from script path: {PROJECT_ROOT}")
 
 
 def sha256(path: Path) -> str:
@@ -148,6 +153,7 @@ def append_manifest(entry: dict[str, Any]) -> None:
 
 
 def main() -> int:
+    assert_project_root()
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--conversation-id", action="append", help="Legacy PB UUID to recover (repeatable)")

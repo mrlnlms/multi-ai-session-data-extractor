@@ -1,6 +1,6 @@
 """Download binarios (imagens) dos files referenciados no raw atual.
 
-Uso: python scripts/claude-download-assets.py [raw_dir]
+Uso: python scripts/platform/claude-ai/download-assets.py [raw_dir]
 Se nao passar raw_dir, usa data/raw/Claude.ai/ (pasta unica cumulativa).
 
 Flags:
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     else:
         raw = _default_raw()
         if not raw:
-            print("ERRO: nao foi possivel achar raw — rode scripts/claude-export.py primeiro")
+            print("ERRO: nao foi possivel achar raw — rode scripts/platform/claude-ai/export.py primeiro")
             sys.exit(1)
         print(f"Usando raw: {raw}")
 

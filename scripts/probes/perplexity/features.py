@@ -5,7 +5,7 @@ todos os XHRs /rest/*.
 Tambem inclui probe explicito de pinned threads (HTTP 400 conhecido)
 testando variacoes de version/method.
 
-Uso: python scripts/perplexity-probe-features.py
+Uso: python scripts/probes/perplexity/features.py
 Output: /tmp/perplexity-features-probe.json + sumario no stdout
 """
 

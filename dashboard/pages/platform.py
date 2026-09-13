@@ -109,9 +109,14 @@ def render(state: PlatformState) -> None:
         st.session_state["view"] = "overview"
         st.rerun()
 
-    badge = STATUS_BADGES.get(state.status(), "⚪")
+    health = state.health()
+    badge = STATUS_BADGES.get(health.color, "⚪")
     st.title(f"{badge} {state.name}")
-    st.caption(f"Status: {STATUS_LABEL.get(state.status(), state.status())}")
+    capture_age = relative_time(state.last_capture.started_at) if state.last_capture else "—"
+    st.caption(
+        f"Health: {STATUS_LABEL.get(health.color, health.label)} — {health.reason}. "
+        f"Last capture: {capture_age}."
+    )
 
     render_last_run_summary()
 
@@ -259,19 +264,16 @@ def _render_quarto_section(state: PlatformState) -> None:
 def _render_qmd_row(state: PlatformState, qmd, label_suffix: str) -> None:
     """Linha pra 1 .qmd (consolidado ou per-account): link + botao re-render."""
     html_src = quarto.html_output_path_for_qmd(qmd)
-    static_dst = quarto.html_static_path_for_qmd(qmd)
     stale = quarto.is_html_stale_for_qmd(state.name, qmd)
 
     cols = st.columns([3, 1])
 
     with cols[0]:
         if html_src.exists() and not stale:
-            if not static_dst.exists() or static_dst.stat().st_mtime < html_src.stat().st_mtime:
-                quarto.copy_to_static_for_qmd(qmd)
-            url = quarto.streamlit_static_url_for_qmd(qmd)
+            url = quarto.report_url_for_qmd(qmd)
             st.markdown(
                 f'📊 **[View detailed data {label_suffix}]({url})** — '
-                f'self-contained HTML, opens in a new tab',
+                f'self-contained HTML served locally, opens in a new tab',
                 unsafe_allow_html=True,
             )
         elif html_src.exists() and stale:

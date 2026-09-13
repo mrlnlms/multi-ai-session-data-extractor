@@ -2,7 +2,7 @@
 
 Abre browser em uma conv com file, voce clica pra baixar, script captura a XHR.
 
-Uso: python scripts/deepseek-probe-download.py
+Uso: python scripts/probes/deepseek/download.py
 """
 
 import asyncio

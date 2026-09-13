@@ -50,6 +50,11 @@ arquivo.
 
 ## Pipeline e validacao
 
+- `scripts/` e a interface operacional: comandos normais
+  `<source>-login.py`, `<source>-sync.py` e `<source>-parse.py` ficam na raiz.
+  Helpers internos ficam em `scripts/platform/<source>/`; probes empiricos em
+  `scripts/probes/<source>/`; manutencao e recuperacao excepcional ficam em
+  `scripts/maintenance/` e `scripts/recovery/`, respectivamente.
 - Os scripts `<source>-sync.py` das fontes web fazem captura + assets +
   reconcile e nao chamam o parser quando executados diretamente. O pipeline
   do dashboard/headless executa automaticamente o `<source>-parse.py` depois
@@ -98,5 +103,3 @@ produto.
   usuario.
 - Preservar mudancas preexistentes no worktree e nunca limpar dados para
   "fazer o DVC bater".
-- `scripts/backup_to_dvc.sh` e legado e nao representa o conjunto atual de
-  dados; nao usa-lo ate ser corrigido e validado.

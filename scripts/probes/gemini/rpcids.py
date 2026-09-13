@@ -5,7 +5,7 @@ Roda Playwright com profile logado, hooka request events, faz acoes tipicas
 
 Saida: .runtime/probes/gemini-rpcids-<ts>.json com mapa de {rpcid: {count, sizes, sample_payload}}.
 
-Uso: python scripts/gemini-probe-rpcids.py [--account 1]
+Uso: python scripts/probes/gemini/rpcids.py [--account 1]
 """
 
 import argparse

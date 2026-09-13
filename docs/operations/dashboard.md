@@ -26,6 +26,18 @@ capturas, alertas de queda de discovery e uma linha do tempo cumulativa. Cada
 plataforma abre uma visão própria com logs de captura/reconciliação, estado do
 parquet, métricas e relatórios Quarto disponíveis.
 
+A cor da plataforma representa a saúde da pipeline, não a idade da captura:
+
+- verde: captura sem erros e Parquet cobrindo as entradas do parser;
+- amarelo: a captura mais recente registrou erros, mas os dados existentes
+  continuam disponíveis;
+- vermelho: Parquet ausente ou anterior a uma entrada relevante;
+- preto: nenhuma captura registrada.
+
+A recência aparece separadamente em **Last capture**. Para decidir frescor, o
+dashboard compara o Parquet com arquivos consumidos pelos parsers (`.json` nas
+fontes web e extensões próprias das CLIs), nunca com o `mtime` dos diretórios.
+
 Use **Reload data** após uma rodada manual para invalidar o cache do
 Streamlit. Os indicadores descrevem o que existe em disco; eles não substituem
 a verificação de que `processed` está mais recente que `raw` e `merged`.
@@ -99,6 +111,6 @@ captura parcial ou assets, use o `state.md` da plataforma listado em
 ## Relatórios Quarto
 
 O dashboard oferece os HTMLs Quarto já renderizados e pode renderizar os que
-ainda não existirem. O servidor separado de HTML continua opcional e é
-controlado pela barra lateral; os mesmos comandos estão em
-[pipeline.md](pipeline.md).
+ainda não existirem. Os links usam o servidor local controlado pela barra
+lateral, que serve diretamente `notebooks/_output/` na porta 8765; os mesmos
+comandos estão em [pipeline.md](pipeline.md).

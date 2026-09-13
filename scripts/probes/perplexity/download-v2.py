@@ -3,7 +3,7 @@
 Sem filtros agressivos — pega request, response, download events, iframes.
 Captura por 120s depois que thread carrega.
 
-Uso: python scripts/perplexity-probe-download-v2.py
+Uso: python scripts/probes/perplexity/download-v2.py
 """
 
 import asyncio

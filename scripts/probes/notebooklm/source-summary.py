@@ -3,7 +3,7 @@
 Abre 1 notebook, clica num source via JS, captura TODOS os batchexecute
 requests. Identifica RPCs novos vs ja mapeados em api_client.py.
 
-Uso: PYTHONPATH=. .venv/bin/python scripts/notebooklm-probe-source-summary.py
+Uso: PYTHONPATH=. .venv/bin/python scripts/probes/notebooklm/source-summary.py
 """
 
 import asyncio

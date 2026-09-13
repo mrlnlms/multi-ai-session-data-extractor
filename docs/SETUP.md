@@ -328,7 +328,7 @@ publicado e verificado.
 Depois de sync, parse e unify concluirem com sucesso, atualize os ponteiros de
 dados e publique a base atual. E uma operacao deliberada: `dvc push` escreve
 no armazenamento externo e `git push` publica os ponteiros. Use a sequencia de
-validacao do runbook; nao use o legado `scripts/backup_to_dvc.sh`.
+validacao do runbook.
 
 Guia operacional completo, incluindo limpeza de armazenamento:
 [operations/dvc-runbook.md](operations/dvc-runbook.md).

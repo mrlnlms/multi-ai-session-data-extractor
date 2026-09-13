@@ -27,7 +27,7 @@ helper consulta somente `127.0.0.1`, não altera `~/.gemini/antigravity-cli` e
 guarda o resultado em `data/raw/Antigravity CLI/recovered/`:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/antigravity-recover-legacy.py --all-opaque
+PYTHONPATH=. .venv/bin/python scripts/recovery/antigravity-recover-legacy.py --all-opaque
 ```
 
 `recovery_manifest.jsonl` registra os SHA-256 do PB e da trajetória. Uma

@@ -60,6 +60,9 @@ class CodexParser(BaseParser):
         self.agent_memories = []
         self._conv_source_files = {}
         self._input_path = None
+        self.files_seen = 0
+        self.files_parsed = 0
+        self.files_skipped = 0
 
     def parse(self, input_path: Path, home_memory_files: Optional[set[str]] = None) -> None:
         """Le todas sessoes em year/month/day/rollout-*.jsonl + memorias globais.
@@ -73,7 +76,11 @@ class CodexParser(BaseParser):
         input_path = Path(input_path)
         self._input_path = input_path
         for session_file in sorted(input_path.rglob("rollout-*.jsonl")):
-            self._parse_session(session_file)
+            self.files_seen += 1
+            if self._parse_session(session_file):
+                self.files_parsed += 1
+            else:
+                self.files_skipped += 1
         self._build_branches()
         from src.extractors.cli.preservation import mark_cli_preservation
         mark_cli_preservation(self)
@@ -85,7 +92,11 @@ class CodexParser(BaseParser):
     def parse_files(self, files: list[Path]) -> None:
         """Processa apenas a lista de arquivos especificada (uso incremental)."""
         for session_file in files:
-            self._parse_session(session_file)
+            self.files_seen += 1
+            if self._parse_session(session_file):
+                self.files_parsed += 1
+            else:
+                self.files_skipped += 1
         self._build_branches()
 
     def _build_branches(self) -> None:
@@ -114,12 +125,29 @@ class CodexParser(BaseParser):
                 created_at=conv.created_at if conv.created_at is not None else pd.Timestamp.now(tz="UTC"),
             ))
 
-    def _parse_session(self, session_file: Path) -> None:
+    @staticmethod
+    def _response_message_text(payload: dict) -> str:
+        """Concatena apenas as partes textuais de `response_item.message`."""
+        content = payload.get("content") or []
+        if isinstance(content, str):
+            return content
+        parts = []
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") not in {"input_text", "output_text", "text"}:
+                continue
+            text = item.get("text")
+            if isinstance(text, str) and text:
+                parts.append(text)
+        return "\n\n".join(parts)
+
+    def _parse_session(self, session_file: Path) -> bool:
         try:
             text = session_file.read_text(encoding="utf-8")
         except Exception as e:
             logger.warning(f"  {session_file}: falha ao ler: {e}")
-            return
+            return False
         events = []
         for line in text.strip().split("\n"):
             if not line.strip():
@@ -133,6 +161,7 @@ class CodexParser(BaseParser):
         model = None
         user_msgs = []
         agent_msgs = []
+        response_msgs = []
         reasoning_parts: list[str] = []
         function_calls: dict[str, dict] = {}
         exec_ends: dict[str, dict] = {}
@@ -146,7 +175,10 @@ class CodexParser(BaseParser):
             payload = evt.get("payload", {}) or {}
 
             if etype == "session_meta":
-                meta = payload
+                # O primeiro meta identifica o rollout (e coincide com o ID
+                # no filename). Alguns rollouts atuais incorporam historico
+                # com um segundo session_meta de uma sessao anterior.
+                meta = meta or payload
             elif etype == "turn_context":
                 model = model or payload.get("model")
             elif etype == "event_msg":
@@ -174,7 +206,13 @@ class CodexParser(BaseParser):
                         exec_ends[call_id] = payload
             elif etype == "response_item":
                 ptype = payload.get("type")
-                if ptype == "function_call":
+                if ptype == "message" and payload.get("role") in {"user", "assistant"}:
+                    response_msgs.append({
+                        "role": payload["role"],
+                        "content": self._response_message_text(payload),
+                        "ts": ts,
+                    })
+                elif ptype == "function_call":
                     call_id = payload.get("call_id")
                     if call_id:
                         function_calls[call_id] = {"payload": payload, "ts": ts}
@@ -183,8 +221,22 @@ class CodexParser(BaseParser):
         if agent_msgs and reasoning_parts:
             agent_msgs[-1]["_thinking"] = "\n\n".join(reasoning_parts)
 
+        # Rollouts antigos duplicam mensagens em response_item; os eventos
+        # legados continuam autoritativos quando presentes. Rollouts atuais
+        # (observados desde 2026-08-13) usam somente response_item.message.
+        if not user_msgs and not agent_msgs:
+            for msg in response_msgs:
+                if msg["role"] == "user":
+                    user_msgs.append({"content": msg["content"], "ts": msg["ts"]})
+                else:
+                    agent_msgs.append({
+                        "content": msg["content"],
+                        "ts": msg["ts"],
+                        "_thinking": None,
+                    })
+
         if not meta or (not user_msgs and not agent_msgs):
-            return
+            return False
 
         session_id = meta["id"]
         cwd = meta.get("cwd", "")
@@ -274,6 +326,7 @@ class CodexParser(BaseParser):
         ))
         self.messages.extend(messages)
         self.events.extend(tool_events)
+        return True
 
     def branches_df(self) -> pd.DataFrame:
         return branches_to_df(self.branches)

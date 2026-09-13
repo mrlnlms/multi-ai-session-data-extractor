@@ -27,6 +27,7 @@ import streamlit as st
 
 from dashboard.data import PROJECT_ROOT, PlatformState
 from dashboard.progress import parse_progress
+from dashboard.quarto import report_server_base_url
 from dashboard.sync import (
     acquire_pipeline_lock,
     quarto_installed,
@@ -515,7 +516,7 @@ def _get_auto_open_url(scope: str) -> str:
     'all' -> 00-overview.html
     'platform:ChatGPT' -> chatgpt.html
     """
-    base_url = "http://localhost:8765"
+    base_url = report_server_base_url()
     if scope == "all":
         return f"{base_url}/00-overview.html"
     if scope.startswith("platform:"):

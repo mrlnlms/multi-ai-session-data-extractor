@@ -37,7 +37,9 @@ def main() -> int:
     parser.add_argument("--report", type=Path)
     args = parser.parse_args()
 
-    source_root = Path(__file__).resolve().parent.parent
+    source_root = Path(__file__).resolve().parents[2]
+    if not (source_root / "src").is_dir() or not (source_root / "data").is_dir():
+        raise RuntimeError(f"invalid project root resolved from script path: {source_root}")
     project_root = args.project_root.resolve()
     if project_root == source_root:
         raise ValueError("refusing to rebuild the frozen source worktree")

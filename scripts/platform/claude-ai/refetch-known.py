@@ -7,8 +7,8 @@ conversations/<uuid>.json. Esta tool faz a mitigacao com retry+backoff.
 NAO eh state-refresh — pra isso, rode `claude-sync.py --full`.
 
 Uso:
-    PYTHONPATH=. .venv/bin/python scripts/claude-refetch-known.py
-    PYTHONPATH=. .venv/bin/python scripts/claude-refetch-known.py --profile default --retries 3
+    PYTHONPATH=. .venv/bin/python scripts/platform/claude-ai/refetch-known.py
+    PYTHONPATH=. .venv/bin/python scripts/platform/claude-ai/refetch-known.py --profile default --retries 3
 
 Proximos passos sugeridos no fim da run.
 """
@@ -133,7 +133,7 @@ async def main(args: argparse.Namespace) -> int:
             print(f"  {uuid}: {err[:100]}")
     print()
     print("Proximos passos:")
-    print("  PYTHONPATH=. .venv/bin/python scripts/claude-reconcile.py")
+    print("  PYTHONPATH=. .venv/bin/python scripts/platform/claude-ai/reconcile.py")
     print("  PYTHONPATH=. .venv/bin/python scripts/claude-parse.py")
     return 0 if not errors else 2
 

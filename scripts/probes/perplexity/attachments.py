@@ -2,7 +2,7 @@
 automaticamente, captura XHRs. Se o SPA faz fetch dos attachments no load,
 pegamos a URL real.
 
-Uso: python scripts/perplexity-probe-attachments.py
+Uso: python scripts/probes/perplexity/attachments.py
 """
 
 import asyncio

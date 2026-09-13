@@ -27,3 +27,5 @@ define as regras de trabalho para agentes.
   do reader.
 
 Material privado e duravel pertence ao workbench apontado por `private/`.
+O mapa da interface operacional e das ferramentas de engenharia fica em
+[`scripts/README.md`](../scripts/README.md).

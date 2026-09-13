@@ -1,7 +1,7 @@
 """Probe: captura TODOS os requests batchexecute enquanto voce gera cada tipo de output.
 
 Uso:
-    PYTHONPATH=. python scripts/notebooklm-probe-generators.py \\
+    PYTHONPATH=. python scripts/probes/notebooklm/generators.py \\
         --account hello --notebook 86b0d03b-95c7-4394-8be0-433ce10b84e8
 
 Workflow:

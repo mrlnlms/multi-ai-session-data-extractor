@@ -86,7 +86,7 @@ to force body refetch.
     - Same pattern as Perplexity Enterprise-only archive
     - **Not an extractor gap** — canonical schema has `is_archived`
       field, just never True on Pro/free account
-    - Probe: `scripts/qwen-probe-archived.py`
+    - Probe: `scripts/probes/qwen/archived.py`
 
 ## Bugs discovered+fixed in this battery
 

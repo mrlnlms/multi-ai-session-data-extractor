@@ -3,7 +3,7 @@
 Abre um notebook conhecido com mind map, clica no botao "Mind Map" na sidebar,
 e dumpa todos os batchexecute + outros requests pra identificar o endpoint/rpcid.
 
-Uso: PYTHONPATH=. python scripts/notebooklm-probe-mindmap.py --account hello
+Uso: PYTHONPATH=. python scripts/probes/notebooklm/mindmap.py --account hello
 """
 
 import argparse

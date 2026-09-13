@@ -3,9 +3,9 @@
 Pasta unica per-account. Sem timestamps.
 
 Uso:
-    python scripts/notebooklm-reconcile.py --account 1
-    python scripts/notebooklm-reconcile.py --account 2 --full
-    python scripts/notebooklm-reconcile.py --account 1 --refetch-features rLM1Ne_metadata
+    python scripts/platform/notebooklm/reconcile.py --account 1
+    python scripts/platform/notebooklm/reconcile.py --account 2 --full
+    python scripts/platform/notebooklm/reconcile.py --account 1 --refetch-features rLM1Ne_metadata
 """
 
 import argparse

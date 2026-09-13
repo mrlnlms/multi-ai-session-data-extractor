@@ -28,7 +28,7 @@ Conversations + assistant messages + tool events + images
 - Account 1 asset download saved 114 new assets and skipped 54 existing ones;
   73 image URLs returned HTTP 403 and remain unavailable upstream. Account 2
   assets were left unchanged during this run after its incremental capture.
-- `scripts/gemini-reconcile.py` is again usable with the current
+- `scripts/platform/gemini/reconcile.py` is again usable with the current
   `data/raw/Gemini/account-{N}` layout. It supports `--full`; there are no
   Gemini-specific feature-refetch flags.
 
@@ -55,7 +55,7 @@ Conversations + assistant messages + tool events + images
 `src/parsers/gemini.py` + `_gemini_helpers.py`.
 
 The raw schema is **positional** (Google batchexecute, no keys) — paths
-discovered via probe (`scripts/gemini-probe-schema.py`):
+discovered via probe (`scripts/probes/gemini/schema.py`):
 
 - `turn[2][0][0]` → user text.
 - `turn[3][0][0][1]` → assistant text (chunks).
@@ -97,8 +97,8 @@ discovered via probe (`scripts/gemini-probe-schema.py`):
 ## Related documents
 
 - `docs/extractor-engineering/platforms/web/gemini/server-behavior.md` — upstream behavior.
-- Probes: `scripts/gemini-probe-schema.py`,
-  `scripts/gemini-probe-pin-share.py`.
+- Probes: `scripts/probes/gemini/schema.py`,
+  `scripts/probes/gemini/pin-share.py`.
 
 ## Commands
 

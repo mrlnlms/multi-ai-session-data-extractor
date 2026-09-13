@@ -1,6 +1,36 @@
-from datetime import datetime, timezone
+import json
+import os
+from datetime import datetime, timedelta, timezone
 
-from dashboard.data import CaptureRun, PlatformState
+from dashboard.data import CaptureRun, PlatformState, _load_capture_log
+
+
+def _capture(*, days_ago: int = 0, errors: int = 0) -> CaptureRun:
+    return CaptureRun(
+        started_at=datetime.now(timezone.utc) - timedelta(days=days_ago),
+        finished_at=None,
+        duration_seconds=None,
+        discovery_total=None,
+        fetch_attempted=None,
+        fetch_succeeded=None,
+        errors_count=errors,
+    )
+
+
+def _state_with_parquet(tmp_path, *, name="ChatGPT", capture=None):
+    raw = tmp_path / "raw"
+    processed = tmp_path / "processed"
+    raw.mkdir()
+    processed.mkdir()
+    parquet = processed / "conversations.parquet"
+    parquet.touch()
+    return PlatformState(
+        name=name,
+        raw_dir=raw,
+        merged_dir=None,
+        processed_dir=processed,
+        capture_runs=[capture or _capture()],
+    ), raw, parquet
 
 
 def test_recent_capture_with_errors_is_not_green():
@@ -16,3 +46,77 @@ def test_recent_capture_with_errors_is_not_green():
     )
 
     assert state.status() == "yellow"
+    assert state.health().reason == "Last capture completed with 1 error"
+
+
+def test_old_capture_can_be_healthy(tmp_path):
+    state, raw, parquet = _state_with_parquet(tmp_path, capture=_capture(days_ago=45))
+    source = raw / "conversation.json"
+    source.touch()
+    os.utime(source, (parquet.stat().st_mtime - 10, parquet.stat().st_mtime - 10))
+
+    assert state.status() == "green"
+    assert state.health().reason == "Processed data is up to date"
+
+
+def test_missing_parquet_is_failed(tmp_path):
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    state = PlatformState("ChatGPT", raw, None, tmp_path / "missing", [_capture()])
+
+    assert state.status() == "red"
+    assert state.health().reason == "Processed conversations Parquet is missing"
+
+
+def test_newer_relevant_input_is_failed(tmp_path):
+    state, raw, parquet = _state_with_parquet(tmp_path, name="Codex")
+    source = raw / "rollout-example.jsonl"
+    source.touch()
+    os.utime(source, (parquet.stat().st_mtime + 10, parquet.stat().st_mtime + 10))
+
+    assert state.status() == "red"
+    assert "newer than the processed Parquet" in state.health().reason
+
+
+def test_irrelevant_file_does_not_make_parquet_stale(tmp_path):
+    state, raw, parquet = _state_with_parquet(tmp_path, name="Codex")
+    irrelevant = raw / "notes.txt"
+    irrelevant.touch()
+    os.utime(irrelevant, (parquet.stat().st_mtime + 10, parquet.stat().st_mtime + 10))
+
+    assert state.status() == "green"
+
+
+def test_never_run_is_gray():
+    state = PlatformState("ChatGPT", None, None)
+
+    assert state.status() == "gray"
+    assert state.health().reason == "No capture has been recorded"
+
+
+def test_parser_skips_are_attention_even_with_current_parquet(tmp_path):
+    state, _raw, _parquet = _state_with_parquet(
+        tmp_path,
+        name="Codex",
+        capture=_capture(),
+    )
+    state.capture_runs[0].files_seen = 10
+    state.capture_runs[0].files_parsed = 9
+    state.capture_runs[0].files_skipped = 1
+
+    assert state.status() == "yellow"
+    assert state.health().reason == "Parser skipped 1 session file"
+
+
+def test_capture_log_loads_optional_parser_coverage(tmp_path):
+    log = tmp_path / "capture_log.jsonl"
+    log.write_text(json.dumps({
+        "started_at": "2026-09-12T12:00:00Z",
+        "totals": {"files_seen": 251, "files_parsed": 251, "files_skipped": 0},
+    }) + "\n")
+
+    run = _load_capture_log(log)[0]
+
+    assert run.files_seen == 251
+    assert run.files_parsed == 251
+    assert run.files_skipped == 0

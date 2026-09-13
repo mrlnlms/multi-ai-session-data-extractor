@@ -1,6 +1,6 @@
 """Cruza timestamps do MyActivity.html com conversas do scraper.
 
-Uso: python scripts/gemini-merge-timestamps.py [--account 1]
+Uso: python scripts/platform/gemini/merge-timestamps.py [--account 1]
 
 Le:
   - data/raw/Gemini Data/account-{N}/gemini-full-export.json (scraper)

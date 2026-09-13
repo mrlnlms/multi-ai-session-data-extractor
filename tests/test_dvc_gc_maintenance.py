@@ -2,7 +2,7 @@ import importlib.util
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).parents[1] / "scripts" / "dvc_gc_maintenance.py"
+SCRIPT = Path(__file__).parents[1] / "scripts" / "maintenance" / "dvc-gc.py"
 SPEC = importlib.util.spec_from_file_location("dvc_gc_maintenance", SCRIPT)
 assert SPEC and SPEC.loader
 gc = importlib.util.module_from_spec(SPEC)

@@ -1,6 +1,6 @@
 """Baixa imagens das convs do Gemini raw mais recente de uma conta.
 
-Uso: python scripts/gemini-download-assets.py --account 1 [raw_dir]
+Uso: python scripts/platform/gemini/download-assets.py --account 1 [raw_dir]
 """
 
 import argparse

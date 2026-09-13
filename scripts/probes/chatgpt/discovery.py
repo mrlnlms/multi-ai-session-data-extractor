@@ -1,7 +1,7 @@
 """Executa descoberta ChatGPT sem escrita de raw e preserva somente métricas.
 
 Uso:
-    PYTHONPATH=. .venv/bin/python scripts/dev/probe-chatgpt-discovery.py
+    PYTHONPATH=. .venv/bin/python scripts/probes/chatgpt/discovery.py
 """
 
 import asyncio

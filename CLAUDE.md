@@ -50,6 +50,11 @@ Nao conclua que houve consolidacao apenas pelo nome, idade ou status do arquivo.
 
 ## Pipeline e validacao
 
+- `scripts/` e a interface operacional: comandos normais
+  `<source>-login.py`, `<source>-sync.py` e `<source>-parse.py` ficam na raiz.
+  Helpers internos ficam em `scripts/platform/<source>/`; probes empiricos em
+  `scripts/probes/<source>/`; manutencao e recuperacao excepcional ficam em
+  `scripts/maintenance/` e `scripts/recovery/`, respectivamente.
 - Scripts `<source>-sync.py` web fazem captura + assets + reconcile, mas nao
   chamam o parser quando executados diretamente.
 - O dashboard/headless executa o `<source>-parse.py` depois de sync web
@@ -143,4 +148,3 @@ setup](docs/SETUP.md), o runbook DVC e o complemento privado
   usuario.
 - Preserve mudancas preexistentes no worktree e nunca limpe dados apenas para
   “fazer o DVC bater”.
-- `scripts/backup_to_dvc.sh` e legado; nao o use ate ser corrigido e validado.

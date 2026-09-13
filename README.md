@@ -149,7 +149,7 @@ For ChatGPT/Perplexity: expected behavior.
 
 ## Commands per platform
 
-Each web platform has 2-4 scripts in `scripts/`. Pattern:
+Each web platform exposes stable operational commands at the `scripts/` root:
 
 ```bash
 python scripts/<plat>-login.py    # once — manual login in the browser
@@ -166,6 +166,8 @@ Common web-sync flags (availability varies by source):
 
 Full list of commands per platform:
 [docs/operations/pipeline.md](docs/operations/pipeline.md).
+Secondary platform helpers, probes, maintenance, and recovery commands are
+classified in [`scripts/README.md`](scripts/README.md).
 
 ## Dashboard
 
@@ -198,6 +200,11 @@ To view the generated HTMLs locally:
 ```bash
 ./scripts/serve-qmds.sh open
 ```
+
+This server exposes `notebooks/_output/` directly at
+<http://localhost:8765>; it is also the report endpoint used by the dashboard.
+Rendered reports contain real derived data, remain ignored by Git, and are not
+the source of a public GitHub Pages site.
 
 ## Tests
 

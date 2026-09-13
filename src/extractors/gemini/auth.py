@@ -33,7 +33,7 @@ async def login(account: int = 1) -> None:
         await context.wait_for_event("close", timeout=0)
 
     print(f"Browser fechado. Sessao da conta {account} salva em {profile_dir}")
-    print(f"Agora rode: python scripts/gemini-export.py --account {account}")
+    print(f"Agora rode: python scripts/platform/gemini/export.py --account {account}")
 
 
 async def load_context(account: int = 1, headless: bool = True) -> BrowserContext:
