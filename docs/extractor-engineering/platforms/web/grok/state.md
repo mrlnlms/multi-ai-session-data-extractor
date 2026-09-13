@@ -4,11 +4,11 @@
 
 - **Pastas cumulativas por conta:** a conta padrao usa `data/raw/Grok/` e
   `data/merged/Grok/`; as demais usam `account-<n>/` sob essas raizes.
-- **Sync orchestrator (3 steps):** `scripts/platform/grok/sync.py` (capture +
+- **Sync orchestrator (3 steps):** `python -m src.platforms.grok.commands.sync` (capture +
   assets + reconcile).
 - **Headless capture** (Cloudflare did not block on smoke 2026-05-09).
 - **Auth:** persistent profile in `.storage/grok-profile-<account>/`
-  (generated via `scripts/platform/grok/login.py`). Login via grok.com (SSO da
+  (generated via `python -m src.platforms.grok.commands.login`). Login via grok.com (SSO da
   conta X). Cookies bastam — sem token em localStorage.
 
 ## Coverage
@@ -26,7 +26,7 @@ workspaces.
 
 ## Canonical parser
 
-`src/parsers/grok.py`.
+`src/platforms/grok/parser.py`.
 
 ### Coverage
 
@@ -74,7 +74,7 @@ Acesso na UI: avatar -> Tasks (`grok.com/tasks`).
 
 ### Asset binarios — fechado via API
 
-`src/extractors/grok/asset_downloader.py` baixa binarios via
+`src/platforms/grok/extractor/asset_downloader.py` baixa binarios via
 `https://assets.grok.com/<key>` (CDN dedicado, auth herdada via cookies
 do profile — same eTLD+1 que grok.com). O campo `key` da listagem
 `/rest/assets` ja vem com path completo `users/<uid>/<aid>/content`,
@@ -147,7 +147,7 @@ arvores e grava o e-mail configurado em `.storage/accounts.json` no campo
 `account` dos Parquets:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/grok/login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/grok/sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/grok/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.login --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.sync --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.parse
 ```

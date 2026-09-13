@@ -5,11 +5,11 @@
 - **Per-account cumulative folders:** the legacy `default` account remains in
   `data/raw/Kimi/` and `data/merged/Kimi/`; another profile key uses
   `account-<key>/` below each tree.
-- **Sync orchestrator (3 steps):** `scripts/platform/kimi/sync.py` (capture +
+- **Sync orchestrator (3 steps):** `python -m src.platforms.kimi.commands.sync` (capture +
   assets + reconcile).
 - **Headless capture** (Cloudflare did not block on smoke 2026-05-09).
 - **Auth:** persistent profile in `.storage/kimi-profile-<account>/`
-  (generated via `scripts/platform/kimi/login.py`). Cookies + Bearer token from
+  (generated via `python -m src.platforms.kimi.commands.login`). Cookies + Bearer token from
   `localStorage.access_token` (~563 chars JWT-like). Cookies-only = 401.
   Token loaded via `page.evaluate(localStorage.getItem)` em cada captura.
   Since 2026-08-30, the login and runtime origin is `https://kimi.ai/`
@@ -38,10 +38,10 @@
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/kimi/sync.py
-PYTHONPATH=. .venv/bin/python scripts/platform/kimi/login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/kimi/sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/kimi/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.sync
+PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.login --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.sync --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.parse
 ```
 
 ## Coverage
@@ -59,7 +59,7 @@ for convs + assets cumulativos.
 
 ## Canonical parser
 
-`src/parsers/kimi.py`.
+`src/platforms/kimi/parser.py`.
 
 ### Coverage
 

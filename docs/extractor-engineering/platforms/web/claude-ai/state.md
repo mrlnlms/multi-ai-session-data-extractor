@@ -5,18 +5,18 @@
 - **Per-account cumulative folders:** the legacy `default` account remains in
   `data/raw/Claude.ai/` and `data/merged/Claude.ai/`; another profile key uses
   `account-<key>/` below each tree.
-- **Sync orchestrator (3 steps):** `scripts/platform/claude/sync.py` (capture +
+- **Sync orchestrator (3 steps):** `python -m src.platforms.claude_ai.commands.sync` (capture +
   assets + reconcile).
 - **Headless capture** (no Cloudflare challenge at runtime).
 - **Auth:** the default persistent profile is
   `.storage/claude-ai-profile-default/` (generated via
-  `scripts/platform/claude/login.py --profile default`). Other profile names follow
+  `python -m src.platforms.claude_ai.commands.login --profile default`). Other profile names follow
   `.storage/claude-ai-profile-<name>/`.
 
 ## Coverage
 
 Conversations + projects discovered and captured via standard discovery.
-Automatic recovery from transient timeouts via `scripts/platform/claude/refetch-known.py`.
+Automatic recovery from transient timeouts via `python -m src.platforms.claude_ai.commands.refetch_known`.
 
 Binaries + artifacts (code/markdown/html/react via `tool_use`) extracted
 during asset download.
@@ -59,7 +59,7 @@ projects), idempotent. Output: `data/merged/Claude.ai/conversations/<uuid>.json`
 
 ## Canonical parser v3.1
 
-`src/parsers/claude_ai.py` + `_claude_ai_helpers.py`.
+`src/platforms/claude_ai/parser.py` + `_parser_helpers.py`.
 
 ### Coverage
 
@@ -112,12 +112,12 @@ color: Anthropic burnt orange `#CC785C`.
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/claude/sync.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.sync
 # Additional Claude account after one interactive login:
-PYTHONPATH=. .venv/bin/python scripts/platform/claude/login.py --profile account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/claude/sync.py --profile account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.login --profile account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.sync --profile account-2
 # If sync left gaps (transient timeouts):
-PYTHONPATH=. .venv/bin/python scripts/platform/claude/refetch-known.py
-PYTHONPATH=. .venv/bin/python scripts/platform/claude/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.refetch_known
+PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.parse
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/claude-ai.qmd
 ```

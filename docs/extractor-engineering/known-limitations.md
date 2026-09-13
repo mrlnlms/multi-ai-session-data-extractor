@@ -20,7 +20,7 @@ Limitations fall into 3 categories:
   voice messages have transcript text populated (via raw heuristic
   detecting `audio_transcription` in parts). 4 voice messages end up
   with empty text (edge cases — transcription failed upstream). The Pass 2
-  via DOM scraping (`src/extractors/chatgpt/dom_voice.py`) exists but
+  via DOM scraping (`src/platforms/chatgpt/extractor/dom_voice.py`) exists but
   is not necessary for this coverage — over-engineering for the 4
   remaining cases.
 - **8 unrecoverable assets:** some old assets are no longer
@@ -114,7 +114,7 @@ These validations require a Pro Max account and remain open until someone tests:
   URL and keeps it isolated). Not an extractor gap — not capturable.
 - **Multi-account:** three active Google accounts are configured (acc-1,
   acc-2, acc-3); the parser discovers `account-N` directories automatically.
-  For more accounts, you would need to adjust `scripts/platform/gemini/sync.py` and the
+  For more accounts, you would need to adjust `src/platforms/gemini/commands/sync.py` and the
   Quarto template.
 
 ### NotebookLM
@@ -207,9 +207,9 @@ These validations require a Pro Max account and remain open until someone tests:
   (smoke tests with fixtures: build_plan + run_reconciliation +
   preservation + idempotency), **pure functions of the web extractors**
   (parsing, dedup, discovery baseline, target_path, ext_from_url).
-- **CI runs on Ubuntu + macOS x Python 3.12/3.13** (4 unit
-  combinations) + integration smoke (Quarto render + Playwright import + Streamlit
-  healthcheck + source import smoke tests).
+- **Validation is local.** Before merge, run the full automated suite and the
+  applicable integration smoke checks (Quarto render, Playwright import,
+  Streamlit healthcheck, and source import smoke tests).
 - **Extractors' HTTP/auth/Playwright without unit tests.** The logic
   is validated empirically in real syncs. Mocking Playwright/httpx is
   expensive (~20h of setup + fragile when the platform changes). If worth it,

@@ -1,0 +1,1 @@
+"""Executable Kimi command modules."""

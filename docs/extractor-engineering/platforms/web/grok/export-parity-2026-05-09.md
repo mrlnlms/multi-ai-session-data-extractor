@@ -118,7 +118,7 @@ DOM que existe CDN dedicado `assets.grok.com`. URL determinístico:
 listagem `/rest/assets` (formato `users/<uid>/<aid>/content`). Auth
 funciona via cookies do mesmo eTLD+1.
 
-`src/extractors/grok/asset_downloader.py` implementa download via
+`src/platforms/grok/extractor/asset_downloader.py` implementa download via
 `page.evaluate(fetch + base64)`. Sync agora roda 3 etapas:
 capture + assets + reconcile.
 
@@ -167,7 +167,7 @@ Ambos vazios na conta atual. `media_posts` parece ser entidade nova
 ## Schedule de re-export
 
 **Nao necessario pro pipeline canonico.** asset_downloader via API
-mantem `data/raw/Grok/assets/` atualizado a cada `scripts/platform/grok/sync.py` —
+mantem `data/raw/Grok/assets/` atualizado a cada `python -m src.platforms.grok.commands.sync` —
 asset novo aparece em `/rest/assets`, downloader pega.
 
 Re-export so faz sentido se quiser refrescar os blobs preservados

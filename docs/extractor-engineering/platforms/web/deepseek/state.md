@@ -4,11 +4,11 @@
 
 - **Pastas cumulativas por conta:** a conta padrao usa `data/raw/DeepSeek/`
   e `data/merged/DeepSeek/`; as demais usam `account-<n>/` sob essas raizes.
-- **Sync orchestrator (2 steps):** `scripts/platform/deepseek/sync.py` (capture +
+- **Sync orchestrator (2 steps):** `python -m src.platforms.deepseek.commands.sync` (capture +
   reconcile).
 - **Headless capture.**
 - **Auth:** perfis persistentes em `.storage/deepseek-profile-<account>/`
-  (gerados via `scripts/platform/deepseek/login.py --account <account>`). A profile can remain present
+  (gerados via `python -m src.platforms.deepseek.commands.login --account <account>`). A profile can remain present
   after its `userToken` expires, so validate a minimal API request first.
 
 ## Coverage
@@ -47,7 +47,7 @@ filesystem supports it, with a normal copy as the portability fallback.
 
 ## Canonical parser
 
-`src/parsers/deepseek.py` + `_deepseek_helpers.py`.
+`src/platforms/deepseek/parser.py` + `_parser_helpers.py`.
 
 ### Coverage
 
@@ -92,8 +92,8 @@ filesystem supports it, with a normal copy as the portability fallback.
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/sync.py
-PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.sync
+PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.parse
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/deepseek.qmd
 ```
 
@@ -102,7 +102,7 @@ as arvores e registra o email configurado em `.storage/accounts.json` no campo
 `account` dos Parquets:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.login --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.sync --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.parse
 ```

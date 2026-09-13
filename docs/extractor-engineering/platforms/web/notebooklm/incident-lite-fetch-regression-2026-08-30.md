@@ -52,7 +52,7 @@ na interface. Ele não participa da decisão de incrementalidade.
 
 ## Correção implementada
 
-`src/extractors/notebooklm/orchestrator.py::_lite_metadata_equal` agora:
+`src/platforms/notebooklm/extractor/orchestrator.py::_lite_metadata_equal` agora:
 
 1. copia os corpos antes de comparar;
 2. mascara apenas a URL e os dois textos derivados observados dentro de cada
@@ -69,7 +69,7 @@ comparando corpos completos e preservando registros ausentes como
 notas (`cFji9`), artifacts (`gArtLc`), conteúdo capturado ou qualquer outro
 campo de metadata. Esses podem representar uma alteração real.
 
-Também foi corrigido `scripts/platform/notebooklm/sync.py` para que erros de download
+Também foi corrigido `src/platforms/notebooklm/commands/sync.py` para que erros de download
 de assets não sejam sobrescritos ao combinar as estatísticas de assets, notas
 e text artifacts.
 

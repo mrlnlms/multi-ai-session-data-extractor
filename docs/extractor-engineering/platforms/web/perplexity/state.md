@@ -4,13 +4,14 @@
 
 - **Pastas cumulativas por conta:** a conta padrao usa `data/raw/Perplexity/`
   e `data/merged/Perplexity/`; as demais usam `account-<n>/` sob essas raizes.
-- **Sync orchestrator (2 steps):** `scripts/platform/perplexity/sync.py`
+- **Sync orchestrator (2 steps):**
+  `python -m src.platforms.perplexity.commands.sync`
   (capture + reconcile). Captures everything in one shot (no separate
   asset step).
 - **Capture:** **headed** (Cloudflare 403 in headless — documented by
   design in `perplexity/api_client.py:12-13`).
 - **Auth:** persistent profile in `.storage/perplexity-profile-<account>/`
-  (generated via `scripts/platform/perplexity/login.py`).
+  (generated via `python -m src.platforms.perplexity.commands.login`).
 
 ## Coverage
 
@@ -41,7 +42,7 @@ recent capture timestamp.
 
 ## Canonical parser
 
-`src/parsers/perplexity.py`:
+`src/platforms/perplexity/parser.py`:
 
 - Pages have `conversation_id='page:<slug>'`.
 - Search results extracted from `blocks[*].web_result_block.web_results`.
@@ -74,13 +75,13 @@ recent capture timestamp.
 
 ## Related documents
 
-- Probes: engineering commands in `scripts/platform/perplexity/probes/`.
+- Probes: engineering modules in `src/platforms/perplexity/probes/`.
 
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/sync.py
-PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.sync
+PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.parse
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/perplexity.qmd
 ```
 
@@ -89,7 +90,7 @@ as arvores e grava o e-mail configurado em `.storage/accounts.json` no campo
 `account` dos Parquets:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.login --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.sync --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.parse
 ```

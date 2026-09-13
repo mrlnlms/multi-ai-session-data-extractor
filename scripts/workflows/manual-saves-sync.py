@@ -24,9 +24,9 @@ from pathlib import Path
 
 from src.runtime.project import find_project_root
 
-from src.parsers.manual.clippings_obsidian import ClippingsObsidianParser
-from src.parsers.manual.copypaste_web import CopypasteWebParser
-from src.parsers.manual.terminal_claude_code import TerminalClaudeCodeParser
+from src.importers.manual.clippings_obsidian import ClippingsObsidianParser
+from src.importers.manual.copypaste_web import CopypasteWebParser
+from src.importers.manual.terminal_claude_code import TerminalClaudeCodeParser
 from src.schema.models import (
     branches_to_df,
     conversations_to_df,

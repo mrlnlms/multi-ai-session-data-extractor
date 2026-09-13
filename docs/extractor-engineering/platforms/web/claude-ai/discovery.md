@@ -1,7 +1,7 @@
 # Parser Claude.ai v3 — empirical findings (2026-05-01)
 
 Findings coletados sobre o raw real (~835 convs + 83 projects capturados
-via `scripts/platform/claude/sync.py`). Espelha
+via `python -m src.platforms.claude_ai.commands.sync`). Espelha
 `the detailed parser investigation from the same discovery phase`.
 
 ## 1. Top-level conversation schema

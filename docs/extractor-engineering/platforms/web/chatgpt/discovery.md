@@ -4,7 +4,7 @@ Coleta empírica em `data/merged/ChatGPT/chatgpt_merged.json` (1171 convs,
 27/abr–28/abr/2026). Documenta shape real de cada feature antes do plan
 formal. Plan deve citar este doc como referência.
 
-Fixtures sanitizadas em `tests/extractors/chatgpt/fixtures/raw_with_*.json`
+Fixtures sanitizadas em `tests/platforms/chatgpt/extractor/fixtures/raw_with_*.json`
 + meta-tests em `test_fixtures_integrity.py` (24 testes passando).
 
 ---
@@ -264,7 +264,7 @@ Computer Use (agentic — ChatGPT Agent):
 - Detecção via prefix `computer.` ou `container.` em `author.name`
 - Vira ToolEvent com `event_type="computer_use"` (categoria dedicada,
   separada de `other`)
-- Fixture: `tests/extractors/chatgpt/fixtures/raw_with_computer_use.json`
+- Fixture: `tests/platforms/chatgpt/extractor/fixtures/raw_with_computer_use.json`
   (conv "Documentos CodeMarker v2", 81 nodes, 2 compute events
   cobrindo `container.download` + `container.open_image`)
 - Meta-test: `test_fixture_computer_use_has_agent_tools`
@@ -447,7 +447,7 @@ Pontos que precisam de mais dados antes de cravar no plan:
 
 ## 12. Lista de fixtures geradas
 
-Em `tests/extractors/chatgpt/fixtures/`:
+Em `tests/platforms/chatgpt/extractor/fixtures/`:
 
 | Fixture | Conv ID original (prefix) | Nodes | Feature alvo |
 |---|---|---|---|

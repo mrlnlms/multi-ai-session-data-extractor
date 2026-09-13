@@ -34,6 +34,22 @@ WORKFLOW_FILES = {
     "unify-parquets.py",
 }
 TOOL_FILES = {"prune-dvc-history.py"}
+PLATFORM_PACKAGE = {
+    "ChatGPT": "chatgpt",
+    "Claude.ai": "claude_ai",
+    "Gemini": "gemini",
+    "NotebookLM": "notebooklm",
+    "Qwen": "qwen",
+    "DeepSeek": "deepseek",
+    "Perplexity": "perplexity",
+    "Grok": "grok",
+    "Kimi": "kimi",
+    "Claude Code": "claude_code",
+    "Codex": "codex",
+    "Gemini CLI": "gemini_cli",
+    "Antigravity CLI": "antigravity_cli",
+}
+MIGRATED_PLATFORMS: set[str] = set(KNOWN_PLATFORMS)
 
 
 @pytest.mark.parametrize(
@@ -41,8 +57,10 @@ TOOL_FILES = {"prune-dvc-history.py"}
     [(platform, action) for platform, actions in PLATFORM_ACTIONS.items() for action in sorted(actions)],
 )
 def test_supported_source_has_platform_entrypoint(platform: str, action: str):
-    prefix = SCRIPT_PREFIX[platform]
-    assert (SCRIPTS_DIR / "platform" / prefix / f"{action}.py").is_file()
+    source_id = PLATFORM_PACKAGE[platform]
+    assert (
+        PROJECT_ROOT / "src" / "platforms" / source_id / "commands" / f"{action}.py"
+    ).is_file()
 
 
 @pytest.mark.parametrize(
@@ -50,8 +68,11 @@ def test_supported_source_has_platform_entrypoint(platform: str, action: str):
     [(platform, tool) for platform, tools in PLATFORM_TOOLS.items() for tool in sorted(tools)],
 )
 def test_supported_source_has_platform_tool(platform: str, tool: str):
-    prefix = SCRIPT_PREFIX[platform]
-    assert (SCRIPTS_DIR / "platform" / prefix / f"{tool}.py").is_file()
+    source_id = PLATFORM_PACKAGE[platform]
+    module = tool.replace("-", "_")
+    assert (
+        PROJECT_ROOT / "src" / "platforms" / source_id / "commands" / f"{module}.py"
+    ).is_file()
 
 
 @pytest.mark.parametrize("filename", sorted(WORKFLOW_FILES))
@@ -74,6 +95,8 @@ def test_scripts_root_contains_only_readme():
 
 def test_layout_contract_covers_every_known_platform():
     assert set(PLATFORM_ACTIONS) == set(KNOWN_PLATFORMS)
+    assert set(PLATFORM_PACKAGE) == set(KNOWN_PLATFORMS)
+    assert MIGRATED_PLATFORMS == set(KNOWN_PLATFORMS)
 
 
 def test_web_platforms_are_exactly_platforms_with_login():
@@ -82,12 +105,13 @@ def test_web_platforms_are_exactly_platforms_with_login():
 
 
 def test_platform_directories_match_registered_prefixes():
-    actual = {
-        path.name
-        for path in (SCRIPTS_DIR / "platform").iterdir()
-        if path.is_dir()
-    }
-    assert actual == set(SCRIPT_PREFIX.values())
+    assert MIGRATED_PLATFORMS == set(KNOWN_PLATFORMS)
+    assert not (SCRIPTS_DIR / "platform").exists()
+
+
+def test_horizontal_source_namespaces_are_absent():
+    for namespace in ("extractors", "parsers", "reconcilers"):
+        assert not (PROJECT_ROOT / "src" / namespace).exists()
 
 
 def test_no_legacy_root_entrypoints():
@@ -128,11 +152,11 @@ def test_no_python_cache_is_tracked():
 def test_dashboard_resolves_every_sync_entrypoint(platform: str):
     command = sync_command(platform)
     assert command is not None
-    assert Path(command[1]).is_file()
+    assert command[1:3] == ["-m", f"src.platforms.{PLATFORM_PACKAGE[platform]}.commands.sync"]
 
 
 @pytest.mark.parametrize("platform", sorted(WEB_PLATFORMS))
 def test_dashboard_resolves_every_web_parse_entrypoint(platform: str):
     command = parse_command(platform)
     assert command is not None
-    assert Path(command[1]).is_file()
+    assert command[1:3] == ["-m", f"src.platforms.{PLATFORM_PACKAGE[platform]}.commands.parse"]

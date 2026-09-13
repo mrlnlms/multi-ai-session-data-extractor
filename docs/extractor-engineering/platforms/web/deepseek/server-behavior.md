@@ -98,19 +98,19 @@ which is why sync ran clean on the first attempt:
    After the migration to the single folder, `parent` became `data/raw/`
    and rglob walked all platforms, picking up the maximum from Claude.ai
    (835) or ChatGPT (1171). Fix: pass `output_dir`. Applied in
-   `src/extractors/deepseek/orchestrator.py`.
+   `src/platforms/deepseek/extractor/orchestrator.py`.
 
 2. **`discover()` persisted `discovery_ids.json` before fail-fast.** If
    it aborted, the next run loaded `prev_map` already with new timestamps
    and stopped refetching bodies that had changed. Fix: separate
    `discover()` (pure fetch) from `persist_discovery()` (called by the
    orchestrator after fail-fast). Applied in
-   `src/extractors/deepseek/discovery.py`.
+   `src/platforms/deepseek/extractor/discovery.py`.
 
 3. **`--full` in sync did not propagate to the reconciler.** `--full` only
    forced the extractor to refetch; the reconciler still used stale merged
    cache. Fix: pass `full=args.full` to `run_reconciliation`. Applied in
-   `scripts/platform/deepseek/sync.py`.
+   `python -m src.platforms.deepseek.commands.sync`.
 
 ## Other pending items (non-blocking — feature edges)
 

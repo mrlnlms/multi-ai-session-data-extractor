@@ -1,4 +1,4 @@
-"""Wrapper CLI pra `src.extractors.cli.copy.copy_source`.
+"""Wrapper CLI pra `src.capture.cli.copy.copy_source`.
 
 Uso:
     PYTHONPATH=. .venv/bin/python scripts/workflows/copy-cli-data.py            # todas as 4 CLIs
@@ -12,8 +12,8 @@ import argparse
 import logging
 import sys
 
-from src.extractors.cli.copy import SOURCES, copy_source
-from src.extractors.cli.snapshot import snapshot_configs
+from src.capture.cli.copy import SOURCES, copy_source
+from src.capture.cli.snapshot import snapshot_configs
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)

@@ -8,7 +8,7 @@ Source: `gemini_cli`. Mode: `cli`. Local data — incremental copy from
 - **JSON schema** (not JSONL like Claude Code/Codex): `session-<timestamp>-<sid>.json`
 - **Periodic snapshots:** the same session can have N files with the
   same internal `sessionId`. Parser consolidates into 1 Conversation
-  with dedup by `message_id`. See `src/parsers/gemini_cli.py:_parse_session`.
+  with dedup by `message_id`. See `src/platforms/gemini_cli/parser.py:_parse_session`.
 - `thoughts` array → formatted `thinking`.
 - `toolCalls` correlated via status (`success`/`error`).
 - **`logs.json` orphan handling:** convs presentes em `logs.json` sem
@@ -24,7 +24,7 @@ the "preservation at the raw level via cli-copy" pattern.
 
 ## Where the real info lives
 
-- **Parser:** `src/parsers/gemini_cli.py`
-- **Copy script:** `src/extractors/cli/copy.py`
+- **Parser:** `src/platforms/gemini_cli/parser.py`
+- **Copy script:** `src/capture/cli/copy.py`
 - **Quarto data profile:** `notebooks/gemini-cli.qmd`
-- **Sync orchestrator:** `scripts/platform/gemini-cli/sync.py`
+- **Sync orchestrator:** `python -m src.platforms.gemini_cli.commands.sync`

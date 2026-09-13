@@ -49,9 +49,9 @@ documentation.
 Keep all operational commands for a source together:
 
 ```text
-scripts/platform/<source>/login.py   # web platforms only
-scripts/platform/<source>/sync.py
-scripts/platform/<source>/parse.py
+src/platforms/<source_id>/commands/login.py   # web platforms only
+src/platforms/<source_id>/commands/sync.py
+src/platforms/<source_id>/commands/parse.py
 ```
 
 A promoted source must also be registered in `KNOWN_PLATFORMS` and

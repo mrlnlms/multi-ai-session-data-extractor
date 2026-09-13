@@ -33,13 +33,13 @@ data/external/
 ### manual-saves/ ✅ parsável
 
 Convertido pra parquets canônicos via `scripts/manual-saves-sync.py`. Os 3
-parsers (`src/parsers/manual/`):
+parsers (`src/importers/manual/`):
 - **clippings-obsidian** — Obsidian Web Clipper (markdown com YAML frontmatter)
 - **copypaste-web** — copy-paste manual (.txt) de chats web
 - **terminal-claude-code** — output renderizado do terminal Claude Code (.txt)
 
 Output: `data/processed/<Plataforma>/<source>_manual_<table>.parquet`. Quartos
-fazem UNION via `setup_views_with_manual()` em `src/parsers/quarto_helpers.py`.
+fazem UNION via `setup_views_with_manual()` em `src/reporting/quarto_helpers.py`.
 
 Stats atuais (29 convs / 403 msgs / 70 tool_events):
 | Plataforma | Convs | capture_method |
@@ -63,7 +63,7 @@ storage do servidor. Estrutura por snapshot:
 - `prod-mc-billing.json` — billing balance (vazio em free tier)
 - `prod-mc-asset-server/<asset_id>/content` × 44 + profile-picture.webp
   — **redundante:** mesmos binarios baixados via API por
-  `src/extractors/grok/asset_downloader.py` em `https://assets.grok.com/
+  `src/platforms/grok/extractor/asset_downloader.py` em `https://assets.grok.com/
   <key>` (sha256 bit-identical). Pipeline canonico nao depende deste
   snapshot.
 
@@ -126,8 +126,8 @@ específico antes de implementar.
 2. Adicionar entrada em **Categorias** acima documentando o que é
 3. Decidir se vira parser ou fica preservado como blob
 4. Se virar parser:
-   - Criar `src/parsers/manual/<source>.py` (ou `external/<source>.py`)
-   - Atualizar `scripts/manual-saves-sync.py` (se aplicável) ou criar sync próprio
+   - Criar `src/importers/manual/<source>.py` (ou `external/<source>.py`)
+   - Atualizar `scripts/workflows/manual-saves-sync.py` (se aplicável) ou criar sync próprio
    - Output em `data/processed/<Plataforma>/<source>_manual_<table>.parquet`
 
 ## Total atual

@@ -20,11 +20,11 @@ plataforma. Nao extraia credenciais do perfil nem tente contornar a sessao.
 
 ## Ciclo por fonte
 
-1. Execute `scripts/platform/<source>/sync.py` com a menor abrangencia segura.
+1. Execute `python -m src.platforms.<source_id>.commands.sync` com a menor abrangencia segura.
 2. Verifique discovery e reconciliacao. Se houver discovery parcial, mantenha
    raw/merged existentes e siga o fallback documentado — por exemplo,
    `refetch_known` quando a fonte o oferecer.
-3. So depois de reconcile saudavel, execute `scripts/platform/<source>/parse.py` para fontes
+3. So depois de reconcile saudavel, execute `python -m src.platforms.<source_id>.commands.parse` para fontes
    web. O parquet resultante deve ser mais novo que os insumos relevantes.
 4. Registre comando, flags, contagens `added`/`updated`/`preserved_missing`,
    status e proxima acao segura.

@@ -20,7 +20,7 @@ import duckdb
 from itables import init_notebook_mode
 init_notebook_mode(all_interactive=False)
 
-from src.parsers.quarto_helpers import (
+from src.reporting.quarto_helpers import (
     fmt_pct, fmt_int, show_df, show_md, plotly_bar,
     has_col, has_view, table_count, setup_unified_views,
 )

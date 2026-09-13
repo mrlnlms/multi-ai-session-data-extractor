@@ -1,0 +1,1 @@
+"""Kimi platform package tests."""

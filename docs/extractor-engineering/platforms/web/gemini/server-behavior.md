@@ -26,7 +26,7 @@ conversation discovery or a reason to discard the existing asset corpus.
 
 ## Raw schema — positional (no keys)
 
-Paths discovered via probe (`scripts/platform/gemini/probes/schema.py`):
+Paths discovered via probe (`src/platforms/gemini/probes/schema.py`):
 
 ```
 raw                 — list[4] = [turns_wrapper, ?, None, ?]
@@ -107,11 +107,11 @@ The same 3 patterns from Qwen/DeepSeek applied preventively to Gemini:
    leakage across platforms.
 2. **`discover()` lazy persist** (separate from `persist_discovery()`) —
    ensures fail-fast does not corrupt the incremental baseline.
-3. **`--full` propagated to reconcile** in `scripts/platform/gemini/sync.py`.
+3. **`--full` propagated to reconcile** in `src/platforms/gemini/commands/sync.py`.
 
 Plus:
 4. **Multi-account** — orchestrator/reconciler operate per-account; the sync
-   orchestrator (`scripts/platform/gemini/sync.py`) iterates over both. `account-{N}/`
+   orchestrator (`src/platforms/gemini/commands/sync.py`) iterates over both. `account-{N}/`
    subfolders in raw and merged.
 5. **Adapted dashboard** — `_collect_logs()` now supports both flat layout
    (`base/capture_log.jsonl`) and multi-account
@@ -150,7 +150,7 @@ The MaZiqc listing schema has 10 fields per conv:
 [9] int          (always 2 in this base)
 ```
 
-Probe: `scripts/platform/gemini/probes/pin-share.py`. Comparison between a pinned chat
+Probe: `src/platforms/gemini/probes/pin_share.py`. Comparison between a pinned chat
 and normal chats revealed a difference in position [2]. Alternative RPC ids
 tested (EaipR, yQzmHb, VhQOs) returned 400 — pin has no dedicated endpoint
 (same as ChatGPT, which also doesn't expose a separate `/pinned` but uses a

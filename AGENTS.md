@@ -55,14 +55,16 @@ arquivo.
 
 ## Pipeline e validacao
 
-- `scripts/` e a interface operacional: cada fonte fica inteira em
-  `scripts/platform/<source>/`. Fontes web expoem `login.py`, `sync.py` e
-  `parse.py`; fontes CLI expoem `sync.py` e `parse.py`. Probes empiricos ficam
-  em `scripts/platform/<source>/probes/`; ferramentas excepcionais especificas
-  tambem ficam junto da plataforma. Fluxos transversais ficam em
+- Cada fonte fica inteira em `src/platforms/<source>/`. Fontes web expoem
+  modulos em `commands/` para login, sync e parse; fontes CLI expoem sync e
+  parse. Probes empiricos ficam em `src/platforms/<source>/probes/`;
+  ferramentas excepcionais especificas tambem ficam junto da plataforma.
+  Fluxos transversais ficam em
   `scripts/workflows/`; comandos opcionais do operador ficam em
   `scripts/tools/` e nao integram o pipeline normal.
-- Os scripts `scripts/platform/<source>/sync.py` das fontes web fazem captura + assets +
+- `scripts/` contem apenas workflows transversais e ferramentas opcionais do
+  operador. Dashboard, workflows e testes reutilizam os pacotes em `src/`.
+- Os modulos `src.platforms.<source>.commands.sync` das fontes web fazem captura + assets +
   reconcile e nao chamam o parser quando executados diretamente. O pipeline
   do dashboard/headless executa automaticamente o `parse.py` da fonte depois
   de cada sync web bem-sucedido e antes de `scripts/workflows/unify-parquets.py`.

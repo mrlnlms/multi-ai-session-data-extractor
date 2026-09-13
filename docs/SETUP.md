@@ -78,25 +78,25 @@ navegador, voce entra manualmente e o perfil fica em
 `.storage/<platform>-profile-<account>/` (ignorado pelo Git).
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/login.py
-PYTHONPATH=. .venv/bin/python scripts/platform/claude/login.py
-PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/login.py
-PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/login.py
-PYTHONPATH=. .venv/bin/python scripts/platform/qwen/login.py
-PYTHONPATH=. .venv/bin/python scripts/platform/grok/login.py
-PYTHONPATH=. .venv/bin/python scripts/platform/kimi/login.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.login
+PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.login
+PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.login
+PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.login
+PYTHONPATH=. .venv/bin/python -m src.platforms.qwen.commands.login
+PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.login
+PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.login
 ```
 
 Para uma segunda conta de uma plataforma, use um perfil separado, por exemplo
-`PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/login.py --account account-2`.
+`PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.login --account account-2`.
 
 Para Gemini e NotebookLM, informe a conta explicitamente:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/gemini/login.py --account 1
-PYTHONPATH=. .venv/bin/python scripts/platform/gemini/login.py --account 2
-PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/login.py --account 1
-PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/login.py --account 2
+PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login --account 1
+PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login --account 2
+PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.login --account 1
+PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.login --account 2
 ```
 
 **O que esperar:**
@@ -117,7 +117,7 @@ faz login. Ele copia dados dos diretorios locais da ferramenta, como
 Comece por uma plataforma para validar o ambiente:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/sync.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync
 ```
 
 For another ChatGPT account, create and log into an isolated extractor profile
@@ -125,37 +125,37 @@ once, then pass the same key to sync. The default account keeps the original
 paths; `account-2` uses its own raw and merged subdirectories.
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/login.py --profile account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/sync.py --account account-2 --no-voice-pass
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.login --profile account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync --account account-2 --no-voice-pass
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.parse
 ```
 
 Claude.ai follows the same profile-key pattern:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/claude/login.py --profile account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/claude/sync.py --profile account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/claude/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.login --profile account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.sync --profile account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.parse
 ```
 
 Kimi also uses a named isolated profile for each additional account:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/kimi/login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/kimi/sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/kimi/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.login --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.sync --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.parse
 ```
 
 Grok e Perplexity seguem o mesmo padrao quando uma segunda conta existir:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/grok/login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/grok/sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/grok/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.login --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.sync --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.parse
 
-PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.login --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.sync --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.parse
 ```
 
 Um sync web executado diretamente faz captura, download de assets e
@@ -172,7 +172,7 @@ Ao executar um sync web diretamente, rode depois o parser para converter o
 merged em Parquet:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.parse
 ```
 
 Isso gera os Parquets de `data/processed/ChatGPT/` no schema canonico.
@@ -200,15 +200,15 @@ Para Gemini:
 
 ```bash
 # Login to each account separately
-PYTHONPATH=. .venv/bin/python scripts/platform/gemini/login.py --account 1
-PYTHONPATH=. .venv/bin/python scripts/platform/gemini/login.py --account 2
-PYTHONPATH=. .venv/bin/python scripts/platform/gemini/login.py --account 3
+PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login --account 1
+PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login --account 2
+PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login --account 3
 
 # Sync all accounts
-PYTHONPATH=. .venv/bin/python scripts/platform/gemini/sync.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync
 
 # Or just one
-PYTHONPATH=. .venv/bin/python scripts/platform/gemini/sync.py --account 1
+PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync --account 1
 ```
 
 Para NotebookLM, use o mesmo padrao com `--account 1`, `--account 2` ou
@@ -221,7 +221,7 @@ Para NotebookLM, use o mesmo padrao com `--account 1`, `--account 2` ou
 A sessao da plataforma expirou. Faca login de novo:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/login.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.login
 ```
 
 ### ChatGPT abre uma janela mesmo durante o sync
@@ -247,10 +247,10 @@ O que fazer:
 
 ```bash
 # Try again (transient instability usually resolves)
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/sync.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync
 
 # Investigate manually
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/sync.py --dry-run
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync --dry-run
 ```
 
 ### O sync esta demorando demais
@@ -284,13 +284,13 @@ janela visivel nessa plataforma; se o erro persistir, recrie o perfil:
 
 ```bash
 rm -rf .storage/perplexity-profile-default
-PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/login.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.login
 ```
 
 ### Quero recapturar tudo (sem aproveitar o incremental)
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/sync.py --full
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync --full
 ```
 
 Isso busca todas as conversas de novo, nao apenas as alteradas. Ainda assim,

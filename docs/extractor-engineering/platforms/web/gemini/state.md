@@ -3,11 +3,12 @@
 ## Pipeline
 
 - **Multi-account** — 3 Google accounts. Profiles in
-  `.storage/gemini-profile-{1,2,3}/` (generated via `scripts/platform/gemini/login.py`).
+  `.storage/gemini-profile-{1,2,3}/` (generated via
+  `python -m src.platforms.gemini.commands.login`).
 - **Single cumulative folder per-account:** `data/raw/Gemini/account-{N}/` and
   `data/merged/Gemini/account-{N}/`.
 - **Sync orchestrator (3 multi-account steps):**
-  `scripts/platform/gemini/sync.py` — capture per-account + assets + reconcile
+  `python -m src.platforms.gemini.commands.sync` — capture per-account + assets + reconcile
   per-account. Iterates over all active accounts in sequence (default) or
   `--account N` to run just one.
 - **Headless capture** (no Cloudflare at runtime).
@@ -30,7 +31,7 @@ copy fallback; mutable conversation JSON remains independent.
 - Account 1 asset download saved 114 new assets and skipped 54 existing ones;
   73 image URLs returned HTTP 403 and remain unavailable upstream. Account 2
   assets were left unchanged during this run after its incremental capture.
-- `scripts/platform/gemini/reconcile.py` is again usable with the current
+- `python -m src.platforms.gemini.commands.reconcile` is again usable with the current
   `data/raw/Gemini/account-{N}` layout. It supports `--full`; there are no
   Gemini-specific feature-refetch flags.
 
@@ -54,10 +55,10 @@ copy fallback; mutable conversation JSON remains independent.
 
 ## Canonical parser
 
-`src/parsers/gemini.py` + `_gemini_helpers.py`.
+`src/platforms/gemini/parser.py` + `_parser_helpers.py`.
 
 The raw schema is **positional** (Google batchexecute, no keys) — paths
-discovered via probe (`scripts/platform/gemini/probes/schema.py`):
+discovered via probe (`src/platforms/gemini/probes/schema.py`):
 
 - `turn[2][0][0]` → user text.
 - `turn[3][0][0][1]` → assistant text (chunks).
@@ -99,15 +100,15 @@ discovered via probe (`scripts/platform/gemini/probes/schema.py`):
 ## Related documents
 
 - `docs/extractor-engineering/platforms/web/gemini/server-behavior.md` — upstream behavior.
-- Probes: `scripts/platform/gemini/probes/schema.py`,
-  `scripts/platform/gemini/probes/pin-share.py`.
+- Probes: `src/platforms/gemini/probes/schema.py`,
+  `src/platforms/gemini/probes/pin_share.py`.
 
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/gemini/sync.py             # all accounts
-PYTHONPATH=. .venv/bin/python scripts/platform/gemini/sync.py --account 1 # account 1 only
-PYTHONPATH=. .venv/bin/python scripts/platform/gemini/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync             # all accounts
+PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync --account 1 # account 1 only
+PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.parse
 for f in gemini gemini-acc-1 gemini-acc-2 gemini-acc-3; do
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd
 done

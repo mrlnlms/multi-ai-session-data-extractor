@@ -44,7 +44,7 @@ silenciosamente.
 
 ## Where the real info lives
 
-- **Parser:** `src/parsers/codex.py`
-- **Copy script:** `src/extractors/cli/copy.py`
+- **Parser:** `src/platforms/codex/parser.py`
+- **Copy script:** `src/capture/cli/copy.py`
 - **Quarto data profile:** `notebooks/codex.qmd`
-- **Sync orchestrator:** `scripts/platform/codex/sync.py`
+- **Sync orchestrator:** `python -m src.platforms.codex.commands.sync`

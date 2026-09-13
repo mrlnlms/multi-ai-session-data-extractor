@@ -26,46 +26,46 @@ bem-sucedido. Os quatro syncs de CLI ja fazem copy e parse.
 
 ```bash
 # Fonte web: exemplo ChatGPT
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/sync.py --no-voice-pass
-# Outra conta ChatGPT, depois de executar scripts/platform/chatgpt/login.py --profile account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/sync.py --account account-2 --no-voice-pass
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync --no-voice-pass
+# Outra conta ChatGPT, depois de executar python -m src.platforms.chatgpt.commands.login --profile account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync --account account-2 --no-voice-pass
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.parse
 
-# Outra conta Claude.ai, depois de executar scripts/platform/claude/login.py --profile account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/claude/sync.py --profile account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/claude/parse.py
+# Outra conta Claude.ai, depois de executar python -m src.platforms.claude_ai.commands.login --profile account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.sync --profile account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.parse
 
-# Outra conta Kimi, depois de executar scripts/platform/kimi/login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/kimi/sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/kimi/parse.py
+# Outra conta Kimi, depois de executar python -m src.platforms.kimi.commands.login --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.sync --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.parse
 
-# Outra conta DeepSeek, depois de executar scripts/platform/deepseek/login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/deepseek/parse.py
+# Outra conta DeepSeek, depois de executar python -m src.platforms.deepseek.commands.login --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.sync --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.parse
 
-# Outra conta Qwen, depois de executar scripts/platform/qwen/login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/qwen/sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/qwen/parse.py
+# Outra conta Qwen, depois de executar python -m src.platforms.qwen.commands.login --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.qwen.commands.sync --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.qwen.commands.parse
 
 # Outra conta Grok ou Perplexity, depois do login no perfil separado
-PYTHONPATH=. .venv/bin/python scripts/platform/grok/sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/grok/parse.py
-PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/perplexity/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.sync --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.parse
+PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.sync --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.parse
 
 # Gemini e NotebookLM: tres contas ativas
-PYTHONPATH=. .venv/bin/python scripts/platform/gemini/sync.py
-PYTHONPATH=. .venv/bin/python scripts/platform/gemini/parse.py
-PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/sync.py
-PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync
+PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.parse
+PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.sync
+PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.parse
 
 # Fonte CLI: sync ja inclui parse
-PYTHONPATH=. .venv/bin/python scripts/platform/codex/sync.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.codex.commands.sync
 
 # Antigravity CLI: recuperacao legacy e excepcional; sidecars passam a ser
 # consumidos pelos parses seguintes
-PYTHONPATH=. .venv/bin/python scripts/platform/antigravity-cli/recover-legacy.py --all-opaque
-PYTHONPATH=. .venv/bin/python scripts/platform/antigravity-cli/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.antigravity_cli.commands.recover_legacy --all-opaque
+PYTHONPATH=. .venv/bin/python -m src.platforms.antigravity_cli.commands.parse
 ```
 
 O parse oficial do NotebookLM tambem inclui todos os snapshots historicos em

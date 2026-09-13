@@ -20,7 +20,7 @@ same way — sessions are JSONL files in the user's filesystem.
   `parent_session_id` pointing to the main session.
 - **Compacted threads (`/compact`):** N JSONLs with the same internal
   sessionId become 1 Conversation with `conv_id=root`. See fix in
-  `src/parsers/claude_code.py` (Phase 1: `_build_chain_links`).
+  `src/platforms/claude_code/parser.py` (Phase 1: `_build_chain_links`).
 - **Repeated events in raw JSONL:** defensive dedup by `uuid`.
 
 ## Deferred enrichment
@@ -45,7 +45,7 @@ same way — sessions are JSONL files in the user's filesystem.
 
 ## Where the real info lives
 
-- **Parser:** `src/parsers/claude_code.py`
-- **Copy script:** `src/extractors/cli/copy.py`
+- **Parser:** `src/platforms/claude_code/parser.py`
+- **Copy script:** `src/capture/cli/copy.py`
 - **Quarto data profile:** `notebooks/claude-code.qmd`
-- **Sync orchestrator:** `scripts/platform/claude-code/sync.py`
+- **Sync orchestrator:** `python -m src.platforms.claude_code.commands.sync`

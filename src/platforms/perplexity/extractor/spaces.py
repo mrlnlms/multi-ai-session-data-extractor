@@ -1,0 +1,121 @@
+"""Captura Spaces (collections na API). Cada space pode ter:
+metadata, threads, files. Saida em spaces/{uuid}/{metadata,threads_index,files}.json.
+
+Threads dentro de spaces sao as MESMAS de list_ask_threads (validado empiricamente
+em 2026-04-29) — list_collection_threads e view filtrada. Nao precisa re-fetchar
+thread bodies. Mas o mapping thread->space e preservado em threads_index.json.
+"""
+
+import json
+from pathlib import Path
+
+from playwright.async_api import Page as PlaywrightPage
+
+from src.platforms.perplexity.extractor.api_client import PerplexityAPIClient
+from src.platforms.perplexity.extractor.pages import discover_pages_in_space, fetch_pages_in_space
+
+
+async def discover_spaces(client: PerplexityAPIClient, output_dir: Path) -> list[dict]:
+    """Lista todas as collections do user + pins, salva _index.json enxuto."""
+    print("Descobrindo spaces...")
+    collections = await client.list_user_collections()
+    pinned = await client.list_user_pinned_spaces()
+    pinned_uuids = {c.get("uuid") for c in pinned if c.get("uuid")}
+    print(f"  {len(collections)} spaces ({len(pinned_uuids)} pinados)")
+
+    spaces_dir = output_dir / "spaces"
+    spaces_dir.mkdir(parents=True, exist_ok=True)
+    summary = [
+        {
+            "uuid": c.get("uuid"),
+            "title": c.get("title") or "",
+            "slug": c.get("slug"),
+            "emoji": c.get("emoji"),
+            "access": c.get("access"),
+            "user_permission": c.get("user_permission"),
+            "thread_count": c.get("thread_count"),
+            "page_count": c.get("page_count"),
+            "file_count": c.get("file_count"),
+            "updated_datetime": c.get("updated_datetime"),
+            "is_pinned": c.get("uuid") in pinned_uuids,
+        }
+        for c in collections if c.get("uuid")
+    ]
+    with open(spaces_dir / "_index.json", "w", encoding="utf-8") as f:
+        json.dump(summary, f, ensure_ascii=False, indent=2)
+    # Preserva resposta crua de user-pins tambem (caso schema tenha info extra)
+    with open(spaces_dir / "_pinned_raw.json", "w", encoding="utf-8") as f:
+        json.dump(pinned, f, ensure_ascii=False, indent=2)
+    return collections
+
+
+async def fetch_spaces(
+    client: PerplexityAPIClient,
+    collections: list[dict],
+    output_dir: Path,
+    page: PlaywrightPage | None = None,
+) -> tuple[int, int, list[tuple[str, str]]]:
+    """Pra cada space: salva metadata + threads_index + files + pages.
+    Pages exigem playwright Page pra DOM-click scrape. Se page=None, pula pages.
+    Retorna (ok, skip, errors)."""
+    spaces_dir = output_dir / "spaces"
+    spaces_dir.mkdir(parents=True, exist_ok=True)
+
+    ok = 0
+    skip = 0
+    errors: list[tuple[str, str]] = []
+
+    for i, c in enumerate(collections, start=1):
+        uuid = c.get("uuid")
+        slug = c.get("slug")
+        title = c.get("title") or "?"
+        if not uuid or not slug:
+            errors.append((str(uuid), "missing uuid or slug"))
+            continue
+
+        space_dir = spaces_dir / uuid
+        space_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            metadata = await client.get_collection(slug)
+            with open(space_dir / "metadata.json", "w", encoding="utf-8") as f:
+                json.dump(metadata, f, ensure_ascii=False, indent=2)
+
+            threads_in_space = await client.list_all_collection_threads(slug)
+            threads_summary = [
+                {
+                    "uuid": t.get("uuid"),
+                    "slug": t.get("slug"),
+                    "title": t.get("title") or "",
+                    "last_query_datetime": t.get("last_query_datetime"),
+                    "mode": t.get("mode"),
+                }
+                for t in threads_in_space if t.get("uuid")
+            ]
+            with open(space_dir / "threads_index.json", "w", encoding="utf-8") as f:
+                json.dump(threads_summary, f, ensure_ascii=False, indent=2)
+
+            files = await client.list_collection_files(uuid)
+            with open(space_dir / "files.json", "w", encoding="utf-8") as f:
+                json.dump(files, f, ensure_ascii=False, indent=2)
+
+            skills = await client.list_collection_skills(uuid)
+            with open(space_dir / "skills.json", "w", encoding="utf-8") as f:
+                json.dump(skills, f, ensure_ascii=False, indent=2)
+
+            pages_count = 0
+            if page is not None:
+                pages_meta = await discover_pages_in_space(page, slug, uuid)
+                if pages_meta:
+                    pages_ok, pages_errs = await fetch_pages_in_space(client, uuid, pages_meta, output_dir)
+                    pages_count = len(pages_meta)
+                    if pages_errs:
+                        errors.extend([(f"{uuid}/page/{s}", e) for s, e in pages_errs])
+
+            ok += 1
+            print(f"  [{i}/{len(collections)}] {title!r}: {len(threads_summary)} threads, {len(files)} files, {len(skills)} skills, {pages_count} pages")
+        except Exception as e:
+            errors.append((uuid, str(e)[:200]))
+            print(f"  [{i}/{len(collections)}] {title!r}: ERRO {str(e)[:120]}")
+
+    return ok, skip, errors

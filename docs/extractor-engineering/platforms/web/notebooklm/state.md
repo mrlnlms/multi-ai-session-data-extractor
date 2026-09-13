@@ -8,11 +8,11 @@ slide deck PDF+PPTX, infographic, mind map).
 
 - **Multi-account** — three active accounts (acc-1, acc-2, acc-3). Profiles
   in `.storage/notebooklm-profile-{1,2,3}/` (generated via
-  `scripts/platform/notebooklm/login.py`).
+  `python -m src.platforms.notebooklm.commands.login`).
 - **Single cumulative folder per-account:** `data/raw/NotebookLM/account-{N}/`
   and `data/merged/NotebookLM/account-{N}/`.
 - **Sync orchestrator (3 steps multi-account):**
-  `scripts/platform/notebooklm/sync.py` — capture per-account + assets + reconcile
+  `python -m src.platforms.notebooklm.commands.sync` — capture per-account + assets + reconcile
   per-account.
 - **Headless capture.**
 - **Historical archive** — immutable old-format snapshots live in
@@ -60,7 +60,7 @@ subfolders), `LAST_RECONCILE.md` + `reconcile_log.jsonl` per-account.
 
 ## Canonical parser
 
-`src/parsers/notebooklm.py` + `_notebooklm_helpers.py`. Full rewrite.
+`src/platforms/notebooklm/parser.py` + `_parser_helpers.py`. Full rewrite.
 **9 parquets** (4 canonical + 5 auxiliary):
 
 - **Canonical:** conversations / messages / tool_events / branches.
@@ -122,7 +122,7 @@ de uma vez**, mas responde 206 Partial Content rápido pra Range pequeno.
 | `GET Range: bytes=0-1MB` | 206 OK 1.4s |
 | `HEAD` | 200 OK 1-2s com content-length |
 
-**Fix em `src/extractors/notebooklm/api_client.py::download_asset`:** HEAD
+**Fix em `src/platforms/notebooklm/extractor/api_client.py::download_asset`:** HEAD
 pra content-length, GET em chunks de 8MB com `Range: bytes={start}-{end}`
 explícito, concat dos bytes. Cada chunk responde 206; `resp.ok` cobre
 200/206. Audio de 16MB que travava → 7.2s.
@@ -178,8 +178,8 @@ This archive is separate from the three active account profiles. It contains
 and 33 guide questions from an old extractor capture.
 
 - Immutable input: `data/external/notebooklm-snapshots/<archive>-YYYY-MM-DD/`
-- Format adapter: `src/parsers/notebooklm_historical.py`
-- Official entry point: `scripts/platform/notebooklm/parse.py`
+- Format adapter: `src/platforms/notebooklm/historical_parser.py`
+- Official entry point: `python -m src.platforms.notebooklm.commands.parse`
 - Provenance: `capture_method='historical_notebooklm_snapshot'`
 - Account identity: stable `archive:<snapshot-directory>` key, which cannot be
   confused with active `account-1`, `account-2`, or `account-3` profiles.
@@ -257,11 +257,11 @@ also without removal or overwrite. The NotebookLM parser then completed with
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/sync.py             # all active accounts
-PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/sync.py --account 1 # only account 1
-PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/sync.py --account 3 # only account 3
-PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/parse.py
-PYTHONPATH=. .venv/bin/python scripts/platform/notebooklm/parse.py --without-historical  # explicit current-only rebuild
+PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.sync             # all active accounts
+PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.sync --account 1 # only account 1
+PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.sync --account 3 # only account 3
+PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.parse
+PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.parse --without-historical  # explicit current-only rebuild
 for f in notebooklm notebooklm-acc-1 notebooklm-acc-2; do
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd
 done

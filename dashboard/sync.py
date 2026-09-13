@@ -35,6 +35,25 @@ WORKFLOWS_DIR = SCRIPTS_DIR / "workflows"
 RUNTIME_DIR = PROJECT_ROOT / ".runtime"
 LOCK_PATH = RUNTIME_DIR / "locks" / "pipeline.lock"
 
+# Platforms move here one at a time during the vertical-package refactor.
+# Once registered, their operational entrypoints run as Python modules and no
+# parallel scripts/platform/<source>/ tree remains.
+PLATFORM_COMMAND_PACKAGES = {
+    "ChatGPT": "src.platforms.chatgpt.commands",
+    "Claude.ai": "src.platforms.claude_ai.commands",
+    "Gemini": "src.platforms.gemini.commands",
+    "NotebookLM": "src.platforms.notebooklm.commands",
+    "Perplexity": "src.platforms.perplexity.commands",
+    "DeepSeek": "src.platforms.deepseek.commands",
+    "Qwen": "src.platforms.qwen.commands",
+    "Grok": "src.platforms.grok.commands",
+    "Kimi": "src.platforms.kimi.commands",
+    "Claude Code": "src.platforms.claude_code.commands",
+    "Codex": "src.platforms.codex.commands",
+    "Gemini CLI": "src.platforms.gemini_cli.commands",
+    "Antigravity CLI": "src.platforms.antigravity_cli.commands",
+}
+
 # As CLIs ja fazem copy + parse dentro do proprio sync. As fontes web fazem
 # capture + assets + reconcile e precisam do parser como passo separado antes
 # de qualquer unify.
@@ -84,6 +103,8 @@ def platform_script(platform: str, action: str) -> Optional[Path]:
 
 
 def has_sync_script(platform: str) -> bool:
+    if platform in PLATFORM_COMMAND_PACKAGES:
+        return True
     script = platform_script(platform, "sync")
     return script is not None and script.exists()
 
@@ -94,6 +115,12 @@ def sync_command(platform: str) -> Optional[list[str]]:
     Retorna o sync orquestrador ou None se a plataforma nao o possuir.
     """
     python = sys.executable
+    command_package = PLATFORM_COMMAND_PACKAGES.get(platform)
+    if command_package:
+        cmd = [python, "-m", f"{command_package}.sync"]
+        if platform == "ChatGPT":
+            cmd.append("--no-voice-pass")
+        return cmd
     script = platform_script(platform, "sync")
     if script is not None and script.exists():
         cmd = [python, str(script)]
@@ -107,6 +134,9 @@ def parse_command(platform: str) -> Optional[list[str]]:
     """Return the mandatory post-sync parser command for a web platform."""
     if platform not in WEB_PLATFORMS:
         return None
+    command_package = PLATFORM_COMMAND_PACKAGES.get(platform)
+    if command_package:
+        return [sys.executable, "-m", f"{command_package}.parse"]
     script = platform_script(platform, "parse")
     if script is None or not script.exists():
         return None

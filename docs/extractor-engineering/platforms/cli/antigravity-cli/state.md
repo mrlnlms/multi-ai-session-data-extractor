@@ -29,7 +29,7 @@ decriptada de um `.pb`. O comando consulta somente `127.0.0.1`, não altera
 `data/raw/Antigravity CLI/recovered/`:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/antigravity-cli/recover-legacy.py --all-opaque
+PYTHONPATH=. .venv/bin/python -m src.platforms.antigravity_cli.commands.recover_legacy --all-opaque
 ```
 
 `recovery_manifest.jsonl` registra os SHA-256 do PB e da trajetória. Uma
@@ -60,8 +60,8 @@ trajetória legacy recuperada e, por último, stub opaco.
 
 ## Where the real info lives
 
-- **Parser:** `src/parsers/antigravity_cli.py`
-- **Copy script:** `src/extractors/cli/copy.py`
-- **Legacy recovery:** `src/extractors/antigravity_cli/legacy_recovery.py`
-- **Sync orchestrator:** `scripts/platform/antigravity-cli/sync.py`
+- **Parser:** `src/platforms/antigravity_cli/parser.py`
+- **Copy script:** `src/capture/cli/copy.py`
+- **Legacy recovery:** `src/platforms/antigravity_cli/legacy_recovery.py`
+- **Sync orchestrator:** `python -m src.platforms.antigravity_cli.commands.sync`
 - **Quarto data profile:** `notebooks/antigravity-cli.qmd`

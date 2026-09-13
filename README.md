@@ -1,6 +1,5 @@
 # multi-ai-session-data-extractor
 
-[![tests](https://github.com/mrlnlms/multi-ai-session-data-extractor/actions/workflows/test.yml/badge.svg)](https://github.com/mrlnlms/multi-ai-session-data-extractor/actions/workflows/test.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -84,14 +83,14 @@ playwright install chromium
 Login (once per platform — opens a browser, you log in manually, close):
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/login.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.login
 ```
 
 Sync web data (capture + consolidation), then parse it:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/sync.py
-PYTHONPATH=. .venv/bin/python scripts/platform/chatgpt/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.parse
 ```
 
 Result:
@@ -103,9 +102,9 @@ Result:
 
 ![ChatGPT platform drill-down — capture status, content metrics, monthly creation chart, models, projects, knowledge files, and reconcile history](docs/assets/quickstart-02-platform.png)
 
-Repeat the commands for other web platforms under their respective
-`scripts/platform/<source>/` directories. CLI sources are copied and parsed
-by their respective `sync.py` commands. Details in
+Repeat the commands with the corresponding package under
+`src/platforms/<source_id>/`. CLI sources are copied and parsed by their
+respective `commands.sync` modules. Details in
 [docs/SETUP.md](docs/SETUP.md).
 
 If you are restoring an existing personal archive rather than starting a new
@@ -153,9 +152,9 @@ For ChatGPT/Perplexity: expected behavior.
 Each web platform keeps its operational commands together in one directory:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/<source>/login.py    # once — manual login in the browser
-PYTHONPATH=. .venv/bin/python scripts/platform/<source>/sync.py     # capture + consolidation
-PYTHONPATH=. .venv/bin/python scripts/platform/<source>/parse.py    # merged -> canonical parquet
+PYTHONPATH=. .venv/bin/python -m src.platforms.<source_id>.commands.login
+PYTHONPATH=. .venv/bin/python -m src.platforms.<source_id>.commands.sync
+PYTHONPATH=. .venv/bin/python -m src.platforms.<source_id>.commands.parse
 ```
 
 Common web-sync flags (availability varies by source):

@@ -4,11 +4,11 @@
 
 - **Pastas cumulativas por conta:** a conta padrao usa `data/raw/Qwen/` e
   `data/merged/Qwen/`; as demais usam `account-<n>/` sob essas raizes.
-- **Sync orchestrator (2 steps):** `scripts/platform/qwen/sync.py` (capture +
+- **Sync orchestrator (2 steps):** `python -m src.platforms.qwen.commands.sync` (capture +
   reconcile).
 - **Headless capture.**
 - **Auth:** perfis persistentes em `.storage/qwen-profile-<account>/`
-  (gerados via `scripts/platform/qwen/login.py --account <account>`). The token may expire even when the
+  (gerados via `python -m src.platforms.qwen.commands.login --account <account>`). The token may expire even when the
   profile still opens; validate a minimal API list request before a sync.
 
 ## Coverage
@@ -50,7 +50,7 @@ Chats + projects + project files captured. Reconciler v3
 
 ## Canonical parser
 
-`src/parsers/qwen.py` + `_qwen_helpers.py`.
+`src/platforms/qwen/parser.py` + `_parser_helpers.py`.
 
 ### Coverage
 
@@ -72,7 +72,7 @@ Chats + projects + project files captured. Reconciler v3
 
 ## Integrated asset download
 
-`scripts/platform/qwen/download-assets.py`. URLs in msgs/projects downloaded via
+`python -m src.platforms.qwen.commands.download_assets`. URLs in msgs/projects downloaded via
 manifest. Parser resolves `asset_paths` via `assets_manifest.json`.
 
 ## Descriptive Quarto
@@ -95,8 +95,8 @@ manifest. Parser resolves `asset_paths` via `assets_manifest.json`.
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/qwen/sync.py
-PYTHONPATH=. .venv/bin/python scripts/platform/qwen/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.qwen.commands.sync
+PYTHONPATH=. .venv/bin/python -m src.platforms.qwen.commands.parse
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/qwen.qmd
 ```
 
@@ -105,7 +105,7 @@ as arvores e registra o email configurado em `.storage/accounts.json` no campo
 `account` dos Parquets:
 
 ```bash
-PYTHONPATH=. .venv/bin/python scripts/platform/qwen/login.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/qwen/sync.py --account account-2
-PYTHONPATH=. .venv/bin/python scripts/platform/qwen/parse.py
+PYTHONPATH=. .venv/bin/python -m src.platforms.qwen.commands.login --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.qwen.commands.sync --account account-2
+PYTHONPATH=. .venv/bin/python -m src.platforms.qwen.commands.parse
 ```
