@@ -14,7 +14,10 @@ from src.account_bindings import (
 )
 from src.account_catalog import LifecycleStatus, load_account_catalog, serialize_account_catalog, write_account_catalog_atomic
 from src.account_service import create_account, set_lifecycle
-from src.auth_health import DEFAULT_HEALTH_PATH, load_auth_health, set_auth_observation, write_auth_health_atomic
+from src.auth_health import (
+    DEFAULT_HEALTH_PATH, AuthEvidenceMethod, AuthObservation, AuthStatus,
+    load_auth_health, set_auth_observation, write_auth_health_atomic,
+)
 from src.auth_probes import check_account_auth
 
 
@@ -54,6 +57,9 @@ def _parser() -> argparse.ArgumentParser:
     auth = sub.add_parser("auth-check")
     auth.add_argument("account_id")
     auth.add_argument("--apply", action="store_true", help="persist the completed observation")
+    confirm = sub.add_parser("auth-confirm", help="record an operator-confirmed visible login")
+    confirm.add_argument("account_id")
+    confirm.add_argument("--apply", action="store_true")
     return parser
 
 
@@ -71,6 +77,29 @@ def main(argv: Sequence[str] | None = None) -> int:
             storage_root=args.storage_root, apply=args.apply)
         print(json.dumps({"account_id": result.account_id, "status": result.status.value,
                           "detail": result.detail, "persisted": args.apply}))
+        return 0
+    if args.command == "auth-confirm":
+        record = next((item for item in catalog.records if item.account_id == args.account_id), None)
+        if record is None:
+            raise ValueError(f"Unknown account_id: {args.account_id}")
+        if record.lifecycle_status is not LifecycleStatus.ACTIVE:
+            raise ValueError("Only active accounts can be manually confirmed")
+        print(f"Preview auth-confirm: {args.health_path}")
+        print("Operator confirms the visible account session is authenticated.")
+        print(PRESERVATION_NOTICE)
+        if not args.apply:
+            print("Preview only; pass --apply to write atomically.")
+            return 0
+        before = load_auth_health(args.health_path)
+        observation = AuthObservation(
+            args.account_id, AuthStatus.VALID, now,
+            "Visible authenticated session confirmed by operator",
+            AuthEvidenceMethod.OPERATOR,
+        )
+        write_auth_health_atomic(
+            args.health_path, set_auth_observation(before, observation), expected_before=before,
+        )
+        print("Applied.")
         return 0
     if args.command == "create":
         change = create_account(catalog, platform=args.platform, technical_key=args.technical_key, now=now)

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from src.account_catalog import AccountCatalog, AccountCatalogRecord, LifecycleStatus, load_account_catalog, write_account_catalog_atomic
+from src.auth_health import AuthEvidenceMethod, AuthStatus, load_auth_health
 from src.operations.accounts import main
 
 ACCOUNT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -31,4 +32,15 @@ def test_lifecycle_and_bind_are_preview_first(tmp_path):
 def test_parser_exposes_no_delete_command():
     from src.operations.accounts import _parser
     choices = _parser()._subparsers._group_actions[0].choices
-    assert set(choices) == {"list", "create", "lifecycle", "bind", "auth-check"}
+    assert set(choices) == {"list", "create", "lifecycle", "bind", "auth-check", "auth-confirm"}
+
+
+def test_auth_confirm_is_preview_first_and_records_operator_evidence(tmp_path):
+    catalog = AccountCatalog(records=(AccountCatalogRecord(ACCOUNT_ID, "Qwen", "work", LifecycleStatus.ACTIVE, NOW, NOW),))
+    write_account_catalog_atomic(tmp_path / "catalog.json", catalog, expected_before=AccountCatalog())
+    assert main(_args(tmp_path, "auth-confirm", ACCOUNT_ID)) == 0
+    assert not (tmp_path / "health.json").exists()
+    assert main(_args(tmp_path, "auth-confirm", ACCOUNT_ID, "--apply")) == 0
+    record = load_auth_health(tmp_path / "health.json").get(ACCOUNT_ID)
+    assert record.status is AuthStatus.VALID
+    assert record.evidence_method is AuthEvidenceMethod.OPERATOR

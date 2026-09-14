@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import pytest
 
 from src.auth_health import (
-    AuthHealth, AuthObservation, AuthStatus, load_auth_health,
+    AuthEvidenceMethod, AuthHealth, AuthObservation, AuthStatus, load_auth_health,
     serialize_auth_health, set_auth_observation, write_auth_health_atomic,
 )
 
@@ -23,7 +23,7 @@ def test_missing_is_empty_and_roundtrip_supports_unknown(tmp_path):
 
 
 @pytest.mark.parametrize("payload", [
-    {"version": 2, "observations": []},
+    {"version": 3, "observations": []},
     {"version": 1, "observations": [{"account_id": "bad", "status": "unknown", "checked_at": None, "detail": "x"}]},
     {"version": 1, "observations": [{"account_id": ACCOUNT_ID, "status": "bogus", "checked_at": None, "detail": "x"}]},
     {"version": 1, "observations": [{"account_id": ACCOUNT_ID, "status": "valid", "checked_at": "2026-09-13T00:00:00", "detail": "x"}]},
@@ -51,3 +51,16 @@ def test_serialization_redacts_sensitive_diagnostics():
     serialized = serialize_auth_health(health)
     assert "secret" not in serialized
     assert "example.test" not in serialized
+
+
+def test_version_one_health_migrates_completed_observations_to_probe(tmp_path):
+    path = tmp_path / "health.json"
+    path.write_text(json.dumps({"version": 1, "observations": [{
+        "account_id": ACCOUNT_ID, "status": "valid",
+        "checked_at": "2026-09-13T00:00:00Z", "detail": "ok",
+    }]}))
+    record = load_auth_health(path).records[0]
+    assert record.evidence_method is AuthEvidenceMethod.PROBE
+    payload = json.loads(serialize_auth_health(load_auth_health(path)))
+    assert payload["version"] == 2
+    assert payload["observations"][0]["evidence_method"] == "probe"

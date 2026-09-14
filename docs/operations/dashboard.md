@@ -41,7 +41,11 @@ archive histórico, conforme a evidência disponível.
 
 Abrir essa visão não testa login nem consulta serviços upstream. **Unknown (not
 checked)** significa que a autenticação não foi verificada; não significa sessão
-válida. **Not configured** indica ausência de profile local, sem fazer
+válida. Observacoes concluidas mostram tambem a origem da evidencia, como
+**Valid — probe** ou **Valid — operator**. A acao de confirmacao manual deve ser
+usada somente depois que o operador abriu o profile em navegador visivel e
+confirmou a interface autenticada. Um sync seletivo concluido com sucesso passa
+a aparecer como **Valid — sync**. **Not configured** indica ausência de profile local, sem fazer
 afirmações sobre a retenção dos dados históricos. Os
 rótulos privados são lidos pelo serviço canônico de contas e exibidos somente
 nesse dashboard local.

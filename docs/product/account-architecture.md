@@ -224,6 +224,7 @@ AccountBinding
   profile_locator
   auth_status            valid | expired | missing | unknown
   last_validated_at
+  evidence_method        probe | operator | sync
   observed_subject       opcional
 ```
 
@@ -232,6 +233,12 @@ continua existindo, mas `auth_status=missing`. Um novo login deve vincular o
 profile recriado ao `account_id` existente. Quando a plataforma expuser um
 subject estavel, um subject diferente bloqueia o vinculo e evita mistura de
 historicos.
+
+Presenca de profile nunca produz `valid` por inferencia. Uma observacao valida
+declara como foi obtida: leitura minima automatizada (`probe`), confirmacao
+explicita em navegador visivel (`operator`) ou sync seletivo e parse concluídos
+com sucesso (`sync`). A confirmacao do operador nao tenta contornar protecoes
+anti-bot e permanece estado local.
 
 ### 5.3 Catalogo de plataformas
 

@@ -50,6 +50,18 @@ profile local e executa uma verificacao explicita de login. Criacao, lifecycle
 e binding apenas mostram preview sem `--apply`; nenhuma operacao exclui a
 identidade ou dados preservados. `auth-check` nunca e executado na abertura do
 dashboard e so persiste sua observacao quando recebe `--apply`.
+Depois de conferir uma sessao em navegador visivel, o operador pode registrar
+essa evidencia local sem consultar a plataforma:
+
+```bash
+python -m src.operations.accounts auth-confirm ACCOUNT_ID
+python -m src.operations.accounts auth-confirm ACCOUNT_ID --apply
+```
+
+O primeiro comando e apenas preview. O segundo registra status `valid`, horario
+e metodo `operator`; nao executa login, sync, DVC ou Git.
+Um sync seletivo concluido com sucesso tambem atualiza a observacao local para
+`valid` com metodo `sync`.
 
 Manual saves nao substituem a captura oficial. Eles geram arquivos
 `<source>_manual_<table>.parquet` na pasta processada da plataforma e sao

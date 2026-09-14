@@ -12,6 +12,7 @@ from src.account_catalog import (
     LifecycleStatus, legacy_account_id, load_account_catalog, validate_technical_key,
 )
 from src.platforms.registry import PLATFORM_ACCOUNT_CAPABILITIES, PLATFORM_ACCOUNT_METADATA
+from src.auth_health import DEFAULT_HEALTH_PATH, load_auth_health
 
 
 DEFAULT_ACCOUNTS_FILE = Path(".storage/accounts.json")
@@ -65,6 +66,7 @@ class AccountState:
     authentication: str
     account_id: str = ""
     lifecycle_status: LifecycleStatus | None = None
+    authentication_method: str | None = None
 
 
 def account_definitions(platform: str) -> tuple[AccountDefinition, ...]:
@@ -182,6 +184,7 @@ def discover_accounts(
     external_root: Path = Path("data/external"),
     catalog_path: Path = Path("data/accounts/catalog.json"),
     registry_path: Path = DEFAULT_ACCOUNTS_FILE,
+    health_path: Path | None = None,
 ) -> tuple[AccountState, ...]:
     """Inventory all locally observable accounts without validating login."""
     metadata = PLATFORM_ACCOUNT_METADATA.get(platform)
@@ -195,6 +198,7 @@ def discover_accounts(
         for record in load_account_catalog(catalog_path).records
         if record.platform == platform
     }
+    health = load_auth_health(health_path or storage_root / DEFAULT_HEALTH_PATH.name)
     keys.update(catalog_records)
     profiles: dict[str, Path] = {}
 
@@ -265,21 +269,26 @@ def discover_accounts(
             merged_path=merged_paths.get(key),
             historical_path=historical_paths.get(key),
         )
-        authentication = "unknown" if evidence.profile_present else "not_configured"
         catalog_record = catalog_records.get(key)
+        account_id = catalog_record.account_id if catalog_record is not None else legacy_account_id(platform, key)
+        observation = health.get(account_id)
+        authentication = (
+            observation.status.value if observation is not None
+            else ("unknown" if evidence.profile_present else "not_configured")
+        )
         states.append(AccountState(
             platform,
             key,
             label,
             evidence,
             authentication,
-            account_id=(
-                catalog_record.account_id
-                if catalog_record is not None
-                else legacy_account_id(platform, key)
-            ),
+            account_id=account_id,
             lifecycle_status=(
                 catalog_record.lifecycle_status if catalog_record is not None else None
+            ),
+            authentication_method=(
+                observation.evidence_method.value
+                if observation is not None and observation.evidence_method is not None else None
             ),
         ))
     return tuple(states)

@@ -36,7 +36,8 @@ Each web platform has a login command under its vertical package:
 - `account-bindings.json`, which maps immutable account UUIDs to relative
   technical profile keys
 - `account-health.json`, which stores the latest explicit login-health
-  observation; it is not proof derived from profile presence
+  observation and its evidence method (`probe`, `operator`, or `sync`); it is
+  never proof derived from profile presence alone
 
 **What does NOT live in `.storage/`:**
 

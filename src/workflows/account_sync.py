@@ -7,11 +7,15 @@ import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from datetime import datetime, timezone
 
 from src.account_bindings import DEFAULT_BINDINGS_PATH, load_account_bindings
 from src.account_catalog import LifecycleStatus, load_account_catalog
 from src.accounts import account_command_argument
-from src.auth_health import AuthStatus, DEFAULT_HEALTH_PATH, load_auth_health
+from src.auth_health import (
+    AuthEvidenceMethod, AuthObservation, AuthStatus, DEFAULT_HEALTH_PATH,
+    load_auth_health, set_auth_observation, write_auth_health_atomic,
+)
 from src.platforms.registry import PLATFORM_ACCOUNT_METADATA, PLATFORM_COMMAND_PACKAGES
 from src.workflows.execution import run_commands
 
@@ -72,6 +76,17 @@ def execute_account_sync(plan: AccountSyncPlan, *, runner: Callable = run_comman
     return runner(plan.commands)
 
 
+def record_successful_sync_auth(account_id: str, *, health_path: Path = DEFAULT_HEALTH_PATH) -> None:
+    before = load_auth_health(health_path)
+    observation = AuthObservation(
+        account_id, AuthStatus.VALID, datetime.now(timezone.utc),
+        "Authenticated account sync and parse completed", AuthEvidenceMethod.SYNC,
+    )
+    write_auth_health_atomic(
+        health_path, set_auth_observation(before, observation), expected_before=before,
+    )
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Preview or run one account sync by immutable UUID.")
     parser.add_argument("account_id")
@@ -103,6 +118,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("Preview only; pass --apply to execute.")
         return 0
     rc, output = execute_account_sync(plan)
+    if rc == 0:
+        record_successful_sync_auth(plan.account_id, health_path=args.health_path)
     print(output, end="")
     return rc
 

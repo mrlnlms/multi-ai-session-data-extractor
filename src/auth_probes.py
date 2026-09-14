@@ -11,7 +11,7 @@ from pathlib import Path
 
 from src.account_bindings import AccountBindings
 from src.account_catalog import AccountCatalog, LifecycleStatus
-from src.auth_health import AuthObservation, AuthStatus
+from src.auth_health import AuthEvidenceMethod, AuthObservation, AuthStatus
 from src.platforms.registry import PLATFORM_ACCOUNT_METADATA
 
 
@@ -72,4 +72,5 @@ def check_account_auth(
     if not isinstance(result, ProbeResult):
         result = ProbeResult(AuthStatus.ERROR, "Invalid platform probe result")
     checked_at = datetime.now(timezone.utc) if result.status is not AuthStatus.UNKNOWN else None
-    return AuthObservation(account_id, result.status, checked_at, redact_probe_detail(result.detail))
+    method = AuthEvidenceMethod.PROBE if checked_at is not None else None
+    return AuthObservation(account_id, result.status, checked_at, redact_probe_detail(result.detail), method)

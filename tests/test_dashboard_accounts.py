@@ -17,6 +17,7 @@ def _account(
     merged: bool = False,
     historical: bool = False,
     authentication: str = "not_configured",
+    authentication_method: str | None = None,
     lifecycle: LifecycleStatus | None = None,
 ) -> AccountState:
     return AccountState(
@@ -31,6 +32,7 @@ def _account(
             historical_path=Path(f"historical-{key}") if historical else None,
         ),
         authentication=authentication,
+        authentication_method=authentication_method,
         account_id=legacy_account_id(platform, key),
         lifecycle_status=lifecycle,
     )
@@ -92,6 +94,12 @@ def test_account_rows_expose_independent_evidence_without_claiming_login():
         "Authentication": "Unknown (not checked)",
         "Archive": "Data with local profile",
     }
+
+
+def test_account_rows_show_authentication_evidence_method():
+    account = _account("ChatGPT", "default", profile=True, authentication="valid", authentication_method="operator")
+    row = _account_rows([PlatformState("ChatGPT", None, None, accounts=(account,))])[0]
+    assert row["Authentication"] == "Valid — operator"
 
 
 def test_account_rows_keep_data_only_account_visible_as_preserved():

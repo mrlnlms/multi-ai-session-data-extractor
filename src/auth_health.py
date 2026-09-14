@@ -13,7 +13,7 @@ from enum import StrEnum
 from pathlib import Path
 
 
-HEALTH_VERSION = 1
+HEALTH_VERSION = 2
 DEFAULT_HEALTH_PATH = Path(".storage/account-health.json")
 
 
@@ -23,6 +23,12 @@ class AuthStatus(StrEnum):
     VALID = "valid"
     EXPIRED = "expired"
     ERROR = "error"
+
+
+class AuthEvidenceMethod(StrEnum):
+    PROBE = "probe"
+    OPERATOR = "operator"
+    SYNC = "sync"
 
 
 _SENSITIVE_DETAIL = re.compile(
@@ -42,6 +48,7 @@ class AuthObservation:
     status: AuthStatus
     checked_at: datetime | None
     detail: str
+    evidence_method: AuthEvidenceMethod | None = None
 
 
 @dataclass(frozen=True)
@@ -68,6 +75,15 @@ def _validate(observation: AuthObservation) -> None:
         raise ValueError("health checked_at must be timezone-aware")
     if not isinstance(observation.detail, str):
         raise ValueError("health detail must be a string")
+    if observation.evidence_method is not None:
+        try:
+            AuthEvidenceMethod(observation.evidence_method)
+        except ValueError as exc:
+            raise ValueError(f"Unknown authentication evidence method: {observation.evidence_method!r}") from exc
+    if observation.checked_at is None and observation.evidence_method is not None:
+        raise ValueError("unchecked health observation cannot have an evidence method")
+    if observation.evidence_method is AuthEvidenceMethod.OPERATOR and observation.status is not AuthStatus.VALID:
+        raise ValueError("operator evidence may only confirm a valid session")
 
 
 def load_auth_health(path: Path = DEFAULT_HEALTH_PATH) -> AuthHealth:
@@ -79,15 +95,18 @@ def load_auth_health(path: Path = DEFAULT_HEALTH_PATH) -> AuthHealth:
         raise ValueError(f"Invalid account health JSON: {path}") from exc
     if not isinstance(raw, Mapping) or set(raw) != {"version", "observations"}:
         raise ValueError("Account health root fields must be version and observations")
-    if type(raw["version"]) is not int or raw["version"] != HEALTH_VERSION:
+    if type(raw["version"]) is not int or raw["version"] not in {1, HEALTH_VERSION}:
         raise ValueError(f"Unsupported account health version: {raw['version']!r}")
     if not isinstance(raw["observations"], list):
         raise ValueError("Account health observations must be an array")
     records = []
     seen = set()
     for item in raw["observations"]:
-        if not isinstance(item, Mapping) or set(item) != {"account_id", "status", "checked_at", "detail"}:
-            raise ValueError("Account health fields must match version 1 exactly")
+        expected = {"account_id", "status", "checked_at", "detail"}
+        if raw["version"] == HEALTH_VERSION:
+            expected.add("evidence_method")
+        if not isinstance(item, Mapping) or set(item) != expected:
+            raise ValueError(f"Account health fields must match version {raw['version']} exactly")
         checked = item["checked_at"]
         if checked is not None:
             if not isinstance(checked, str):
@@ -100,7 +119,14 @@ def load_auth_health(path: Path = DEFAULT_HEALTH_PATH) -> AuthHealth:
             status = AuthStatus(item["status"])
         except (TypeError, ValueError) as exc:
             raise ValueError(f"Unknown authentication status: {item['status']!r}") from exc
-        record = AuthObservation(item["account_id"], status, checked, item["detail"])
+        method_value = item.get("evidence_method")
+        if raw["version"] == 1:
+            method_value = "probe" if checked is not None else None
+        try:
+            method = AuthEvidenceMethod(method_value) if method_value is not None else None
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Unknown authentication evidence method: {method_value!r}") from exc
+        record = AuthObservation(item["account_id"], status, checked, item["detail"], method)
         _validate(record)
         if record.account_id in seen:
             raise ValueError(f"Duplicate health account_id: {record.account_id}")
@@ -115,7 +141,8 @@ def serialize_auth_health(health: AuthHealth) -> str:
     payload = {"version": health.version, "observations": [
         {"account_id": item.account_id, "status": item.status.value,
          "checked_at": item.checked_at.isoformat().replace("+00:00", "Z") if item.checked_at else None,
-         "detail": sanitize_auth_detail(item.detail)}
+         "detail": sanitize_auth_detail(item.detail),
+         "evidence_method": item.evidence_method.value if item.evidence_method else None}
         for item in health.records
     ]}
     return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"

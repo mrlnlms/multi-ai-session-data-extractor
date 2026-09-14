@@ -4,8 +4,8 @@ import pytest
 
 from src.account_bindings import AccountBinding, AccountBindings, write_account_bindings_atomic
 from src.account_catalog import AccountCatalog, AccountCatalogRecord, LifecycleStatus, write_account_catalog_atomic
-from src.auth_health import AuthHealth, AuthObservation, AuthStatus, write_auth_health_atomic
-from src.workflows.account_sync import execute_account_sync, plan_account_sync
+from src.auth_health import AuthHealth, AuthObservation, AuthStatus, load_auth_health, write_auth_health_atomic
+from src.workflows.account_sync import execute_account_sync, plan_account_sync, record_successful_sync_auth
 
 ACCOUNT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 NOW = datetime(2026, 9, 13, tzinfo=timezone.utc)
@@ -58,3 +58,11 @@ def test_unknown_unbound_missing_profile_and_bad_health_rejected(tmp_path):
 def test_unknown_health_warns_but_can_preview(tmp_path):
     plan = plan_account_sync(ACCOUNT_ID, **_state(tmp_path, health=None))
     assert plan.warning and "unknown" in plan.warning.lower()
+
+
+def test_successful_sync_can_record_sync_auth_evidence(tmp_path):
+    health_path = tmp_path / "health.json"
+    record_successful_sync_auth(ACCOUNT_ID, health_path=health_path)
+    record = load_auth_health(health_path).get(ACCOUNT_ID)
+    assert record.status is AuthStatus.VALID
+    assert record.evidence_method.value == "sync"

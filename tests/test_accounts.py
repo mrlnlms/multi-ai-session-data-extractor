@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 
 import pytest
 
@@ -16,6 +17,7 @@ from src.accounts import (
     load_account_registry,
 )
 from src.account_catalog import LifecycleStatus, legacy_account_id
+from src.auth_health import AuthEvidenceMethod, AuthHealth, AuthObservation, AuthStatus, write_auth_health_atomic
 
 
 def _catalog_record(platform, key, lifecycle):
@@ -262,6 +264,23 @@ def test_missing_profile_does_not_change_active_lifecycle(tmp_path):
     )[0]
     assert account.lifecycle_status is LifecycleStatus.ACTIVE
     assert account.authentication == "not_configured"
+
+
+def test_discovery_uses_explicit_local_health_and_evidence_method(tmp_path):
+    account_id = legacy_account_id("ChatGPT", "default")
+    health_path = tmp_path / "health.json"
+    health = AuthHealth(records=(AuthObservation(
+        account_id, AuthStatus.VALID, datetime(2026, 9, 14, tzinfo=timezone.utc),
+        "visible login", AuthEvidenceMethod.OPERATOR,
+    ),))
+    write_auth_health_atomic(health_path, health, expected_before=AuthHealth())
+    account = discover_accounts(
+        "ChatGPT", storage_root=tmp_path / ".storage", raw_root=tmp_path / "raw",
+        merged_root=tmp_path / "merged", catalog_path=tmp_path / "catalog.json",
+        registry_path=tmp_path / "registry.json", health_path=health_path,
+    )[0]
+    assert account.authentication == "valid"
+    assert account.authentication_method == "operator"
 
 
 def test_account_models_are_immutable():

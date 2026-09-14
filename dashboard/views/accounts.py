@@ -9,7 +9,7 @@ from src.accounts import AccountState
 from src.application.platforms import PlatformState
 from src.account_catalog import LifecycleStatus
 from src.application.accounts import (
-    account_actions, add_account_action, auth_check_action, bind_action,
+    account_actions, add_account_action, auth_check_action, auth_confirm_action, bind_action,
     lifecycle_action, sync_action,
 )
 from src.platforms.registry import WEB_PLATFORMS
@@ -19,12 +19,13 @@ def _present(value: bool) -> str:
     return "Present" if value else "—"
 
 
-def _authentication_label(value: str) -> str:
+def _authentication_label(value: str, method: str | None = None) -> str:
     labels = {
         "unknown": "Unknown (not checked)",
         "not_configured": "Not configured",
     }
-    return labels.get(value, value.replace("_", " ").title())
+    label = labels.get(value, value.replace("_", " ").title())
+    return f"{label} — {method}" if method else label
 
 
 def _lifecycle_label(account: AccountState) -> str:
@@ -63,7 +64,7 @@ def _account_rows(states: list[PlatformState]) -> list[dict[str, object]]:
                     "Raw": _present(evidence.raw_present),
                     "Merged": _present(evidence.merged_present),
                     "Historical": _present(evidence.historical_present),
-                    "Authentication": _authentication_label(account.authentication),
+                    "Authentication": _authentication_label(account.authentication, account.authentication_method),
                     "Archive": _archive_label(account),
                 }
             )
@@ -129,7 +130,7 @@ def render(states: list[PlatformState]) -> None:
     )
 
     st.info(
-        "Authentication is checked only after an explicit Check login action. "
+        "Authentication evidence is recorded only after an explicit check or operator confirmation. "
         "“Unknown (not checked)” is not a login-health verdict. "
         "Unclassified means evidence exists without a catalog lifecycle decision."
     )
@@ -159,6 +160,8 @@ def render(states: list[PlatformState]) -> None:
                 "New lifecycle", [item.value for item in LifecycleStatus], key="account_lifecycle_status"))
         elif action_name == "bind":
             profile_key = st.text_input("Profile key", value=selected.key, key="account_bind_key")
+        elif action_name == "auth-confirm":
+            st.info("Use only after visibly confirming that this exact account profile is authenticated.")
         if st.button("Preview account action", key="account_action_preview"):
             st.session_state["account_action_pending"] = (selected.account_id, action_name)
         if st.session_state.get("account_action_pending") == (selected.account_id, action_name):
@@ -171,6 +174,8 @@ def render(states: list[PlatformState]) -> None:
                     outcome = bind_action(selected.account_id, profile_key, confirmed=True)
                 elif action_name == "auth-check":
                     outcome = auth_check_action(selected.account_id, confirmed=True)
+                elif action_name == "auth-confirm":
+                    outcome = auth_confirm_action(selected.account_id, confirmed=True)
                 else:
                     outcome = sync_action(selected.account_id, confirmed=True)
                 (st.success if outcome.ok else st.error)(outcome.message)
