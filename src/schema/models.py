@@ -12,6 +12,10 @@ VALID_SOURCES = ("claude_ai", "chatgpt", "qwen", "claude_code", "deepseek", "per
 VALID_ROLES = ("user", "assistant", "system")
 VALID_MODES = ("chat", "search", "research", "copilot", "concise", "dalle", "cli")
 VALID_ASSET_KINDS = ("attachment", "generated", "project_file", "output", "artifact", "other")
+VALID_ASSET_ORIGINS = ("user", "assistant", "platform", "imported", "unknown")
+VALID_ASSET_LINK_OBJECT_TYPES = ("message", "conversation", "project", "source", "output")
+VALID_ASSET_LINK_ROLES = ("input", "output", "context", "reference", "unknown")
+ASSET_LINK_NAMESPACE = uuid.UUID("c76d54a8-9ba8-5f33-b2a3-0ae129545238")
 
 
 def _validate_account_id(account_id: Optional[str]) -> None:
@@ -201,10 +205,8 @@ class Asset:
     asset_id: str
     source: str
     account_id: Optional[str]
-    conversation_id: Optional[str]
-    message_id: Optional[str]
-    project_id: Optional[str]
     asset_kind: str
+    asset_origin: str
     file_name: Optional[str]
     mime_type: Optional[str]
     size_bytes: Optional[int]
@@ -225,8 +227,92 @@ class Asset:
             raise ValueError(
                 f"asset_kind '{self.asset_kind}' invalido. Validos: {VALID_ASSET_KINDS}"
             )
+        if self.asset_origin not in VALID_ASSET_ORIGINS:
+            raise ValueError(
+                f"asset_origin '{self.asset_origin}' invalido. Validos: {VALID_ASSET_ORIGINS}"
+            )
+        if self.asset_origin == "assistant" and self.is_model_generated is not True:
+            raise ValueError("assistant asset_origin requires is_model_generated=True")
+        if self.asset_origin == "user" and self.is_model_generated is not False:
+            raise ValueError("user asset_origin requires is_model_generated=False")
         if not isinstance(self.is_binary_available, bool):
             raise ValueError("is_binary_available must be bool")
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+def make_asset_link_id(
+    source: str,
+    account_id: Optional[str],
+    asset_id: str,
+    object_type: str,
+    object_id: str,
+    role: str,
+    ordinal: Optional[int] = None,
+    content_block_index: Optional[int] = None,
+) -> str:
+    """Return a stable ID for one observed asset-to-domain-object relation."""
+    parts = (
+        source, account_id or "", asset_id, object_type, object_id, role,
+        "" if ordinal is None else str(ordinal),
+        "" if content_block_index is None else str(content_block_index),
+    )
+    return str(uuid.uuid5(ASSET_LINK_NAMESPACE, "\x1f".join(parts)))
+
+
+@dataclass
+class AssetLink:
+    asset_link_id: str
+    source: str
+    account_id: Optional[str]
+    asset_id: str
+    object_type: str
+    object_id: str
+    conversation_id: Optional[str]
+    message_id: Optional[str]
+    project_id: Optional[str]
+    role: str
+    ordinal: Optional[int]
+    content_block_index: Optional[int]
+    metadata_json: Optional[str]
+
+    def __post_init__(self):
+        if not isinstance(self.asset_link_id, str) or not self.asset_link_id:
+            raise ValueError("asset_link_id must be a non-empty string")
+        try:
+            parsed_link_id = uuid.UUID(self.asset_link_id)
+        except (ValueError, AttributeError) as exc:
+            raise ValueError("asset_link_id must be a canonical UUID string") from exc
+        if str(parsed_link_id) != self.asset_link_id:
+            raise ValueError("asset_link_id must be a canonical UUID string")
+        if not isinstance(self.asset_id, str) or not self.asset_id:
+            raise ValueError("asset_id must be a non-empty string")
+        if not isinstance(self.object_id, str) or not self.object_id:
+            raise ValueError("object_id must be a non-empty string")
+        _validate_account_id(self.account_id)
+        if self.source not in VALID_SOURCES:
+            raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
+        if self.object_type not in VALID_ASSET_LINK_OBJECT_TYPES:
+            raise ValueError(f"object_type '{self.object_type}' invalido")
+        if self.role not in VALID_ASSET_LINK_ROLES:
+            raise ValueError(f"role '{self.role}' invalido")
+        if self.message_id is not None and self.conversation_id is None:
+            raise ValueError("message_id requires conversation_id")
+        if self.content_block_index is not None and self.message_id is None:
+            raise ValueError("content_block_index requires message_id")
+        for name, value in (
+            ("ordinal", self.ordinal),
+            ("content_block_index", self.content_block_index),
+        ):
+            if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value < 0):
+                raise ValueError(f"{name} must be a nonnegative integer or None")
+        if self.object_type == "message" and self.message_id != self.object_id:
+            raise ValueError("message object_id must equal message_id")
+        if self.object_type == "conversation" and self.conversation_id != self.object_id:
+            raise ValueError("conversation object_id must equal conversation_id")
+        if self.object_type == "project" and self.project_id != self.object_id:
+            raise ValueError("project object_id must equal project_id")
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -452,6 +538,11 @@ def project_docs_to_df(docs: list[ProjectDoc]) -> pd.DataFrame:
 
 def assets_to_df(items: list[Asset]) -> pd.DataFrame:
     cols = [f.name for f in fields(Asset)]
+    return _models_to_df(items, cols)
+
+
+def asset_links_to_df(items: list[AssetLink]) -> pd.DataFrame:
+    cols = [f.name for f in fields(AssetLink)]
     return _models_to_df(items, cols)
 
 

@@ -81,7 +81,11 @@ legacy `account` label and all existing native IDs remain unchanged.
   manifest em `assets_manifest.json`. O reconciler preserva a arvore aninhada
   em `merged`; caminhos publicados sao relativos a `data/` e incluem a raiz da
   conta (`account-<n>`) quando aplicavel. A URL assinada permanece apenas no
-  manifest sob DVC e nunca entra no Parquet processado.
+  manifest sob DVC e nunca entra no Parquet processado. O catalogo canonico
+  mantem esses arquivos com `asset_origin=unknown`, pois `chat.files[]` nao
+  prova autoria. `kimi_asset_links.parquet` registra a associacao observavel a
+  conversa com `role=unknown`; mensagem, posicao inline e direcao nao sao
+  inferidas.
 - **Branches:** parser monta DAG via `parentId` mas V1 emite **1 branch
   por conv** (sem fork detection). `childrenMessageIds` mapeado mas
   nao usado pra split — refinar V2 quando observarmos forks reais.

@@ -20,7 +20,7 @@ adaptado (mesma logica). leaf_messageId nao retornado mas pode-se inferir
 pelo ultimo nao referenciado como parent.
 
 Output: data/processed/Kimi/kimi_{conversations,messages,tool_events,
-branches,project_metadata,assets}.parquet (project_metadata com 1 row
+branches,project_metadata,assets,asset_links}.parquet (project_metadata com 1 row
 por skill instalada — analogo a Qwen project).
 """
 
@@ -35,13 +35,16 @@ import pandas as pd
 from src.parsing.base import BaseParser
 from src.schema.models import (
     Asset,
+    AssetLink,
     Branch,
     Conversation,
     Message,
     ToolEvent,
     assets_to_df,
+    asset_links_to_df,
     branches_to_df,
     conversations_to_df,
+    make_asset_link_id,
     messages_to_df,
     tool_events_to_df,
 )
@@ -398,8 +401,7 @@ class KimiParser(BaseParser):
             rows.append(Asset(
                 asset_id=str(native_id), source=SOURCE,
                 account_id=info.get("account_id", self.account_id),
-                conversation_id=info.get("chat_id") or None,
-                message_id=None, project_id=None, asset_kind="attachment",
+                asset_kind="attachment", asset_origin="unknown",
                 file_name=info.get("name") or None,
                 mime_type=info.get("mime") or None,
                 size_bytes=int(info["size"]) if info.get("size") is not None else None,
@@ -409,6 +411,27 @@ class KimiParser(BaseParser):
                 metadata_json=None,
             ))
         return assets_to_df(rows)
+
+    def asset_links_df(self) -> pd.DataFrame:
+        rows: list[AssetLink] = []
+        for fid, info in self.assets_manifest.items():
+            native_id = str(info.get("asset_id") or fid)
+            conversation_id = info.get("chat_id") or None
+            if conversation_id is None:
+                continue
+            account_id = info.get("account_id", self.account_id)
+            rows.append(AssetLink(
+                asset_link_id=make_asset_link_id(
+                    SOURCE, account_id, native_id, "conversation",
+                    str(conversation_id), "unknown",
+                ),
+                source=SOURCE, account_id=account_id, asset_id=native_id,
+                object_type="conversation", object_id=str(conversation_id),
+                conversation_id=str(conversation_id), message_id=None,
+                project_id=None, role="unknown", ordinal=None,
+                content_block_index=None, metadata_json=None,
+            ))
+        return asset_links_to_df(rows)
 
     def _available_asset_path(
         self, relpath: Optional[str], merged_root: Optional[Path] = None
@@ -481,3 +504,7 @@ class KimiParser(BaseParser):
         as_df = self.assets_df()
         if not as_df.empty:
             as_df.to_parquet(output_dir / f"{self.source_name}_assets.parquet")
+
+        self.asset_links_df().to_parquet(
+            output_dir / f"{self.source_name}_asset_links.parquet"
+        )

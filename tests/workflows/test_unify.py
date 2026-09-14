@@ -56,6 +56,7 @@ class TestIdentifyTable:
 
     def test_assets_suffix(self):
         assert unify_module._identify_table(Path("grok_assets.parquet")) == "assets"
+        assert unify_module._identify_table(Path("kimi_asset_links.parquet")) == "asset_links"
 
 
 # === _source_from_path ===
@@ -252,19 +253,17 @@ class TestUnifyTable:
         assert len(frame) == 2
 
 
-def test_asset_integrity_rejects_relationship_path_and_secret_defects(tmp_path):
+def test_asset_integrity_rejects_path_secret_and_link_defects(tmp_path):
     account_id = "810f3e91-ae10-5cb1-931a-53b80630af16"
     conversations = pd.DataFrame({
         "source": ["kimi"], "account_id": [account_id], "conversation_id": ["chat-1"],
     })
     base = {
         "asset_id": ["asset-1"], "source": ["kimi"], "account_id": [account_id],
-        "conversation_id": ["chat-1"], "message_id": [None],
+        "asset_origin": ["unknown"], "is_model_generated": [None],
         "asset_path": [None], "is_binary_available": [False], "metadata_json": [None],
     }
     for field, value, match in [
-        ("conversation_id", "missing", "conversation_id"),
-        ("message_id", "missing", "message_id"),
         ("asset_path", "../escape", "relative"),
         ("metadata_json", json.dumps({"url": "https://example.test/?token=x"}), "forbidden"),
         ("metadata_json", json.dumps({"local_path": "/Users/private/file"}), "absolute"),
@@ -275,7 +274,6 @@ def test_asset_integrity_rejects_relationship_path_and_secret_defects(tmp_path):
             unify_module._validate_asset_integrity(
                 {"conversations": conversations, "assets": pd.DataFrame(broken)}, tmp_path
             )
-
     available = {key: list(values) for key, values in base.items()}
     available["asset_path"] = ["merged/Kimi/missing.pdf"]
     available["is_binary_available"] = [True]
@@ -283,6 +281,57 @@ def test_asset_integrity_rejects_relationship_path_and_secret_defects(tmp_path):
         unify_module._validate_asset_integrity(
             {"conversations": conversations, "assets": pd.DataFrame(available)}, tmp_path
         )
+
+    valid_link = {
+        "asset_link_id": ["link-1"], "source": ["kimi"], "account_id": [account_id],
+        "asset_id": ["asset-1"], "object_type": ["conversation"],
+        "object_id": ["chat-1"], "conversation_id": ["chat-1"],
+        "message_id": [None], "role": ["unknown"], "content_block_index": [None],
+    }
+    for field, value, match in [
+        ("asset_id", "missing", "asset_id"),
+        ("object_id", "missing", "conversation"),
+    ]:
+        broken_link = {key: list(values) for key, values in valid_link.items()}
+        broken_link[field] = [value]
+        with pytest.raises(ValueError, match=match):
+            unify_module._validate_asset_integrity(
+                {
+                    "conversations": conversations,
+                    "assets": pd.DataFrame(base),
+                    "asset_links": pd.DataFrame(broken_link),
+                },
+                tmp_path,
+            )
+
+
+def test_asset_integrity_rejects_links_without_catalog(tmp_path):
+    with pytest.raises(ValueError, match="without assets"):
+        unify_module._validate_asset_integrity(
+            {"asset_links": pd.DataFrame({"asset_link_id": ["link-1"]})}, tmp_path
+        )
+
+
+def test_asset_source_link_resolves_against_project_docs(tmp_path):
+    account_id = "810f3e91-ae10-5cb1-931a-53b80630af16"
+    frames = {
+        "assets": pd.DataFrame({
+            "asset_id": ["file-1"], "source": ["qwen"], "account_id": [account_id],
+            "asset_origin": ["user"], "is_model_generated": [False],
+            "asset_path": [None], "is_binary_available": [False], "metadata_json": [None],
+        }),
+        "asset_links": pd.DataFrame({
+            "asset_link_id": ["link-1"], "source": ["qwen"], "account_id": [account_id],
+            "asset_id": ["file-1"], "object_type": ["source"], "object_id": ["file-1"],
+            "conversation_id": [None], "message_id": [None], "role": ["context"],
+            "content_block_index": [None],
+        }),
+        "project_docs": pd.DataFrame({
+            "source": ["qwen"], "account_id": [account_id],
+            "project_id": ["project-1"], "doc_id": ["file-1"],
+        }),
+    }
+    unify_module._validate_asset_integrity(frames, tmp_path)
 
 
 # === unify (end-to-end) ===

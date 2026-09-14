@@ -24,8 +24,11 @@ import pytest
 from src.platforms.qwen.parser import QwenParser
 
 
+ACCOUNT_ID = "810f3e91-ae10-5cb1-931a-53b80630af16"
+
+
 def _write_merged(tmp_path: Path, convs_envelopes: list[dict], projects: list[dict] | None = None) -> Path:
-    merged = tmp_path / "Qwen"
+    merged = tmp_path / "data/merged/Qwen"
     (merged / "conversations").mkdir(parents=True, exist_ok=True)
     for env in convs_envelopes:
         cid = env["data"]["id"]
@@ -272,6 +275,65 @@ def test_project_metadata_and_docs(tmp_path):
     assert pdocs.iloc[0]["content_size"] == 12345
 
 
+def test_assets_deduplicate_rotated_urls_and_emit_evidenced_links(tmp_path):
+    upload_url = "https://cdn.qwenlm.ai/user/upload?token=secret"
+    generated_url = "https://cdn.qwenlm.ai/output/generated.png?signature=secret"
+    project_url_1 = "https://oss.aliyuncs.com/project?signature=old"
+    project_url_2 = "https://oss.aliyuncs.com/project?signature=new"
+    conv = _basic_conv()
+    user = conv["data"]["chat"]["history"]["messages"]["msg-1"]
+    assistant = conv["data"]["chat"]["history"]["messages"]["msg-2"]
+    user["files"] = [{"id": "upload-1", "name": "input.pdf", "url": upload_url}]
+    assistant["content_list"] = [{"content": generated_url, "timestamp": 1777088060}]
+    project = {
+        "id": "project-1", "name": "Project", "_files": [{
+            "file_id": "project-file-1", "file_name": "source.md",
+            "path": project_url_2, "size": 7,
+        }],
+    }
+    merged = _write_merged(tmp_path, [conv], projects=[project])
+    assets_dir = merged / "assets"
+    files = {
+        "conv-1/input.pdf": b"upload",
+        "conv-1/generated.png": b"generated",
+        "_project_project-1/source-old.md": b"project",
+        "_project_project-1/source-new.md": b"project",
+    }
+    for relpath, content in files.items():
+        path = assets_dir / relpath
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    manifest = {
+        "upload-key": {"url": upload_url, "conv_id": "conv-1", "source_type": "user_upload", "file_class": "document", "file_name": "input.pdf", "file_id": "upload-1", "content_type": "application/pdf", "size": 6, "relpath": "conv-1/input.pdf"},
+        "generated-key": {"url": generated_url, "conv_id": "conv-1", "source_type": "generated", "file_class": "t2i", "file_name": None, "file_id": None, "content_type": "image/png", "size": 9, "relpath": "conv-1/generated.png"},
+        "project-old": {"url": project_url_1, "conv_id": "_project_project-1", "source_type": "project_file", "file_class": None, "file_name": "source.md", "file_id": "project-file-1", "content_type": "text/markdown", "size": 7, "relpath": "_project_project-1/source-old.md"},
+        "project-new": {"url": project_url_2, "conv_id": "_project_project-1", "source_type": "project_file", "file_class": None, "file_name": "source.md", "file_id": "project-file-1", "content_type": "text/markdown", "size": 7, "relpath": "_project_project-1/source-new.md"},
+    }
+    (merged / "assets_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    p = QwenParser(account_id=ACCOUNT_ID, merged_root=merged)
+    p.parse(merged)
+    assets = p.assets_df()
+    links = p.asset_links_df()
+
+    assert len(assets) == 3
+    assert set(assets["asset_kind"]) == {"attachment", "generated", "project_file"}
+    assert set(assets["asset_origin"]) == {"user", "assistant"}
+    assert assets["asset_id"].str.startswith("sha256:").sum() == 1
+    assert set(links["object_type"]) == {"message", "source"}
+    assert set(links["role"]) == {"input", "output", "context"}
+    assert links["asset_link_id"].is_unique
+    generated_link = links.loc[links["role"] == "output"].iloc[0]
+    assert generated_link["message_id"] == "msg-2"
+    assert generated_link["content_block_index"] == 0
+    project_link = links.loc[links["object_type"] == "source"].iloc[0]
+    assert project_link["object_id"] == "project-file-1"
+    assert project_link["project_id"] == "project-1"
+    serialized = assets.to_json() + links.to_json()
+    assert "token=secret" not in serialized
+    assert "signature=" not in serialized
+
+
 def test_save_writes_parquets(tmp_path):
     merged = _write_merged(tmp_path, [_basic_conv()])
     p = QwenParser(merged_root=merged)
@@ -281,6 +343,8 @@ def test_save_writes_parquets(tmp_path):
     assert (out / "qwen_conversations.parquet").exists()
     assert (out / "qwen_messages.parquet").exists()
     assert (out / "qwen_branches.parquet").exists()
+    assert (out / "qwen_assets.parquet").exists()
+    assert (out / "qwen_asset_links.parquet").exists()
 
 
 def test_preservation_via_explicit_flag(tmp_path):

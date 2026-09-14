@@ -125,14 +125,14 @@ extractor → reconciler → parser → unify
    already had — preserving records that disappeared from the server.
 3. **Parser** converts the raw JSON into parquet with a unified schema:
    `Conversation`, `Message`, `ToolEvent`, `Branch` (and auxiliaries such as
-   `Asset`, `ProjectDoc`, and `NotebookLMOutput`). The initial unified asset
-   index covers the native Grok and Kimi catalogs; it is not yet a complete
+   `Asset`, `AssetLink`, `ProjectDoc`, and `NotebookLMOutput`). The unified asset
+   index covers Grok, Kimi, and Qwen; it is not yet a complete
    inventory of every file representation in the archive.
    Web rows carry the immutable catalog UUID in `account_id`; the legacy
    display `account` remains available. CLI and manual rows keep
    `account_id` null until a durable identity is observable.
 4. **Unify** consolidates the parquets from the 13 sources into a single
-   `data/unified/` with 14 parquet tables (4 canonical + 10 auxiliaries),
+   `data/unified/` with 15 parquet tables (4 canonical + 11 auxiliaries),
    ready for cross-platform analysis.
 
 Full schema in `src/schema/models.py`. Capture and parser terminology is in

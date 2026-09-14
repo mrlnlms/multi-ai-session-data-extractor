@@ -206,7 +206,7 @@ These validations require a Pro Max account and remain open until someone tests:
 ## Cross-platform assets
 
 - **The unified asset index is intentionally partial.** Its current coverage
-  scope is `native_asset_catalogs` for Grok and Kimi. Message-embedded files,
+  covers Grok, Kimi, and Qwen. Message-embedded files,
   manifests and domain outputs from the other web sources remain preserved in
   their existing representations until source-specific adapters validate their
   identities and path semantics.

@@ -23,6 +23,12 @@ from src.runtime.project import find_project_root
 
 import pandas as pd
 
+from src.schema.models import (
+    VALID_ASSET_LINK_OBJECT_TYPES,
+    VALID_ASSET_LINK_ROLES,
+    VALID_ASSET_ORIGINS,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -50,8 +56,9 @@ TABLE_PKS: dict[str, list[str]] = {
     "conversation_projects": ["source", "account_id", "conversation_id", "project_tag"],
     # 1 auxiliar Claude Code/Codex (memorias do agente)
     "agent_memories":   ["source", "account_id", "memory_id"],
-    # Native asset catalogs (Grok/Kimi in the initial partial scope)
+    # Canonical asset catalog and evidence-backed domain relationships
     "assets":           ["source", "account_id", "asset_id"],
+    "asset_links":      ["source", "account_id", "asset_link_id"],
 }
 
 # Ordenado por len(table) DESC pra match seguro:
@@ -189,7 +196,10 @@ def _validate_asset_integrity(
     frames: dict[str, pd.DataFrame], data_root: Path
 ) -> None:
     assets = frames.get("assets")
+    links = frames.get("asset_links")
     if assets is None or assets.empty:
+        if links is not None and not links.empty:
+            raise ValueError("asset_links cannot exist without assets")
         return
 
     conversations = frames.get("conversations", pd.DataFrame())
@@ -197,15 +207,6 @@ def _validate_asset_integrity(
         (str(row.source), _identity(row.account_id), str(row.conversation_id))
         for row in conversations.itertuples(index=False)
     }
-    messages = frames.get("messages", pd.DataFrame())
-    message_keys = {
-        (
-            str(row.source), _identity(row.account_id),
-            str(row.conversation_id), str(row.message_id),
-        )
-        for row in messages.itertuples(index=False)
-    }
-
     forbidden_metadata_keys = {
         "url", "uri", "token", "signature", "authorization", "cookie",
         "signurl", "signed_url", "upstream_url",
@@ -223,17 +224,16 @@ def _validate_asset_integrity(
 
     for row in assets.itertuples(index=False):
         account_id = _identity(row.account_id)
-        conversation_id = _identity(row.conversation_id)
-        message_id = _identity(row.message_id)
-        if conversation_id is not None:
-            key = (str(row.source), account_id, conversation_id)
-            if key not in conversation_keys:
-                raise ValueError(f"asset conversation_id does not resolve: {key}")
-        if message_id is not None:
-            key = (str(row.source), account_id, conversation_id, message_id)
-            if key not in message_keys:
-                raise ValueError(f"asset message_id does not resolve: {key}")
-
+        if row.asset_origin not in VALID_ASSET_ORIGINS:
+            raise ValueError(f"asset_origin is invalid: {row.asset_origin}")
+        if row.asset_origin == "assistant" and (
+            pd.isna(row.is_model_generated) or not bool(row.is_model_generated)
+        ):
+            raise ValueError("assistant asset_origin requires is_model_generated=True")
+        if row.asset_origin == "user" and (
+            pd.isna(row.is_model_generated) or bool(row.is_model_generated)
+        ):
+            raise ValueError("user asset_origin requires is_model_generated=False")
         asset_path = _identity(row.asset_path)
         if asset_path is not None:
             path = Path(asset_path)
@@ -257,6 +257,65 @@ def _validate_asset_integrity(
                 raise ValueError("asset metadata_json contains forbidden URL/credential material")
             if any(Path(value).is_absolute() for value in metadata_values(metadata)):
                 raise ValueError("asset metadata_json contains an absolute local path")
+
+    if links is None or links.empty:
+        return
+    asset_keys = {
+        (str(row.source), _identity(row.account_id), str(row.asset_id))
+        for row in assets.itertuples(index=False)
+    }
+    messages = frames.get("messages", pd.DataFrame())
+    message_keys = {
+        (str(row.source), _identity(row.account_id), str(row.conversation_id), str(row.message_id))
+        for row in messages.itertuples(index=False)
+    }
+    projects = frames.get("project_metadata", pd.DataFrame())
+    project_keys = {
+        (str(row.source), _identity(row.account_id), str(row.project_id))
+        for row in projects.itertuples(index=False)
+    }
+    sources = frames.get("sources", pd.DataFrame())
+    source_keys = {
+        (str(row.source), _identity(row.account_id), str(row.doc_id))
+        for row in sources.itertuples(index=False)
+    }
+    project_docs = frames.get("project_docs", pd.DataFrame())
+    source_keys.update({
+        (str(row.source), _identity(row.account_id), str(row.doc_id))
+        for row in project_docs.itertuples(index=False)
+    })
+    outputs = frames.get("outputs", pd.DataFrame())
+    output_keys = {
+        (str(row.source), _identity(row.account_id), str(row.output_id))
+        for row in outputs.itertuples(index=False)
+    }
+    object_keys = {
+        "conversation": conversation_keys,
+        "project": project_keys,
+        "source": source_keys,
+        "output": output_keys,
+    }
+    for row in links.itertuples(index=False):
+        prefix = (str(row.source), _identity(row.account_id))
+        if row.object_type not in VALID_ASSET_LINK_OBJECT_TYPES:
+            raise ValueError(f"asset_link object_type is invalid: {row.object_type}")
+        if row.role not in VALID_ASSET_LINK_ROLES:
+            raise ValueError(f"asset_link role is invalid: {row.role}")
+        if _identity(row.message_id) is not None and _identity(row.conversation_id) is None:
+            raise ValueError("asset_link message_id requires conversation_id")
+        if pd.notna(row.content_block_index) and _identity(row.message_id) is None:
+            raise ValueError("asset_link content_block_index requires message_id")
+        asset_key = (*prefix, str(row.asset_id))
+        if asset_key not in asset_keys:
+            raise ValueError(f"asset_link asset_id does not resolve: {asset_key}")
+        if row.object_type == "message":
+            key = (*prefix, _identity(row.conversation_id), str(row.object_id))
+            if key not in message_keys:
+                raise ValueError(f"asset_link message does not resolve: {key}")
+        else:
+            key = (*prefix, str(row.object_id))
+            if key not in object_keys[row.object_type]:
+                raise ValueError(f"asset_link {row.object_type} does not resolve: {key}")
 
 
 def unify(processed_dir: Path, unified_dir: Path) -> dict[str, int]:

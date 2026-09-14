@@ -17,7 +17,7 @@ Cobertura (probe + smoke 2026-05-09):
   (response-node retorna threads quando alternative paths existem; deferred).
 
 Output: data/processed/Grok/grok_{conversations,messages,tool_events,
-workspace_metadata,conversation_projects}.parquet
+workspace_metadata,conversation_projects,assets,asset_links}.parquet
 """
 
 from __future__ import annotations
@@ -36,6 +36,7 @@ from src.schema.models import (
     Message,
     ToolEvent,
     assets_to_df,
+    asset_links_to_df,
     conversation_projects_to_df,
     conversations_to_df,
     messages_to_df,
@@ -382,8 +383,11 @@ class GrokParser(BaseParser):
             rows.append(Asset(
                 asset_id=str(aid), source=SOURCE,
                 account_id=a.get("account_id", self.account_id),
-                conversation_id=None, message_id=None, project_id=None,
-                asset_kind=kind, file_name=a.get("name") or None,
+                asset_kind=kind,
+                asset_origin="assistant" if model_generated else (
+                    "user" if file_source == "SELF_UPLOAD_FILE_SOURCE" else "unknown"
+                ),
+                file_name=a.get("name") or None,
                 mime_type=a.get("mimeType") or None,
                 size_bytes=int(a["sizeBytes"]) if a.get("sizeBytes") is not None else None,
                 asset_path=asset_path, is_model_generated=model_generated,
@@ -393,6 +397,11 @@ class GrokParser(BaseParser):
                 metadata_json=json.dumps(metadata, ensure_ascii=False, sort_keys=True),
             ))
         return assets_to_df(rows)
+
+    def asset_links_df(self) -> pd.DataFrame:
+        # /rest/assets is a global Files catalog. It exposes no trustworthy
+        # conversation/message/project use relation, so do not invent one.
+        return asset_links_to_df([])
 
     def _data_relative_path(self, path: Path) -> str:
         for parent in (path, *path.parents):
@@ -477,6 +486,10 @@ class GrokParser(BaseParser):
         as_df = self.assets_df()
         if not as_df.empty:
             as_df.to_parquet(output_dir / f"{self.source_name}_assets.parquet")
+
+        self.asset_links_df().to_parquet(
+            output_dir / f"{self.source_name}_asset_links.parquet"
+        )
 
         tk_df = self.scheduled_tasks_df()
         if not tk_df.empty:

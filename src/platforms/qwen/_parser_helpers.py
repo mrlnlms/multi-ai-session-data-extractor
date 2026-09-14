@@ -110,6 +110,20 @@ def load_assets_manifest(merged_root) -> dict[str, str]:
             if isinstance(entry, dict) and entry.get("url") and entry.get("relpath")}
 
 
+def load_asset_manifest_entries(merged_root) -> list[dict]:
+    """Load full manifest rows while keeping signed URLs parser-private."""
+    from pathlib import Path
+    p = Path(merged_root) / "assets_manifest.json"
+    if not p.exists():
+        return []
+    try:
+        manifest = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    return [dict(entry, _manifest_key=key) for key, entry in sorted(manifest.items())
+            if isinstance(entry, dict)]
+
+
 def resolve_msg_assets(files: list, assets_root, url_to_relpath: dict[str, str]) -> list[str]:
     """Resolve URLs dos files de uma msg pra paths em disco."""
     from pathlib import Path

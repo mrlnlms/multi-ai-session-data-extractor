@@ -76,7 +76,18 @@ legacy `account` label and all existing native IDs remain unchanged.
 ## Integrated asset download
 
 `python -m src.platforms.qwen.commands.download_assets`. URLs in msgs/projects downloaded via
-manifest. Parser resolves `asset_paths` via `assets_manifest.json`.
+manifest. Parser resolves `asset_paths` via `assets_manifest.json` and publishes
+the canonical `assets` plus `asset_links` contracts. Native `file_id` identifies
+uploads and project sources; generated files without an upstream ID use their
+preserved SHA-256 content identity. Rotated signed URLs therefore do not create
+duplicate assets and are never copied into processed metadata.
+
+The current archive materializes 367 distinct assets: 294 user uploads, 54
+assistant-generated outputs, and 19 project sources. Each has one evidenced
+link: uploads and generated outputs resolve to their exact input/output message,
+while project files resolve to the matching `ProjectDoc` with `role=context`.
+All 367 binaries are locally available. Existing `Message.asset_paths` and
+`ProjectDoc` rows remain intact for compatibility and domain-specific analysis.
 
 ## Descriptive Quarto
 

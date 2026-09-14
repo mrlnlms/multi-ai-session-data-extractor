@@ -93,8 +93,11 @@ relpath, size, mime}}). Reconciler espelha pra
 `data/merged/Grok/assets/` por hardlink quando suportado, com copia normal como
 fallback entre filesystems. Parser populates coluna `asset_path` em
 `grok_assets.parquet`. O parser publica o contrato canonico `Asset`; arquivos
-gerados viram `asset_kind=generated`, uploads viram `attachment`, e o catalogo
-global nao recebe relacionamentos de conversa ou mensagem fabricados. Campos
+gerados viram `asset_kind=generated` e `asset_origin=assistant`, enquanto
+uploads viram `attachment` e `asset_origin=user`. Como `/rest/assets` e um
+catalogo global sem evidencia de uso, `grok_asset_links.parquet` tem schema
+canonico e zero linhas: nenhum relacionamento de conversa ou mensagem e
+fabricado. Campos
 especificos nao secretos ficam em `metadata_json`; chaves do CDN nao entram no
 Parquet processado.
 

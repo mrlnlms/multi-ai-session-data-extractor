@@ -17,12 +17,13 @@ Cobertura (probe 2026-05-01):
 - Project com custom_instruction + _files → project_metadata + project_docs
 
 Output: data/processed/Qwen/{conversations,messages,tool_events,branches,
-project_metadata,project_docs}.parquet
+project_metadata,project_docs,assets,asset_links}.parquet
 """
 
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 from typing import Optional
 
@@ -37,19 +38,25 @@ from src.platforms.qwen._parser_helpers import (
     collect_text_from_content_list,
     extract_search_results,
     load_assets_manifest,
+    load_asset_manifest_entries,
     resolve_msg_assets,
     serialize_settings,
 )
 from src.parsing.base import BaseParser
 from src.schema.models import (
+    Asset,
+    AssetLink,
     Branch,
     Conversation,
     Message,
     ProjectDoc,
     ToolEvent,
+    asset_links_to_df,
+    assets_to_df,
     branches_to_df,
     conversations_to_df,
     messages_to_df,
+    make_asset_link_id,
     project_docs_to_df,
     tool_events_to_df,
 )
@@ -93,12 +100,17 @@ class QwenParser(BaseParser):
         self.projects: list[dict] = []
         self.project_docs: list[ProjectDoc] = []
         self._url_to_relpath: dict[str, str] = {}
+        self._asset_entries: list[dict] = []
+        self._asset_uses: list[dict] = []
 
     def reset(self):
         super().reset()
         self.branches: list[Branch] = []
         self.projects = []
         self.project_docs = []
+        self._url_to_relpath = {}
+        self._asset_entries = []
+        self._asset_uses = []
 
     @property
     def conversations_dir(self) -> Path:
@@ -122,6 +134,10 @@ class QwenParser(BaseParser):
         last_run_date = self._compute_last_run_date(conv_dir)
         # Carrega manifest dos assets baixados (se houver)
         self._url_to_relpath = load_assets_manifest(merged_root)
+        self._asset_entries = [
+            dict(entry, account_id=self.account_id, _merged_root=str(merged_root))
+            for entry in load_asset_manifest_entries(merged_root)
+        ]
 
         # Conversations
         if conv_dir.exists():
@@ -190,6 +206,8 @@ class QwenParser(BaseParser):
         # Ordenacao: percorrer todos msgs, sequence baseada em timestamp
         all_msgs = list(messages_dict.values())
         all_msgs.sort(key=lambda m: m.get("timestamp") or 0)
+
+        self._record_asset_uses(conv_id, all_msgs)
 
         for seq, msg_data in enumerate(all_msgs, start=1):
             built = self._build_message(
@@ -266,6 +284,137 @@ class QwenParser(BaseParser):
 
         self.messages.extend(messages)
         self.events.extend(tool_events)
+
+    def _record_asset_uses(self, conv_id: str, messages: list[dict]) -> None:
+        entries_by_url = {
+            entry.get("url"): entry
+            for entry in self._asset_entries
+            if entry.get("url") and entry.get("conv_id") == conv_id
+        }
+        for msg in messages:
+            msg_id = msg.get("id")
+            if not msg_id:
+                continue
+            direction = "input" if msg.get("role") == "user" else (
+                "output" if msg.get("role") == "assistant" else "unknown"
+            )
+            seen_urls: set[str] = set()
+            for ordinal, file_info in enumerate(msg.get("files") or []):
+                if not isinstance(file_info, dict):
+                    continue
+                url = file_info.get("url")
+                if url in entries_by_url:
+                    seen_urls.add(url)
+                    self._asset_uses.append({
+                        "entry": entries_by_url[url], "conversation_id": conv_id,
+                        "message_id": str(msg_id), "role": direction,
+                        "ordinal": ordinal, "content_block_index": None,
+                    })
+            for block_index, block in enumerate(msg.get("content_list") or []):
+                serialized = json.dumps(block, ensure_ascii=False) if isinstance(block, (dict, list)) else str(block)
+                for url, entry in entries_by_url.items():
+                    if url not in seen_urls and url in serialized:
+                        seen_urls.add(url)
+                        self._asset_uses.append({
+                            "entry": entry, "conversation_id": conv_id,
+                            "message_id": str(msg_id), "role": direction,
+                            "ordinal": None, "content_block_index": block_index,
+                        })
+            serialized_msg = json.dumps(msg, ensure_ascii=False)
+            for url, entry in entries_by_url.items():
+                if url not in seen_urls and url in serialized_msg:
+                    self._asset_uses.append({
+                        "entry": entry, "conversation_id": conv_id,
+                        "message_id": str(msg_id), "role": direction,
+                        "ordinal": None, "content_block_index": None,
+                    })
+
+    @staticmethod
+    def _asset_id(entry: dict) -> str:
+        if entry.get("file_id"):
+            return str(entry["file_id"])
+        binary = Path(entry["_merged_root"]) / "assets" / str(entry.get("relpath") or "")
+        if binary.is_file():
+            return f"sha256:{hashlib.sha256(binary.read_bytes()).hexdigest()}"
+        stable = "\x1f".join(str(entry.get(key) or "") for key in (
+            "source_type", "conv_id", "file_class", "file_name", "relpath"
+        ))
+        return f"missing:{hashlib.sha256(stable.encode()).hexdigest()}"
+
+    @staticmethod
+    def _data_relative_path(path: Path) -> str:
+        for parent in (path, *path.parents):
+            if parent.name == "data":
+                return path.relative_to(parent).as_posix()
+        raise ValueError(f"asset path is not under a data directory: {path}")
+
+    def assets_df(self) -> pd.DataFrame:
+        grouped: dict[tuple[str | None, str], list[dict]] = {}
+        for entry in self._asset_entries:
+            grouped.setdefault((entry.get("account_id"), self._asset_id(entry)), []).append(entry)
+        rows: list[Asset] = []
+        for (account_id, asset_id), entries in sorted(grouped.items(), key=lambda item: str(item[0])):
+            entry = sorted(entries, key=lambda row: str(row.get("relpath") or ""))[-1]
+            source_type = entry.get("source_type")
+            binary = Path(entry["_merged_root"]) / "assets" / str(entry.get("relpath") or "")
+            available = binary.is_file()
+            kind = {"user_upload": "attachment", "generated": "generated", "project_file": "project_file"}.get(source_type, "other")
+            origin = {"user_upload": "user", "generated": "assistant", "project_file": "user"}.get(source_type, "unknown")
+            rows.append(Asset(
+                asset_id=asset_id, source=SOURCE, account_id=account_id,
+                asset_kind=kind, asset_origin=origin,
+                file_name=entry.get("file_name") or (binary.name if available else None),
+                mime_type=entry.get("content_type") or None,
+                size_bytes=int(entry["size"]) if entry.get("size") is not None else (binary.stat().st_size if available else None),
+                asset_path=self._data_relative_path(binary) if available else None,
+                is_model_generated=True if origin == "assistant" else False if origin == "user" else None,
+                is_preserved_missing=None, is_binary_available=available,
+                created_at=None,
+                metadata_json=json.dumps({
+                    "source_type": source_type,
+                    "file_class": entry.get("file_class"),
+                }, ensure_ascii=False, sort_keys=True),
+            ))
+        return assets_to_df(rows)
+
+    def asset_links_df(self) -> pd.DataFrame:
+        rows: list[AssetLink] = []
+        seen: set[str] = set()
+        for use in self._asset_uses:
+            entry = use["entry"]
+            account_id = entry.get("account_id")
+            asset_id = self._asset_id(entry)
+            link_id = make_asset_link_id(
+                SOURCE, account_id, asset_id, "message", use["message_id"],
+                use["role"], use["ordinal"], use["content_block_index"],
+            )
+            if link_id in seen:
+                continue
+            seen.add(link_id)
+            rows.append(AssetLink(
+                asset_link_id=link_id, source=SOURCE, account_id=account_id,
+                asset_id=asset_id, object_type="message", object_id=use["message_id"],
+                conversation_id=use["conversation_id"], message_id=use["message_id"],
+                project_id=None, role=use["role"], ordinal=use["ordinal"],
+                content_block_index=use["content_block_index"], metadata_json=None,
+            ))
+        for entry in self._asset_entries:
+            if entry.get("source_type") != "project_file" or not entry.get("file_id"):
+                continue
+            project_id = entry.get("project_id") or str(entry.get("conv_id") or "").removeprefix("_project_")
+            account_id = entry.get("account_id")
+            asset_id = self._asset_id(entry)
+            link_id = make_asset_link_id(SOURCE, account_id, asset_id, "source", str(entry["file_id"]), "context")
+            if link_id in seen:
+                continue
+            seen.add(link_id)
+            rows.append(AssetLink(
+                asset_link_id=link_id, source=SOURCE, account_id=account_id,
+                asset_id=asset_id, object_type="source", object_id=str(entry["file_id"]),
+                conversation_id=None, message_id=None, project_id=project_id or None,
+                role="context", ordinal=None, content_block_index=None, metadata_json=None,
+            ))
+        return asset_links_to_df(rows)
 
     def _build_message(
         self,
@@ -495,3 +644,6 @@ class QwenParser(BaseParser):
         docs_df = self.project_docs_df()
         if not docs_df.empty:
             docs_df.to_parquet(output_dir / f"{self.source_name}_project_docs.parquet")
+
+        self.assets_df().to_parquet(output_dir / f"{self.source_name}_assets.parquet")
+        self.asset_links_df().to_parquet(output_dir / f"{self.source_name}_asset_links.parquet")

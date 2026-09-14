@@ -32,7 +32,7 @@ SOURCE_COLOR   = "#3DB39E"  # Kimi teal-green (Moonshot brand)
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Kimi"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
-AUX_TABLES     = ["project_metadata", "assets"]
+AUX_TABLES     = ["project_metadata", "assets", "asset_links"]
 ACCOUNT_FILTER = None
 
 con = duckdb.connect()

@@ -12,14 +12,18 @@ from src.schema.models import (
     conversation_projects_to_df,
     VALID_MODES,
     Asset,
+    AssetLink,
     VALID_ASSET_KINDS,
+    VALID_ASSET_ORIGINS,
     assets_to_df,
+    asset_links_to_df,
+    make_asset_link_id,
 )
 
 
 ASSET_COLUMNS = [
-    "asset_id", "source", "account_id", "conversation_id", "message_id",
-    "project_id", "asset_kind", "file_name", "mime_type", "size_bytes",
+    "asset_id", "source", "account_id", "asset_kind", "asset_origin",
+    "file_name", "mime_type", "size_bytes",
     "asset_path", "is_model_generated", "is_preserved_missing",
     "is_binary_available", "created_at", "metadata_json",
 ]
@@ -29,8 +33,7 @@ def _asset(**overrides):
     values = dict(
         asset_id="file-1", source="kimi",
         account_id="810f3e91-ae10-5cb1-931a-53b80630af16",
-        conversation_id=None, message_id=None, project_id=None,
-        asset_kind="attachment", file_name=None, mime_type=None,
+        asset_kind="attachment", asset_origin="unknown", file_name=None, mime_type=None,
         size_bytes=None, asset_path=None, is_model_generated=None,
         is_preserved_missing=None, is_binary_available=False,
         created_at=None, metadata_json=None,
@@ -60,6 +63,55 @@ def test_asset_rejects_invalid_kind_source_account_and_availability():
         _asset(account_id="not-a-uuid")
     with pytest.raises(ValueError, match="is_binary_available"):
         _asset(is_binary_available=None)
+
+
+@pytest.mark.parametrize("origin", VALID_ASSET_ORIGINS)
+def test_asset_accepts_every_origin(origin):
+    generated = True if origin == "assistant" else False if origin == "user" else None
+    assert _asset(asset_origin=origin, is_model_generated=generated).asset_origin == origin
+
+
+def test_asset_origin_enforces_compatibility_flag():
+    with pytest.raises(ValueError, match="assistant"):
+        _asset(asset_origin="assistant", is_model_generated=False)
+    with pytest.raises(ValueError, match="user"):
+        _asset(asset_origin="user", is_model_generated=None)
+
+
+def test_asset_link_contract_and_deterministic_id():
+    args = ("kimi", _asset().account_id, "file-1", "conversation", "chat-1", "unknown")
+    link_id = make_asset_link_id(*args)
+    assert link_id == make_asset_link_id(*args)
+    link = AssetLink(
+        asset_link_id=link_id, source="kimi", account_id=_asset().account_id,
+        asset_id="file-1", object_type="conversation", object_id="chat-1",
+        conversation_id="chat-1", message_id=None, project_id=None,
+        role="unknown", ordinal=None, content_block_index=None, metadata_json=None,
+    )
+    assert list(asset_links_to_df([link]).columns) == [
+        "asset_link_id", "source", "account_id", "asset_id", "object_type",
+        "object_id", "conversation_id", "message_id", "project_id", "role",
+        "ordinal", "content_block_index", "metadata_json",
+    ]
+    assert list(asset_links_to_df([]).columns) == list(asset_links_to_df([link]).columns)
+
+
+def test_asset_link_rejects_invalid_id_position_and_context():
+    values = dict(
+        asset_link_id=make_asset_link_id("kimi", _asset().account_id, "file-1", "conversation", "chat-1", "unknown"),
+        source="kimi", account_id=_asset().account_id, asset_id="file-1",
+        object_type="conversation", object_id="chat-1", conversation_id="chat-1",
+        message_id=None, project_id=None, role="unknown", ordinal=None,
+        content_block_index=None, metadata_json=None,
+    )
+    for override, match in [
+        ({"asset_link_id": "not-a-uuid"}, "UUID"),
+        ({"ordinal": -1}, "ordinal"),
+        ({"content_block_index": 0}, "requires message_id"),
+        ({"conversation_id": "other"}, "conversation object_id"),
+    ]:
+        with pytest.raises(ValueError, match=match):
+            AssetLink(**(values | override))
 
 
 def test_conversation_to_dict():

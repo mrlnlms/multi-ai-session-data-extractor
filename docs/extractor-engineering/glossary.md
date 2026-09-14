@@ -97,10 +97,20 @@ que contem apenas mensagens de usuario e assistente.
 Linha em `assets.parquet` que indexa metadados de um arquivo observado ou
 preservado, sem incorporar o binario. O caminho, quando disponivel, e relativo
 a `data/`; um binario ausente mantem sua linha com
-`is_binary_available=False`. A cobertura unificada inicial e explicitamente
-`native_asset_catalogs`: Grok e Kimi. Arquivos representados apenas em outras
+`is_binary_available=False`. `asset_origin` registra quem originou o arquivo
+(`user`, `assistant`, `platform`, `imported` ou `unknown`) sem confundir essa
+propriedade com o uso do arquivo em uma conversa. A cobertura unificada inicial e explicitamente
+`native_asset_catalogs`: Grok, Kimi e Qwen. Arquivos representados apenas em outras
 fontes serao incorporados por adaptadores posteriores, sem substituir tabelas
 de dominio como `project_docs` e os outputs do NotebookLM.
+
+### AssetLink
+
+Linha em `asset_links.parquet` que relaciona um `Asset` a uma mensagem,
+conversa, projeto, fonte ou output. `role` descreve o uso contextual
+(`input`, `output`, `context`, `reference` ou `unknown`), enquanto
+`content_block_index` permite posicionamento inline quando a fonte oferece essa
+evidencia. Um mesmo asset pode ter varios vinculos sem duplicar seus metadados.
 
 ### Custom GPT e Project
 

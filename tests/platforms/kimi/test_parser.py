@@ -31,9 +31,14 @@ def test_assets_are_account_aware_and_omit_signed_urls(tmp_path):
     assert bool(frame.loc["file-1", "is_binary_available"])
     assert pd.isna(frame.loc["file-2", "asset_path"])
     assert not bool(frame.loc["file-2", "is_binary_available"])
-    assert set(frame["conversation_id"]) == {"chat-1"}
+    assert set(frame["asset_origin"]) == {"unknown"}
     assert "http" not in frame.reset_index().to_json()
     assert "secret" not in frame.reset_index().to_json()
+    links = parser.asset_links_df()
+    assert set(links["object_type"]) == {"conversation"}
+    assert set(links["object_id"]) == {"chat-1"}
+    assert set(links["role"]) == {"unknown"}
+    assert links["asset_link_id"].is_unique
 
 
 def test_message_only_publishes_available_asset_paths(tmp_path):

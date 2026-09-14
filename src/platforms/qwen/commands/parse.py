@@ -7,6 +7,8 @@ Output em data/processed/Qwen/:
     qwen_branches.parquet
     qwen_project_metadata.parquet
     qwen_project_docs.parquet
+    qwen_assets.parquet
+    qwen_asset_links.parquet
 """
 
 import argparse
@@ -59,6 +61,8 @@ def main():
         parser.branches.extend(per_account.branches)
         parser.projects.extend(per_account.projects)
         parser.project_docs.extend(per_account.project_docs)
+        parser._asset_entries.extend(per_account._asset_entries)
+        parser._asset_uses.extend(per_account._asset_uses)
 
     log.info(
         f"Parseado: {len(parser.conversations)} convs, "
