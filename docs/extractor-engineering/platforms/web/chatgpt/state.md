@@ -82,3 +82,7 @@ missing deps (duckdb, plotly, itables).
 ## Related documents
 
 - `docs/extractor-engineering/platforms/web/chatgpt/server-behavior.md` — upstream behavior.
+## Explicit login-health check
+
+`GET /backend-api/conversations` is documented, but the current Cloudflare-safe transport requires a visible page. This delivery therefore returns `unknown` instead of opening a browser implicitly. Profile presence alone never produces a valid status. The check is
+read-only, runs only after an explicit operator action, and never refreshes tokens.

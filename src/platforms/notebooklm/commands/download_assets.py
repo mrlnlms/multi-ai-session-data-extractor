@@ -13,8 +13,9 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from src.accounts import capturable_account_key
 
-from src.platforms.notebooklm.extractor.auth import load_context, VALID_ACCOUNTS, ACCOUNT_LANG
+from src.platforms.notebooklm.extractor.auth import load_context, ACCOUNT_LANG
 from src.platforms.notebooklm.extractor.api_client import NotebookLMClient
 from src.platforms.notebooklm.extractor.batchexecute import load_session
 from src.platforms.notebooklm.extractor.asset_downloader import (
@@ -27,7 +28,7 @@ async def main(raw_dir: Path, account: str):
     context = await load_context(account, headless=True)
     try:
         session = await load_session(context)
-        client = NotebookLMClient(context, session, hl=ACCOUNT_LANG[account])
+        client = NotebookLMClient(context, session, hl=ACCOUNT_LANG.get(account, "pt-BR"))
         # Notes + Mind Maps: offline (ja estao no cFji9 capturado)
         nm_stats = save_notes_and_mindmaps(raw_dir)
         # Downloads de midia (audios, videos, slide decks, pages)
@@ -56,7 +57,7 @@ async def main(raw_dir: Path, account: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--account", required=True, choices=list(VALID_ACCOUNTS))
+    parser.add_argument("--account", type=capturable_account_key, required=True)
     parser.add_argument("raw_dir", nargs="?", default=None,
                         help="Override do raw dir (default: data/raw/NotebookLM/account-{N}/)")
     args = parser.parse_args()

@@ -132,3 +132,7 @@ Cursor pagination via `nextPageToken`. Bearer token obrigatorio em
 
 O comportamento da migracao de origem e outros fatos upstream ficam em
 [server-behavior.md](server-behavior.md).
+## Explicit login-health check
+
+A one-row `ListChats` request is the established read-only check; cookies plus the existing `access_token` are required. Profile presence alone never produces a valid status. The check is
+read-only, runs only after an explicit operator action, and never refreshes tokens.

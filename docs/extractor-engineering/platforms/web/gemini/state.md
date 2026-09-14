@@ -2,15 +2,15 @@
 
 ## Pipeline
 
-- **Multi-account** — 3 Google accounts. Profiles in
-  `.storage/gemini-profile-{1,2,3}/` (generated via
+- **Multi-account** — three compatibility-default Google accounts. Profiles in
+  `.storage/gemini-profile-<key>/` (generated via
   `python -m src.platforms.gemini.commands.login`).
 - **Single cumulative folder per-account:** `data/raw/Gemini/account-{N}/` and
   `data/merged/Gemini/account-{N}/`.
 - **Sync orchestrator (3 multi-account steps):**
   `python -m src.platforms.gemini.commands.sync` — capture per-account + assets + reconcile
-  per-account. Iterates over all active accounts in sequence (default) or
-  `--account N` to run just one.
+  per-account. Without a flag it still iterates `1`, `2`, `3` in that order;
+  `--account <safe-key>` selects one dynamically named account.
 - **Headless capture** (no Cloudflare at runtime).
 
 ## Coverage
@@ -116,3 +116,7 @@ for f in gemini gemini-acc-1 gemini-acc-2 gemini-acc-3; do
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd
 done
 ```
+## Explicit login-health check
+
+A single `MaZiqc` conversation listing is the established read-only check; a successful parsed response is the only path to `valid`. Profile presence alone never produces a valid status. The check is
+read-only, runs only after an explicit operator action, and never refreshes tokens.

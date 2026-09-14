@@ -8,8 +8,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.account_catalog import LifecycleStatus, legacy_account_id, load_account_catalog
-from src.platforms.registry import PLATFORM_ACCOUNT_METADATA
+from src.account_catalog import (
+    LifecycleStatus, legacy_account_id, load_account_catalog, validate_technical_key,
+)
+from src.platforms.registry import PLATFORM_ACCOUNT_CAPABILITIES, PLATFORM_ACCOUNT_METADATA
 
 
 DEFAULT_ACCOUNTS_FILE = Path(".storage/accounts.json")
@@ -79,6 +81,25 @@ def account_definitions(platform: str) -> tuple[AccountDefinition, ...]:
 def account_keys(platform: str) -> tuple[str, ...]:
     """Return canonical fallback keys in their operational order."""
     return tuple(definition.key for definition in account_definitions(platform))
+
+
+def default_sync_accounts(platform: str) -> tuple[str, ...]:
+    """Return the unchanged compatibility order for an all-account sync."""
+    return account_keys(platform)
+
+
+def account_command_argument(platform: str, technical_key: str) -> tuple[str, str]:
+    """Resolve an immutable catalog identity to the platform's existing sync flag."""
+    capability = PLATFORM_ACCOUNT_CAPABILITIES.get(platform)
+    if capability is None:
+        raise ValueError(f"Platform does not support web account selection: {platform!r}")
+    key = validate_technical_key(technical_key, allow_archive=False)
+    return capability.sync_argument, key
+
+
+def capturable_account_key(value: str) -> str:
+    """Argparse-compatible validator for an explicitly selected account."""
+    return validate_technical_key(value, allow_archive=False)
 
 
 def load_account_registry(path: Path = DEFAULT_ACCOUNTS_FILE) -> dict[str, dict[str, str]]:

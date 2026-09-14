@@ -12,12 +12,13 @@ Para cada conta Google, rode uma vez com seu numero:
 import argparse
 import asyncio
 
-from src.platforms.gemini.extractor.auth import VALID_ACCOUNTS, get_profile_dir, login
+from src.accounts import capturable_account_key
+from src.platforms.gemini.extractor.auth import get_profile_dir, login
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--account", type=int, default=1, choices=list(VALID_ACCOUNTS))
+    parser.add_argument("--account", type=capturable_account_key, default="1")
     return parser
 
 

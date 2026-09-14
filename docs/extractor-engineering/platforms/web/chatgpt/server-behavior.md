@@ -147,3 +147,9 @@ comparison error after capture. Regression coverage includes mixed formats.
 **Before creating ANY new script:** check whether sync, existing standalone
 scripts, or the helpers in `src/` already solve it. If unsure, read code +
 memory before proposing.
+## Authentication probe boundary
+
+Account health reuses only the minimal listing contract documented below. A
+successful parsed authenticated response is `valid`; an explicit authentication
+rejection is `expired`; transport or parse failures are `error`. No profile,
+cookie, token, or response body is persisted in the observation.

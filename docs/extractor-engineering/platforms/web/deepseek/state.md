@@ -106,3 +106,7 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.login --account
 PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.sync --account account-2
 PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.parse
 ```
+## Explicit login-health check
+
+A minimal `GET /api/v0/chat_session/fetch_page` listing is the established read-only check; missing or rejected `userToken` means `expired`. Profile presence alone never produces a valid status. The check is
+read-only, runs only after an explicit operator action, and never refreshes tokens.

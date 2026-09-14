@@ -8,19 +8,20 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from src.accounts import capturable_account_key
 
-from src.platforms.gemini.extractor.auth import VALID_ACCOUNTS, load_context
+from src.platforms.gemini.extractor.auth import load_context
 from src.platforms.gemini.extractor.api_client import GeminiAPIClient
 from src.platforms.gemini.extractor.batchexecute import load_session
 from src.platforms.gemini.extractor.asset_downloader import download_assets, extract_deep_research
 
 
-def _find_latest_raw(account: int) -> Path | None:
+def _find_latest_raw(account: str) -> Path | None:
     base = Path("data/raw/Gemini") / f"account-{account}"
     return base if base.is_dir() else None
 
 
-async def main(raw_dir: Path, account: int, artifacts_only: bool):
+async def main(raw_dir: Path, account: str, artifacts_only: bool):
     # Deep Research offline (le raw)
     print("Extraindo Deep Research reports...")
     dr = extract_deep_research(raw_dir)
@@ -47,7 +48,7 @@ async def main(raw_dir: Path, account: int, artifacts_only: bool):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--account", type=int, default=1, choices=list(VALID_ACCOUNTS))
+    parser.add_argument("--account", type=capturable_account_key, default="1")
     parser.add_argument("raw_dir", nargs="?", default=None)
     parser.add_argument("--artifacts-only", action="store_true",
                         help="So extrai Deep Research, pula download de imagens")

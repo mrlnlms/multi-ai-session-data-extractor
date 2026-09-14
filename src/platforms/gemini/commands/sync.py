@@ -9,7 +9,7 @@ Multi-conta: por default roda todas as contas ativas (1, 2 e 3). Use
 --account N pra rodar so uma.
 
 Flags:
-    --account {1,2,3} roda so a conta indicada (default: todas)
+    --account KEY roda so a conta indicada (default: 1, 2 e 3)
     --no-binaries     pula etapa 2 (assets)
     --no-reconcile    pula etapa 3
     --full            forca refetch full
@@ -27,6 +27,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from src.accounts import capturable_account_key
 
 from src.platforms.gemini.extractor.auth import VALID_ACCOUNTS, load_context
 from src.platforms.gemini.extractor.api_client import GeminiAPIClient
@@ -46,7 +47,7 @@ def _section(title: str):
     print("=" * 72)
 
 
-async def _run_assets(raw_dir: Path, account: int) -> dict:
+async def _run_assets(raw_dir: Path, account: str) -> dict:
     """Extrai Deep Research offline + baixa imagens online."""
     print("Extraindo Deep Research reports...")
     dr = extract_deep_research(raw_dir)
@@ -67,7 +68,7 @@ async def _run_assets(raw_dir: Path, account: int) -> dict:
     return {"deep_research": dr, "images": stats}
 
 
-async def _sync_account(args: argparse.Namespace, account: int) -> int:
+async def _sync_account(args: argparse.Namespace, account: str) -> int:
     _section(f"ACCOUNT {account}")
     _section(f"Etapa 1/3 — Capture (account {account})")
     try:
@@ -136,7 +137,7 @@ async def main(args: argparse.Namespace) -> int:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--account", type=int, choices=list(VALID_ACCOUNTS), default=None,
+    ap.add_argument("--account", type=capturable_account_key, default=None,
                     help="Roda so a conta indicada (default: todas)")
     ap.add_argument("--no-binaries", action="store_true", help="Pula etapa 2 (assets)")
     ap.add_argument("--no-reconcile", action="store_true")

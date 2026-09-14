@@ -11,8 +11,8 @@ Uso:
 import argparse
 import sys
 from pathlib import Path
+from src.accounts import capturable_account_key
 
-from src.platforms.notebooklm.extractor.auth import VALID_ACCOUNTS
 from src.platforms.notebooklm.extractor.orchestrator import BASE_DIR as RAW_BASE
 from src.platforms.notebooklm.reconciler import run_reconciliation, FEATURE_FLAGS
 
@@ -22,7 +22,7 @@ MERGED_BASE = Path("data/merged/NotebookLM")
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--account", required=True, choices=list(VALID_ACCOUNTS))
+    parser.add_argument("--account", type=capturable_account_key, required=True)
     parser.add_argument("raw_dir", nargs="?", default=None,
                         help="Override do raw dir (default: data/raw/NotebookLM/account-{N}/)")
     parser.add_argument("--full", action="store_true",

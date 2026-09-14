@@ -67,6 +67,28 @@ class PlatformAccountMetadata:
     historical_archive_root: str | None = None
 
 
+@dataclass(frozen=True)
+class AccountExecutionCapability:
+    """Existing public flags used to select one web account."""
+
+    login_argument: str
+    sync_argument: str
+    accepts_dynamic_keys: bool
+
+
+PLATFORM_ACCOUNT_CAPABILITIES: dict[str, AccountExecutionCapability] = {
+    "ChatGPT": AccountExecutionCapability("--profile", "--account", True),
+    "Claude.ai": AccountExecutionCapability("--profile", "--profile", True),
+    "Gemini": AccountExecutionCapability("--account", "--account", True),
+    "NotebookLM": AccountExecutionCapability("--account", "--account", True),
+    "Qwen": AccountExecutionCapability("--account", "--account", True),
+    "DeepSeek": AccountExecutionCapability("--account", "--account", True),
+    "Perplexity": AccountExecutionCapability("--account", "--account", True),
+    "Grok": AccountExecutionCapability("--account", "--account", True),
+    "Kimi": AccountExecutionCapability("--account", "--account", True),
+}
+
+
 PLATFORM_ACCOUNT_METADATA: dict[str, PlatformAccountMetadata] = {
     "ChatGPT": PlatformAccountMetadata("chatgpt", "chatgpt-profile-"),
     "Claude.ai": PlatformAccountMetadata("claude_ai", "claude-ai-profile-"),
@@ -87,3 +109,4 @@ PLATFORM_ACCOUNT_METADATA: dict[str, PlatformAccountMetadata] = {
 }
 
 assert set(PLATFORM_ACCOUNT_METADATA) == set(WEB_PLATFORMS)
+assert set(PLATFORM_ACCOUNT_CAPABILITIES) == set(WEB_PLATFORMS)

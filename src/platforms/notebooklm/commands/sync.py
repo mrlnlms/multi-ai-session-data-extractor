@@ -9,7 +9,7 @@ Multi-conta: por default roda todas as contas ativas (1, 2 e 3). Use
 --account N pra rodar so uma.
 
 Flags:
-    --account {1,2,3} roda so a conta indicada (default: todas)
+    --account KEY roda so a conta indicada (default: 1, 2 e 3)
     --no-binaries     pula etapa 2 (assets)
     --no-reconcile    pula etapa 3
     --full            forca refetch full (propagado pro reconcile — bug preventivo #3)
@@ -27,6 +27,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from src.accounts import capturable_account_key
 
 from src.platforms.notebooklm.extractor.auth import ACCOUNT_LANG, VALID_ACCOUNTS, load_context
 from src.platforms.notebooklm.extractor.api_client import NotebookLMClient
@@ -53,7 +54,7 @@ async def _run_assets(raw_dir: Path, account: str) -> dict:
     context = await load_context(account=account, headless=True)
     try:
         session = await load_session(context)
-        client = NotebookLMClient(context, session, hl=ACCOUNT_LANG[account])
+        client = NotebookLMClient(context, session, hl=ACCOUNT_LANG.get(account, "pt-BR"))
         # Offline: notes + mind_maps
         nm_stats = save_notes_and_mindmaps(raw_dir)
         # Online: binarios
@@ -152,7 +153,7 @@ async def main(args: argparse.Namespace) -> int:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--account", choices=list(VALID_ACCOUNTS), default=None,
+    ap.add_argument("--account", type=capturable_account_key, default=None,
                     help="Roda so a conta indicada (default: todas)")
     ap.add_argument("--no-binaries", action="store_true", help="Pula etapa 2 (assets)")
     ap.add_argument("--no-reconcile", action="store_true")

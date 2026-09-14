@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
-import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +13,8 @@ from src.account_catalog import (
     LifecycleStatus,
     legacy_account_id,
     load_account_catalog,
+    serialize_account_catalog,
+    write_account_catalog_atomic,
 )
 from src.application.platforms import PlatformState, discover_platforms
 from src.platforms.registry import KNOWN_PLATFORMS, PLATFORM_ACCOUNT_METADATA
@@ -78,27 +78,7 @@ def build_catalog(
     return AccountCatalog(records=tuple(records))
 
 
-def _timestamp(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def serialize_catalog(catalog: AccountCatalog) -> str:
-    """Serialize a catalog reproducibly without machine-local metadata."""
-    payload = {
-        "version": catalog.version,
-        "accounts": [
-            {
-                "account_id": record.account_id,
-                "platform": record.platform,
-                "technical_key": record.technical_key,
-                "lifecycle_status": record.lifecycle_status.value,
-                "created_at": _timestamp(record.created_at),
-                "updated_at": _timestamp(record.updated_at),
-            }
-            for record in catalog.records
-        ],
-    }
-    return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+serialize_catalog = serialize_account_catalog
 
 
 def _parse_timestamp(value: str) -> datetime:
@@ -135,13 +115,7 @@ def _write_catalog(path: Path, catalog: AccountCatalog, serialized: str) -> None
         if load_account_catalog(path) == catalog:
             return
         raise ValueError(f"Refusing to overwrite different account catalog: {path}")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
-    try:
-        temporary.write_text(serialized, encoding="utf-8")
-        temporary.replace(path)
-    finally:
-        temporary.unlink(missing_ok=True)
+    write_account_catalog_atomic(path, catalog, expected_before=AccountCatalog())
 
 
 def _parser() -> argparse.ArgumentParser:

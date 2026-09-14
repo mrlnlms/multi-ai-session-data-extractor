@@ -121,3 +121,7 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.refetch_known
 PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.parse
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/claude-ai.qmd
 ```
+## Explicit login-health check
+
+A one-row `chat_conversations_v2` listing is the established read-only check; HTTP 401/403 or `account_session_invalid` means `expired`. Profile presence alone never produces a valid status. The check is
+read-only, runs only after an explicit operator action, and never refreshes tokens.

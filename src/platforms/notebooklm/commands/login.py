@@ -6,13 +6,14 @@ preservada por snapshots e nao requer login.
 
 import argparse
 import asyncio
+from src.accounts import capturable_account_key
 
-from src.platforms.notebooklm.extractor.auth import login, VALID_ACCOUNTS
+from src.platforms.notebooklm.extractor.auth import login
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--account", required=True, choices=list(VALID_ACCOUNTS))
+    parser.add_argument("--account", type=capturable_account_key, required=True)
     return parser
 
 

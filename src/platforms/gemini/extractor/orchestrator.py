@@ -46,7 +46,7 @@ DISCOVERY_DROP_FALLBACK_THRESHOLD = 0.20
 DISCOVERY_DROP_ABORT_THRESHOLD = DISCOVERY_DROP_FALLBACK_THRESHOLD
 
 
-def _account_dir(account: int) -> Path:
+def _account_dir(account: str) -> Path:
     return BASE_DIR / f"account-{account}"
 
 
@@ -109,7 +109,7 @@ def _write_last_capture_md(output_dir: Path, log: dict) -> None:
 
 
 async def run_export(
-    account: int = 1,
+    account: str = "1",
     full: bool = False,
     smoke_limit: int | None = None,
 ) -> Path:

@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 from pathlib import Path
+import pytest
 
 from src.platforms.gemini.commands import login as login_command
 from src.platforms.gemini.commands import download_assets, reconcile
@@ -11,8 +12,10 @@ from src.platforms.gemini.extractor.auth import get_profile_dir
 def test_login_defaults_to_account_one_with_current_choices():
     args = login_command.build_parser().parse_args([])
 
-    assert args.account == 1
-    assert login_command.build_parser().parse_args(["--account", "3"]).account == 3
+    assert args.account == "1"
+    assert login_command.build_parser().parse_args(["--account", "work"]).account == "work"
+    with pytest.raises(SystemExit):
+        login_command.build_parser().parse_args(["--account", "../work"])
 
 
 def test_sync_without_account_selects_all_three_accounts(capsys):
@@ -29,8 +32,15 @@ def test_sync_without_account_selects_all_three_accounts(capsys):
 
 
 def test_gemini_profile_and_data_paths_are_unchanged():
-    assert get_profile_dir(2).as_posix() == ".storage/gemini-profile-2"
+    assert get_profile_dir("2").as_posix() == ".storage/gemini-profile-2"
     assert (sync.MERGED_BASE / "account-2").as_posix() == "data/merged/Gemini/account-2"
+
+
+def test_sync_accepts_dynamic_account_without_changing_default_order(capsys):
+    args = argparse.Namespace(account="work", dry_run=True, full=False, no_binaries=False,
+                              no_reconcile=False, smoke=None)
+    assert asyncio.run(sync.main(args)) == 0
+    assert "Account work:" in capsys.readouterr().out
 
 
 def test_auxiliary_commands_find_current_canonical_raw_tree(tmp_path, monkeypatch):

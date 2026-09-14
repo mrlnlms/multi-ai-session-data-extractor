@@ -9,17 +9,19 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright, BrowserContext
 
+from src.account_catalog import validate_technical_key
 from src.accounts import account_keys
 
 
-VALID_ACCOUNTS = tuple(int(key) for key in account_keys("Gemini"))
+VALID_ACCOUNTS = account_keys("Gemini")
 
 
-def get_profile_dir(account: int = 1) -> Path:
+def get_profile_dir(account: str = "1") -> Path:
+    account = validate_technical_key(str(account), allow_archive=False)
     return Path(f".storage/gemini-profile-{account}")
 
 
-async def login(account: int = 1) -> None:
+async def login(account: str = "1") -> None:
     """Abre browser com profile persistente, espera usuario logar e fechar."""
     profile_dir = get_profile_dir(account)
     profile_dir.mkdir(parents=True, exist_ok=True)
@@ -41,7 +43,7 @@ async def login(account: int = 1) -> None:
     print(f"Agora rode: PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.export --account {account}")
 
 
-async def load_context(account: int = 1, headless: bool = True) -> BrowserContext:
+async def load_context(account: str = "1", headless: bool = True) -> BrowserContext:
     """Carrega context persistente autenticado pra uso pelo api_client."""
     profile_dir = get_profile_dir(account)
     if not profile_dir.exists():

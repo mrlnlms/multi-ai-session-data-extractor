@@ -29,3 +29,9 @@ unavailable during this run while existing local files were preserved.
   `localStorage.access_token`; cookies alone were insufficient.
 - Assets use expiring inline `signUrl` values and are preserved locally once
   downloaded.
+## Authentication probe boundary
+
+Account health reuses only the minimal listing contract documented below. A
+successful parsed authenticated response is `valid`; an explicit authentication
+rejection is `expired`; transport or parse failures are `error`. No profile,
+cookie, token, or response body is persisted in the observation.

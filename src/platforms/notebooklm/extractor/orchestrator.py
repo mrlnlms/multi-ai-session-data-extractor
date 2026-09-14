@@ -153,13 +153,14 @@ async def run_export(
 ) -> Path:
     started_at = datetime.now(timezone.utc)
     output_dir = _resolve_output_dir(account)
-    print(f"Account: {account} ({ACCOUNT_LANG[account]})")
+    account_lang = ACCOUNT_LANG.get(account, "pt-BR")
+    print(f"Account: {account} ({account_lang})")
     print(f"Raw output: {output_dir}")
 
     context = await load_context(account, headless=True)
     try:
         session = await load_session(context)
-        client = NotebookLMClient(context, session, hl=ACCOUNT_LANG[account])
+        client = NotebookLMClient(context, session, hl=account_lang)
 
         # Discovery LAZY — nao persiste ainda
         nbs_all = await discover(client)
@@ -180,7 +181,7 @@ async def run_export(
                 "started_at": started_at.isoformat(),
                 "finished_at": datetime.now(timezone.utc).isoformat(),
                 "account": account,
-                "hl": ACCOUNT_LANG[account],
+                "hl": account_lang,
                 "mode": "refetch_known_fallback",
                 "totals": {
                     "notebooks_discovered": stats["total"],
@@ -285,7 +286,7 @@ async def run_export(
             "started_at": started_at.isoformat(),
             "finished_at": datetime.now(timezone.utc).isoformat(),
             "account": account,
-            "hl": ACCOUNT_LANG[account],
+            "hl": account_lang,
             "smoke_limit": smoke_limit,
             "totals": {
                 "notebooks_discovered": n_discovered,

@@ -31,6 +31,9 @@ notebooks/_output/
 
 # Positron / Playwright storage
 .storage/
+# Explicit machine-local account operations state (defense in depth).
+.storage/account-bindings.json
+.storage/account-health.json
 
 # OS
 .DS_Store

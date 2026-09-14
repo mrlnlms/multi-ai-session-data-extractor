@@ -7,6 +7,12 @@ import streamlit as st
 
 from src.accounts import AccountState
 from src.application.platforms import PlatformState
+from src.account_catalog import LifecycleStatus
+from src.application.accounts import (
+    account_actions, add_account_action, auth_check_action, bind_action,
+    lifecycle_action, sync_action,
+)
+from src.platforms.registry import WEB_PLATFORMS
 
 
 def _present(value: bool) -> str:
@@ -70,6 +76,18 @@ def render(states: list[PlatformState]) -> None:
         "Read-only local inventory. Lifecycle is an explicit archival decision; "
         "authentication and local evidence are reported independently."
     )
+    with st.expander("Add account"):
+        platform_name = st.selectbox("Platform", sorted(WEB_PLATFORMS), key="account_add_platform")
+        technical_key = st.text_input("Technical profile key", key="account_add_key")
+        if st.button("Preview add account", key="account_add_preview"):
+            st.session_state["account_add_pending"] = (platform_name, technical_key)
+        pending = st.session_state.get("account_add_pending")
+        if pending:
+            st.warning("Identity and preserved data will not be deleted.")
+            confirmed = st.checkbox("I confirm this account catalog change", key="account_add_confirm")
+            if st.button("Apply add account", disabled=not confirmed, key="account_add_apply"):
+                outcome = add_account_action(platform=pending[0], technical_key=pending[1], confirmed=True)
+                (st.success if outcome.ok else st.error)(outcome.message)
 
     accounts = [account for state in states for account in state.accounts]
     with_data = [
@@ -111,8 +129,8 @@ def render(states: list[PlatformState]) -> None:
     )
 
     st.info(
-        "Authentication is not tested by this view. “Unknown (not checked)” means "
-        "that a local profile exists; it is not a login-health verdict. "
+        "Authentication is checked only after an explicit Check login action. "
+        "“Unknown (not checked)” is not a login-health verdict. "
         "Unclassified means evidence exists without a catalog lifecycle decision."
     )
 
@@ -122,9 +140,44 @@ def render(states: list[PlatformState]) -> None:
     else:
         st.caption("No account definitions are available.")
 
+    st.subheader("Account actions")
+    selected = st.selectbox("Account", accounts,
+        format_func=lambda item: f"{item.platform} · {item.key} · {item.account_id}",
+        key="account_action_selected") if accounts else None
+    if selected is not None:
+        actions = account_actions(selected)
+        login = next(item for item in actions if item.action == "login")
+        if login.command:
+            st.caption("Headed login command (run deliberately in a terminal):")
+            st.code(login.command)
+        enabled = [item.action for item in actions if item.enabled and item.action != "login"]
+        action_name = st.selectbox("Action", enabled, key="account_action_name")
+        desired_status = None
+        profile_key = None
+        if action_name == "lifecycle":
+            desired_status = LifecycleStatus(st.selectbox(
+                "New lifecycle", [item.value for item in LifecycleStatus], key="account_lifecycle_status"))
+        elif action_name == "bind":
+            profile_key = st.text_input("Profile key", value=selected.key, key="account_bind_key")
+        if st.button("Preview account action", key="account_action_preview"):
+            st.session_state["account_action_pending"] = (selected.account_id, action_name)
+        if st.session_state.get("account_action_pending") == (selected.account_id, action_name):
+            st.warning("Identity and preserved data will not be deleted.")
+            confirmed = st.checkbox("I confirm this account action", key="account_action_confirm")
+            if st.button("Apply account action", disabled=not confirmed, key="account_action_apply"):
+                if action_name == "lifecycle":
+                    outcome = lifecycle_action(selected.account_id, desired_status, confirmed=True)
+                elif action_name == "bind":
+                    outcome = bind_action(selected.account_id, profile_key, confirmed=True)
+                elif action_name == "auth-check":
+                    outcome = auth_check_action(selected.account_id, confirmed=True)
+                else:
+                    outcome = sync_action(selected.account_id, confirmed=True)
+                (st.success if outcome.ok else st.error)(outcome.message)
+
     st.caption(
         "Private labels come from the local account registry and remain local. "
-        "Removing a profile does not remove or retire an account. A future product "
-        "action to delete an account will retire capture capability, never its "
+        "Removing a profile does not remove or retire an account. The lifecycle "
+        "action retires capture capability, never its "
         "identity or preserved data."
     )

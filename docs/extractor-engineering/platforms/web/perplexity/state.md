@@ -94,3 +94,7 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.login --accou
 PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.sync --account account-2
 PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.parse
 ```
+## Explicit login-health check
+
+A one-row `list_ask_threads` request is the established read-only check. It is user-triggered and may require a visible Cloudflare-safe browser. Profile presence alone never produces a valid status. The check is
+read-only, runs only after an explicit operator action, and never refreshes tokens.

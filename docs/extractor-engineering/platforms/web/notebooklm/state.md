@@ -6,14 +6,17 @@ slide deck PDF+PPTX, infographic, mind map).
 
 ## Pipeline
 
-- **Multi-account** — three active accounts (acc-1, acc-2, acc-3). Profiles
-  in `.storage/notebooklm-profile-{1,2,3}/` (generated via
+- **Multi-account** — three compatibility-default active accounts (acc-1,
+  acc-2, acc-3). Profiles in `.storage/notebooklm-profile-<key>/` (generated via
   `python -m src.platforms.notebooklm.commands.login`).
 - **Single cumulative folder per-account:** `data/raw/NotebookLM/account-{N}/`
   and `data/merged/NotebookLM/account-{N}/`.
 - **Sync orchestrator (3 steps multi-account):**
   `python -m src.platforms.notebooklm.commands.sync` — capture per-account + assets + reconcile
   per-account.
+- Without `--account`, sync still visits `1`, `2`, `3` in that order. An
+  explicit `--account <safe-key>` supports a dynamically named local account;
+  archive keys and path-like values are rejected.
 - **Headless capture.**
 - **Historical archive** — immutable old-format snapshots live in
   `data/external/notebooklm-snapshots/<archive>-YYYY-MM-DD/`. The official
@@ -266,3 +269,7 @@ for f in notebooklm notebooklm-acc-1 notebooklm-acc-2; do
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd
 done
 ```
+## Explicit login-health check
+
+A single `wXbhsf` notebook listing is the established read-only check; a successful parsed response is the only path to `valid`. Profile presence alone never produces a valid status. The check is
+read-only, runs only after an explicit operator action, and never refreshes tokens.

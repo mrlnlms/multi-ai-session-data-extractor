@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 
 import pytest
 
@@ -6,6 +7,8 @@ from src.account_catalog import (
     LifecycleStatus,
     legacy_account_id,
     load_account_catalog,
+    serialize_account_catalog,
+    write_account_catalog_atomic,
 )
 
 
@@ -91,3 +94,16 @@ def test_catalog_root_and_record_fields_are_strict(tmp_path):
 
     with pytest.raises(ValueError, match="fields"):
         load_account_catalog(_write_catalog(tmp_path, accounts=[_record(extra="value")]))
+
+
+def test_canonical_serializer_and_atomic_stale_write(tmp_path):
+    path = _write_catalog(tmp_path)
+    before = load_account_catalog(path)
+    serialized = serialize_account_catalog(before)
+    assert serialized.endswith("\n")
+    assert json.loads(serialized)["accounts"][0]["created_at"].endswith("Z")
+
+    after = type(before)(records=())
+    path.write_text(json.dumps({"version": 1, "accounts": []}))
+    with pytest.raises(ValueError, match="stale"):
+        write_account_catalog_atomic(path, after, expected_before=before)

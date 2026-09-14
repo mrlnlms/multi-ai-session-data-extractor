@@ -8,8 +8,10 @@ from src.accounts import (
     AccountEvidence,
     AccountState,
     account_data_dir,
+    account_command_argument,
     account_definitions,
     account_email,
+    default_sync_accounts,
     discover_accounts,
     load_account_registry,
 )
@@ -54,6 +56,11 @@ def test_canonical_account_fallbacks_preserve_current_command_contracts():
     assert [item.key for item in account_definitions("Gemini")] == ["1", "2", "3"]
     assert [item.key for item in account_definitions("NotebookLM")] == ["1", "2", "3"]
     assert [item.key for item in account_definitions("ChatGPT")] == ["default"]
+    assert default_sync_accounts("Gemini") == ("1", "2", "3")
+    assert default_sync_accounts("NotebookLM") == ("1", "2", "3")
+    assert account_command_argument("Gemini", "work") == ("--account", "work")
+    assert account_command_argument("ChatGPT", "work") == ("--account", "work")
+    assert account_command_argument("Claude.ai", "work") == ("--profile", "work")
 
 
 def test_discovery_unions_registry_profile_and_data_evidence(tmp_path):

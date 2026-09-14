@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import StrEnum
 from pathlib import Path
 
@@ -24,6 +26,7 @@ _RECORD_FIELDS = frozenset({
     "created_at",
     "updated_at",
 })
+_SAFE_TECHNICAL_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 class LifecycleStatus(StrEnum):
@@ -46,6 +49,20 @@ class AccountCatalogRecord:
 class AccountCatalog:
     version: int = CATALOG_VERSION
     records: tuple[AccountCatalogRecord, ...] = ()
+
+
+def validate_technical_key(value: object, *, allow_archive: bool = True) -> str:
+    """Return a safe relative technical key or raise ``ValueError``."""
+    if not isinstance(value, str) or not value or value != value.strip():
+        raise ValueError("technical_key must be a non-empty safe string")
+    if value.startswith("archive:"):
+        archive_key = value.removeprefix("archive:")
+        if allow_archive and archive_key and _SAFE_TECHNICAL_KEY.fullmatch(archive_key):
+            return value
+        raise ValueError("archive technical keys are not capturable")
+    if value in {".", ".."} or not _SAFE_TECHNICAL_KEY.fullmatch(value):
+        raise ValueError(f"technical_key is unsafe: {value!r}")
+    return value
 
 
 def legacy_account_id(platform: str, technical_key: str) -> str:
@@ -81,9 +98,10 @@ def _parse_record(value: object) -> AccountCatalogRecord:
     if not isinstance(platform, str) or platform not in PLATFORM_ACCOUNT_METADATA:
         raise ValueError(f"Catalog platform is not supported: {platform!r}")
 
-    technical_key = value["technical_key"]
-    if not isinstance(technical_key, str) or not technical_key.strip():
-        raise ValueError("Catalog technical_key must be a non-empty string")
+    try:
+        technical_key = validate_technical_key(value["technical_key"], allow_archive=True)
+    except ValueError as exc:
+        raise ValueError("Catalog technical_key must be a safe relative string") from exc
 
     lifecycle_value = value["lifecycle_status"]
     try:
@@ -129,3 +147,50 @@ def load_account_catalog(path: Path) -> AccountCatalog:
         account_ids.add(record.account_id)
         identities.add(identity)
     return AccountCatalog(version=CATALOG_VERSION, records=records)
+
+
+def _timestamp(value: datetime) -> str:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("Catalog timestamps must be timezone-aware")
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def serialize_account_catalog(catalog: AccountCatalog) -> str:
+    """Serialize the durable catalog deterministically and without local metadata."""
+    payload = {
+        "version": catalog.version,
+        "accounts": [
+            {
+                "account_id": record.account_id,
+                "platform": record.platform,
+                "technical_key": record.technical_key,
+                "lifecycle_status": record.lifecycle_status.value,
+                "created_at": _timestamp(record.created_at),
+                "updated_at": _timestamp(record.updated_at),
+            }
+            for record in catalog.records
+        ],
+    }
+    return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+
+
+def write_account_catalog_atomic(
+    path: Path,
+    catalog: AccountCatalog,
+    *,
+    expected_before: AccountCatalog,
+) -> None:
+    """Replace a catalog only when its current semantic state is expected."""
+    current = load_account_catalog(path)
+    if current != expected_before:
+        raise ValueError(f"Refusing stale account catalog write: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temporary.write_text(serialize_account_catalog(catalog), encoding="utf-8")
+        # Re-read immediately before replacement to catch a concurrent writer.
+        if load_account_catalog(path) != expected_before:
+            raise ValueError(f"Refusing stale account catalog write: {path}")
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)

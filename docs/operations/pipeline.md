@@ -19,6 +19,10 @@ manifestos e outros arquivos que podem ser anotados continuam independentes.
 Use `PYTHONPATH=. .venv/bin/python` para executar scripts sem depender do
 Python global.
 
+Uma conta web ativa e vinculada localmente pode ser selecionada pelo UUID
+imutavel. `python -m src.workflows.account_sync ACCOUNT_ID` mostra um preview;
+`--apply` executa somente sync + parse da plataforma, sem unify, DVC ou Git.
+
 ## Atualizar uma fonte
 
 Quando chamados diretamente, os nove syncs web executam captura, assets quando

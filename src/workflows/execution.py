@@ -99,6 +99,20 @@ def parse_command(platform: str) -> Optional[list[str]]:
     return None
 
 
+def run_commands(commands: tuple[tuple[str, ...], ...]) -> tuple[int, str]:
+    """Run an already-reviewed command sequence without publication stages."""
+    output: list[str] = []
+    for command in commands:
+        result = subprocess.run(
+            list(command), cwd=str(PROJECT_ROOT), capture_output=True, text=True,
+            env={**_safe_env(), "PYTHONPATH": str(PROJECT_ROOT), **_NONINTERACTIVE_ENV},
+        )
+        output.extend(part for part in (result.stdout, result.stderr) if part)
+        if result.returncode:
+            return result.returncode, "".join(output)
+    return 0, "".join(output)
+
+
 def run_sync(platform: str, capture_output: bool = True) -> subprocess.CompletedProcess:
     """Run sync and, for web platforms, its mandatory parser."""
     cmd = sync_command(platform)

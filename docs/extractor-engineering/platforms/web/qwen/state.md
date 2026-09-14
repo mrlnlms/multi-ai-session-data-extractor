@@ -109,3 +109,7 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.qwen.commands.login --account acc
 PYTHONPATH=. .venv/bin/python -m src.platforms.qwen.commands.sync --account account-2
 PYTHONPATH=. .venv/bin/python -m src.platforms.qwen.commands.parse
 ```
+## Explicit login-health check
+
+A one-page `GET /api/v2/chats/` listing is the established read-only check; an upstream authentication rejection means `expired`. Profile presence alone never produces a valid status. The check is
+read-only, runs only after an explicit operator action, and never refreshes tokens.

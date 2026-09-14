@@ -1,9 +1,8 @@
 # Instancias de conta e arquitetura da aplicacao
 
-**Status:** exploracao arquitetural pausada; o inventario somente leitura e o
-catalogo duravel de identidade/lifecycle descritos na secao 2.4 foram
-implementados. Mutacoes, autenticacao validada e migracao de schema continuam
-fora deste documento.
+**Status:** identidade/lifecycle, bindings locais, verificacao explicita de
+autenticacao e sync seletivo por UUID foram implementados sem mudar o schema
+publicado. Migracao de schema continua fora deste documento.
 
 **Data:** 2026-08-31
 
@@ -88,7 +87,7 @@ Como ele e o unico consumidor e ambos os projetos sao pessoais, existe uma
 janela favoravel para revisar esse acoplamento antes de publicar um schema ou
 uma identidade novos.
 
-### 2.4 Inventario local somente leitura
+### 2.4 Inventario local e operacoes explicitas
 
 `src/accounts.py` consolida as instancias observaveis a partir de evidencias
 independentes: defaults operacionais do catalogo de plataformas, chaves do
@@ -99,13 +98,12 @@ indica apenas estado local; nao comprova cookies validos nem autenticacao
 upstream.
 
 O inventario e exposto por `PlatformState.accounts` para callers em `src/` e
-para a visao **Accounts** do dashboard Streamlit. Essa interface e somente
-leitura e exibe cada evidencia separadamente, inclusive contas preservadas sem
-profile. O servico nao escreve configuracao, nao abre browser, nao consulta
-servicos upstream e nao altera selecao de contas, comandos, pipeline, schema ou
-publicacao. Gemini e NotebookLM mantem nesta fatia os tres alvos operacionais
-existentes; listas dinamicas e mutacoes de lifecycle continuam decisoes de uma
-rodada posterior.
+para a visao **Accounts** do dashboard Streamlit. O carregamento continua
+somente leitura e offline, exibindo cada evidencia separadamente. Operacoes de
+catalogo, binding, verificacao de login e sync seletivo passam por servicos em
+`src/`, exigem acao/confirmacao e nao alteram schema ou publicacao. Gemini e
+NotebookLM preservam `1`, `2`, `3` como ordem default, mas aceitam chaves
+tecnicas seguras quando selecionadas explicitamente.
 
 `src/account_catalog.py` acrescenta uma camada arquivavel, versionada e
 restauravel por DVC, com UUID imutavel e lifecycle explicito (`active`,
@@ -183,9 +181,9 @@ implementacao:
    com as conversas preservadas.
 9. Credenciais nunca entram em Git, DVC, Parquet ou logs. Profiles continuam
    sendo estado local descartavel e recriavel por login.
-10. A interface inicial de contas e uma visao somente leitura do inventario
-    local. Cadastro, lifecycle, login/relogin e sync seletivo permanecem uma
-    entrega operacional separada.
+10. A abertura da interface de contas e somente leitura; cadastro, lifecycle,
+    binding, verificacao de login e sync seletivo sao acoes explicitas e
+    preview-first da entrega operacional.
 11. Antes de mudar IDs ou schema, deve existir uma baseline validada dos
     Parquets atualmente consumidos pelo `AI Interaction Analysis`.
 12. Nenhum DVC push, commit ou publicacao faz parte desta exploracao.
@@ -291,8 +289,9 @@ adicionou um requisito: registrar e sincronizar uma conta suportada deve ser uma
 operacao normal do produto, nao uma tarefa que dependa de um agente de IA ou de
 edicao de codigo.
 
-A pagina **Accounts** atual cobre apenas observacao local. Ela nao implementa
-nenhuma das mutacoes ou verificacoes upstream descritas abaixo.
+A pagina **Accounts** oferece controles preview-first sobre os servicos
+canonicos. Ela nao executa rede na abertura, nao automatiza login e exige
+confirmacao para mutacoes; lifecycle nunca exclui identidade ou dados.
 
 Fluxo candidato:
 

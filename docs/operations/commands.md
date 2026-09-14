@@ -41,6 +41,15 @@ suas tres contas por default; os demais comandos preservam seus defaults.
 | Importar saves manuais | `python -m src.workflows.manual_saves` | Quando houver clippings, copy/paste ou renders de terminal em `data/external/manual-saves/` |
 | Servir relatorios | `python -m src.workflows.serve_reports open` | Depois de renderizar os HTMLs Quarto |
 | Snapshot de configuracoes CLI | `python -m src.capture.cli.snapshot` | Preservar versoes sanitizadas de skills, hooks e configuracoes locais |
+| Sync de uma conta | `python -m src.workflows.account_sync ACCOUNT_ID` | Preview por UUID; `--apply` executa sync + parse, sem unify/publicacao |
+
+## Operacoes de conta
+
+`python -m src.operations.accounts` lista, cria, altera lifecycle, vincula um
+profile local e executa uma verificacao explicita de login. Criacao, lifecycle
+e binding apenas mostram preview sem `--apply`; nenhuma operacao exclui a
+identidade ou dados preservados. `auth-check` nunca e executado na abertura do
+dashboard e so persiste sua observacao quando recebe `--apply`.
 
 Manual saves nao substituem a captura oficial. Eles geram arquivos
 `<source>_manual_<table>.parquet` na pasta processada da plataforma e sao

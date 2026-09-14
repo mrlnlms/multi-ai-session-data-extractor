@@ -30,18 +30,19 @@ capturas, alertas de queda de discovery e uma linha do tempo cumulativa. Cada
 plataforma abre uma visão própria com logs de captura/reconciliação, estado do
 parquet, métricas e relatórios Quarto disponíveis.
 
-A barra lateral também abre **Accounts**, um inventário local somente leitura
-das contas web observáveis. A tabela mostra separadamente o UUID imutável, o
+A barra lateral também abre **Accounts**, cujo inventário permanece uma leitura
+offline das contas web observáveis. Controles separados são executados somente
+após ação e confirmação explícitas. A tabela mostra o UUID imutável, o
 lifecycle, a chave técnica, o rótulo do registro privado e a presença de
 registro, profile, `raw`, `merged` e archive histórico. Uma conta com dados
 continua visível mesmo sem profile;
 nesse caso, a interface a identifica como acervo preservado sem profile ou como
 archive histórico, conforme a evidência disponível.
 
-Essa visão não testa login nem consulta serviços upstream. **Unknown (not
-checked)** significa apenas que existe um profile local e a autenticação não foi
-verificada; não significa sessão válida. **Not configured** indica ausência de
-profile local, sem fazer afirmações sobre a retenção dos dados históricos. Os
+Abrir essa visão não testa login nem consulta serviços upstream. **Unknown (not
+checked)** significa que a autenticação não foi verificada; não significa sessão
+válida. **Not configured** indica ausência de profile local, sem fazer
+afirmações sobre a retenção dos dados históricos. Os
 rótulos privados são lidos pelo serviço canônico de contas e exibidos somente
 nesse dashboard local.
 
@@ -49,9 +50,8 @@ Lifecycle é uma decisão arquivística explícita e independente da autenticaç
 **Active**, **Disabled** e **Historical** vêm do catálogo restaurável;
 **Unclassified** significa que existe evidência observável sem uma decisão no
 catálogo. Remover um profile não desativa nem torna histórica uma conta. Uma
-futura ação de “excluir conta” retirará sua capacidade de captura, mas nunca
-apagará a identidade ou os dados preservados; esta página não oferece controles
-de mutação.
+ação de lifecycle pode retirar sua capacidade de captura, mas nunca apagará a
+identidade ou os dados preservados; a página exige preview e confirmação.
 
 Archives históricos aparecem com a identidade estável produzida pelo parser,
 como `archive:<nome-do-snapshot>`. Essa classificação confirma a preservação do
@@ -79,6 +79,16 @@ Streamlit. Os indicadores descrevem o que existe em disco; eles não substituem
 a verificação de que `processed` está mais recente que `raw` e `merged`.
 
 ## Executar o pipeline
+
+## Operacoes de conta
+
+A pagina **Accounts** permanece offline durante a abertura. Ela mostra
+previews para adicionar conta, alterar lifecycle, vincular profile, verificar
+login e sincronizar uma conta. Toda mutacao exige uma segunda confirmacao e
+informa que identidade e dados preservados nao serao excluidos. O login nao e
+automatizado: a pagina mostra o comando headed existente para execucao
+deliberada. Sync por conta tambem nasce como preview e nao executa unify nem
+publicacao.
 
 Na visão geral, **Update all** executa as fontes que possuem sync. Em uma
 plataforma, **Run full pipeline** limita a captura àquela fonte. Ambos usam a

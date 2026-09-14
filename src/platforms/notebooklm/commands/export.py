@@ -9,14 +9,14 @@ Uso:
 
 import argparse
 import asyncio
+from src.accounts import capturable_account_key
 
-from src.platforms.notebooklm.extractor.auth import VALID_ACCOUNTS
 from src.platforms.notebooklm.extractor.orchestrator import run_export
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--account", required=True, choices=list(VALID_ACCOUNTS))
+    parser.add_argument("--account", type=capturable_account_key, required=True)
     parser.add_argument("--notebook", default=None,
                         help="UUID(s) de notebook a fetchar (csv pra varios). Default: todos")
     parser.add_argument("--full", action="store_true", help="(Compat) ignora cutoff — orchestrator ja fetcha tudo por default")

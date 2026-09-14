@@ -122,3 +122,9 @@ to force body refetch.
   probe in consecutive snapshots.
 - ✅ **Share:** menu option, populates `share_id`. Not exercised.
 - ✅ **Folder:** `folder_id` in schema, not exercised.
+## Authentication probe boundary
+
+Account health reuses only the minimal listing contract documented below. A
+successful parsed authenticated response is `valid`; an explicit authentication
+rejection is `expired`; transport or parse failures are `error`. No profile,
+cookie, token, or response body is persisted in the observation.

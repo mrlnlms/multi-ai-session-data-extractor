@@ -151,3 +151,7 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.login --account acc
 PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.sync --account account-2
 PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.parse
 ```
+## Explicit login-health check
+
+A one-row `GET /rest/app-chat/conversations` listing is the established cookies-only read check. Profile presence alone never produces a valid status. The check is
+read-only, runs only after an explicit operator action, and never refreshes tokens.

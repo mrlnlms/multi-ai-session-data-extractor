@@ -97,3 +97,9 @@ CRUD scenarios applicable to NotebookLM **all validated**. The only
 was already mitigated in the reconciler design.
 
 **Status:** ✅ ready to ship.
+## Authentication probe boundary
+
+Account health reuses only the minimal listing contract documented below. A
+successful parsed authenticated response is `valid`; an explicit authentication
+rejection is `expired`; transport or parse failures are `error`. No profile,
+cookie, token, or response body is persisted in the observation.

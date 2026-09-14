@@ -9,6 +9,7 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright, BrowserContext
 
+from src.account_catalog import validate_technical_key
 from src.accounts import account_keys
 
 
@@ -24,8 +25,7 @@ ACCOUNT_LANG = {
 
 
 def get_profile_dir(account: str) -> Path:
-    if account not in VALID_ACCOUNTS:
-        raise ValueError(f"Account invalido: {account!r}. Use um de {VALID_ACCOUNTS}")
+    account = validate_technical_key(account, allow_archive=False)
     return Path(f".storage/notebooklm-profile-{account}")
 
 

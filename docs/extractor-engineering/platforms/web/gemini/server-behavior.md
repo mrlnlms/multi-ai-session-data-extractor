@@ -187,3 +187,9 @@ flag in the listing body).
 - [ ] **Search/grounding citations** — 1/80 convs with 'grounding' substring,
   structure not mapped.
 - [ ] **Add to notebook** — NotebookLM integration, not tested.
+## Authentication probe boundary
+
+Account health reuses only the minimal listing contract documented below. A
+successful parsed authenticated response is `valid`; an explicit authentication
+rejection is `expired`; transport or parse failures are `error`. No profile,
+cookie, token, or response body is persisted in the observation.

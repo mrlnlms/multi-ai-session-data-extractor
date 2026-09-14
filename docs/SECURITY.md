@@ -33,6 +33,10 @@ Each web platform has a login command under its vertical package:
 - HTTP cookies for the platform
 - Browser LocalStorage / IndexedDB
 - Browser cache (irrelevant)
+- `account-bindings.json`, which maps immutable account UUIDs to relative
+  technical profile keys
+- `account-health.json`, which stores the latest explicit login-health
+  observation; it is not proof derived from profile presence
 
 **What does NOT live in `.storage/`:**
 
@@ -46,6 +50,8 @@ Each web platform has a login command under its vertical package:
 
 ```
 .storage/        # cookies/profiles for each platform
+.storage/account-bindings.json  # local UUID/profile bindings
+.storage/account-health.json    # local explicit auth observations
 data/raw/        # raw captured data (your conversations)
 data/merged/     # consolidated data
 data/processed/  # canonical parquets

@@ -118,3 +118,9 @@ which is why sync ran clean on the first attempt:
 - [ ] **R1 reasoner (expert):** session with full reasoning_content +
   thinking_elapsed (1 already captured)
 - [ ] **Files per msg in account with upload:** full schema of `files[]`
+## Authentication probe boundary
+
+Account health reuses only the minimal listing contract documented below. A
+successful parsed authenticated response is `valid`; an explicit authentication
+rejection is `expired`; transport or parse failures are `error`. No profile,
+cookie, token, or response body is persisted in the observation.

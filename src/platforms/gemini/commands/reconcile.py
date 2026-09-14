@@ -8,19 +8,19 @@ Uso:
 import argparse
 import sys
 from pathlib import Path
+from src.accounts import capturable_account_key
 
-from src.platforms.gemini.extractor.auth import VALID_ACCOUNTS
 from src.platforms.gemini.reconciler import run_reconciliation
 
 
-def _find_latest_raw(account: int) -> Path | None:
+def _find_latest_raw(account: str) -> Path | None:
     base = Path("data/raw/Gemini") / f"account-{account}"
     return base if base.is_dir() else None
 
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--account", type=int, required=True, choices=list(VALID_ACCOUNTS))
+    p.add_argument("--account", type=capturable_account_key, required=True)
     p.add_argument("raw_dir", nargs="?", default=None)
     p.add_argument("--full", action="store_true")
     p.add_argument("--previous-merged", default=None)
