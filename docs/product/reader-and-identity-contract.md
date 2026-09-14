@@ -1,9 +1,8 @@
 # Identidade dos dados e fidelidade do leitor
 
-**Status:** registro técnico para orientar decisões futuras; não é schema novo,
-spec de implementação nem plano de migração.
+**Status:** contrato técnico mantido para identidade e fidelidade do leitor.
 
-**Última auditoria:** 2026-08-31.
+**Última revisão:** 2026-09-14.
 
 ## 1. Por que este registro existe
 
@@ -26,19 +25,21 @@ podem ser locais à conversa ou reutilizados em sessões relacionadas:
 
 | Entidade | Identidade canônica |
 |---|---|
-| Conversa | `(source, conversation_id)` |
-| Mensagem | `(source, conversation_id, message_id)` |
-| Tool event | `(source, conversation_id, event_id)` |
-| Branch | `(source, conversation_id, branch_id)` |
+| Conversa | `(source, account_id, conversation_id)` |
+| Mensagem | `(source, account_id, conversation_id, message_id)` |
+| Tool event | `(source, account_id, conversation_id, event_id)` |
+| Branch | `(source, account_id, conversation_id, branch_id)` |
 
-O campo `account` registra procedência e localização operacional. Ele não faz
-parte da identidade canônica atual e não deve substituir `source` na resolução
-de referências.
+`account_id` é o UUID imutável do catálogo e participa das chaves publicadas.
+Ele é obrigatório para capturas web automatizadas e para snapshots históricos
+do NotebookLM. Sessões CLI e importações manuais permanecem nulas enquanto a
+origem não fornecer evidência durável. O campo legado `account` continua como
+rótulo compatível e nunca é usado para inferir o UUID.
 
 Consequências para consumidores futuros:
 
 - nunca persistir somente `conversation_id` ou `message_id` numa classificação;
-- preservar `source` mesmo quando não houver colisão observada;
+- preservar `source` e `account_id` mesmo quando não houver colisão observada;
 - tratar `sequence` como ordenação observada, não como identidade universal; e
 - não presumir que campos chamados `message_id` sejam automaticamente foreign
   keys para a tabela canônica de mensagens.

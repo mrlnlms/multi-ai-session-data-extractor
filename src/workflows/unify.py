@@ -26,29 +26,29 @@ logger = logging.getLogger(__name__)
 
 
 # Tabelas canonicas + auxiliares + chave primaria composta pra dedup.
-# PK sempre inclui `source` (separa plataformas) e `conversation_id` ou
+# PK sempre inclui `source`, `account_id` (separa contas) e `conversation_id` ou
 # `project_id` quando a tabela eh "filha" — porque algumas plataformas
 # usam IDs locais por conv (DeepSeek `message_id` int 1-98; Claude Code
 # subagents reusam message_id do parent quando compactam sessao).
 TABLE_PKS: dict[str, list[str]] = {
     # 4 canonicas
-    "conversations":    ["source", "conversation_id"],
-    "messages":         ["source", "conversation_id", "message_id"],
-    "tool_events":      ["source", "conversation_id", "event_id"],
-    "branches":         ["source", "conversation_id", "branch_id"],
+    "conversations":    ["source", "account_id", "conversation_id"],
+    "messages":         ["source", "account_id", "conversation_id", "message_id"],
+    "tool_events":      ["source", "account_id", "conversation_id", "event_id"],
+    "branches":         ["source", "account_id", "conversation_id", "branch_id"],
     # 5 auxiliares NotebookLM (filhas de conv ou de project)
-    "sources":          ["source", "project_id", "doc_id"],   # filha de notebook(project)
-    "notes":            ["source", "conversation_id", "note_id"],
-    "outputs":          ["source", "conversation_id", "output_id"],
-    "guide_questions":  ["source", "conversation_id", "question_id"],
-    "source_guides":    ["source", "conversation_id", "source_id"],
+    "sources":          ["source", "account_id", "project_id", "doc_id"],
+    "notes":            ["source", "account_id", "conversation_id", "note_id"],
+    "outputs":          ["source", "account_id", "conversation_id", "output_id"],
+    "guide_questions":  ["source", "account_id", "conversation_id", "question_id"],
+    "source_guides":    ["source", "account_id", "conversation_id", "source_id"],
     # 2 auxiliares Qwen/Claude.ai (filhas de project)
-    "project_metadata": ["source", "project_id"],
-    "project_docs":     ["source", "project_id", "doc_id"],
+    "project_metadata": ["source", "account_id", "project_id"],
+    "project_docs":     ["source", "account_id", "project_id", "doc_id"],
     # Mapping conv -> project (cross-platform tagging)
-    "conversation_projects": ["source", "conversation_id", "project_tag"],
+    "conversation_projects": ["source", "account_id", "conversation_id", "project_tag"],
     # 1 auxiliar Claude Code/Codex (memorias do agente)
-    "agent_memories":   ["source", "memory_id"],
+    "agent_memories":   ["source", "account_id", "memory_id"],
 }
 
 # Ordenado por len(table) DESC pra match seguro:
@@ -121,6 +121,10 @@ def unify_table(table: str, files: list[Path]) -> pd.DataFrame:
         # Enriquece com source quando ausente (caso project_metadata)
         if "source" not in df.columns:
             df = df.assign(source=_source_from_path(f))
+        # Compatibility with pre-migration and CLI/manual Parquets. Never
+        # synthesize identity from the legacy display `account` column.
+        if "account_id" not in df.columns:
+            df = df.assign(account_id=pd.NA)
         dfs.append(df)
 
     merged = pd.concat(dfs, ignore_index=True)
@@ -145,6 +149,35 @@ def unify_table(table: str, files: list[Path]) -> pd.DataFrame:
     return merged
 
 
+def _validate_account_integrity(frames: dict[str, pd.DataFrame]) -> None:
+    """Reject non-null child identities that disagree with their conversation."""
+    conversations = frames.get("conversations")
+    if conversations is None or conversations.empty:
+        return
+    parent_keys = set(zip(conversations["source"], conversations["conversation_id"]))
+    parent_identities = set(
+        zip(
+            conversations.loc[conversations["account_id"].notna(), "source"],
+            conversations.loc[conversations["account_id"].notna(), "conversation_id"],
+            conversations.loc[conversations["account_id"].notna(), "account_id"],
+        )
+    )
+    for table, child in frames.items():
+        if table == "conversations" or "conversation_id" not in child.columns:
+            continue
+        mismatches = sum(
+            1
+            for row in child.loc[child["account_id"].notna()].itertuples(index=False)
+            if (row.source, row.conversation_id) in parent_keys
+            and (row.source, row.conversation_id, row.account_id) not in parent_identities
+        )
+        if mismatches:
+            raise ValueError(
+                f"account_id mismatch between conversations and {table}: "
+                f"{mismatches} row(s)"
+            )
+
+
 def unify(processed_dir: Path, unified_dir: Path) -> dict[str, int]:
     """Materializa data/unified/<table>.parquet pra cada tabela presente.
 
@@ -153,21 +186,28 @@ def unify(processed_dir: Path, unified_dir: Path) -> dict[str, int]:
     unified_dir.mkdir(parents=True, exist_ok=True)
     by_table = discover_parquets(processed_dir)
 
-    counts: dict[str, int] = {}
+    frames: dict[str, pd.DataFrame] = {}
+    file_counts: dict[str, int] = {}
     for table in TABLE_PKS:
         files = by_table.get(table, [])
         if not files:
             logger.info(f"  {table:20} (sem parquets — skipped)")
             continue
 
-        merged = unify_table(table, files)
+        frames[table] = unify_table(table, files)
+        file_counts[table] = len(files)
+
+    _validate_account_integrity(frames)
+
+    counts: dict[str, int] = {}
+    for table, merged in frames.items():
         out = unified_dir / f"{table}.parquet"
         merged.to_parquet(out, index=False)
         counts[table] = len(merged)
         size_mb = out.stat().st_size / 1024 / 1024
         logger.info(
             f"  {table:18} {len(merged):>7,} rows  "
-            f"{size_mb:>5.1f} MB  ({len(files)} files concat)"
+            f"{size_mb:>5.1f} MB  ({file_counts[table]} files concat)"
         )
 
     return counts

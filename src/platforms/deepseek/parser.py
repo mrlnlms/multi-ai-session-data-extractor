@@ -56,8 +56,9 @@ class DeepSeekParser(BaseParser):
         self,
         account: Optional[str] = None,
         merged_root: Optional[Path] = None,
+        account_id: Optional[str] = None,
     ):
-        super().__init__(account)
+        super().__init__(account, account_id)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/DeepSeek")
 
     def reset(self):
@@ -152,6 +153,7 @@ class DeepSeekParser(BaseParser):
                 branch_id=br["branch_id"],
                 conversation_id=conv_id,
                 source=SOURCE,
+                account_id=self.account_id,
                 root_message_id=br["root_message_id"],
                 leaf_message_id=br["leaf_message_id"],
                 is_active=br["is_active"],
@@ -201,6 +203,7 @@ class DeepSeekParser(BaseParser):
         self.conversations.append(Conversation(
             conversation_id=conv_id,
             source=SOURCE,
+            account_id=self.account_id,
             title=sess.get("title") or None,
             created_at=self._ts(sess.get("inserted_at")),
             updated_at=self._ts(sess.get("updated_at")),
@@ -317,6 +320,7 @@ class DeepSeekParser(BaseParser):
             message_id=msg_id,
             conversation_id=conv_id,
             source=SOURCE,
+            account_id=self.account_id,
             sequence=seq,
             role=role,
             content=content,
@@ -347,6 +351,7 @@ class DeepSeekParser(BaseParser):
                 conversation_id=conv_id,
                 message_id=msg_id,
                 source=SOURCE,
+                account_id=self.account_id,
                 event_type="search_call",
                 tool_name="web_search",
                 metadata_json=json.dumps({
@@ -360,6 +365,7 @@ class DeepSeekParser(BaseParser):
                 conversation_id=conv_id,
                 message_id=msg_id,
                 source=SOURCE,
+                account_id=self.account_id,
                 event_type="search_result",
                 tool_name="web_search",
                 success=True,

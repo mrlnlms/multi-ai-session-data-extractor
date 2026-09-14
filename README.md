@@ -126,6 +126,9 @@ extractor → reconciler → parser → unify
 3. **Parser** converts the raw JSON into parquet with a unified schema:
    `Conversation`, `Message`, `ToolEvent`, `Branch` (and a few auxiliaries
    per platform — `ProjectDoc`, `NotebookLMOutput`, etc.).
+   Web rows carry the immutable catalog UUID in `account_id`; the legacy
+   display `account` remains available. CLI and manual rows keep
+   `account_id` null until a durable identity is observable.
 4. **Unify** consolidates the parquets from the 13 sources into a single
    `data/unified/` with 13 parquet files (4 canonical + 9 auxiliaries),
    ready for cross-platform analysis.

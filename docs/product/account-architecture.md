@@ -1,8 +1,8 @@
 # Instancias de conta e arquitetura da aplicacao
 
 **Status:** identidade/lifecycle, bindings locais, verificacao explicita de
-autenticacao e sync seletivo por UUID foram implementados sem mudar o schema
-publicado. Migracao de schema continua fora deste documento.
+autenticacao, sync seletivo e propagacao do UUID ao schema publicado foram
+implementados.
 
 **Data:** 2026-08-31
 
@@ -76,11 +76,10 @@ sessao, o suporte pode ser adicionado com base nessa evidencia.
 
 ### 2.3 Consumidores e identidade atual
 
-O unificador considera conversa por `(source, conversation_id)`; `account` e
-procedencia, mas nao participa da chave canonica atual. Gemini evita colisoes
-incluindo a conta em IDs derivados. Uma mudanca geral de contas precisa decidir
-se preserva esse contrato por namespace ou se promove `account_id` a parte da
-identidade composta.
+O unificador considera conversa por `(source, account_id, conversation_id)` e
+usa a mesma dimensao nas chaves das tabelas filhas. `account_id` vem somente do
+catalogo por `(platform, technical_key)`; `account` permanece como rotulo legado.
+IDs nativos e IDs derivados existentes nao mudam.
 
 O projeto `AI Interaction Analysis` consome `processed` e `unified` por DVC.
 Como ele e o unico consumidor e ambos os projetos sao pessoais, existe uma
@@ -450,20 +449,15 @@ local, em vez de ser incorporado ao binario desktop.
 
 ## 11. Decisoes em aberto
 
-### Identidade e schema
+### Identidade e schema — decisões fechadas em 2026-09-14
 
-1. UUIDv4, UUIDv7 ou ULID para `account_id`?
-2. Onde a identidade arquivavel da conta vive: banco operacional, JSON
-   DVC-tracked, tabela Parquet propria ou combinacao?
-3. O campo canonico atual `account` vira `account_id`, e como ocorre a
-   deprecacao?
-4. Deve existir uma tabela/dimensao `accounts` em `processed` e `unified`?
-5. `account_id` passa a compor as chaves canonicas ou os IDs de conversa,
-   projeto e artefato recebem namespace de conta?
-6. Como migrar referencias existentes do Gemini, NotebookLM, ChatGPT e da
-   camada curada sem perder ancoras?
-7. Como armazenar ou proteger `upstream_subject` e quais plataformas o expoem
-   de forma estavel?
+1. Contas legadas usam UUIDv5 determinístico já persistido no catálogo.
+2. A identidade arquivável vive em `data/accounts/catalog.json`, sob DVC.
+3. `account_id` foi acrescentado; `account` foi preservado para compatibilidade.
+4. Não existe `accounts.parquet` nesta migração; o catálogo é a dimensão.
+5. `account_id` compõe as chaves sem alterar IDs existentes.
+6. Web e NotebookLM histórico recebem UUID; CLI/manual permanecem nulos.
+7. `upstream_subject` continua fora do contrato até existir evidência estável.
 
 ### Estado e persistencia
 

@@ -108,5 +108,11 @@ PLATFORM_ACCOUNT_METADATA: dict[str, PlatformAccountMetadata] = {
     "Kimi": PlatformAccountMetadata("kimi", "kimi-profile-"),
 }
 
+SOURCE_TO_CATALOG_PLATFORM: dict[str, str] = {
+    metadata.registry_key: platform
+    for platform, metadata in PLATFORM_ACCOUNT_METADATA.items()
+}
+
 assert set(PLATFORM_ACCOUNT_METADATA) == set(WEB_PLATFORMS)
 assert set(PLATFORM_ACCOUNT_CAPABILITIES) == set(WEB_PLATFORMS)
+assert len(SOURCE_TO_CATALOG_PLATFORM) == len(PLATFORM_ACCOUNT_METADATA)

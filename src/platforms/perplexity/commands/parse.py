@@ -11,6 +11,7 @@ import argparse
 from pathlib import Path
 
 from src.accounts import account_email
+from src.account_identity import resolve_account_id
 from src.platforms.perplexity.parser import PerplexityParser
 
 
@@ -21,6 +22,7 @@ def main():
     ap.add_argument("--output-dir", type=Path, default=Path("data/processed/Perplexity"))
     ap.add_argument("--account", default=None, help="Override the configured account e-mail")
     ap.add_argument("--accounts-file", type=Path, default=Path(".storage/accounts.json"))
+    ap.add_argument("--catalog-path", type=Path, default=Path("data/accounts/catalog.json"))
     args = ap.parse_args()
     account_trees = [("default", args.merged_root, args.raw_root)]
     for account_dir in sorted(args.merged_root.glob("account-*")):
@@ -31,8 +33,10 @@ def main():
     parser.reset()
     for profile, merged_tree, raw_tree in account_trees:
         account = args.account or account_email("perplexity", profile, args.accounts_file)
+        account_id = resolve_account_id("Perplexity", profile, args.catalog_path)
         per_account = PerplexityParser(
-            account=account, merged_root=merged_tree, raw_root=raw_tree,
+            account=account, account_id=account_id,
+            merged_root=merged_tree, raw_root=raw_tree,
         )
         per_account.parse()
         parser.conversations.extend(per_account.conversations)

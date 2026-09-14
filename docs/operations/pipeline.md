@@ -112,10 +112,17 @@ que existem na maquina:
 }
 ```
 
-O parser grava o e-mail na coluna canonica `account`; se o arquivo ou o
-mapeamento nao existir, o valor continua nulo. Os IDs historicos de conversa
-nao mudam por causa dessa etiquetagem. Por conter dados pessoais, o arquivo
-real deve permanecer em `.storage/` e nunca ser adicionado ao Git.
+O parser preserva esse e-mail na coluna legada `account`; se o arquivo ou o
+mapeamento nao existir, o rótulo continua nulo. Separadamente, ele resolve o
+UUID imutável `account_id` por plataforma e chave técnica no catálogo DVC. A
+resolução falha antes de publicar a saída se uma conta web não estiver no
+catálogo. IDs históricos de conversa não mudam. Por conter dados pessoais, o
+arquivo real de rótulos permanece em `.storage/` e nunca entra no Git.
+
+Na unificação, as chaves começam por `(source, account_id, ...)`. Parquets
+legados sem a coluna são aceitos como nulos; nenhum UUID é inferido de e-mail.
+Fontes CLI e importações manuais permanecem nulas até exporem identidade
+durável.
 
 Depois de uma ou mais fontes web processadas:
 

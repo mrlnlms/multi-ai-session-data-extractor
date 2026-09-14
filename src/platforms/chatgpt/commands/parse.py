@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 
 from src.accounts import account_email
+from src.account_identity import resolve_account_id
 from src.platforms.chatgpt.parser import ChatGPTParser
 
 
@@ -31,6 +32,7 @@ def main():
     )
     ap.add_argument("--account", default=None, help="Override the configured account e-mail")
     ap.add_argument("--accounts-file", type=Path, default=Path(".storage/accounts.json"))
+    ap.add_argument("--catalog-path", type=Path, default=Path("data/accounts/catalog.json"))
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -61,7 +63,8 @@ def main():
     parser.reset()
     for profile, merged, raw_root in account_trees:
         account = args.account or account_email("chatgpt", profile, args.accounts_file)
-        per_account = ChatGPTParser(account=account, raw_root=raw_root)
+        account_id = resolve_account_id("ChatGPT", profile, args.catalog_path)
+        per_account = ChatGPTParser(account=account, account_id=account_id, raw_root=raw_root)
         per_account.parse(merged)
         parser.conversations.extend(per_account.conversations)
         parser.messages.extend(per_account.messages)

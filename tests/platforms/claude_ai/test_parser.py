@@ -625,8 +625,9 @@ def test_project_docs_extracted_with_content(tmp_path):
     df = parser.project_docs_df()
     assert list(df.columns) == [
         "doc_id", "project_id", "source", "file_name", "content",
-        "content_size", "estimated_token_count", "created_at",
-    ]
+            "content_size", "estimated_token_count", "created_at",
+            "account_id",
+        ]
     row = df.iloc[0]
     assert row["project_id"] == "proj-x"
     assert row["source"] == "claude_ai"

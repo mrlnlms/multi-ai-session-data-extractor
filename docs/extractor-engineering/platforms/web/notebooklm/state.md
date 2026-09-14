@@ -63,6 +63,9 @@ subfolders), `LAST_RECONCILE.md` + `reconcile_log.jsonl` per-account.
 
 ## Canonical parser
 
+Current account trees and historical archives resolve immutable catalog UUIDs
+into `account_id`; legacy labels and all existing native IDs remain unchanged.
+
 `src/platforms/notebooklm/parser.py` + `_parser_helpers.py`. Full rewrite.
 **9 parquets** (4 canonical + 5 auxiliary):
 

@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 
 from src.accounts import account_email
+from src.account_identity import resolve_account_id
 from src.platforms.deepseek.parser import DeepSeekParser
 
 
@@ -14,6 +15,7 @@ def main():
     ap.add_argument("--output-dir", type=Path, default=Path("data/processed/DeepSeek"))
     ap.add_argument("--account", default=None)
     ap.add_argument("--accounts-file", type=Path, default=Path(".storage/accounts.json"))
+    ap.add_argument("--catalog-path", type=Path, default=Path("data/accounts/catalog.json"))
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -38,7 +40,8 @@ def main():
     parser.reset()
     for profile, tree in account_trees:
         account = args.account or account_email("deepseek", profile, args.accounts_file)
-        per_account = DeepSeekParser(account=account, merged_root=tree)
+        account_id = resolve_account_id("DeepSeek", profile, args.catalog_path)
+        per_account = DeepSeekParser(account=account, account_id=account_id, merged_root=tree)
         per_account.parse(tree)
         parser.conversations.extend(per_account.conversations)
         parser.messages.extend(per_account.messages)

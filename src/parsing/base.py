@@ -28,8 +28,9 @@ class BaseParser(ABC):
 
     source_name: str = ""
 
-    def __init__(self, account: str | None = None):
+    def __init__(self, account: str | None = None, account_id: str | None = None):
         self.account = account
+        self.account_id = account_id
         self.reset()
 
     def reset(self):

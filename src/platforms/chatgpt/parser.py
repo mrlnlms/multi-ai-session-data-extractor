@@ -51,8 +51,9 @@ from src.schema.models import (
 class ChatGPTParser(BaseParser):
     source_name = "chatgpt"
 
-    def __init__(self, account: Optional[str] = None, raw_root: Optional[Path] = None):
-        super().__init__(account)
+    def __init__(self, account: Optional[str] = None, raw_root: Optional[Path] = None,
+                 account_id: Optional[str] = None):
+        super().__init__(account, account_id)
         self.raw_root = Path(raw_root) if raw_root else Path("data/raw/ChatGPT")
 
     def reset(self):
@@ -169,6 +170,7 @@ class ChatGPTParser(BaseParser):
                 branch_id=b["branch_id"],
                 conversation_id=b["conversation_id"],
                 source=self.source_name,
+                account_id=self.account_id,
                 root_message_id=b["root_message_id"],
                 leaf_message_id=b["leaf_message_id"],
                 is_active=(b["branch_id"] == active_branch_id),
@@ -301,6 +303,7 @@ class ChatGPTParser(BaseParser):
                 message_id=msg.get("id") or f"{conv_id}_{seq}",
                 conversation_id=conv_id,
                 source=self.source_name,
+                account_id=self.account_id,
                 sequence=seq,
                 role=role,
                 content=text,
@@ -342,6 +345,7 @@ class ChatGPTParser(BaseParser):
         self.conversations.append(Conversation(
             conversation_id=conv_id,
             source=self.source_name,
+            account_id=self.account_id,
             title=conv_data.get("title") or None,
             created_at=self._ts(conv_data.get("create_time")),
             updated_at=self._ts(conv_data.get("update_time")),
@@ -394,6 +398,7 @@ class ChatGPTParser(BaseParser):
             conversation_id=conv_id,
             message_id=parent_id,
             source=self.source_name,
+            account_id=self.account_id,
             event_type="quote",
             tool_name="tether_quote",
             result=content.get("text") or None,
@@ -425,6 +430,7 @@ class ChatGPTParser(BaseParser):
             conversation_id=conv_id,
             message_id=parent_id,
             source=self.source_name,
+            account_id=self.account_id,
             event_type=event_type,
             tool_name=tool_name,
             file_path=file_path,
@@ -444,6 +450,7 @@ class ChatGPTParser(BaseParser):
             conversation_id=conv_id,
             message_id=parent_id,
             source=self.source_name,
+            account_id=self.account_id,
             event_type="canvas",
             tool_name=tool_name,
             result=extract_text(content) or None,
@@ -465,6 +472,7 @@ class ChatGPTParser(BaseParser):
             conversation_id=conv_id,
             message_id=parent_id,
             source=self.source_name,
+            account_id=self.account_id,
             event_type="deep_research",
             tool_name=tool_name,
             result=extract_text(content) or None,

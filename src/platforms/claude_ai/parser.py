@@ -70,8 +70,9 @@ class ClaudeAIParser(BaseParser):
         self,
         account: Optional[str] = None,
         merged_root: Optional[Path] = None,
+        account_id: Optional[str] = None,
     ):
-        super().__init__(account)
+        super().__init__(account, account_id)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Claude.ai")
         self.projects: list[dict] = []  # raw project dicts (para tabela separada)
 
@@ -201,6 +202,7 @@ class ClaudeAIParser(BaseParser):
                 branch_id=br["branch_id"],
                 conversation_id=conv_uuid,
                 source=SOURCE,
+                account_id=self.account_id,
                 root_message_id=br["root_message_id"],
                 leaf_message_id=br["leaf_message_id"],
                 is_active=br["is_active"],
@@ -232,6 +234,7 @@ class ClaudeAIParser(BaseParser):
         self.conversations.append(Conversation(
             conversation_id=conv_uuid,
             source=SOURCE,
+            account_id=self.account_id,
             title=conv.get("name") or None,
             created_at=self._ts(conv.get("created_at")),
             updated_at=self._ts(conv.get("updated_at")),
@@ -311,6 +314,7 @@ class ClaudeAIParser(BaseParser):
             message_id=msg_uuid,
             conversation_id=conv_uuid,
             source=SOURCE,
+            account_id=self.account_id,
             sequence=seq,
             role=role,
             content=text_content,
@@ -367,6 +371,7 @@ class ClaudeAIParser(BaseParser):
                     conversation_id=conv_uuid,
                     message_id=msg_uuid,
                     source=SOURCE,
+                    account_id=self.account_id,
                     event_type=f"{category}_call",
                     tool_name=tool_name or None,
                     metadata_json=json.dumps(metadata, ensure_ascii=False),
@@ -395,6 +400,7 @@ class ClaudeAIParser(BaseParser):
                     conversation_id=conv_uuid,
                     message_id=msg_uuid,
                     source=SOURCE,
+                    account_id=self.account_id,
                     event_type=f"{category}_result",
                     tool_name=tool_name or None,
                     success=not is_error,
@@ -433,6 +439,7 @@ class ClaudeAIParser(BaseParser):
                 doc_id=doc_uuid,
                 project_id=proj_uuid,
                 source=SOURCE,
+                account_id=self.account_id,
                 file_name=doc.get("file_name") or "",
                 content=content,
                 content_size=len(content),
@@ -456,6 +463,7 @@ class ClaudeAIParser(BaseParser):
                 "created_at", "updated_at", "archived_at",
                 "is_private", "is_starred", "is_starter_project",
                 "docs_count", "files_count",
+                "account_id",
             ])
         rows = []
         for p in self.projects:
@@ -472,6 +480,7 @@ class ClaudeAIParser(BaseParser):
                 "is_starter_project": bool(p.get("is_starter_project", False)),
                 "docs_count": int(p.get("docs_count") or 0),
                 "files_count": int(p.get("files_count") or 0),
+                "account_id": p.get("account_id", self.account_id),
             })
         return pd.DataFrame(rows)
 

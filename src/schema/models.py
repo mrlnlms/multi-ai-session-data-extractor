@@ -3,6 +3,7 @@
 
 from dataclasses import dataclass, fields, asdict
 from typing import Optional
+import uuid
 
 import pandas as pd
 
@@ -10,6 +11,20 @@ import pandas as pd
 VALID_SOURCES = ("claude_ai", "chatgpt", "qwen", "claude_code", "deepseek", "perplexity", "gemini", "notebooklm", "codex", "gemini_cli", "antigravity_cli", "grok", "kimi")
 VALID_ROLES = ("user", "assistant", "system")
 VALID_MODES = ("chat", "search", "research", "copilot", "concise", "dalle", "cli")
+
+
+def _validate_account_id(account_id: Optional[str]) -> None:
+    """Require canonical UUID text when immutable account provenance is present."""
+    if account_id is None:
+        return
+    if not isinstance(account_id, str):
+        raise ValueError("account_id must be a canonical UUID string or None")
+    try:
+        parsed = uuid.UUID(account_id)
+    except (ValueError, AttributeError) as exc:
+        raise ValueError("account_id must be a canonical UUID string or None") from exc
+    if str(parsed) != account_id:
+        raise ValueError("account_id must be a canonical UUID string or None")
 
 
 @dataclass
@@ -48,8 +63,10 @@ class Conversation:
     # 'historical_notebooklm_snapshot': snapshot de extractor antigo sem acesso upstream
     # 'external_gdpr': export GDPR oficial (futuro)
     capture_method: str = "extractor"
+    account_id: Optional[str] = None
 
     def __post_init__(self):
+        _validate_account_id(self.account_id)
         if self.source not in VALID_SOURCES:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
         if self.mode is not None and self.mode not in VALID_MODES:
@@ -91,8 +108,10 @@ class Message:
     attachments_json: Optional[str] = None
     start_timestamp: Optional[pd.Timestamp] = None
     stop_timestamp: Optional[pd.Timestamp] = None
+    account_id: Optional[str] = None
 
     def __post_init__(self):
+        _validate_account_id(self.account_id)
         if self.source not in VALID_SOURCES:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
         if self.role not in VALID_ROLES:
@@ -119,8 +138,10 @@ class ToolEvent:
     metadata_json: Optional[str] = None
     # parser v3
     result: Optional[str] = None
+    account_id: Optional[str] = None
 
     def __post_init__(self):
+        _validate_account_id(self.account_id)
         if self.source not in VALID_SOURCES:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
 
@@ -135,8 +156,10 @@ class ConversationProject:
     tagged_by: str
     confidence: Optional[float] = None
     source: Optional[str] = None
+    account_id: Optional[str] = None
 
     def __post_init__(self):
+        _validate_account_id(self.account_id)
         if self.source is not None and self.source not in VALID_SOURCES:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
 
@@ -161,8 +184,10 @@ class ProjectDoc:
     content_size: int
     estimated_token_count: Optional[int] = None
     created_at: Optional[pd.Timestamp] = None
+    account_id: Optional[str] = None
 
     def __post_init__(self):
+        _validate_account_id(self.account_id)
         if self.source not in VALID_SOURCES:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
 
@@ -180,8 +205,10 @@ class Branch:
     is_active: bool
     created_at: pd.Timestamp
     parent_branch_id: Optional[str] = None
+    account_id: Optional[str] = None
 
     def __post_init__(self):
+        _validate_account_id(self.account_id)
         if self.source not in VALID_SOURCES:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
 
@@ -214,8 +241,10 @@ class AgentMemory:
     created_at: Optional[pd.Timestamp]
     updated_at: Optional[pd.Timestamp]
     is_preserved_missing: bool = False
+    account_id: Optional[str] = None
 
     def __post_init__(self):
+        _validate_account_id(self.account_id)
         if self.source not in VALID_SOURCES:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
         if self.kind not in VALID_MEMORY_KINDS:
@@ -252,8 +281,10 @@ class NotebookLMNote:
     kind: str  # 'note' | 'brief'
     source_refs_json: Optional[str]
     created_at: Optional[pd.Timestamp]
+    account_id: Optional[str] = None
 
     def __post_init__(self):
+        _validate_account_id(self.account_id)
         if self.source not in VALID_SOURCES:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
         if self.kind not in VALID_NOTE_KINDS:
@@ -277,8 +308,10 @@ class NotebookLMOutput:
     content: Optional[str]
     source_refs_json: Optional[str]
     created_at: Optional[pd.Timestamp]
+    account_id: Optional[str] = None
 
     def __post_init__(self):
+        _validate_account_id(self.account_id)
         if self.source not in VALID_SOURCES:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
         if self.output_type not in VALID_OUTPUT_TYPES:
@@ -311,8 +344,10 @@ class NotebookLMSourceGuide:
     summary: Optional[str]
     tags_json: Optional[str]       # JSON list de tags
     questions_json: Optional[str]  # JSON list de suggested questions
+    account_id: Optional[str] = None
 
     def __post_init__(self):
+        _validate_account_id(self.account_id)
         if self.source not in VALID_SOURCES:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
 
@@ -329,8 +364,10 @@ class NotebookLMGuideQuestion:
     question_text: str
     full_prompt: str
     order: int
+    account_id: Optional[str] = None
 
     def __post_init__(self):
+        _validate_account_id(self.account_id)
         if self.source not in VALID_SOURCES:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
 

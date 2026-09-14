@@ -41,6 +41,17 @@ _meta_rows = [
     {"Field": "Creation period", "Value": f"{_oldest:%Y-%m-%d} → {_newest:%Y-%m-%d}" if pd.notna(_oldest) else "—"},
     {"Field": "Last update", "Value": f"{_last:%Y-%m-%d %H:%M}" if pd.notna(_last) else "—"},
 ]
+if has_col(con, "conversations", "account_id"):
+    _account_count = con.execute(
+        "SELECT COUNT(DISTINCT account_id) FROM conversations WHERE account_id IS NOT NULL"
+    ).fetchone()[0]
+    _account_covered = con.execute(
+        "SELECT COUNT(*) FROM conversations WHERE account_id IS NOT NULL"
+    ).fetchone()[0]
+    _meta_rows.append({
+        "Field": "Catalog accounts",
+        "Value": f"{_account_count} · {fmt_pct(_account_covered, table_count(con, 'conversations'))} coverage",
+    })
 show_df(pd.DataFrame(_meta_rows))
 ```
 

@@ -179,6 +179,41 @@ class TestUnifyTable:
         assert "source" in df.columns
         assert df["source"].iloc[0] == "sourceB"
         assert len(df) == 2
+        assert "account_id" in df.columns
+        assert df["account_id"].isna().all()
+
+    def test_same_native_id_survives_across_accounts(self, tmp_path):
+        d = tmp_path / "PlatX"
+        d.mkdir()
+        ids = [
+            "810f3e91-ae10-5cb1-931a-53b80630af16",
+            "bbeeb29c-7a95-5f5a-b564-59b01445cd14",
+        ]
+        pd.DataFrame({
+            "conversation_id": ["same", "same"],
+            "source": ["chatgpt", "chatgpt"],
+            "account_id": ids,
+        }).to_parquet(d / "chatgpt_conversations.parquet")
+
+        df = unify_module.unify_table(
+            "conversations", [d / "chatgpt_conversations.parquet"]
+        )
+        assert len(df) == 2
+        assert set(df["account_id"]) == set(ids)
+
+    def test_account_mismatch_is_rejected(self):
+        frames = {
+            "conversations": pd.DataFrame({
+                "source": ["chatgpt"], "conversation_id": ["c"],
+                "account_id": ["810f3e91-ae10-5cb1-931a-53b80630af16"],
+            }),
+            "messages": pd.DataFrame({
+                "source": ["chatgpt"], "conversation_id": ["c"],
+                "account_id": ["bbeeb29c-7a95-5f5a-b564-59b01445cd14"],
+            }),
+        }
+        with pytest.raises(ValueError, match="account_id mismatch"):
+            unify_module._validate_account_integrity(frames)
 
     def test_dedup_keep_last(self, tmp_path):
         """Quando ha colisao real (PK identica), keep='last' favorece o ultimo file."""
@@ -238,3 +273,4 @@ class TestUnifyEndToEnd:
         for f in unified.glob("*.parquet"):
             df = pd.read_parquet(f)
             assert "source" in df.columns, f"{f.name} sem coluna source"
+            assert "account_id" in df.columns, f"{f.name} sem coluna account_id"

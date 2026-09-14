@@ -86,8 +86,9 @@ class QwenParser(BaseParser):
         self,
         account: Optional[str] = None,
         merged_root: Optional[Path] = None,
+        account_id: Optional[str] = None,
     ):
-        super().__init__(account)
+        super().__init__(account, account_id)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Qwen")
         self.projects: list[dict] = []
         self.project_docs: list[ProjectDoc] = []
@@ -204,6 +205,7 @@ class QwenParser(BaseParser):
                 branch_id=br["branch_id"],
                 conversation_id=conv_id,
                 source=SOURCE,
+                account_id=self.account_id,
                 root_message_id=br["root_message_id"],
                 leaf_message_id=br["leaf_message_id"],
                 is_active=br["is_active"],
@@ -242,6 +244,7 @@ class QwenParser(BaseParser):
         self.conversations.append(Conversation(
             conversation_id=conv_id,
             source=SOURCE,
+            account_id=self.account_id,
             title=data.get("title") or None,
             created_at=self._ts(_normalize_epoch(data.get("created_at"))),
             updated_at=self._ts(_normalize_epoch(data.get("updated_at"))),
@@ -329,6 +332,7 @@ class QwenParser(BaseParser):
             message_id=msg_id,
             conversation_id=conv_id,
             source=SOURCE,
+            account_id=self.account_id,
             sequence=seq,
             role=role,
             content=text_content,
@@ -363,6 +367,7 @@ class QwenParser(BaseParser):
                 conversation_id=conv_id,
                 message_id=msg_id,
                 source=SOURCE,
+                account_id=self.account_id,
                 event_type=f"{category}_call",
                 tool_name=chat_type,
                 metadata_json=json.dumps({
@@ -376,6 +381,7 @@ class QwenParser(BaseParser):
                 conversation_id=conv_id,
                 message_id=msg_id,
                 source=SOURCE,
+                account_id=self.account_id,
                 event_type=f"{category}_result",
                 tool_name=chat_type,
                 success=True,
@@ -391,6 +397,7 @@ class QwenParser(BaseParser):
                 conversation_id=conv_id,
                 message_id=msg_id,
                 source=SOURCE,
+                account_id=self.account_id,
                 event_type=f"{category}_call",
                 tool_name=chat_type,
                 metadata_json=json.dumps({
@@ -423,6 +430,7 @@ class QwenParser(BaseParser):
                 doc_id=doc_id,
                 project_id=proj_id,
                 source=SOURCE,
+                account_id=self.account_id,
                 file_name=f.get("file_name") or f.get("name") or "",
                 content="",  # Qwen retorna URL S3, content nao inline
                 content_size=int(f.get("size") or 0),
@@ -441,6 +449,7 @@ class QwenParser(BaseParser):
             return pd.DataFrame(columns=[
                 "project_id", "name", "icon", "custom_instruction",
                 "memory_span", "created_at", "updated_at", "files_count",
+                "account_id",
             ])
         rows = []
         for p in self.projects:
@@ -454,6 +463,7 @@ class QwenParser(BaseParser):
                 "created_at": self._ts(_normalize_epoch(p.get("created_at"))),
                 "updated_at": self._ts(_normalize_epoch(p.get("updated_at"))),
                 "files_count": len(files),
+                "account_id": p.get("account_id", self.account_id),
             })
         return pd.DataFrame(rows)
 

@@ -26,6 +26,9 @@ workspaces.
 
 ## Canonical parser
 
+Each account tree resolves its immutable catalog UUID into `account_id`; the
+legacy `account` label and all existing native IDs remain unchanged.
+
 `src/platforms/grok/parser.py`.
 
 ### Coverage

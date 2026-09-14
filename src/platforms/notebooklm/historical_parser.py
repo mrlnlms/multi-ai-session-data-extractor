@@ -89,9 +89,10 @@ def _capture_timestamp(archive_key: str) -> pd.Timestamp:
 class NotebookLMHistoricalParser:
     """Convert one old-format snapshot directory to canonical model rows."""
 
-    def __init__(self, archive_key: str):
+    def __init__(self, archive_key: str, account_id: str | None = None):
         self.archive_key = _safe_key(archive_key)
         self.account = f"archive:{self.archive_key}"
+        self.account_id = account_id
         self.captured_at = _capture_timestamp(self.archive_key)
 
     def parse(self, input_path: Path) -> NotebookLMHistoricalResult:
@@ -132,6 +133,7 @@ class NotebookLMHistoricalParser:
                     message_id=f"{conversation_id}_guide_summary",
                     conversation_id=conversation_id,
                     source=SOURCE,
+                    account_id=self.account_id,
                     sequence=0,
                     role="system",
                     content=summary,
@@ -172,6 +174,7 @@ class NotebookLMHistoricalParser:
                             message_id=message_id,
                             conversation_id=conversation_id,
                             source=SOURCE,
+                            account_id=self.account_id,
                             sequence=sequence,
                             role=turn["role"],
                             content=str(turn.get("content") or ""),
@@ -190,6 +193,7 @@ class NotebookLMHistoricalParser:
                 branch_id=branch_id,
                 conversation_id=conversation_id,
                 source=SOURCE,
+                account_id=self.account_id,
                 root_message_id=first_message_id,
                 leaf_message_id=last_message_id,
                 is_active=True,
@@ -205,6 +209,7 @@ class NotebookLMHistoricalParser:
                     doc_id=str(source["uuid"]),
                     project_id=conversation_id,
                     source=SOURCE,
+                    account_id=self.account_id,
                     file_name=str(source.get("name") or ""),
                     content="",
                     content_size=0,
@@ -230,6 +235,7 @@ class NotebookLMHistoricalParser:
                             note_id=asset.stem.removesuffix("_brief"),
                             conversation_id=conversation_id,
                             source=SOURCE,
+                            account_id=self.account_id,
                             account=self.account,
                             title=title,
                             content=content,
@@ -248,6 +254,7 @@ class NotebookLMHistoricalParser:
                             ),
                             conversation_id=conversation_id,
                             source=SOURCE,
+                            account_id=self.account_id,
                             account=self.account,
                             output_type=output_type,
                             output_type_name=output_name,
@@ -270,6 +277,7 @@ class NotebookLMHistoricalParser:
                         question_id=f"{conversation_id}_q{index}",
                         conversation_id=conversation_id,
                         source=SOURCE,
+                        account_id=self.account_id,
                         account=self.account,
                         question_text=question,
                         full_prompt=question,
@@ -281,6 +289,7 @@ class NotebookLMHistoricalParser:
             Conversation(
                 conversation_id=conversation_id,
                 source=SOURCE,
+                account_id=self.account_id,
                 title=str(data.get("title") or notebook_id),
                 created_at=captured_at,
                 updated_at=captured_at,
@@ -295,7 +304,9 @@ class NotebookLMHistoricalParser:
         )
 
 
-def parse_historical_archives(root: Path) -> NotebookLMHistoricalResult:
+def parse_historical_archives(
+    root: Path, *, account_ids: dict[str, str] | None = None,
+) -> NotebookLMHistoricalResult:
     """Parse each direct child snapshot using its directory name as provenance."""
 
     root = Path(root)
@@ -310,5 +321,8 @@ def parse_historical_archives(root: Path) -> NotebookLMHistoricalResult:
     for archive_dir in archive_dirs:
         if not any((child / "notebook.json").is_file() for child in archive_dir.iterdir()):
             raise ValueError(f"historical archive has no notebook snapshots: {archive_dir}")
-        combined.extend(NotebookLMHistoricalParser(archive_dir.name).parse(archive_dir))
+        account_id = (account_ids or {}).get(archive_dir.name)
+        combined.extend(
+            NotebookLMHistoricalParser(archive_dir.name, account_id=account_id).parse(archive_dir)
+        )
     return combined

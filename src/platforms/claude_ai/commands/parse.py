@@ -17,6 +17,7 @@ import logging
 from pathlib import Path
 
 from src.accounts import account_email
+from src.account_identity import resolve_account_id, stamp_account_id_rows
 from src.platforms.claude_ai.parser import ClaudeAIParser
 
 
@@ -35,6 +36,7 @@ def main():
         help="Tag account no campo Conversation.account (default: None)",
     )
     ap.add_argument("--accounts-file", type=Path, default=Path(".storage/accounts.json"))
+    ap.add_argument("--catalog-path", type=Path, default=Path("data/accounts/catalog.json"))
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -59,20 +61,26 @@ def main():
     parser.reset()
     for profile, merged_root in account_trees:
         account = args.account or account_email("claude_ai", profile, args.accounts_file)
-        per_account = ClaudeAIParser(account=account, merged_root=merged_root)
+        account_id = resolve_account_id("Claude.ai", profile, args.catalog_path)
+        per_account = ClaudeAIParser(
+            account=account, account_id=account_id, merged_root=merged_root,
+        )
         per_account.parse(merged_root)
+        stamp_account_id_rows(per_account.projects, account_id)
         parser.conversations.extend(per_account.conversations)
         parser.messages.extend(per_account.messages)
         parser.events.extend(per_account.events)
         parser.branches.extend(per_account.branches)
         parser.projects.extend(per_account.projects)
+        parser.project_docs.extend(per_account.project_docs)
 
     log.info(
         f"Parseado: {len(parser.conversations)} convs, "
         f"{len(parser.messages)} msgs, "
         f"{len(parser.events)} tool_events, "
         f"{len(parser.branches)} branches, "
-        f"{len(parser.projects)} projects"
+        f"{len(parser.projects)} projects, "
+        f"{len(parser.project_docs)} project docs"
     )
 
     parser.save(args.output_dir)

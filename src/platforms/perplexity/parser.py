@@ -139,8 +139,9 @@ class PerplexityParser(BaseParser):
         account: Optional[str] = None,
         merged_root: Optional[Path] = None,
         raw_root: Optional[Path] = None,
+        account_id: Optional[str] = None,
     ):
-        super().__init__(account)
+        super().__init__(account, account_id)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Perplexity")
         self.raw_root = Path(raw_root) if raw_root else Path("data/raw/Perplexity")
 
@@ -271,6 +272,7 @@ class PerplexityParser(BaseParser):
                 message_id=user_msg_id,
                 conversation_id=uid,
                 source=self.source_name,
+                account_id=self.account_id,
                 sequence=seq,
                 role="user",
                 content=entry.get("query_str") or "",
@@ -291,6 +293,7 @@ class PerplexityParser(BaseParser):
                 message_id=asst_msg_id,
                 conversation_id=uid,
                 source=self.source_name,
+                account_id=self.account_id,
                 sequence=seq,
                 role="assistant",
                 content=_entry_answer_text(entry),
@@ -322,6 +325,7 @@ class PerplexityParser(BaseParser):
                         conversation_id=uid,
                         message_id=asst_msg_id,
                         source=self.source_name,
+                        account_id=self.account_id,
                         event_type="search_result",
                         tool_name="web_search",
                         metadata_json=json.dumps({
@@ -339,6 +343,7 @@ class PerplexityParser(BaseParser):
                     conversation_id=uid,
                     message_id=asst_msg_id,
                     source=self.source_name,
+                    account_id=self.account_id,
                     event_type="media_reference",
                     tool_name=m.get("source") or "external_media",
                     metadata_json=json.dumps({
@@ -352,6 +357,7 @@ class PerplexityParser(BaseParser):
         self.conversations.append(Conversation(
             conversation_id=uid,
             source=self.source_name,
+            account_id=self.account_id,
             title=thread_title[:500] if thread_title else None,
             created_at=_to_ts(first_query),
             updated_at=_to_ts(last_query),
@@ -372,6 +378,7 @@ class PerplexityParser(BaseParser):
                 branch_id=f"{uid}_main",
                 conversation_id=uid,
                 source=self.source_name,
+                account_id=self.account_id,
                 root_message_id=first_msg_id,
                 leaf_message_id=last_msg_id,
                 is_active=True,
@@ -418,6 +425,7 @@ class PerplexityParser(BaseParser):
                 message_id=uid_msg,
                 conversation_id=page_id,
                 source=self.source_name,
+                account_id=self.account_id,
                 sequence=seq,
                 role="user",
                 content=entry.get("query_str") or "",
@@ -437,6 +445,7 @@ class PerplexityParser(BaseParser):
                 message_id=asst_id,
                 conversation_id=page_id,
                 source=self.source_name,
+                account_id=self.account_id,
                 sequence=seq,
                 role="assistant",
                 content=_entry_answer_text(entry),
@@ -451,6 +460,7 @@ class PerplexityParser(BaseParser):
         self.conversations.append(Conversation(
             conversation_id=page_id,
             source=self.source_name,
+            account_id=self.account_id,
             title=title[:500] if title else None,
             created_at=first_ts,
             updated_at=last_ts,
@@ -469,6 +479,7 @@ class PerplexityParser(BaseParser):
                 branch_id=f"{page_id}_main",
                 conversation_id=page_id,
                 source=self.source_name,
+                account_id=self.account_id,
                 root_message_id=first_msg_id,
                 leaf_message_id=last_msg_id,
                 is_active=True,
@@ -488,6 +499,7 @@ class PerplexityParser(BaseParser):
             conversation_id=conv_id,
             message_id=msg_id,
             source=self.source_name,
+            account_id=self.account_id,
             event_type="asset_generation",
             tool_name=asset.get("asset_type"),
             file_path=f"assets/files/{slug}",

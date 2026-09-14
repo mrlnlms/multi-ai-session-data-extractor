@@ -50,6 +50,9 @@ Chats + projects + project files captured. Reconciler v3
 
 ## Canonical parser
 
+Each account tree resolves its immutable catalog UUID into `account_id`; the
+legacy `account` label and all existing native IDs remain unchanged.
+
 `src/platforms/qwen/parser.py` + `_parser_helpers.py`.
 
 ### Coverage

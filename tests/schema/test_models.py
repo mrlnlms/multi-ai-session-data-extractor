@@ -108,7 +108,23 @@ def test_conversations_to_df():
         "is_archived", "is_temporary",
         "summary", "settings_json",
         "capture_method",
+        "account_id",
     ]
+
+
+@pytest.mark.parametrize("model", [Conversation, Message, ToolEvent, ConversationProject])
+def test_models_reject_invalid_account_id(model):
+    kwargs = {
+        Conversation: dict(conversation_id="c", source="chatgpt", title=None,
+                           created_at=pd.NaT, updated_at=pd.NaT, message_count=0, model=None),
+        Message: dict(message_id="m", conversation_id="c", source="chatgpt", sequence=0,
+                      role="user", content="", model=None, created_at=pd.NaT),
+        ToolEvent: dict(event_id="e", conversation_id="c", message_id="m",
+                        source="chatgpt", event_type="tool"),
+        ConversationProject: dict(conversation_id="c", project_tag="p", tagged_by="manual"),
+    }[model]
+    with pytest.raises(ValueError, match="account_id"):
+        model(**kwargs, account_id="not-a-uuid")
 
 
 def test_messages_to_df():

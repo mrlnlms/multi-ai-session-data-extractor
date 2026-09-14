@@ -59,6 +59,9 @@ projects), idempotent. Output: `data/merged/Claude.ai/conversations/<uuid>.json`
 
 ## Canonical parser v3.1
 
+Each account tree resolves its immutable catalog UUID into `account_id`; the
+legacy `account` label and all existing native IDs remain unchanged.
+
 `src/platforms/claude_ai/parser.py` + `_parser_helpers.py`.
 
 ### Coverage

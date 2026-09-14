@@ -8,6 +8,7 @@ import argparse
 from pathlib import Path
 
 from src.accounts import account_email
+from src.account_identity import resolve_account_id, stamp_account_id_rows
 from src.platforms.grok.parser import GrokParser
 
 
@@ -17,6 +18,7 @@ def main():
     ap.add_argument("--out", default="data/processed/Grok", help="Output dir")
     ap.add_argument("--account", default=None)
     ap.add_argument("--accounts-file", type=Path, default=Path(".storage/accounts.json"))
+    ap.add_argument("--catalog-path", type=Path, default=Path("data/accounts/catalog.json"))
     args = ap.parse_args()
 
     merged_root = Path(args.merged)
@@ -29,8 +31,13 @@ def main():
     parser.reset()
     for profile, tree in account_trees:
         account = args.account or account_email("grok", profile, args.accounts_file)
-        per_account = GrokParser(account=account, merged_root=tree)
+        account_id = resolve_account_id("Grok", profile, args.catalog_path)
+        per_account = GrokParser(account=account, account_id=account_id, merged_root=tree)
         per_account.parse(tree)
+        stamp_account_id_rows(per_account.workspaces, account_id)
+        stamp_account_id_rows(per_account.assets, account_id)
+        for status in ("active", "inactive"):
+            stamp_account_id_rows(per_account.scheduled_tasks.get(status) or [], account_id)
         parser.conversations.extend(per_account.conversations)
         parser.messages.extend(per_account.messages)
         parser.events.extend(per_account.events)

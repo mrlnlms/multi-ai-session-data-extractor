@@ -112,8 +112,9 @@ class KimiParser(BaseParser):
         self,
         account: Optional[str] = None,
         merged_root: Optional[Path] = None,
+        account_id: Optional[str] = None,
     ):
-        super().__init__(account)
+        super().__init__(account, account_id)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Kimi")
         self.skills: dict = {"official": [], "installed": []}
         self.assets_manifest: dict = {}
@@ -191,6 +192,7 @@ class KimiParser(BaseParser):
                 branch_id=br["branch_id"],
                 conversation_id=conv_id,
                 source=SOURCE,
+                account_id=self.account_id,
                 root_message_id=br["root_message_id"],
                 leaf_message_id=br["leaf_message_id"],
                 is_active=br["is_active"],
@@ -226,6 +228,7 @@ class KimiParser(BaseParser):
         self.conversations.append(Conversation(
             conversation_id=conv_id,
             source=SOURCE,
+            account_id=self.account_id,
             title=chat.get("name") or None,
             created_at=self._ts(chat.get("createTime")),
             updated_at=self._ts(chat.get("updateTime")),
@@ -310,6 +313,7 @@ class KimiParser(BaseParser):
             message_id=msg_id,
             conversation_id=conv_id,
             source=SOURCE,
+            account_id=self.account_id,
             sequence=seq,
             role=role,
             content=text_content,
@@ -341,6 +345,7 @@ class KimiParser(BaseParser):
                 conversation_id=conv_id,
                 message_id=msg_id,
                 source=SOURCE,
+                account_id=self.account_id,
                 event_type=f"{tool_name}_call",
                 tool_name=tool_name,
                 command=t.get("args") or None,
@@ -365,6 +370,7 @@ class KimiParser(BaseParser):
                     conversation_id=conv_id,
                     message_id=msg_id,
                     source=SOURCE,
+                    account_id=self.account_id,
                     event_type="search_result",
                     tool_name="web_search",
                     success=True,
@@ -381,6 +387,7 @@ class KimiParser(BaseParser):
             return pd.DataFrame(columns=[
                 "asset_id", "chat_id", "name", "mime_type", "size_bytes",
                 "asset_path", "url",
+                "account_id",
             ])
         rows = []
         for fid, info in self.assets_manifest.items():
@@ -392,6 +399,7 @@ class KimiParser(BaseParser):
                 "size_bytes": int(info.get("size") or 0),
                 "asset_path": f"merged/Kimi/{info['relpath']}" if info.get("relpath") else "",
                 "url": info.get("url") or "",
+                "account_id": info.get("account_id", self.account_id),
             })
         return pd.DataFrame(rows)
 
@@ -406,6 +414,7 @@ class KimiParser(BaseParser):
                 "project_id", "name", "icon", "custom_instruction",
                 "is_pinned", "is_installed", "categories", "source_type",
                 "created_at", "updated_at",
+                "account_id",
             ])
         rows = []
         for s in installed:
@@ -420,6 +429,7 @@ class KimiParser(BaseParser):
                 "source_type": s.get("source") or "",
                 "created_at": pd.NaT,
                 "updated_at": pd.NaT,
+                "account_id": s.get("account_id", self.account_id),
             })
         return pd.DataFrame(rows)
 

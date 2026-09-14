@@ -160,6 +160,7 @@ class NotebookLMParser:
     ):
         account = str(nb.get("account", "1"))
         account_key = str(nb.get("account_key", account))
+        account_id = nb.get("account_id")
         nb_uuid = nb["uuid"]
         conv_id = f"account-{account_key}_{nb_uuid}"
 
@@ -190,6 +191,7 @@ class NotebookLMParser:
                 doc_id=s["uuid"],
                 project_id=conv_id,
                 source=SOURCE,
+                account_id=account_id,
                 file_name=s.get("filename") or "",
                 content=content or "",
                 content_size=len(content or ""),
@@ -206,6 +208,7 @@ class NotebookLMParser:
                         source_id=s["uuid"],
                         conversation_id=conv_id,
                         source=SOURCE,
+                        account_id=account_id,
                         account=account,
                         summary=g.get("summary"),
                         tags_json=json.dumps(g.get("tags", [])) if g.get("tags") else None,
@@ -223,6 +226,7 @@ class NotebookLMParser:
                 message_id=msg_id,
                 conversation_id=conv_id,
                 source=SOURCE,
+                account_id=account_id,
                 sequence=sequence,
                 role="system",
                 content=summary,
@@ -241,6 +245,7 @@ class NotebookLMParser:
                 message_id=tid,
                 conversation_id=conv_id,
                 source=SOURCE,
+                account_id=account_id,
                 sequence=sequence,
                 role=turn.get("role", "user"),
                 content=turn.get("content", ""),
@@ -259,6 +264,7 @@ class NotebookLMParser:
             branch_id=f"{conv_id}_main",
             conversation_id=conv_id,
             source=SOURCE,
+            account_id=account_id,
             root_message_id=first_msg_id or "",
             leaf_message_id=last_msg_id or first_msg_id or "",
             is_active=True,
@@ -272,6 +278,7 @@ class NotebookLMParser:
                     note_id=n["uuid"],
                     conversation_id=conv_id,
                     source=SOURCE,
+                    account_id=account_id,
                     account=account,
                     title=n.get("title"),
                     content=n.get("content", ""),
@@ -297,6 +304,7 @@ class NotebookLMParser:
                 output_id=art["uuid"],
                 conversation_id=conv_id,
                 source=SOURCE,
+                account_id=account_id,
                 account=account,
                 output_type=t,
                 output_type_name=VALID_OUTPUT_TYPES[t],
@@ -323,6 +331,7 @@ class NotebookLMParser:
                 output_id=mm_uuid,
                 conversation_id=conv_id,
                 source=SOURCE,
+                account_id=account_id,
                 account=account,
                 output_type=10,
                 output_type_name="mind_map",
@@ -341,6 +350,7 @@ class NotebookLMParser:
                 question_id=f"{conv_id}_q{i}",
                 conversation_id=conv_id,
                 source=SOURCE,
+                account_id=account_id,
                 account=account,
                 question_text=q["text"],
                 full_prompt=q.get("prompt", ""),
@@ -359,6 +369,7 @@ class NotebookLMParser:
         convs.append(Conversation(
             conversation_id=conv_id,
             source=SOURCE,
+            account_id=account_id,
             title=title,
             created_at=created_at,
             updated_at=updated_at,

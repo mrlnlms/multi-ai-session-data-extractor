@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 from src.accounts import account_email
+from src.account_identity import resolve_account_id
 from src.platforms.notebooklm.parser import NotebookLMParser
 from src.platforms.notebooklm.historical_parser import (
     NotebookLMHistoricalResult,
@@ -24,7 +25,9 @@ PROCESSED_DIR = Path("data/processed/NotebookLM")
 HISTORICAL_ROOT = Path("data/external/notebooklm-snapshots")
 
 
-def _load_account(account_dir: Path, account_key: str, account_label: str) -> dict:
+def _load_account(
+    account_dir: Path, account_key: str, account_label: str, account_id: str,
+) -> dict:
     """Le notebooks/sources/artifacts/mind_map_trees do merged dir per-account.
 
     Retorna dict com 'notebooks' (list) e 'sources' (dict).
@@ -67,6 +70,7 @@ def _load_account(account_dir: Path, account_key: str, account_label: str) -> di
         # Inject account
         nb["account"] = account_label
         nb["account_key"] = account_key
+        nb["account_id"] = account_id
 
         # Merge timestamps from discovery se disponivel
         disc = discovery.get(nb_uuid)
@@ -149,6 +153,7 @@ def main(argv: list[str] | None = None):
     ap.add_argument("--merged-root", type=Path, default=MERGED_BASE)
     ap.add_argument("--output-dir", type=Path, default=PROCESSED_DIR)
     ap.add_argument("--accounts-file", type=Path, default=Path(".storage/accounts.json"))
+    ap.add_argument("--catalog-path", type=Path, default=Path("data/accounts/catalog.json"))
     ap.add_argument(
         "--historical-root",
         type=Path,
@@ -170,7 +175,16 @@ def main(argv: list[str] | None = None):
     historical = NotebookLMHistoricalResult()
     if not args.without_historical:
         try:
-            historical = parse_historical_archives(args.historical_root)
+            archive_account_ids = {
+                path.name: resolve_account_id(
+                    "NotebookLM", f"archive:{path.name}", args.catalog_path,
+                )
+                for path in args.historical_root.iterdir()
+                if path.is_dir()
+            }
+            historical = parse_historical_archives(
+                args.historical_root, account_ids=archive_account_ids,
+            )
         except (FileNotFoundError, ValueError) as exc:
             print(f"ERRO: {exc}")
             print("Restaure o snapshot via DVC ou use --without-historical conscientemente.")
@@ -179,7 +193,8 @@ def main(argv: list[str] | None = None):
     for account_dir in sorted(args.merged_root.glob("account-*")):
         account_key = account_dir.name.replace("account-", "")
         account_label = account_email("notebooklm", account_dir.name, args.accounts_file) or account_key
-        data = _load_account(account_dir, account_key, account_label)
+        account_id = resolve_account_id("NotebookLM", account_dir.name, args.catalog_path)
+        data = _load_account(account_dir, account_key, account_label, account_id)
         merged_combined["notebooks"].extend(data["notebooks"])
         merged_combined["sources"].update(data["sources"])
         merged_combined["source_guides"].update(data.get("source_guides", {}))

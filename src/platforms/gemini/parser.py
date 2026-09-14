@@ -99,10 +99,12 @@ class GeminiParser(BaseParser):
         account: Optional[str] = None,
         merged_root: Optional[Path] = None,
         account_labels: Mapping[str, str] | None = None,
+        account_ids: Mapping[str, str] | None = None,
     ):
         super().__init__(account)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Gemini")
         self.account_labels = dict(account_labels or {})
+        self.account_ids = dict(account_ids or {})
 
     def parse(self, input_path: Path | None = None) -> None:
         """Itera merged/Gemini/account-{N}/conversations/.
@@ -126,6 +128,7 @@ class GeminiParser(BaseParser):
     def _parse_account(self, account_dir: Path, account: int) -> None:
         manifest = _load_assets_manifest(self.merged_root, account)
         account_label = self.account_labels.get(f"account-{account}", str(account))
+        account_id = self.account_ids.get(str(account))
         conv_dir = account_dir / "conversations"
         if not conv_dir.exists():
             return
@@ -163,7 +166,8 @@ class GeminiParser(BaseParser):
                 logger.warning(f"skip {jp.name}: {e}")
                 continue
             self._parse_conv(
-                obj, account, account_label, titles, created_at_secs, pinned_set, manifest
+                obj, account, account_label, account_id,
+                titles, created_at_secs, pinned_set, manifest
             )
 
     def _parse_conv(
@@ -171,6 +175,7 @@ class GeminiParser(BaseParser):
         obj: dict,
         account: int,
         account_label: str,
+        account_id: str | None,
         titles: dict[str, str],
         created_at_secs: dict[str, int],
         pinned_set: set[str],
@@ -213,6 +218,7 @@ class GeminiParser(BaseParser):
                     message_id=user_msg_id,
                     conversation_id=conv_id,
                     source=SOURCE,
+                    account_id=account_id,
                     sequence=seq,
                     role="user",
                     content=user_text,
@@ -255,6 +261,7 @@ class GeminiParser(BaseParser):
                     message_id=asst_msg_id,
                     conversation_id=conv_id,
                     source=SOURCE,
+                    account_id=account_id,
                     sequence=seq,
                     role="assistant",
                     content=assistant_text or "",
@@ -281,6 +288,7 @@ class GeminiParser(BaseParser):
                             conversation_id=conv_id,
                             message_id=asst_msg_id,
                             source=SOURCE,
+                            account_id=account_id,
                             event_type="image_generation",
                             tool_name="gemini_image",
                             metadata_json=json.dumps({
@@ -297,6 +305,7 @@ class GeminiParser(BaseParser):
                         conversation_id=conv_id,
                         message_id=asst_msg_id,
                         source=SOURCE,
+                        account_id=account_id,
                         event_type="search_result",
                         tool_name="gemini_search",
                         result=cite.get("snippet"),
@@ -314,6 +323,7 @@ class GeminiParser(BaseParser):
         self.conversations.append(Conversation(
             conversation_id=conv_id,
             source=SOURCE,
+            account_id=account_id,
             title=title or None,
             created_at=self._ts(created_secs) if created_secs else pd.NaT,
             updated_at=self._ts(last_secs) if last_secs else pd.NaT,

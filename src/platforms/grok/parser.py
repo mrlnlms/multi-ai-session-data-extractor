@@ -66,8 +66,9 @@ class GrokParser(BaseParser):
         self,
         account: Optional[str] = None,
         merged_root: Optional[Path] = None,
+        account_id: Optional[str] = None,
     ):
-        super().__init__(account)
+        super().__init__(account, account_id)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Grok")
         self.workspaces: list[dict] = []
         self.assets: list[dict] = []
@@ -197,6 +198,7 @@ class GrokParser(BaseParser):
         self.conversations.append(Conversation(
             conversation_id=conv_id,
             source=SOURCE,
+            account_id=self.account_id,
             title=conv.get("title") or None,
             created_at=self._ts(created_at),
             updated_at=self._ts(updated_at),
@@ -227,6 +229,7 @@ class GrokParser(BaseParser):
                 project_tag=wid,
                 tagged_by="grok_workspace",
                 source=SOURCE,
+                account_id=self.account_id,
             ))
 
     def _build_message(
@@ -283,6 +286,7 @@ class GrokParser(BaseParser):
             message_id=msg_id,
             conversation_id=conv_id,
             source=SOURCE,
+            account_id=self.account_id,
             sequence=seq,
             role=role,
             content=text,
@@ -309,6 +313,7 @@ class GrokParser(BaseParser):
                 conversation_id=conv_id,
                 message_id=msg_id,
                 source=SOURCE,
+                account_id=self.account_id,
                 event_type=f"{category}_result",
                 tool_name=key,
                 success=True,
@@ -343,6 +348,7 @@ class GrokParser(BaseParser):
                 "shared_with_team", "is_public", "root_asset_id",
                 "inline_status", "summary", "preview_image_key",
                 "asset_path", "is_preserved_missing", "created_at", "last_use_time",
+                "account_id",
             ])
         # Index binaries em merged/Grok/assets/ por asset_id (sem extensao)
         bin_index: dict[str, str] = {}
@@ -378,6 +384,7 @@ class GrokParser(BaseParser):
                 "is_preserved_missing": bool(a.get("_preserved_missing", False)),
                 "created_at": self._ts(a.get("createTime")),
                 "last_use_time": self._ts(a.get("lastUseTime")),
+                "account_id": a.get("account_id", self.account_id),
             })
         return pd.DataFrame(rows)
 
@@ -392,7 +399,10 @@ class GrokParser(BaseParser):
         if not all_tasks:
             return pd.DataFrame()
         # Mantem tudo como JSON-friendly: dict bruto + status flag
-        return pd.DataFrame(all_tasks)
+        frame = pd.DataFrame(all_tasks)
+        if "account_id" not in frame.columns:
+            frame["account_id"] = self.account_id
+        return frame
 
     def project_metadata_df(self) -> pd.DataFrame:
         """Workspace (project) metadata. Schema alinhado com Qwen project_metadata
@@ -404,6 +414,7 @@ class GrokParser(BaseParser):
                 "preferred_model", "is_public", "access_level",
                 "view_count", "conversations_created_count", "clone_count",
                 "is_preserved_missing", "created_at", "updated_at",
+                "account_id",
             ])
         rows = []
         for w in self.workspaces:
@@ -422,6 +433,7 @@ class GrokParser(BaseParser):
                 "is_preserved_missing": bool(w.get("_preserved_missing", False)),
                 "created_at": self._ts(w.get("createTime")),
                 "updated_at": self._ts(w.get("lastUseTime")),
+                "account_id": w.get("account_id", self.account_id),
             })
         return pd.DataFrame(rows)
 

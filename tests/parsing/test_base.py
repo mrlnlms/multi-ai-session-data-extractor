@@ -108,6 +108,13 @@ def test_parser_account_parameter():
 def test_parser_account_default_none():
     parser = FakeParserWithAccount()
     assert parser.account is None
+    assert parser.account_id is None
+
+
+def test_parser_account_id_parameter():
+    account_id = "810f3e91-ae10-5cb1-931a-53b80630af16"
+    parser = FakeParserWithAccount(account_id=account_id)
+    assert parser.account_id == account_id
 
 
 def test_ts_none_returns_nat():

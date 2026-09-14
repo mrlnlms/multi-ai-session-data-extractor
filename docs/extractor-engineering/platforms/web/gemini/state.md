@@ -58,6 +58,9 @@ copy fallback; mutable conversation JSON remains independent.
 
 ## Canonical parser
 
+Each account tree resolves its immutable catalog UUID into `account_id`; the
+legacy `account` label and all existing native IDs remain unchanged.
+
 `src/platforms/gemini/parser.py` + `_parser_helpers.py`.
 
 The raw schema is **positional** (Google batchexecute, no keys) — paths

@@ -34,6 +34,9 @@
 
 ## Canonical parser
 
+Each account tree resolves its immutable catalog UUID into `account_id`; the
+legacy `account` label and all existing native IDs remain unchanged.
+
 `src/platforms/chatgpt/parser.py` (`ChatGPTParser`, `source_name="chatgpt"`).
 Output in `data/processed/ChatGPT/`: conversations.parquet,
 messages.parquet, tool_events.parquet, branches.parquet.
