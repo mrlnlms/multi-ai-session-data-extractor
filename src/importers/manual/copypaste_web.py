@@ -7,6 +7,10 @@ diferentes dependendo da plataforma:
 - GEMINI-*.txt: 'Conversation with Gemini' header
 - CLAUDE.txt, GEMINI-marlooon.txt: marcadores manuais '--- USER ---'/'--- ASSISTANT ---'
 
+Os adaptadores sem marcadores reproduzem apenas a estrutura observavel nos
+saves legados conhecidos; para novos saves multiturno, use os marcadores
+explicitos. Filenames desconhecidos falham em vez de virar ChatGPT.
+
 source = plataforma original (extraida do filename prefix)
 capture_method = 'manual_copypaste'
 """
@@ -14,15 +18,15 @@ capture_method = 'manual_copypaste'
 from __future__ import annotations
 
 import logging
-import os
 import re
-import uuid as uuid_lib
+from collections import Counter
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 
 from src.parsing.base import BaseParser
+from src.importers.manual.identity import manual_message_id
 from src.schema.models import (
     Branch,
     Conversation,
@@ -78,7 +82,7 @@ class CopypasteWebParser(BaseParser):
                 root_message_id=root_id,
                 leaf_message_id=leaf_id,
                 is_active=True,
-                created_at=conv.created_at if conv.created_at is not None else pd.Timestamp.now(tz="UTC"),
+                created_at=conv.created_at,
             ))
 
     def _parse_file(self, file_path: Path) -> None:
@@ -90,7 +94,7 @@ class CopypasteWebParser(BaseParser):
         stem = file_path.stem
         source = self._detect_source(stem)
         conv_id = f"manual_copypaste_{stem.lower()}"
-        file_ts = self._ts(os.path.getmtime(file_path))
+        file_ts = pd.NaT
 
         turns = self._parse_turns(text, stem)
         if not turns:
@@ -98,9 +102,13 @@ class CopypasteWebParser(BaseParser):
             return
 
         messages = []
+        occurrences: Counter[tuple[str, str]] = Counter()
         for seq, (role, content) in enumerate(turns, start=1):
+            identity_key = (role, content)
+            occurrence = occurrences[identity_key]
+            occurrences[identity_key] += 1
             messages.append(Message(
-                message_id=str(uuid_lib.uuid4()),
+                message_id=manual_message_id(conv_id, role, content, occurrence),
                 conversation_id=conv_id,
                 source=source,
                 sequence=seq,
@@ -132,7 +140,7 @@ class CopypasteWebParser(BaseParser):
         for prefix, source in FILENAME_TO_SOURCE.items():
             if upper.startswith(prefix):
                 return source
-        return "chatgpt"  # fallback
+        raise ValueError(f"{stem}.txt: filename prefix does not identify a supported source")
 
     @staticmethod
     def _parse_turns(text: str, stem: str) -> list[tuple[str, str]]:

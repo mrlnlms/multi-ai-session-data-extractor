@@ -125,3 +125,30 @@ def test_copypaste_no_events(tmp_path):
     parser = CopypasteWebParser()
     parser.parse(tmp_path)
     assert len(parser.events) == 0
+
+
+def test_copypaste_ids_and_timestamps_are_repeatable_across_mtime(tmp_path):
+    source = tmp_path / "first"
+    relocated = tmp_path / "second"
+    source.mkdir()
+    relocated.mkdir()
+    _write_fixture(source, "GPT.txt", FIXTURE_GPT)
+    target = _write_fixture(relocated, "GPT.txt", FIXTURE_GPT) / "GPT.txt"
+    target.touch()
+
+    first = CopypasteWebParser()
+    second = CopypasteWebParser()
+    first.parse(source)
+    second.parse(relocated)
+
+    assert [m.message_id for m in first.messages] == [m.message_id for m in second.messages]
+    assert pd.isna(first.conversations[0].created_at)
+    assert pd.isna(second.conversations[0].created_at)
+    assert pd.isna(first.branches[0].created_at)
+
+
+def test_copypaste_rejects_unknown_filename_prefix(tmp_path):
+    _write_fixture(tmp_path, "MYSTERY.txt", "conteúdo")
+
+    with pytest.raises(ValueError, match="MYSTERY.txt"):
+        CopypasteWebParser().parse(tmp_path)

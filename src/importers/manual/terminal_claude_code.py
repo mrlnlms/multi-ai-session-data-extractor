@@ -6,6 +6,10 @@ Formato: output renderizado do CC CLI com box-drawing characters.
 - ⎿/│/├/└ tool output continuation
 - ✻ completion summary
 
+Este formato preserva o terminal renderizado, mas nao equivale ao JSONL
+oficial: tool results continuam no texto da mensagem e apenas chamadas com
+forma observavel e nao ambigua viram ToolEvent.
+
 source = 'claude_code' (mesmo do extractor automatizado)
 capture_method = 'manual_terminal_cc'
 """
@@ -13,15 +17,15 @@ capture_method = 'manual_terminal_cc'
 from __future__ import annotations
 
 import logging
-import os
 import re
-import uuid as uuid_lib
+from collections import Counter
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 
 from src.parsing.base import BaseParser
+from src.importers.manual.identity import manual_event_id, manual_message_id
 from src.schema.models import (
     Branch,
     Conversation,
@@ -34,9 +38,8 @@ logger = logging.getLogger(__name__)
 
 
 # Pattern for tool use: ⏺ ToolName(content)
-TOOL_PATTERN = re.compile(r"^⏺\s+(\w+)\((.+?)\)\s*$")
+TOOL_PATTERN = re.compile(r"^⏺\s+([A-Za-z0-9_.:-]+)\((.*)\)\s*$")
 TOOL_PATTERN_NO_ARGS = re.compile(r"^⏺\s+Searched for\s+(.+)$")
-TOOL_PATTERN_AGENTS = re.compile(r"^⏺\s+(\d+)\s+(\w+)\s+agents?\s+finished")
 
 
 CAPTURE_METHOD = "manual_terminal_cc"
@@ -75,7 +78,7 @@ class TerminalClaudeCodeParser(BaseParser):
                 root_message_id=root_id,
                 leaf_message_id=leaf_id,
                 is_active=True,
-                created_at=conv.created_at if conv.created_at is not None else pd.Timestamp.now(tz="UTC"),
+                created_at=conv.created_at,
             ))
 
     def _parse_file(self, file_path: Path) -> None:
@@ -86,7 +89,7 @@ class TerminalClaudeCodeParser(BaseParser):
             return
         stem = file_path.stem
         conv_id = f"manual_terminal_{stem}"
-        file_ts = self._ts(os.path.getmtime(file_path))
+        file_ts = self._filename_timestamp(stem)
 
         turns = self._parse_turns(text)
         if not turns:
@@ -95,8 +98,12 @@ class TerminalClaudeCodeParser(BaseParser):
 
         messages = []
         events = []
+        occurrences: Counter[tuple[str, str]] = Counter()
         for seq, (role, content) in enumerate(turns, start=1):
-            msg_id = str(uuid_lib.uuid4())
+            identity_key = (role, content)
+            occurrence = occurrences[identity_key]
+            occurrences[identity_key] += 1
+            msg_id = manual_message_id(conv_id, role, content, occurrence)
             messages.append(Message(
                 message_id=msg_id,
                 conversation_id=conv_id,
@@ -126,6 +133,13 @@ class TerminalClaudeCodeParser(BaseParser):
         ))
         self.messages.extend(messages)
         self.events.extend(events)
+
+    @staticmethod
+    def _filename_timestamp(stem: str) -> pd.Timestamp:
+        match = re.match(r"^(\d{4})-?(\d{2})-?(\d{2})(?:\D|$)", stem)
+        if match is None:
+            return pd.NaT
+        return pd.Timestamp("-".join(match.groups()))
 
     @staticmethod
     def _parse_turns(text: str) -> list[tuple[str, str]]:
@@ -191,6 +205,7 @@ class TerminalClaudeCodeParser(BaseParser):
     @staticmethod
     def _extract_tool_events(content: str, conv_id: str, msg_id: str) -> list[ToolEvent]:
         events: list[ToolEvent] = []
+        occurrences: Counter[tuple[str, str]] = Counter()
         for line in content.split("\n"):
             stripped = line.strip()
 
@@ -198,8 +213,13 @@ class TerminalClaudeCodeParser(BaseParser):
             if match:
                 tool_name = match.group(1)
                 args = match.group(2)
+                identity_key = (tool_name, args)
+                occurrence = occurrences[identity_key]
+                occurrences[identity_key] += 1
                 events.append(ToolEvent(
-                    event_id=str(uuid_lib.uuid4()),
+                    event_id=manual_event_id(
+                        msg_id, "tool_call", tool_name, args, occurrence
+                    ),
                     conversation_id=conv_id,
                     message_id=msg_id,
                     source=SOURCE,
@@ -212,8 +232,14 @@ class TerminalClaudeCodeParser(BaseParser):
 
             match = TOOL_PATTERN_NO_ARGS.match(stripped)
             if match:
+                query = match.group(1)
+                identity_key = ("Search", query)
+                occurrence = occurrences[identity_key]
+                occurrences[identity_key] += 1
                 events.append(ToolEvent(
-                    event_id=str(uuid_lib.uuid4()),
+                    event_id=manual_event_id(
+                        msg_id, "tool_call", "Search", query, occurrence
+                    ),
                     conversation_id=conv_id,
                     message_id=msg_id,
                     source=SOURCE,

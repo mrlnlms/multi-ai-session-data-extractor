@@ -1,9 +1,11 @@
 """Parser pra clippings do Obsidian Web Clipper.
 
 Formato: markdown com YAML frontmatter. User turns em blockquote (>),
-assistant turns em texto plano.
+assistant turns em texto plano. Clippings sem essa distincao explicita podem
+ser preservados como um unico turno assistant; o parser nao inventa alternancia.
 
-source = plataforma original (extraida do `author` no frontmatter):
+source = plataforma original (extraida do `author` no frontmatter; autores
+desconhecidos falham em vez de serem atribuidos silenciosamente ao ChatGPT):
   ChatGPT → 'chatgpt', Claude → 'claude_ai'
 capture_method = 'manual_clipping_obsidian'
 """
@@ -12,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import re
-import uuid as uuid_lib
+from collections import Counter
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
@@ -21,6 +23,7 @@ import pandas as pd
 import yaml
 
 from src.parsing.base import BaseParser
+from src.importers.manual.identity import manual_conversation_id, manual_message_id
 from src.schema.models import (
     Branch,
     Conversation,
@@ -80,7 +83,7 @@ class ClippingsObsidianParser(BaseParser):
                 root_message_id=root_id,
                 leaf_message_id=leaf_id,
                 is_active=True,
-                created_at=conv.created_at if conv.created_at is not None else pd.Timestamp.now(tz="UTC"),
+                created_at=conv.created_at,
             ))
 
     def _parse_file(self, file_path: Path) -> None:
@@ -108,11 +111,15 @@ class ClippingsObsidianParser(BaseParser):
         if isinstance(author_raw, list) and author_raw:
             author_raw = author_raw[0]
         author_clean = re.sub(r"\[\[|\]\]", "", str(author_raw))
-        source = AUTHOR_TO_SOURCE.get(author_clean, "chatgpt")  # fallback chatgpt
+        source = AUTHOR_TO_SOURCE.get(author_clean)
+        if source is None:
+            raise ValueError(
+                f"{file_path.name}: clipping author is not a supported source: {author_clean or '<empty>'}"
+            )
 
         # Conv ID extraído da URL
         source_url = meta.get("source", "")
-        conv_id = self._extract_conv_id(source_url)
+        conv_id = self._extract_conv_id(source_url, source, file_path.stem)
 
         # Title: filename strip date prefix
         stem = file_path.stem
@@ -127,9 +134,13 @@ class ClippingsObsidianParser(BaseParser):
             return
 
         messages = []
+        occurrences: Counter[tuple[str, str]] = Counter()
         for seq, (role, content) in enumerate(turns, start=1):
+            identity_key = (role, content)
+            occurrence = occurrences[identity_key]
+            occurrences[identity_key] += 1
             messages.append(Message(
-                message_id=str(uuid_lib.uuid4()),
+                message_id=manual_message_id(conv_id, role, content, occurrence),
                 conversation_id=conv_id,
                 source=source,
                 sequence=seq,
@@ -156,13 +167,13 @@ class ClippingsObsidianParser(BaseParser):
         self.messages.extend(messages)
 
     @staticmethod
-    def _extract_conv_id(url: str) -> str:
+    def _extract_conv_id(url: str, source: str, input_key: str) -> str:
         """Extrai conversation UUID do URL ChatGPT/Claude.ai."""
         if not url:
-            return str(uuid_lib.uuid4())
+            return f"manual_clipping_{source}_{manual_conversation_id(source, input_key)}"
         path = urlparse(url).path
         segments = [s for s in path.split("/") if s]
-        return segments[-1] if segments else str(uuid_lib.uuid4())
+        return segments[-1] if segments else f"manual_clipping_{source}_{manual_conversation_id(source, input_key)}"
 
     @staticmethod
     def _parse_turns(body: str) -> list[tuple[str, str]]:

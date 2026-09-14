@@ -124,3 +124,44 @@ def test_terminal_user_content(tmp_path):
     user_msg = parser.messages[0]
     assert "qual vault" in user_msg.content
     assert "❯" not in user_msg.content
+
+
+def test_terminal_ids_and_filename_timestamp_are_repeatable(tmp_path):
+    _write_fixture(tmp_path, "2026-02-10-session.txt", FIXTURE_SIMPLE)
+    first = TerminalClaudeCodeParser()
+    second = TerminalClaudeCodeParser()
+
+    first.parse(tmp_path)
+    second.parse(tmp_path)
+
+    assert [m.message_id for m in first.messages] == [m.message_id for m in second.messages]
+    assert [e.event_id for e in first.events] == [e.event_id for e in second.events]
+    assert first.conversations[0].created_at == pd.Timestamp("2026-02-10")
+    assert first.branches[0].created_at == pd.Timestamp("2026-02-10")
+
+
+def test_terminal_without_filename_date_uses_nat(tmp_path):
+    _write_fixture(tmp_path, "session.txt", FIXTURE_NO_TOOLS)
+
+    parser = TerminalClaudeCodeParser()
+    parser.parse(tmp_path)
+
+    assert pd.isna(parser.conversations[0].created_at)
+    assert pd.isna(parser.branches[0].created_at)
+
+
+def test_terminal_namespaced_tool_is_detected(tmp_path):
+    fixture = """❯ pesquise o mercado
+
+⏺ product-management:research-agent(topic=qualitative analysis)
+  ⎿ resultado preservado no texto
+"""
+    _write_fixture(tmp_path, "20260210 - namespaced.txt", fixture)
+
+    parser = TerminalClaudeCodeParser()
+    parser.parse(tmp_path)
+
+    assert len(parser.events) == 1
+    assert parser.events[0].tool_name == "product-management:research-agent"
+    assert parser.events[0].message_id == parser.messages[1].message_id
+    assert "resultado preservado" in parser.messages[1].content

@@ -143,3 +143,40 @@ def test_clippings_no_events(tmp_path):
     parser = ClippingsObsidianParser()
     parser.parse(tmp_path)
     assert len(parser.events) == 0
+
+
+def test_clippings_ids_are_repeatable(tmp_path):
+    _write_fixture(tmp_path, "2025-07-09 - Test Chat.md", FIXTURE_CHATGPT)
+    first = ClippingsObsidianParser()
+    second = ClippingsObsidianParser()
+
+    first.parse(tmp_path)
+    second.parse(tmp_path)
+
+    assert [m.message_id for m in first.messages] == [m.message_id for m in second.messages]
+    assert first.branches[0].root_message_id == second.branches[0].root_message_id
+    assert first.branches[0].leaf_message_id == second.branches[0].leaf_message_id
+
+
+def test_clipping_without_url_has_stable_filename_identity(tmp_path):
+    fixture = FIXTURE_CHATGPT.replace(
+        'source: "https://chatgpt.com/c/abc12345-1234-5678-9abc-def012345678"',
+        'source: ""',
+    )
+    _write_fixture(tmp_path, "2025-07-09 - Test Chat.md", fixture)
+
+    first = ClippingsObsidianParser()
+    second = ClippingsObsidianParser()
+    first.parse(tmp_path)
+    second.parse(tmp_path)
+
+    assert first.conversations[0].conversation_id == second.conversations[0].conversation_id
+    assert first.conversations[0].conversation_id.startswith("manual_clipping_chatgpt_")
+
+
+def test_clipping_rejects_unknown_author(tmp_path):
+    fixture = FIXTURE_CHATGPT.replace('"[[ChatGPT]]"', '"[[Unknown AI]]"')
+    _write_fixture(tmp_path, "unknown.md", fixture)
+
+    with pytest.raises(ValueError, match="unknown.md.*Unknown AI"):
+        ClippingsObsidianParser().parse(tmp_path)

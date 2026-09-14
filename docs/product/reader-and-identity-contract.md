@@ -108,16 +108,20 @@ Esses IDs são determinísticos para a mesma interpretação do mesmo input, mas
 não constituem uma promessa suficiente para anotações permanentes sem sinais
 de recuperação adicionais.
 
-### 4.3 Não determinísticos nas capturas manuais
+### 4.3 Identidades das capturas manuais
 
 Os parsers de clippings do Obsidian, copy/paste web e terminal Claude Code usam
-`uuid4()` para mensagens; alguns fallbacks legados de NotebookLM também usam
-UUID aleatório. Reprocessar o mesmo material pode, portanto, trocar os IDs.
+IDs determinísticos derivados da conversa, papel, conteúdo normalizado e
+ocorrência. Tool events reconstruídos do terminal também derivam sua identidade
+da mensagem-pai, tipo, ferramenta e payload observável. Reprocessar o mesmo
+material preserva essas chaves; alterar o conteúdo cria uma nova identidade sem
+atribuir `account_id` onde a conta não é observável.
 
-No snapshot auditado, as capturas manuais representam cerca de 436 mensagens,
-aproximadamente 0,13% do total. O impacto atual é pequeno, mas esses IDs devem
-se tornar determinísticos antes de sustentar curadoria durável no nível de
-mensagem ou trecho.
+No snapshot auditado, as capturas manuais representam 403 mensagens,
+aproximadamente 0,12% do total. Clippings e copy/paste preservam apenas os
+papéis distinguíveis em seus formatos. Saves renderizados do Claude Code mantêm
+resultados de ferramentas no texto e estruturam somente tool calls observáveis;
+o JSONL oficial continua sendo a fonte de maior fidelidade quando existe.
 
 ## 5. Âncoras para o estado curado
 
