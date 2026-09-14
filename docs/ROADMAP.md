@@ -26,6 +26,7 @@ behavior remains in each platform's own documentation.
 
 | Question | Authoritative document | Role |
 |---|---|---|
+| How do today's dashboard and Quarto surfaces evolve into one application? | [product/README.md](product/README.md) | Product architecture map and transition boundaries. |
 | What product is this becoming, and what remains deliberately open? | [product/product-vision.md](product/product-vision.md) | Product vision; not a spec. |
 | What is the current priority and what work is operationally pending? | This roadmap | Ordering and status. |
 | How should IDs, references and non-message events be interpreted? | [product/reader-and-identity-contract.md](product/reader-and-identity-contract.md) | Technical record for the reader and future curation. |
@@ -46,6 +47,10 @@ read-only; operational and curatorial state lives in a separate mutable layer.
 This direction does not weaken the preservation contract: `raw` retains
 capture evidence, `merged` retains reconciled history, and the Parquets remain
 the analytical interface.
+
+The relationship between the current `dashboard/` and `notebooks/` surfaces,
+the future unified application, and Quarto's residual analytical role is mapped
+in the [product architecture index](product/README.md).
 
 The intended recovery contract is:
 

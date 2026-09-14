@@ -24,7 +24,8 @@ define as regras de trabalho para agentes.
   validacao cross-platform, [limites conhecidos](extractor-engineering/known-limitations.md)
   e [termos de captura](extractor-engineering/glossary.md), alem dos documentos
   tecnicos por plataforma.
-- [product/](product/) — visao do produto, arquitetura de contas e contrato
-  do reader.
+- [product/](product/) — mapa da arquitetura da aplicacao e da transicao entre
+  dashboard, leitor, curadoria e analise exploratoria; aponta para a visao do
+  produto, a arquitetura de contas e o contrato do leitor.
 
 Material privado e duravel pertence ao workbench apontado por `private/`.
