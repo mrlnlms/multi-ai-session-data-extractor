@@ -40,6 +40,12 @@ de bancada, planos, probes, handoffs, midias-fonte e outros artefatos
 duraveis que nao pertencem ao projeto publicavel. O Git registra somente o
 symlink; nunca adicionar seu conteudo ao indice.
 
+Planos de implementacao e outros documentos de trabalho devem ser criados
+diretamente em `private/docs/discussions/`, sem pedir aprovacao separada para
+salva-los. Quando o usuario exigir revisao ou aprovacao antes de alterar codigo,
+esse gate se aplica a implementacao versionada e nao ao registro do plano no
+workbench privado.
+
 `data/`, `.dvc/cache/`, `.storage/` e artefatos renderizados continuam tendo
 seus proprios contratos de DVC ou de estado local; nao devem ser movidos para
 o workbench privado por conveniencia.

@@ -42,6 +42,12 @@ fora do checkout. Use-o para documentos de bancada, midias-fonte, handoffs e
 configuracoes privadas duraveis; o Git registra apenas o symlink. Nao adicione
 seu conteudo ao indice.
 
+Planos de implementacao e outros documentos de trabalho devem ser criados
+diretamente em `private/docs/discussions/`, sem pedir aprovacao separada para
+salva-los. Quando o usuario exigir revisao ou aprovacao antes de alterar codigo,
+esse gate se aplica a implementacao versionada e nao ao registro do plano no
+workbench privado.
+
 `.venv/`, `.storage/`, `.runtime/`, `.dvc/cache/` e o checkout `data/` sao
 estado local descartavel ou recriavel, cada um com seu proprio contrato.
 
