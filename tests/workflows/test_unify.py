@@ -20,6 +20,7 @@ Bugs cobertos:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -52,6 +53,9 @@ class TestIdentifyTable:
     def test_unknown_returns_none(self):
         assert unify_module._identify_table(Path("chatgpt_random_thing.parquet")) is None
         assert unify_module._identify_table(Path("foo.parquet")) is None
+
+    def test_assets_suffix(self):
+        assert unify_module._identify_table(Path("grok_assets.parquet")) == "assets"
 
 
 # === _source_from_path ===
@@ -233,6 +237,52 @@ class TestUnifyTable:
         assert len(df) == 1
         # keep='last' favorece o que vem depois alfabeticamente (manual)
         assert df["title"].iloc[0] == "v2 (manual)"
+
+    def test_same_asset_id_survives_across_accounts(self, tmp_path):
+        path = tmp_path / "kimi_assets.parquet"
+        ids = [
+            "810f3e91-ae10-5cb1-931a-53b80630af16",
+            "bbeeb29c-7a95-5f5a-b564-59b01445cd14",
+        ]
+        pd.DataFrame({
+            "asset_id": ["same", "same"], "source": ["kimi", "kimi"],
+            "account_id": ids,
+        }).to_parquet(path)
+        frame = unify_module.unify_table("assets", [path])
+        assert len(frame) == 2
+
+
+def test_asset_integrity_rejects_relationship_path_and_secret_defects(tmp_path):
+    account_id = "810f3e91-ae10-5cb1-931a-53b80630af16"
+    conversations = pd.DataFrame({
+        "source": ["kimi"], "account_id": [account_id], "conversation_id": ["chat-1"],
+    })
+    base = {
+        "asset_id": ["asset-1"], "source": ["kimi"], "account_id": [account_id],
+        "conversation_id": ["chat-1"], "message_id": [None],
+        "asset_path": [None], "is_binary_available": [False], "metadata_json": [None],
+    }
+    for field, value, match in [
+        ("conversation_id", "missing", "conversation_id"),
+        ("message_id", "missing", "message_id"),
+        ("asset_path", "../escape", "relative"),
+        ("metadata_json", json.dumps({"url": "https://example.test/?token=x"}), "forbidden"),
+        ("metadata_json", json.dumps({"local_path": "/Users/private/file"}), "absolute"),
+    ]:
+        broken = {key: list(values) for key, values in base.items()}
+        broken[field] = [value]
+        with pytest.raises(ValueError, match=match):
+            unify_module._validate_asset_integrity(
+                {"conversations": conversations, "assets": pd.DataFrame(broken)}, tmp_path
+            )
+
+    available = {key: list(values) for key, values in base.items()}
+    available["asset_path"] = ["merged/Kimi/missing.pdf"]
+    available["is_binary_available"] = [True]
+    with pytest.raises(ValueError, match="does not resolve"):
+        unify_module._validate_asset_integrity(
+            {"conversations": conversations, "assets": pd.DataFrame(available)}, tmp_path
+        )
 
 
 # === unify (end-to-end) ===

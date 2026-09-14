@@ -92,6 +92,16 @@ busca, execucao de codigo, canvas, deep research, geracao de imagem, citacao
 ou uso de arquivos. Mensagens de ferramenta nao entram em `messages.parquet`,
 que contem apenas mensagens de usuario e assistente.
 
+### Asset
+
+Linha em `assets.parquet` que indexa metadados de um arquivo observado ou
+preservado, sem incorporar o binario. O caminho, quando disponivel, e relativo
+a `data/`; um binario ausente mantem sua linha com
+`is_binary_available=False`. A cobertura unificada inicial e explicitamente
+`native_asset_catalogs`: Grok e Kimi. Arquivos representados apenas em outras
+fontes serao incorporados por adaptadores posteriores, sem substituir tabelas
+de dominio como `project_docs` e os outputs do NotebookLM.
+
 ### Custom GPT e Project
 
 No raw do ChatGPT, `gizmo_id` pode representar duas coisas: prefixo `g-p-*`

@@ -5,6 +5,7 @@ Some platforms have auxiliary tables beyond the 4 canonical ones
 
 - **NotebookLM**: sources, notes, outputs, guide_questions, source_guides
 - **Qwen / Claude.ai**: project_metadata, project_docs
+- **Grok / Kimi**: assets (native asset catalogs; partial archive coverage)
 
 This section iterates over `AUX_TABLES` configured in the notebook setup.
 
@@ -133,6 +134,29 @@ AUX_CONFIG = {
             "is_preserved_missing": "True if file was deleted from home but kept in raw",
         },
     },
+    "assets": {
+        "title": "Assets",
+        "id_col": "asset_id",
+        "desc": "Canonical file metadata index. Current unified scope: native Grok and Kimi catalogs; binary content remains under data/merged.",
+        "fields": {
+            "asset_id": "Native asset/file ID",
+            "source": "Source platform",
+            "account_id": "Immutable account UUID",
+            "conversation_id": "Owning conversation when observable",
+            "message_id": "Owning message when exactly attributable",
+            "project_id": "Owning project when observable",
+            "asset_kind": "attachment / generated / project_file / output / artifact / other",
+            "file_name": "Original/display file name",
+            "mime_type": "Observed MIME type",
+            "size_bytes": "Observed byte size",
+            "asset_path": "Path relative to data/ when the binary exists",
+            "is_model_generated": "Whether the model generated the file",
+            "is_preserved_missing": "Whether the upstream catalog entry disappeared",
+            "is_binary_available": "Whether asset_path resolves locally",
+            "created_at": "Upstream creation timestamp",
+            "metadata_json": "Allowlisted non-secret source metadata",
+        },
+    },
 }
 ```
 
@@ -215,4 +239,13 @@ for _aux in AUX_TABLES:
         """).df()
         display(Markdown(f"**Content stats ({_aux}):**"))
         show_df(_stats.assign(total_chars=_stats["total_chars"].fillna(0).astype(int)))
+    elif _aux == "assets":
+        _stats = con.execute("""
+            SELECT asset_kind, is_binary_available, COUNT(*) AS n
+            FROM assets
+            GROUP BY asset_kind, is_binary_available
+            ORDER BY asset_kind, is_binary_available DESC
+        """).df()
+        display(Markdown("**Asset kind and local-path health:**"))
+        show_df(_stats)
 ```

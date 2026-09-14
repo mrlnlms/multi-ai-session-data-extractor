@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
+import json
 
 from src.runtime.project import find_project_root
 
@@ -49,6 +50,8 @@ TABLE_PKS: dict[str, list[str]] = {
     "conversation_projects": ["source", "account_id", "conversation_id", "project_tag"],
     # 1 auxiliar Claude Code/Codex (memorias do agente)
     "agent_memories":   ["source", "account_id", "memory_id"],
+    # Native asset catalogs (Grok/Kimi in the initial partial scope)
+    "assets":           ["source", "account_id", "asset_id"],
 }
 
 # Ordenado por len(table) DESC pra match seguro:
@@ -178,6 +181,84 @@ def _validate_account_integrity(frames: dict[str, pd.DataFrame]) -> None:
             )
 
 
+def _identity(value) -> str | None:
+    return None if pd.isna(value) else str(value)
+
+
+def _validate_asset_integrity(
+    frames: dict[str, pd.DataFrame], data_root: Path
+) -> None:
+    assets = frames.get("assets")
+    if assets is None or assets.empty:
+        return
+
+    conversations = frames.get("conversations", pd.DataFrame())
+    conversation_keys = {
+        (str(row.source), _identity(row.account_id), str(row.conversation_id))
+        for row in conversations.itertuples(index=False)
+    }
+    messages = frames.get("messages", pd.DataFrame())
+    message_keys = {
+        (
+            str(row.source), _identity(row.account_id),
+            str(row.conversation_id), str(row.message_id),
+        )
+        for row in messages.itertuples(index=False)
+    }
+
+    forbidden_metadata_keys = {
+        "url", "uri", "token", "signature", "authorization", "cookie",
+        "signurl", "signed_url", "upstream_url",
+    }
+
+    def metadata_values(value):
+        if isinstance(value, dict):
+            for nested in value.values():
+                yield from metadata_values(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                yield from metadata_values(nested)
+        elif isinstance(value, str):
+            yield value
+
+    for row in assets.itertuples(index=False):
+        account_id = _identity(row.account_id)
+        conversation_id = _identity(row.conversation_id)
+        message_id = _identity(row.message_id)
+        if conversation_id is not None:
+            key = (str(row.source), account_id, conversation_id)
+            if key not in conversation_keys:
+                raise ValueError(f"asset conversation_id does not resolve: {key}")
+        if message_id is not None:
+            key = (str(row.source), account_id, conversation_id, message_id)
+            if key not in message_keys:
+                raise ValueError(f"asset message_id does not resolve: {key}")
+
+        asset_path = _identity(row.asset_path)
+        if asset_path is not None:
+            path = Path(asset_path)
+            if path.is_absolute() or ".." in path.parts:
+                raise ValueError(f"asset_path must be relative to data/: {asset_path}")
+        if bool(row.is_binary_available):
+            if asset_path is None or not (data_root / asset_path).is_file():
+                raise ValueError(f"available asset_path does not resolve: {asset_path}")
+
+        metadata_json = _identity(row.metadata_json)
+        if metadata_json:
+            try:
+                metadata = json.loads(metadata_json)
+            except json.JSONDecodeError as exc:
+                raise ValueError("asset metadata_json must be valid JSON") from exc
+            keys = {str(key).lower() for key in metadata} if isinstance(metadata, dict) else set()
+            if keys & forbidden_metadata_keys:
+                raise ValueError("asset metadata_json contains forbidden URL/credential material")
+            lowered = metadata_json.lower()
+            if "://" in lowered or "?x-amz-" in lowered or "?token=" in lowered:
+                raise ValueError("asset metadata_json contains forbidden URL/credential material")
+            if any(Path(value).is_absolute() for value in metadata_values(metadata)):
+                raise ValueError("asset metadata_json contains an absolute local path")
+
+
 def unify(processed_dir: Path, unified_dir: Path) -> dict[str, int]:
     """Materializa data/unified/<table>.parquet pra cada tabela presente.
 
@@ -198,6 +279,7 @@ def unify(processed_dir: Path, unified_dir: Path) -> dict[str, int]:
         file_counts[table] = len(files)
 
     _validate_account_integrity(frames)
+    _validate_asset_integrity(frames, processed_dir.parent)
 
     counts: dict[str, int] = {}
     for table, merged in frames.items():

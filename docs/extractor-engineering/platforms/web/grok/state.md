@@ -92,7 +92,11 @@ Manifest: `data/raw/Grok/assets_manifest.json` ({asset_id: {url,
 relpath, size, mime}}). Reconciler espelha pra
 `data/merged/Grok/assets/` por hardlink quando suportado, com copia normal como
 fallback entre filesystems. Parser populates coluna `asset_path` em
-`grok_assets.parquet`.
+`grok_assets.parquet`. O parser publica o contrato canonico `Asset`; arquivos
+gerados viram `asset_kind=generated`, uploads viram `attachment`, e o catalogo
+global nao recebe relacionamentos de conversa ou mensagem fabricados. Campos
+especificos nao secretos ficam em `metadata_json`; chaves do CDN nao entram no
+Parquet processado.
 
 Pipeline 3 etapas (capture + assets + reconcile) torna export oficial
 redundante pros binarios — `data/external/grok-snapshots/` agora e

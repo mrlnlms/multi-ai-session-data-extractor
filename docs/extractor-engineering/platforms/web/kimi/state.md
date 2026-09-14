@@ -78,7 +78,10 @@ legacy `account` label and all existing native IDs remain unchanged.
 - **Files inline em `chat.files[]`:** signUrl (TTL) → download direto
   via fetch sem auth (URLs pre-assinadas Moonshot CDN). Salvos em
   `data/raw/Kimi/assets/<chat_id>/<file_id>.<ext>` (mime → ext) com
-  manifest em `assets_manifest.json`.
+  manifest em `assets_manifest.json`. O reconciler preserva a arvore aninhada
+  em `merged`; caminhos publicados sao relativos a `data/` e incluem a raiz da
+  conta (`account-<n>`) quando aplicavel. A URL assinada permanece apenas no
+  manifest sob DVC e nunca entra no Parquet processado.
 - **Branches:** parser monta DAG via `parentId` mas V1 emite **1 branch
   por conv** (sem fork detection). `childrenMessageIds` mapeado mas
   nao usado pra split — refinar V2 quando observarmos forks reais.
@@ -102,6 +105,10 @@ legacy `account` label and all existing native IDs remain unchanged.
 - **`IMService/ListRooms`:** 400 com body vazio — payload obrigatorio TBD.
 - **Block.file schema completo:** smoke nao mostrou block.file populado
   com dado rico (attachments vieram em `chat.files[]` inline). Probe V2.
+- **Binario indisponivel:** registros do manifest continuam em
+  `kimi_assets.parquet` com `asset_path` nulo e
+  `is_binary_available=False`; disponibilidade local e diferente de
+  `preserved_missing` upstream.
 
 ## Descriptive Quarto
 

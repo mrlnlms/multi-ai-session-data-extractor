@@ -34,10 +34,12 @@ import pandas as pd
 
 from src.parsing.base import BaseParser
 from src.schema.models import (
+    Asset,
     Branch,
     Conversation,
     Message,
     ToolEvent,
+    assets_to_df,
     branches_to_df,
     conversations_to_df,
     messages_to_df,
@@ -280,8 +282,9 @@ class KimiParser(BaseParser):
                 fid = fobj.get("id")
                 if fid and fid in self.assets_manifest:
                     rel = self.assets_manifest[fid].get("relpath")
-                    if rel:
-                        asset_paths.append(f"merged/Kimi/{rel}")
+                    asset_path = self._available_asset_path(rel)
+                    if asset_path:
+                        asset_paths.append(asset_path)
 
         # Resolve asset_paths via files inline na conversation tambem
         # (nem todo file vira block.file — chat.files[] eh authoritativo
@@ -291,8 +294,9 @@ class KimiParser(BaseParser):
                 fid = fobj.get("id")
                 if fid and fid in self.assets_manifest:
                     rel = self.assets_manifest[fid].get("relpath")
-                    if rel:
-                        asset_paths.append(f"merged/Kimi/{rel}")
+                    asset_path = self._available_asset_path(rel)
+                    if asset_path:
+                        asset_paths.append(asset_path)
 
         text_content = "\n\n".join(text_parts) if text_parts else ""
 
@@ -384,24 +388,40 @@ class KimiParser(BaseParser):
 
     def assets_df(self) -> pd.DataFrame:
         if not self.assets_manifest:
-            return pd.DataFrame(columns=[
-                "asset_id", "chat_id", "name", "mime_type", "size_bytes",
-                "asset_path", "url",
-                "account_id",
-            ])
-        rows = []
+            return assets_to_df([])
+        rows: list[Asset] = []
         for fid, info in self.assets_manifest.items():
-            rows.append({
-                "asset_id": fid,
-                "chat_id": info.get("chat_id") or "",
-                "name": info.get("name") or "",
-                "mime_type": info.get("mime") or "",
-                "size_bytes": int(info.get("size") or 0),
-                "asset_path": f"merged/Kimi/{info['relpath']}" if info.get("relpath") else "",
-                "url": info.get("url") or "",
-                "account_id": info.get("account_id", self.account_id),
-            })
-        return pd.DataFrame(rows)
+            native_id = info.get("asset_id") or fid
+            asset_path = self._available_asset_path(
+                info.get("relpath"), Path(info.get("_merged_root", self.merged_root))
+            )
+            rows.append(Asset(
+                asset_id=str(native_id), source=SOURCE,
+                account_id=info.get("account_id", self.account_id),
+                conversation_id=info.get("chat_id") or None,
+                message_id=None, project_id=None, asset_kind="attachment",
+                file_name=info.get("name") or None,
+                mime_type=info.get("mime") or None,
+                size_bytes=int(info["size"]) if info.get("size") is not None else None,
+                asset_path=asset_path, is_model_generated=None,
+                is_preserved_missing=bool(info.get("_preserved_missing", False)),
+                is_binary_available=bool(asset_path), created_at=None,
+                metadata_json=None,
+            ))
+        return assets_to_df(rows)
+
+    def _available_asset_path(
+        self, relpath: Optional[str], merged_root: Optional[Path] = None
+    ) -> Optional[str]:
+        if not relpath:
+            return None
+        binary = (merged_root or self.merged_root) / relpath
+        if not binary.is_file():
+            return None
+        for parent in (binary, *binary.parents):
+            if parent.name == "data":
+                return binary.relative_to(parent).as_posix()
+        raise ValueError(f"asset path is not under a data directory: {binary}")
 
     def project_metadata_df(self) -> pd.DataFrame:
         """1 row por skill instalada — Kimi skills funcionam como

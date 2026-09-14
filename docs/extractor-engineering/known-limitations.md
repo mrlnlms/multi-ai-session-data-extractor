@@ -147,6 +147,9 @@ These validations require a Pro Max account and remain open until someone tests:
 
 ### Kimi
 
+- **1 manifest record currently has no local binary.** Its metadata stays
+  in the canonical asset index with `is_binary_available=False`; an expired or
+  failed signed download is not grounds to discard the row.
 - **Branches multiplas:** a DAG e preservada, mas o parser emite uma branch
   por conversa ate existir uma amostra representativa de forks.
 - **Scenario mapping:** a conta observada mostrou `SCENARIO_K2D5`; outros
@@ -199,6 +202,14 @@ These validations require a Pro Max account and remain open until someone tests:
   canonical output contains a zero-message Conversation stub. It is not a
   claim that the conversation was empty; it makes the preserved-but-not-yet-
   decodable artifact visible without fabricating content.
+
+## Cross-platform assets
+
+- **The unified asset index is intentionally partial.** Its current coverage
+  scope is `native_asset_catalogs` for Grok and Kimi. Message-embedded files,
+  manifests and domain outputs from the other web sources remain preserved in
+  their existing representations until source-specific adapters validate their
+  identities and path semantics.
 
 ## Test coverage
 

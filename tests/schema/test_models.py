@@ -11,7 +11,55 @@ from src.schema.models import (
     tool_events_to_df,
     conversation_projects_to_df,
     VALID_MODES,
+    Asset,
+    VALID_ASSET_KINDS,
+    assets_to_df,
 )
+
+
+ASSET_COLUMNS = [
+    "asset_id", "source", "account_id", "conversation_id", "message_id",
+    "project_id", "asset_kind", "file_name", "mime_type", "size_bytes",
+    "asset_path", "is_model_generated", "is_preserved_missing",
+    "is_binary_available", "created_at", "metadata_json",
+]
+
+
+def _asset(**overrides):
+    values = dict(
+        asset_id="file-1", source="kimi",
+        account_id="810f3e91-ae10-5cb1-931a-53b80630af16",
+        conversation_id=None, message_id=None, project_id=None,
+        asset_kind="attachment", file_name=None, mime_type=None,
+        size_bytes=None, asset_path=None, is_model_generated=None,
+        is_preserved_missing=None, is_binary_available=False,
+        created_at=None, metadata_json=None,
+    )
+    values.update(overrides)
+    return Asset(**values)
+
+
+def test_assets_to_df_has_exact_contract_columns():
+    assert list(assets_to_df([_asset()]).columns) == ASSET_COLUMNS
+    assert list(assets_to_df([]).columns) == ASSET_COLUMNS
+
+
+@pytest.mark.parametrize("kind", VALID_ASSET_KINDS)
+def test_asset_accepts_every_canonical_kind(kind):
+    assert _asset(asset_kind=kind).asset_kind == kind
+
+
+def test_asset_rejects_invalid_kind_source_account_and_availability():
+    with pytest.raises(ValueError, match="asset_id"):
+        _asset(asset_id="")
+    with pytest.raises(ValueError, match="asset_kind"):
+        _asset(asset_kind="upload")
+    with pytest.raises(ValueError, match="source"):
+        _asset(source="unknown")
+    with pytest.raises(ValueError, match="account_id"):
+        _asset(account_id="not-a-uuid")
+    with pytest.raises(ValueError, match="is_binary_available"):
+        _asset(is_binary_available=None)
 
 
 def test_conversation_to_dict():

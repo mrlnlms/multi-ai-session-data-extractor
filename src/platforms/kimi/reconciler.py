@@ -38,6 +38,18 @@ FEATURES_VERSION = 1
 DROP_THRESHOLD = 0.5
 
 
+def preserve_asset_tree(source_root: Path, destination_root: Path) -> None:
+    """Preserve every asset file while retaining its nested relative path."""
+    if not source_root.exists():
+        return
+    for source_file in sorted(source_root.rglob("*")):
+        if not source_file.is_file():
+            continue
+        destination_file = destination_root / source_file.relative_to(source_root)
+        destination_file.parent.mkdir(parents=True, exist_ok=True)
+        link_or_copy(source_file, destination_file)
+
+
 @dataclass
 class KimiPlan:
     to_use: list[str] = field(default_factory=list)
@@ -208,23 +220,11 @@ def run_reconciliation(
     # Asset binarios — espelha raw_dir/assets/ pra merged
     raw_assets = raw_dir / "assets"
     merged_assets = merged_output / "assets"
-    if raw_assets.exists():
-        merged_assets.mkdir(parents=True, exist_ok=True)
-        for src_bin in raw_assets.iterdir():
-            if not src_bin.is_file():
-                continue
-            dst_bin = merged_assets / src_bin.name
-            link_or_copy(src_bin, dst_bin)
+    preserve_asset_tree(raw_assets, merged_assets)
 
     if previous_merged and previous_merged != merged_output:
         prev_bin = previous_merged / "assets"
-        if prev_bin.exists():
-            merged_assets.mkdir(parents=True, exist_ok=True)
-            for src_bin in prev_bin.iterdir():
-                if not src_bin.is_file():
-                    continue
-                dst_bin = merged_assets / src_bin.name
-                link_or_copy(src_bin, dst_bin)
+        preserve_asset_tree(prev_bin, merged_assets)
 
     raw_manifest = raw_dir / "assets_manifest.json"
     if raw_manifest.exists():

@@ -11,6 +11,7 @@ import pandas as pd
 VALID_SOURCES = ("claude_ai", "chatgpt", "qwen", "claude_code", "deepseek", "perplexity", "gemini", "notebooklm", "codex", "gemini_cli", "antigravity_cli", "grok", "kimi")
 VALID_ROLES = ("user", "assistant", "system")
 VALID_MODES = ("chat", "search", "research", "copilot", "concise", "dalle", "cli")
+VALID_ASSET_KINDS = ("attachment", "generated", "project_file", "output", "artifact", "other")
 
 
 def _validate_account_id(account_id: Optional[str]) -> None:
@@ -190,6 +191,42 @@ class ProjectDoc:
         _validate_account_id(self.account_id)
         if self.source not in VALID_SOURCES:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class Asset:
+    asset_id: str
+    source: str
+    account_id: Optional[str]
+    conversation_id: Optional[str]
+    message_id: Optional[str]
+    project_id: Optional[str]
+    asset_kind: str
+    file_name: Optional[str]
+    mime_type: Optional[str]
+    size_bytes: Optional[int]
+    asset_path: Optional[str]
+    is_model_generated: Optional[bool]
+    is_preserved_missing: Optional[bool]
+    is_binary_available: bool
+    created_at: Optional[pd.Timestamp]
+    metadata_json: Optional[str]
+
+    def __post_init__(self):
+        if not isinstance(self.asset_id, str) or not self.asset_id:
+            raise ValueError("asset_id must be a non-empty string")
+        _validate_account_id(self.account_id)
+        if self.source not in VALID_SOURCES:
+            raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
+        if self.asset_kind not in VALID_ASSET_KINDS:
+            raise ValueError(
+                f"asset_kind '{self.asset_kind}' invalido. Validos: {VALID_ASSET_KINDS}"
+            )
+        if not isinstance(self.is_binary_available, bool):
+            raise ValueError("is_binary_available must be bool")
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -411,6 +448,11 @@ def branches_to_df(branches: list[Branch]) -> pd.DataFrame:
 def project_docs_to_df(docs: list[ProjectDoc]) -> pd.DataFrame:
     cols = [f.name for f in fields(ProjectDoc)]
     return _models_to_df(docs, cols)
+
+
+def assets_to_df(items: list[Asset]) -> pd.DataFrame:
+    cols = [f.name for f in fields(Asset)]
+    return _models_to_df(items, cols)
 
 
 def notebooklm_notes_to_df(notes: list[NotebookLMNote]) -> pd.DataFrame:

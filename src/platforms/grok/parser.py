@@ -30,10 +30,12 @@ import pandas as pd
 
 from src.parsing.base import BaseParser
 from src.schema.models import (
+    Asset,
     Conversation,
     ConversationProject,
     Message,
     ToolEvent,
+    assets_to_df,
     conversation_projects_to_df,
     conversations_to_df,
     messages_to_df,
@@ -341,15 +343,7 @@ class GrokParser(BaseParser):
 
     def assets_df(self) -> pd.DataFrame:
         if not self.assets:
-            return pd.DataFrame(columns=[
-                "asset_id", "mime_type", "name", "size_bytes",
-                "key", "file_source", "is_model_generated",
-                "is_root_asset_created_by_model", "is_latest", "is_deleted",
-                "shared_with_team", "is_public", "root_asset_id",
-                "inline_status", "summary", "preview_image_key",
-                "asset_path", "is_preserved_missing", "created_at", "last_use_time",
-                "account_id",
-            ])
+            return assets_to_df([])
         # Index binaries em merged/Grok/assets/ por asset_id (sem extensao)
         bin_index: dict[str, str] = {}
         bin_dir = self.merged_root / "assets"
@@ -358,35 +352,53 @@ class GrokParser(BaseParser):
                 if not f.is_file():
                     continue
                 aid = f.stem  # tira extensao; profile-picture sem dash padrao fica como nome inteiro
-                bin_index[aid] = str(f.relative_to(self.merged_root.parent.parent))
+                bin_index[aid] = self._data_relative_path(f)
 
-        rows = []
+        rows: list[Asset] = []
         for a in self.assets:
             aid = a.get("assetId")
-            rows.append({
-                "asset_id": aid,
-                "mime_type": a.get("mimeType") or "",
-                "name": a.get("name") or "",
-                "size_bytes": int(a.get("sizeBytes") or 0),
-                "key": a.get("key") or "",
-                "file_source": a.get("fileSource") or "",
-                "is_model_generated": bool(a.get("isModelGenerated", False)),
-                "is_root_asset_created_by_model": bool(a.get("isRootAssetCreatedByModel", False)),
-                "is_latest": bool(a.get("isLatest", False)),
+            if not aid:
+                continue
+            model_generated = bool(
+                a.get("isModelGenerated", False)
+                or a.get("isRootAssetCreatedByModel", False)
+            )
+            file_source = a.get("fileSource") or ""
+            kind = "generated" if model_generated else (
+                "attachment" if file_source == "SELF_UPLOAD_FILE_SOURCE" else "other"
+            )
+            asset_path = self.asset_path_overrides.get(aid) or bin_index.get(aid)
+            metadata = {
+                "file_source": file_source or None,
+                "inline_status": a.get("inlineStatus") or None,
                 "is_deleted": bool(a.get("isDeleted", False)),
-                "shared_with_team": bool(a.get("sharedWithTeam", False)),
+                "is_latest": bool(a.get("isLatest", False)),
                 "is_public": bool(a.get("isPublic", False)),
-                "root_asset_id": a.get("rootAssetId") or "",
-                "inline_status": a.get("inlineStatus") or "",
-                "summary": a.get("summary") or "",
-                "preview_image_key": a.get("previewImageKey") or "",
-                "asset_path": self.asset_path_overrides.get(aid) or bin_index.get(aid) or "",
-                "is_preserved_missing": bool(a.get("_preserved_missing", False)),
-                "created_at": self._ts(a.get("createTime")),
-                "last_use_time": self._ts(a.get("lastUseTime")),
-                "account_id": a.get("account_id", self.account_id),
-            })
-        return pd.DataFrame(rows)
+                "is_root_asset_created_by_model": bool(a.get("isRootAssetCreatedByModel", False)),
+                "last_use_time": a.get("lastUseTime") or None,
+                "root_asset_id": a.get("rootAssetId") or None,
+                "shared_with_team": bool(a.get("sharedWithTeam", False)),
+            }
+            rows.append(Asset(
+                asset_id=str(aid), source=SOURCE,
+                account_id=a.get("account_id", self.account_id),
+                conversation_id=None, message_id=None, project_id=None,
+                asset_kind=kind, file_name=a.get("name") or None,
+                mime_type=a.get("mimeType") or None,
+                size_bytes=int(a["sizeBytes"]) if a.get("sizeBytes") is not None else None,
+                asset_path=asset_path, is_model_generated=model_generated,
+                is_preserved_missing=bool(a.get("_preserved_missing", False)),
+                is_binary_available=bool(asset_path),
+                created_at=self._ts(a.get("createTime")),
+                metadata_json=json.dumps(metadata, ensure_ascii=False, sort_keys=True),
+            ))
+        return assets_to_df(rows)
+
+    def _data_relative_path(self, path: Path) -> str:
+        for parent in (path, *path.parents):
+            if parent.name == "data":
+                return path.relative_to(parent).as_posix()
+        raise ValueError(f"asset path is not under a data directory: {path}")
 
     def scheduled_tasks_df(self) -> pd.DataFrame:
         """Scheduled tasks (active + inactive). Schema preliminar inferido —

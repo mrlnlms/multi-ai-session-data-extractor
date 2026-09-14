@@ -36,16 +36,19 @@ def main():
         per_account.parse(tree)
         for rows in per_account.skills.values():
             stamp_account_id_rows(rows, account_id)
-        for row in per_account.assets_manifest.values():
+        for native_id, row in per_account.assets_manifest.items():
             if isinstance(row, dict):
                 row["account_id"] = account_id
+                row.setdefault("asset_id", native_id)
+                row["_merged_root"] = str(tree)
         parser.conversations.extend(per_account.conversations)
         parser.messages.extend(per_account.messages)
         parser.events.extend(per_account.events)
         parser.branches.extend(per_account.branches)
         parser.skills["official"].extend(per_account.skills.get("official") or [])
         parser.skills["installed"].extend(per_account.skills.get("installed") or [])
-        parser.assets_manifest.update(per_account.assets_manifest)
+        for native_id, row in per_account.assets_manifest.items():
+            parser.assets_manifest[f"{account_id}:{native_id}"] = row
     parser.save(Path(args.out))
 
     print(
