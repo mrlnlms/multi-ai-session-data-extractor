@@ -4,6 +4,8 @@ Output em data/processed/Gemini/:
     gemini_conversations.parquet
     gemini_messages.parquet
     gemini_tool_events.parquet
+    gemini_assets.parquet
+    gemini_asset_links.parquet
 """
 
 import argparse

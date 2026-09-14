@@ -100,6 +100,11 @@ These validations require a Pro Max account and remain open until someone tests:
 
 ### Gemini
 
+- **Asset placement:** hosted images expose no stable native file UUID, so the
+  canonical identity is content-based within each account. Uses resolve to a
+  message and observed ordinal, but the positional payload does not expose a
+  trustworthy content-block index. Manifest-only images remain library-level
+  with unknown origin until a message reference is observable.
 - **Drafts/alternative regenerate:** when you regenerate a response,
   the previous state stays in `turn[1]` but parser v3 does not capture it — only
   the active state. (Backlog: implement when a representative real
@@ -206,7 +211,7 @@ These validations require a Pro Max account and remain open until someone tests:
 ## Cross-platform assets
 
 - **The unified asset index is intentionally partial.** Its current coverage
-  covers Grok, Kimi, and Qwen. Message-embedded files,
+  covers Grok, Kimi, Qwen, and Gemini. Message-embedded files,
   manifests and domain outputs from the other web sources remain preserved in
   their existing representations until source-specific adapters validate their
   identities and path semantics.

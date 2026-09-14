@@ -12,7 +12,7 @@ Cobertura (probe 2026-05-02 em 80 convs):
 - Image URLs (lh3.googleusercontent / gstatic, regex over JSON) → ToolEvent
   event_type='image_generation' + Message.asset_paths via manifest
 - Deep Research markdown reports (extraidos offline pelo asset_downloader)
-  → presente em assets/, surfaced via attachment_names
+  → canonical Asset + exact message AssetLink when the sidecar path permits
 - Locale em settings_json
 - Preservation: _preserved_missing → Conversation.is_preserved_missing
 - last_seen_in_server preservado
@@ -26,7 +26,7 @@ Limitacoes conhecidas:
   snippet, ...] no schema posicional. Populadas em Message.citations_json
   + ToolEvents tipo 'search_result' (1 por citation, dedup por url).
 
-Output: data/processed/Gemini/{conversations,messages,tool_events}.parquet
+Output: data/processed/Gemini/{conversations,messages,tool_events,assets,asset_links}.parquet
 """
 
 from __future__ import annotations
@@ -55,9 +55,14 @@ from src.platforms.gemini._parser_helpers import (
 )
 from src.parsing.base import BaseParser
 from src.schema.models import (
+    Asset,
+    AssetLink,
     Conversation,
     Message,
     ToolEvent,
+    asset_links_to_df,
+    assets_to_df,
+    make_asset_link_id,
 )
 
 
@@ -65,13 +70,20 @@ logger = logging.getLogger(__name__)
 SOURCE = "gemini"
 
 
-def _load_assets_manifest(merged_root: Path, account: int) -> dict[str, str]:
-    """Carrega assets_manifest.json e retorna dict {url -> local_path}.
+def _raw_gemini_root(merged_root: Path) -> Path:
+    """Resolve the sibling raw/Gemini tree for production and test roots."""
+    if merged_root.parent.name == "merged":
+        return merged_root.parent.parent / "raw" / merged_root.name
+    return Path("data/raw/Gemini")
+
+
+def _load_assets_manifest(merged_root: Path, account: int) -> dict[str, dict]:
+    """Load the per-account image manifest keyed by its preserved URL.
 
     Manifest fica em data/raw/Gemini/account-{N}/assets_manifest.json
     (asset_downloader escreve no raw, nao no merged).
     """
-    raw_dir = Path("data/raw/Gemini") / f"account-{account}"
+    raw_dir = _raw_gemini_root(merged_root) / f"account-{account}"
     p = raw_dir / "assets_manifest.json"
     if not p.exists():
         return {}
@@ -80,15 +92,33 @@ def _load_assets_manifest(merged_root: Path, account: int) -> dict[str, str]:
     except Exception:
         return {}
 
-    url_map: dict[str, str] = {}
+    url_map: dict[str, dict] = {}
     for hash_id, info in manifest.items():
         if not isinstance(info, dict):
             continue
         url = info.get("url")
-        rel = f"data/merged/Gemini/account-{account}/assets/{info.get('filename', hash_id)}"
         if url:
-            url_map[url] = rel
+            url_map[url] = dict(info, manifest_key=hash_id)
     return url_map
+
+
+def _contains_string(node: object, value: str) -> bool:
+    if isinstance(node, str):
+        return value in node
+    if isinstance(node, list):
+        return any(_contains_string(item, value) for item in node)
+    if isinstance(node, dict):
+        return any(_contains_string(item, value) for item in node.values())
+    return False
+
+
+def _report_location(source_path: str) -> tuple[int, str] | None:
+    """Return the observed turn index and role encoded by extractor paths."""
+    import re
+    match = re.match(r"^\[0\]\[(\d+)\]\[(2|3)\]", source_path or "")
+    if not match:
+        return None
+    return int(match.group(1)), "user" if match.group(2) == "2" else "assistant"
 
 
 class GeminiParser(BaseParser):
@@ -105,6 +135,8 @@ class GeminiParser(BaseParser):
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Gemini")
         self.account_labels = dict(account_labels or {})
         self.account_ids = dict(account_ids or {})
+        self.assets: list[Asset] = []
+        self.asset_links: list[AssetLink] = []
 
     def parse(self, input_path: Path | None = None) -> None:
         """Itera merged/Gemini/account-{N}/conversations/.
@@ -169,6 +201,7 @@ class GeminiParser(BaseParser):
                 obj, account, account_label, account_id,
                 titles, created_at_secs, pinned_set, manifest
             )
+        self._append_manifest_catalog(account, account_id, manifest)
 
     def _parse_conv(
         self,
@@ -179,7 +212,7 @@ class GeminiParser(BaseParser):
         titles: dict[str, str],
         created_at_secs: dict[str, int],
         pinned_set: set[str],
-        manifest: dict[str, str],
+        manifest: dict[str, dict],
     ) -> None:
         uuid = obj.get("uuid")
         if not uuid:
@@ -245,9 +278,11 @@ class GeminiParser(BaseParser):
             img_urls = extract_image_urls_from_turn(turn)
             asset_paths: list[str] = []
             for url in img_urls:
-                local = manifest.get(url)
-                if local:
-                    asset_paths.append(local)
+                info = manifest.get(url)
+                if info:
+                    asset_paths.append(
+                        f"data/merged/Gemini/account-{account}/assets/{info['filename']}"
+                    )
 
             # Search/Deep Research citations (probe 2026-05-04)
             citations = extract_turn_citations(turn)
@@ -282,7 +317,11 @@ class GeminiParser(BaseParser):
                 # ToolEvent pra geracao de imagem
                 if img_urls:
                     for url_idx, url in enumerate(img_urls):
-                        local_path = manifest.get(url)
+                        info = manifest.get(url)
+                        local_path = (
+                            f"data/merged/Gemini/account-{account}/assets/{info['filename']}"
+                            if info else None
+                        )
                         self.events.append(ToolEvent(
                             event_id=f"{asst_msg_id}_img_{url_idx}",
                             conversation_id=conv_id,
@@ -338,8 +377,213 @@ class GeminiParser(BaseParser):
             settings_json=json.dumps(settings, ensure_ascii=False) if settings else None,
         ))
 
+        self._append_image_assets_and_links(
+            account, account_id, conv_id, turns, manifest
+        )
+        self._append_report_assets_and_links(account, account_id, uuid, conv_id)
+
+    @staticmethod
+    def _asset_id(path: Path, fallback: str) -> str:
+        if path.is_file():
+            return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+        return f"manifest:{hashlib.sha256(fallback.encode()).hexdigest()}"
+
+    def _append_manifest_catalog(
+        self,
+        account: int,
+        account_id: str | None,
+        manifest: dict[str, dict],
+    ) -> None:
+        """Retain downloaded manifest objects even when no current turn references them."""
+        existing = {(asset.account_id, asset.asset_id) for asset in self.assets}
+        entries: dict[str, tuple[Path, dict]] = {}
+        for info in sorted(manifest.values(), key=lambda item: str(item.get("manifest_key", ""))):
+            filename = info.get("filename")
+            if not filename:
+                continue
+            path = self.merged_root / f"account-{account}" / "assets" / filename
+            asset_id = self._asset_id(path, str(info.get("manifest_key", filename)))
+            entries.setdefault(asset_id, (path, info))
+        for asset_id, (path, info) in sorted(entries.items()):
+            if (account_id, asset_id) in existing:
+                continue
+            self.assets.append(Asset(
+                asset_id=asset_id, source=SOURCE, account_id=account_id,
+                asset_kind="other", asset_origin="unknown", file_name=path.name,
+                mime_type=info.get("content_type"),
+                size_bytes=path.stat().st_size if path.is_file() else info.get("size"),
+                asset_path=(
+                    f"merged/Gemini/account-{account}/assets/{path.name}"
+                    if path.is_file() else None
+                ),
+                is_model_generated=None, is_preserved_missing=False,
+                is_binary_available=path.is_file(), created_at=None,
+                metadata_json=json.dumps({"representation": "hosted_image"}, sort_keys=True),
+            ))
+            existing.add((account_id, asset_id))
+
+    def _append_image_assets_and_links(
+        self,
+        account: int,
+        account_id: str | None,
+        conv_id: str,
+        turns: list,
+        manifest: dict[str, dict],
+    ) -> None:
+        uses: dict[str, list[tuple[str, str, int]]] = {}
+        entries: dict[str, tuple[Path, dict]] = {}
+        for turn_idx, turn in enumerate(turns):
+            for ordinal, url in enumerate(extract_image_urls_from_turn(turn)):
+                info = manifest.get(url)
+                if not info:
+                    continue
+                path = self.merged_root / f"account-{account}" / "assets" / info["filename"]
+                asset_id = self._asset_id(path, info.get("manifest_key", url))
+                entries.setdefault(asset_id, (path, info))
+                if _contains_string(turn[2] if len(turn) > 2 else None, url):
+                    uses.setdefault(asset_id, []).append(("user", f"{conv_id}_t{turn_idx}_user", ordinal))
+                if _contains_string(turn[3] if len(turn) > 3 else None, url):
+                    uses.setdefault(asset_id, []).append(("assistant", f"{conv_id}_t{turn_idx}_asst", ordinal))
+
+        existing = {(asset.account_id, asset.asset_id) for asset in self.assets}
+        existing_links = {link.asset_link_id for link in self.asset_links}
+        for asset_id, (path, info) in sorted(entries.items()):
+            observed_roles = {role for role, _, _ in uses.get(asset_id, [])}
+            if observed_roles == {"assistant"}:
+                origin, kind, generated = "assistant", "generated", True
+            elif observed_roles == {"user"}:
+                origin, kind, generated = "user", "attachment", False
+            else:
+                origin, kind, generated = "unknown", "other", None
+            if (account_id, asset_id) not in existing:
+                self.assets.append(Asset(
+                    asset_id=asset_id,
+                    source=SOURCE,
+                    account_id=account_id,
+                    asset_kind=kind,
+                    asset_origin=origin,
+                    file_name=path.name,
+                    mime_type=info.get("content_type"),
+                    size_bytes=path.stat().st_size if path.is_file() else info.get("size"),
+                    asset_path=(
+                        f"merged/Gemini/account-{account}/assets/{path.name}"
+                        if path.is_file() else None
+                    ),
+                    is_model_generated=generated,
+                    is_preserved_missing=False,
+                    is_binary_available=path.is_file(),
+                    created_at=None,
+                    metadata_json=json.dumps({"representation": "hosted_image"}, sort_keys=True),
+                ))
+                existing.add((account_id, asset_id))
+            else:
+                prior = next(
+                    asset for asset in self.assets
+                    if asset.account_id == account_id and asset.asset_id == asset_id
+                )
+                if prior.asset_origin != origin:
+                    prior.asset_origin = "unknown"
+                    prior.asset_kind = "other"
+                    prior.is_model_generated = None
+            for role, message_id, ordinal in uses.get(asset_id, []):
+                link_role = "input" if role == "user" else "output"
+                link_id = make_asset_link_id(
+                    SOURCE, account_id, asset_id, "message", message_id, link_role, ordinal
+                )
+                if link_id in existing_links:
+                    continue
+                self.asset_links.append(AssetLink(
+                    asset_link_id=link_id, source=SOURCE, account_id=account_id,
+                    asset_id=asset_id, object_type="message", object_id=message_id,
+                    conversation_id=conv_id, message_id=message_id, project_id=None,
+                    role=link_role, ordinal=ordinal, content_block_index=None,
+                    metadata_json=None,
+                ))
+                existing_links.add(link_id)
+
+    def _append_report_assets_and_links(
+        self,
+        account: int,
+        account_id: str | None,
+        native_conv_id: str,
+        conv_id: str,
+    ) -> None:
+        report_root = (
+            self.merged_root / f"account-{account}" / "assets" /
+            "deep_research" / native_conv_id
+        )
+        if not report_root.exists():
+            return
+        existing = {(asset.account_id, asset.asset_id) for asset in self.assets}
+        existing_links = {link.asset_link_id for link in self.asset_links}
+        for meta_path in sorted(report_root.glob("*.md.meta.json")):
+            report_path = Path(str(meta_path).removesuffix(".meta.json"))
+            if not report_path.is_file():
+                continue
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except Exception:
+                meta = {}
+            location = _report_location(meta.get("source_path", ""))
+            asset_id = self._asset_id(report_path, str(report_path.relative_to(report_root)))
+            role_name = location[1] if location else None
+            if role_name == "assistant":
+                origin, kind, generated = "assistant", "output", True
+            elif role_name == "user":
+                origin, kind, generated = "user", "attachment", False
+            else:
+                origin, kind, generated = "unknown", "output", None
+            if (account_id, asset_id) not in existing:
+                self.assets.append(Asset(
+                    asset_id=asset_id, source=SOURCE, account_id=account_id,
+                    asset_kind=kind, asset_origin=origin, file_name=report_path.name,
+                    mime_type="text/markdown", size_bytes=report_path.stat().st_size,
+                    asset_path=(
+                        f"merged/Gemini/account-{account}/assets/deep_research/"
+                        f"{native_conv_id}/{report_path.name}"
+                    ),
+                    is_model_generated=generated, is_preserved_missing=False,
+                    is_binary_available=True, created_at=None,
+                    metadata_json=json.dumps({
+                        "representation": "deep_research_report",
+                        "title": meta.get("title"),
+                    }, ensure_ascii=False, sort_keys=True),
+                ))
+                existing.add((account_id, asset_id))
+            else:
+                prior = next(
+                    asset for asset in self.assets
+                    if asset.account_id == account_id and asset.asset_id == asset_id
+                )
+                if prior.asset_origin != origin:
+                    prior.asset_origin = "unknown"
+                    prior.asset_kind = "other"
+                    prior.is_model_generated = None
+            if not location:
+                continue
+            turn_idx, role_name = location
+            suffix = "user" if role_name == "user" else "asst"
+            message_id = f"{conv_id}_t{turn_idx}_{suffix}"
+            link_role = "input" if role_name == "user" else "output"
+            try:
+                ordinal = int(report_path.name.split("_", 2)[1])
+            except (ValueError, IndexError):
+                ordinal = None
+            link_id = make_asset_link_id(
+                SOURCE, account_id, asset_id, "message", message_id, link_role, ordinal
+            )
+            if link_id not in existing_links:
+                self.asset_links.append(AssetLink(
+                    asset_link_id=link_id, source=SOURCE, account_id=account_id,
+                    asset_id=asset_id, object_type="message", object_id=message_id,
+                    conversation_id=conv_id, message_id=message_id, project_id=None,
+                    role=link_role, ordinal=ordinal, content_block_index=None,
+                    metadata_json=None,
+                ))
+                existing_links.add(link_id)
+
     def save(self, output_dir: Path) -> None:
-        """Salva 3 parquets canonicos (overrides BaseParser pra usar tool_events naming)."""
+        """Save canonical Gemini parquet tables."""
         output_dir.mkdir(parents=True, exist_ok=True)
 
         conv_df = self.conversations_df()
@@ -354,6 +598,11 @@ class GeminiParser(BaseParser):
         evt_df = self.events_df()
         if not evt_df.empty:
             evt_df.to_parquet(output_dir / f"{SOURCE}_tool_events.parquet")
+
+        assets_to_df(self.assets).to_parquet(output_dir / f"{SOURCE}_assets.parquet")
+        asset_links_to_df(self.asset_links).to_parquet(
+            output_dir / f"{SOURCE}_asset_links.parquet"
+        )
 
         logger.info(
             "Parseado: %d convs, %d msgs, %d tool_events",

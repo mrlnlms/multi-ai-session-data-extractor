@@ -1,6 +1,7 @@
 """Testes do GeminiParser v3 — schema raw posicional (batchexecute)."""
 
 import json
+import uuid
 from pathlib import Path
 
 import pytest
@@ -247,3 +248,148 @@ def test_gemini_parser_image_generation_emits_tool_event(tmp_path: Path):
     img_events = [e for e in parser.events if e.event_type == "image_generation"]
     assert len(img_events) == 1
     assert img_events[0].tool_name == "gemini_image"
+
+
+def test_gemini_parser_emits_deduplicated_assets_and_distinct_message_uses(tmp_path: Path):
+    merged = tmp_path / "merged" / "Gemini"
+    raw_root = tmp_path / "raw" / "Gemini"
+    account_id = str(uuid.uuid4())
+    image_url = "https://lh3.googleusercontent.com/same-image=s512?token=secret"
+    image_bytes = b"same preserved image"
+
+    for account, conv_id in ((1, "c_first"), (2, "c_second")):
+        conv_dir = merged / f"account-{account}" / "conversations"
+        asset_dir = merged / f"account-{account}" / "assets"
+        manifest_dir = raw_root / f"account-{account}"
+        conv_dir.mkdir(parents=True)
+        asset_dir.mkdir(parents=True)
+        manifest_dir.mkdir(parents=True)
+        filename = f"image-{account}.png"
+        (asset_dir / filename).write_bytes(image_bytes)
+        (manifest_dir / "assets_manifest.json").write_text(json.dumps({
+            f"url-key-{account}": {
+                "url": image_url,
+                "conv_id": conv_id,
+                "content_type": "image/png",
+                "size": len(image_bytes),
+                "filename": filename,
+            },
+        }))
+        turn = _make_turn("draw", "done", 1762000000, images=[image_url])
+        (conv_dir / f"{conv_id}.json").write_text(json.dumps({
+            "uuid": conv_id, "raw": [[turn], None, None, []],
+        }))
+
+    parser = GeminiParser(
+        merged_root=merged,
+        account_ids={"1": account_id, "2": str(uuid.uuid4())},
+    )
+    parser.parse(merged)
+
+    assert len(parser.assets) == 2  # account provenance is part of identity
+    assert len(parser.asset_links) == 2
+    first = parser.assets[0]
+    assert first.asset_kind == "generated"
+    assert first.asset_origin == "assistant"
+    assert first.is_model_generated is True
+    assert first.is_binary_available is True
+    assert first.asset_path.startswith("merged/Gemini/account-1/assets/")
+    assert "http" not in (first.metadata_json or "")
+    link = parser.asset_links[0]
+    assert link.object_type == "message"
+    assert link.role == "output"
+    assert link.message_id == "account-1_c_first_t0_asst"
+    assert link.ordinal == 0
+
+
+def test_gemini_parser_classifies_user_image_and_repeated_reference(tmp_path: Path):
+    merged = tmp_path / "merged" / "Gemini"
+    conv_dir = merged / "account-1" / "conversations"
+    asset_dir = merged / "account-1" / "assets"
+    manifest_dir = tmp_path / "raw" / "Gemini" / "account-1"
+    conv_dir.mkdir(parents=True)
+    asset_dir.mkdir(parents=True)
+    manifest_dir.mkdir(parents=True)
+    image_url = "https://lh3.googleusercontent.com/uploaded-image"
+    (asset_dir / "upload.png").write_bytes(b"upload")
+    (manifest_dir / "assets_manifest.json").write_text(json.dumps({"key": {
+        "url": image_url, "conv_id": "c_upload", "content_type": "image/png",
+        "size": 6, "filename": "upload.png",
+    }}))
+    turns = []
+    for prompt in ("first", "reuse"):
+        turn = _make_turn(prompt, "ok", 1762000000)
+        turn[2].append([image_url])
+        turns.append(turn)
+    (conv_dir / "c_upload.json").write_text(json.dumps({
+        "uuid": "c_upload", "raw": [turns, None, None, []],
+    }))
+
+    parser = GeminiParser(merged_root=merged)
+    parser.parse(merged)
+
+    assert len(parser.assets) == 1
+    assert parser.assets[0].asset_kind == "attachment"
+    assert parser.assets[0].asset_origin == "user"
+    assert len(parser.asset_links) == 2
+    assert {link.role for link in parser.asset_links} == {"input"}
+    assert {link.message_id for link in parser.asset_links} == {
+        "account-1_c_upload_t0_user", "account-1_c_upload_t1_user",
+    }
+
+
+def test_gemini_parser_emits_deep_research_report_at_observed_message(tmp_path: Path):
+    merged = tmp_path / "merged" / "Gemini"
+    conv_dir = merged / "account-1" / "conversations"
+    report_dir = merged / "account-1" / "assets" / "deep_research" / "c_report"
+    conv_dir.mkdir(parents=True)
+    report_dir.mkdir(parents=True)
+    turn = _make_turn("research", "summary", 1762000000)
+    (conv_dir / "c_report.json").write_text(json.dumps({
+        "uuid": "c_report", "raw": [[turn], None, None, []],
+    }))
+    report = report_dir / "report_00_deadbeef.md"
+    report.write_text("# Preserved report\n\nBody")
+    report.with_suffix(".md.meta.json").write_text(json.dumps({
+        "conv_id": "c_report",
+        "source_path": "[0][0][3][0][0][30][0][4]",
+        "title": "Preserved report",
+        "content_size": report.stat().st_size,
+    }))
+
+    parser = GeminiParser(merged_root=merged)
+    parser.parse(merged)
+
+    report_assets = [asset for asset in parser.assets if asset.mime_type == "text/markdown"]
+    assert len(report_assets) == 1
+    assert report_assets[0].asset_kind == "output"
+    assert report_assets[0].asset_origin == "assistant"
+    link = next(link for link in parser.asset_links if link.asset_id == report_assets[0].asset_id)
+    assert link.message_id == "account-1_c_report_t0_asst"
+    assert link.role == "output"
+    assert link.ordinal == 0
+
+
+def test_gemini_parser_keeps_unreferenced_manifest_asset_unavailable(tmp_path: Path):
+    merged = tmp_path / "merged" / "Gemini"
+    conv_dir = merged / "account-1" / "conversations"
+    manifest_dir = tmp_path / "raw" / "Gemini" / "account-1"
+    conv_dir.mkdir(parents=True)
+    manifest_dir.mkdir(parents=True)
+    (manifest_dir / "assets_manifest.json").write_text(json.dumps({"stable-key": {
+        "url": "https://lh3.googleusercontent.com/no-longer-referenced?secret=yes",
+        "conv_id": "c_old", "content_type": "image/png", "size": 123,
+        "filename": "missing.png",
+    }}))
+
+    parser = GeminiParser(merged_root=merged)
+    parser.parse(merged)
+
+    assert len(parser.assets) == 1
+    asset = parser.assets[0]
+    assert asset.asset_origin == "unknown"
+    assert asset.asset_kind == "other"
+    assert asset.asset_path is None
+    assert asset.is_binary_available is False
+    assert parser.asset_links == []
+    assert "http" not in (asset.metadata_json or "")

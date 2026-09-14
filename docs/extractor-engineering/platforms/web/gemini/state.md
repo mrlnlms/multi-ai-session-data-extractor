@@ -56,6 +56,17 @@ copy fallback; mutable conversation JSON remains independent.
 - 8 detected models (2.5 Flash, 3 Pro, Nano Banana, 3 Flash Thinking,
   etc).
 
+### Canonical asset validation — 2026-09-14
+
+- The current merged corpus parses to 105 conversations, 770 messages and
+  1,746 tool events.
+- 350 image-manifest entries plus content-deduplicated Deep Research reports
+  produce 364 available assets across two accounts: 173 assistant-origin, 110
+  user-origin and 81 unknown-origin rows.
+- The parser emits 963 unique message links (787 input and 176 output). Every
+  asset/message relationship resolves, repeated parses are byte-identical, and
+  neither canonical asset table contains signed source URLs.
+
 ## Canonical parser
 
 Each account tree resolves its immutable catalog UUID into `account_id`; the
@@ -78,6 +89,14 @@ discovered via probe (`src/platforms/gemini/probes/schema.py`):
 - ~41% of assistant msgs with thinking.
 - **Image generation** via regex over the turn's JSON → ToolEvent +
   `Message.asset_paths` resolved via per-account `assets_manifest.json`.
+- **Canonical assets** — manifest images and extracted Deep Research Markdown
+  are content-deduplicated within each account into `assets.parquet`. Each
+  distinct observed turn use is represented in `asset_links.parquet`: user
+  blocks are `input`, assistant blocks are `output`, and the sidecar
+  `source_path` locates reports at the exact user or assistant message when
+  available. Manifest objects without a surviving reference remain visible as
+  unlinked assets with unknown origin. Signed source URLs are never copied into
+  either asset table.
 - **Multi-account with `account-{N}_{uuid}` namespace** in
   `conversation_id`.
 - **Search/grounding citations** (Search + Deep Research) — 1 ToolEvent
