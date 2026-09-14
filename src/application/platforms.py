@@ -21,6 +21,7 @@ DATA_RAW = PROJECT_ROOT / "data" / "raw"
 DATA_MERGED = PROJECT_ROOT / "data" / "merged"
 DATA_PROCESSED = PROJECT_ROOT / "data" / "processed"
 DATA_EXTERNAL = PROJECT_ROOT / "data" / "external"
+DATA_ACCOUNTS = PROJECT_ROOT / "data" / "accounts"
 STORAGE_ROOT = PROJECT_ROOT / ".storage"
 
 PARSER_INPUT_SUFFIXES: dict[str, frozenset[str]] = {
@@ -368,6 +369,7 @@ def load_platform_state(name: str) -> PlatformState:
             raw_root=DATA_RAW,
             merged_root=DATA_MERGED,
             external_root=DATA_EXTERNAL,
+            catalog_path=DATA_ACCOUNTS / "catalog.json",
             registry_path=STORAGE_ROOT / "accounts.json",
         ),
     )

@@ -96,6 +96,9 @@ Nao conclua que houve consolidacao apenas pelo nome, idade ou status do arquivo.
   callers da aplicacao. Registro privado, profile e dados raw/merged sao
   evidencias separadas; profile existente nao significa autenticacao valida.
   Esse inventario nao muda os alvos nem o comportamento atual do pipeline.
+- `src/account_catalog.py` valida a identidade e o lifecycle arquivaveis em
+  `data/accounts/catalog.json`, restaurados por DVC. O inventario preserva a
+  uniao entre catalogo e evidencias, e nunca deriva lifecycle da autenticacao.
 - Modulos `src.platforms.<source>.commands.sync` web fazem captura + assets + reconcile, mas nao
   chamam o parser quando executados diretamente.
 - O dashboard/headless executa o `parse.py` da fonte depois de sync web

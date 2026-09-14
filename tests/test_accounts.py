@@ -13,6 +13,18 @@ from src.accounts import (
     discover_accounts,
     load_account_registry,
 )
+from src.account_catalog import LifecycleStatus, legacy_account_id
+
+
+def _catalog_record(platform, key, lifecycle):
+    return {
+        "account_id": legacy_account_id(platform, key),
+        "platform": platform,
+        "technical_key": key,
+        "lifecycle_status": lifecycle,
+        "created_at": "2026-09-13T00:00:00Z",
+        "updated_at": "2026-09-13T00:00:00Z",
+    }
 
 
 def test_load_account_registry_returns_profile_email_mapping(tmp_path):
@@ -65,6 +77,7 @@ def test_discovery_unions_registry_profile_and_data_evidence(tmp_path):
         storage_root=storage,
         raw_root=raw,
         merged_root=merged,
+        catalog_path=tmp_path / "missing-catalog.json",
         registry_path=storage / "accounts.json",
     )
     by_key = {state.key: state for state in states}
@@ -174,6 +187,74 @@ def test_retired_web_account_survives_without_registry_or_profile(tmp_path):
     assert retired.evidence.raw_path == preserved_raw
     assert retired.evidence.merged_path == preserved_merged
     assert retired.authentication == "not_configured"
+
+
+def test_catalog_overlay_preserves_evidence_and_catalog_only_tombstone(tmp_path):
+    storage = tmp_path / ".storage"
+    raw = tmp_path / "raw"
+    catalog_path = tmp_path / "catalog.json"
+    storage.mkdir()
+    (storage / "qwen-profile-default").mkdir()
+    (raw / "Qwen" / "conversation.json").parent.mkdir(parents=True)
+    (raw / "Qwen" / "conversation.json").write_text("{}")
+    catalog_path.write_text(json.dumps({
+        "version": 1,
+        "accounts": [
+            _catalog_record("Qwen", "default", "disabled"),
+            _catalog_record("Qwen", "retired", "historical"),
+        ],
+    }))
+
+    states = discover_accounts(
+        "Qwen",
+        storage_root=storage,
+        raw_root=raw,
+        merged_root=tmp_path / "merged",
+        catalog_path=catalog_path,
+        registry_path=storage / "missing.json",
+    )
+    by_key = {state.key: state for state in states}
+
+    assert by_key["default"].lifecycle_status is LifecycleStatus.DISABLED
+    assert by_key["default"].evidence.profile_present
+    assert by_key["default"].evidence.raw_present
+    assert by_key["retired"].lifecycle_status is LifecycleStatus.HISTORICAL
+    assert by_key["retired"].evidence == AccountEvidence()
+
+
+def test_uncatalogued_data_account_is_visible_and_unclassified(tmp_path):
+    raw_account = tmp_path / "raw" / "Qwen" / "account-unexpected"
+    raw_account.mkdir(parents=True)
+    states = discover_accounts(
+        "Qwen",
+        storage_root=tmp_path / ".storage",
+        raw_root=tmp_path / "raw",
+        merged_root=tmp_path / "merged",
+        catalog_path=tmp_path / "missing-catalog.json",
+        registry_path=tmp_path / "missing-registry.json",
+    )
+    account = {state.key: state for state in states}["unexpected"]
+    assert account.account_id == legacy_account_id("Qwen", "unexpected")
+    assert account.lifecycle_status is None
+    assert account.evidence.raw_path == raw_account
+
+
+def test_missing_profile_does_not_change_active_lifecycle(tmp_path):
+    catalog_path = tmp_path / "catalog.json"
+    catalog_path.write_text(json.dumps({
+        "version": 1,
+        "accounts": [_catalog_record("Qwen", "default", "active")],
+    }))
+    account = discover_accounts(
+        "Qwen",
+        storage_root=tmp_path / ".storage",
+        raw_root=tmp_path / "raw",
+        merged_root=tmp_path / "merged",
+        catalog_path=catalog_path,
+        registry_path=tmp_path / "missing-registry.json",
+    )[0]
+    assert account.lifecycle_status is LifecycleStatus.ACTIVE
+    assert account.authentication == "not_configured"
 
 
 def test_account_models_are_immutable():

@@ -1,8 +1,9 @@
 # Instancias de conta e arquitetura da aplicacao
 
-**Status:** exploracao arquitetural pausada; a fatia somente leitura descrita
-na secao 2.4 foi aprovada e implementada, mas este documento nao e a
-especificacao das decisoes maiores de identidade, lifecycle ou autenticacao.
+**Status:** exploracao arquitetural pausada; o inventario somente leitura e o
+catalogo duravel de identidade/lifecycle descritos na secao 2.4 foram
+implementados. Mutacoes, autenticacao validada e migracao de schema continuam
+fora deste documento.
 
 **Data:** 2026-08-31
 
@@ -103,8 +104,17 @@ leitura e exibe cada evidencia separadamente, inclusive contas preservadas sem
 profile. O servico nao escreve configuracao, nao abre browser, nao consulta
 servicos upstream e nao altera selecao de contas, comandos, pipeline, schema ou
 publicacao. Gemini e NotebookLM mantem nesta fatia os tres alvos operacionais
-existentes; listas dinamicas e lifecycle continuam decisoes de uma rodada
-posterior.
+existentes; listas dinamicas e mutacoes de lifecycle continuam decisoes de uma
+rodada posterior.
+
+`src/account_catalog.py` acrescenta uma camada arquivavel, versionada e
+restauravel por DVC, com UUID imutavel e lifecycle explicito (`active`,
+`disabled` ou `historical`). `src/accounts.py` faz uma uniao lossless entre o
+catalogo e as evidencias locais: registros sem qualquer evidencia continuam
+visiveis como tombstones, e evidencias ausentes do catalogo continuam visiveis
+como `Unclassified`. O UUIDv5 deterministico dessas contas legadas preserva a
+identidade entre previews. Profile ausente, logout ou token perdido nunca
+alteram lifecycle automaticamente.
 
 No NotebookLM, cada subdiretorio de `data/external/notebooklm-snapshots/`
 tambem materializa uma conta `archive:<nome-normalizado>`, igual a identidade

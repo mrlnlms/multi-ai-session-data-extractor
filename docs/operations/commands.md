@@ -49,6 +49,26 @@ aceitos.
 
 ## Operacoes excepcionais
 
+### Adocao do catalogo de contas
+
+O catalogo arquivavel de identidade e lifecycle pode ser proposto a partir do
+inventario local sem alterar dados. Por padrao, a operacao imprime o JSON
+completo; contas fora dos defaults operacionais e archives historicos exigem
+classificacao explicita. `--write` grava somente o path indicado, de forma
+atomica, e nunca chama Git ou DVC:
+
+```bash
+python -m src.operations.bootstrap_account_catalog \
+  --classify Qwen:retired=historical \
+  --captured-at 2026-09-13T00:00:00Z
+```
+
+O catalogo nao inclui rotulos privados, profiles ou estado de autenticacao.
+Materializar `data/accounts/catalog.json` e executar `dvc add` sao passos
+separados, sujeitos a revisao e autorizacao explicita.
+
+### Manutencao DVC
+
 O GC de DVC remove objetos historicos do remoto e nunca e etapa automatica:
 
 ```bash

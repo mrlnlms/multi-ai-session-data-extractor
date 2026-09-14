@@ -35,6 +35,7 @@ remoto DVC e.
 | `data/processed/` | Parquets canonicos por fonte | Interface de leitura para analises. |
 | `data/unified/` | Parquets cross-platform | Contrato de dados para consumidores downstream. |
 | `data/external/` | Inputs manuais e snapshots preservados | Evidencia ou entradas ativas fora da captura regular. |
+| `data/accounts/` | Catalogo de identidade e lifecycle | Estado arquivavel de contas, sem profiles, credenciais ou rotulos privados. |
 
 O conteudo dessas pastas nao vai para Git diretamente: os arquivos `.dvc` sao
 os ponteiros versionados. `data/external/README.md` continua documentacao
@@ -72,6 +73,7 @@ no contrato com seus consumidores downstream.
 
 # Depois de sync + parse + unify, atualizar ponteiros DVC
 .venv/bin/dvc add data/raw data/merged data/processed data/unified \
+    data/accounts \
     data/external/manual-saves data/external/deep-research-md \
     data/external/perplexity-orphan-threads data/external/deepseek-snapshots \
     data/external/chatgpt-extension-snapshot data/external/claude-ai-snapshots \

@@ -21,6 +21,12 @@ def _authentication_label(value: str) -> str:
     return labels.get(value, value.replace("_", " ").title())
 
 
+def _lifecycle_label(account: AccountState) -> str:
+    if account.lifecycle_status is None:
+        return "Unclassified"
+    return account.lifecycle_status.value.title()
+
+
 def _archive_label(account: AccountState) -> str:
     evidence = account.evidence
     if evidence.historical_present:
@@ -43,6 +49,8 @@ def _account_rows(states: list[PlatformState]) -> list[dict[str, object]]:
                 {
                     "Platform": state.name,
                     "Technical account": account.key,
+                    "Account ID": account.account_id,
+                    "Lifecycle": _lifecycle_label(account),
                     "Private label": account.label or "—",
                     "Registry": _present(evidence.registry_present),
                     "Profile": _present(evidence.profile_present),
@@ -59,8 +67,8 @@ def _account_rows(states: list[PlatformState]) -> list[dict[str, object]]:
 def render(states: list[PlatformState]) -> None:
     st.title("Accounts")
     st.caption(
-        "Read-only local inventory. Evidence is reported independently; "
-        "a browser profile does not prove that authentication is valid."
+        "Read-only local inventory. Lifecycle is an explicit archival decision; "
+        "authentication and local evidence are reported independently."
     )
 
     accounts = [account for state in states for account in state.accounts]
@@ -88,9 +96,24 @@ def render(states: list[PlatformState]) -> None:
     )
     cols[3].metric("Preserved without profile", len(preserved_without_profile))
 
+    lifecycle_order = ("Active", "Disabled", "Historical", "Unclassified")
+    lifecycle_counts = {
+        label: sum(_lifecycle_label(account) == label for account in accounts)
+        for label in lifecycle_order
+    }
+    st.dataframe(
+        pd.DataFrame([
+            {"Lifecycle": label, "Accounts": lifecycle_counts[label]}
+            for label in lifecycle_order
+        ]),
+        hide_index=True,
+        width="stretch",
+    )
+
     st.info(
         "Authentication is not tested by this view. “Unknown (not checked)” means "
-        "that a local profile exists; it is not a login-health verdict."
+        "that a local profile exists; it is not a login-health verdict. "
+        "Unclassified means evidence exists without a catalog lifecycle decision."
     )
 
     rows = _account_rows(states)
@@ -101,5 +124,7 @@ def render(states: list[PlatformState]) -> None:
 
     st.caption(
         "Private labels come from the local account registry and remain local. "
-        "Accounts stay visible while raw, merged, or historical evidence exists."
+        "Removing a profile does not remove or retire an account. A future product "
+        "action to delete an account will retire capture capability, never its "
+        "identity or preserved data."
     )

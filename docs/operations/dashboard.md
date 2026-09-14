@@ -31,9 +31,10 @@ plataforma abre uma visão própria com logs de captura/reconciliação, estado 
 parquet, métricas e relatórios Quarto disponíveis.
 
 A barra lateral também abre **Accounts**, um inventário local somente leitura
-das contas web observáveis. A tabela mostra separadamente a chave técnica, o
-rótulo do registro privado e a presença de registro, profile, `raw`, `merged` e
-archive histórico. Uma conta com dados continua visível mesmo sem profile;
+das contas web observáveis. A tabela mostra separadamente o UUID imutável, o
+lifecycle, a chave técnica, o rótulo do registro privado e a presença de
+registro, profile, `raw`, `merged` e archive histórico. Uma conta com dados
+continua visível mesmo sem profile;
 nesse caso, a interface a identifica como acervo preservado sem profile ou como
 archive histórico, conforme a evidência disponível.
 
@@ -43,6 +44,14 @@ verificada; não significa sessão válida. **Not configured** indica ausência 
 profile local, sem fazer afirmações sobre a retenção dos dados históricos. Os
 rótulos privados são lidos pelo serviço canônico de contas e exibidos somente
 nesse dashboard local.
+
+Lifecycle é uma decisão arquivística explícita e independente da autenticação:
+**Active**, **Disabled** e **Historical** vêm do catálogo restaurável;
+**Unclassified** significa que existe evidência observável sem uma decisão no
+catálogo. Remover um profile não desativa nem torna histórica uma conta. Uma
+futura ação de “excluir conta” retirará sua capacidade de captura, mas nunca
+apagará a identidade ou os dados preservados; esta página não oferece controles
+de mutação.
 
 Archives históricos aparecem com a identidade estável produzida pelo parser,
 como `archive:<nome-do-snapshot>`. Essa classificação confirma a preservação do

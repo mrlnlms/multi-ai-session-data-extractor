@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from src.application import platforms
 from src.application.platforms import CaptureRun, PlatformState, _load_capture_log
+from src.account_catalog import LifecycleStatus, legacy_account_id
 
 
 def _capture(*, days_ago: int = 0, errors: int = 0) -> CaptureRun:
@@ -135,6 +136,7 @@ def test_platform_state_exposes_read_only_account_inventory(tmp_path, monkeypatc
     monkeypatch.setattr(platforms, "STORAGE_ROOT", storage)
     monkeypatch.setattr(platforms, "DATA_RAW", raw_root)
     monkeypatch.setattr(platforms, "DATA_MERGED", merged_root)
+    monkeypatch.setattr(platforms, "DATA_ACCOUNTS", tmp_path / "accounts")
 
     state = platforms.load_platform_state("ChatGPT")
     by_key = {account.key: account for account in state.accounts}
@@ -143,6 +145,33 @@ def test_platform_state_exposes_read_only_account_inventory(tmp_path, monkeypatc
     assert by_key["local"].evidence.profile_present
     assert by_key["historical"].evidence.merged_present
     assert by_key["historical"].authentication == "not_configured"
+
+
+def test_platform_state_loads_catalog_lifecycle_without_changing_evidence(tmp_path, monkeypatch):
+    catalog_dir = tmp_path / "accounts"
+    catalog_dir.mkdir()
+    account_id = legacy_account_id("Qwen", "default")
+    (catalog_dir / "catalog.json").write_text(json.dumps({
+        "version": 1,
+        "accounts": [{
+            "account_id": account_id,
+            "platform": "Qwen",
+            "technical_key": "default",
+            "lifecycle_status": "active",
+            "created_at": "2026-09-13T00:00:00Z",
+            "updated_at": "2026-09-13T00:00:00Z",
+        }],
+    }))
+    monkeypatch.setattr(platforms, "STORAGE_ROOT", tmp_path / ".storage")
+    monkeypatch.setattr(platforms, "DATA_RAW", tmp_path / "raw")
+    monkeypatch.setattr(platforms, "DATA_MERGED", tmp_path / "merged")
+    monkeypatch.setattr(platforms, "DATA_ACCOUNTS", catalog_dir)
+
+    account = platforms.load_platform_state("Qwen").accounts[0]
+
+    assert account.account_id == account_id
+    assert account.lifecycle_status is LifecycleStatus.ACTIVE
+    assert account.authentication == "not_configured"
 
 
 def test_platform_state_includes_notebooklm_external_archive(tmp_path, monkeypatch):

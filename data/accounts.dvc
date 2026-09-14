@@ -1,0 +1,6 @@
+outs:
+- md5: 66da22f7b75c15c297a5ff7243f91596.dir
+  size: 4924
+  nfiles: 1
+  hash: md5
+  path: accounts

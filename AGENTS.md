@@ -106,6 +106,10 @@ arquivo.
   contas. Registro privado, profile local e arvores preservadas em raw/merged
   sao evidencias independentes; a existencia de profile nao comprova login
   valido. A descoberta nao altera a selecao nem a execucao atual do pipeline.
+- `src/account_catalog.py` valida a identidade e o lifecycle arquivaveis em
+  `data/accounts/catalog.json`, restaurados por DVC. O inventario faz uma uniao
+  lossless entre catalogo e evidencias: nenhum dos dois lados pode ocultar uma
+  conta do outro, e lifecycle nunca e inferido da autenticacao.
 - Os modulos `src.platforms.<source>.commands.sync` das fontes web fazem captura + assets +
   reconcile e nao chamam o parser quando executados diretamente. O pipeline
   do dashboard/headless executa automaticamente o `parse.py` da fonte depois

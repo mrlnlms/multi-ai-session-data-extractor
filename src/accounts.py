@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from src.account_catalog import LifecycleStatus, legacy_account_id, load_account_catalog
 from src.platforms.registry import PLATFORM_ACCOUNT_METADATA
 
 
@@ -60,6 +61,8 @@ class AccountState:
     label: str | None
     evidence: AccountEvidence
     authentication: str
+    account_id: str = ""
+    lifecycle_status: LifecycleStatus | None = None
 
 
 def account_definitions(platform: str) -> tuple[AccountDefinition, ...]:
@@ -156,6 +159,7 @@ def discover_accounts(
     raw_root: Path = Path("data/raw"),
     merged_root: Path = Path("data/merged"),
     external_root: Path = Path("data/external"),
+    catalog_path: Path = Path("data/accounts/catalog.json"),
     registry_path: Path = DEFAULT_ACCOUNTS_FILE,
 ) -> tuple[AccountState, ...]:
     """Inventory all locally observable accounts without validating login."""
@@ -165,6 +169,12 @@ def discover_accounts(
 
     registry = load_account_registry(registry_path).get(metadata.registry_key, {})
     keys = set(metadata.fallback_keys) | {_technical_key(key) for key in registry}
+    catalog_records = {
+        record.technical_key: record
+        for record in load_account_catalog(catalog_path).records
+        if record.platform == platform
+    }
+    keys.update(catalog_records)
     profiles: dict[str, Path] = {}
 
     if storage_root.exists():
@@ -235,5 +245,20 @@ def discover_accounts(
             historical_path=historical_paths.get(key),
         )
         authentication = "unknown" if evidence.profile_present else "not_configured"
-        states.append(AccountState(platform, key, label, evidence, authentication))
+        catalog_record = catalog_records.get(key)
+        states.append(AccountState(
+            platform,
+            key,
+            label,
+            evidence,
+            authentication,
+            account_id=(
+                catalog_record.account_id
+                if catalog_record is not None
+                else legacy_account_id(platform, key)
+            ),
+            lifecycle_status=(
+                catalog_record.lifecycle_status if catalog_record is not None else None
+            ),
+        ))
     return tuple(states)

@@ -105,6 +105,12 @@ def test_exceptional_operation_is_importable():
     assert 'if __name__ == "__main__"' in path.read_text()
 
 
+def test_account_catalog_adoption_operation_is_importable():
+    path = PROJECT_ROOT / "src" / "operations" / "bootstrap_account_catalog.py"
+    assert path.is_file()
+    assert 'if __name__ == "__main__"' in path.read_text()
+
+
 def test_generic_tools_namespace_is_absent():
     assert not (PROJECT_ROOT / "src" / "tools").exists()
 
@@ -227,3 +233,9 @@ def test_account_service_is_ui_neutral_and_dashboard_does_not_scan_account_stora
     assert "accounts.json" not in dashboard_source
     assert "account-*" not in dashboard_source
     assert ".storage" not in dashboard_source
+    assert "catalog.json" not in dashboard_source
+    assert "data/accounts" not in dashboard_source
+
+    catalog_source = (PROJECT_ROOT / "src" / "account_catalog.py").read_text()
+    assert "streamlit" not in catalog_source
+    assert "dashboard" not in catalog_source
