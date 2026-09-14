@@ -34,6 +34,9 @@ copy fallback; mutable conversation JSON remains independent.
 - `python -m src.platforms.gemini.commands.reconcile` is again usable with the current
   `data/raw/Gemini/account-{N}` layout. It supports `--full`; there are no
   Gemini-specific feature-refetch flags.
+- The standalone `download_assets` and `reconcile` helpers resolve that same
+  cumulative account root directly; only the historical `merge_timestamps`
+  utility still targets the pre-pipeline `data/raw/Gemini Data/` archive.
 
 ### Third account — 2026-09-12
 

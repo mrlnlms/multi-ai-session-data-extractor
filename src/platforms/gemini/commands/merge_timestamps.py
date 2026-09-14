@@ -287,7 +287,9 @@ def main(account: int):
 
 
 if __name__ == "__main__":
+    from src.platforms.gemini.extractor.auth import VALID_ACCOUNTS
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--account", type=int, default=1, choices=[1, 2, 3])
+    parser.add_argument("--account", type=int, default=1, choices=list(VALID_ACCOUNTS))
     args = parser.parse_args()
     main(args.account)

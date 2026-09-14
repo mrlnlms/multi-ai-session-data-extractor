@@ -48,6 +48,25 @@ salva-los. Quando o usuario exigir revisao ou aprovacao antes de alterar codigo,
 esse gate se aplica a implementacao versionada e nao ao registro do plano no
 workbench privado.
 
+### Edicao segura atraves do symlink `private/`
+
+O destino de `private/` fica fora da raiz gravavel do checkout. Ferramentas de
+patch podem ler pelo symlink, mas normalmente nao conseguem escrever nele. Nao
+tente `apply_patch` diretamente em `private/...` e nunca inclua um arquivo de
+`private/` no mesmo patch que arquivos do repositorio: um patch multi-arquivo
+pode aplicar parcialmente os arquivos internos antes de falhar no destino do
+symlink, e uma repeticao pode duplicar mudancas.
+
+Para editar um arquivo existente em `private/`, resolva o destino com
+`readlink private`, copie o alvo para um snapshot original e uma copia de
+trabalho em `/private/tmp`, edite a copia com `apply_patch`, revise `diff -u` e
+use `cmp` para confirmar que o alvo nao mudou desde o snapshot. Entao faca uma
+unica copia escalada da versao revisada para o path externo exato e releia o
+arquivo pelo symlink. Para arquivo novo, prepare e revise o conteudo completo em
+`/private/tmp` antes da unica copia escalada. A autorizacao para documentos de
+trabalho privados continua implicita; a escalacao e apenas tecnica. Se `cmp`
+detectar mudanca concorrente, nao sobrescreva: reinicie a partir do alvo atual.
+
 `.venv/`, `.storage/`, `.runtime/`, `.dvc/cache/` e o checkout `data/` sao
 estado local descartavel ou recriavel, cada um com seu proprio contrato.
 
@@ -73,6 +92,10 @@ Nao conclua que houve consolidacao apenas pelo nome, idade ou status do arquivo.
 - O Streamlit em `dashboard/` e apenas o adaptador de apresentacao. Estado e
   perfis de dados ficam em `src/application/`; orquestracao do pipeline fica em
   `src/workflows/`. `src/` nao importa `streamlit` nem `dashboard`.
+- `src/accounts.py` fornece o inventario somente leitura de contas para os
+  callers da aplicacao. Registro privado, profile e dados raw/merged sao
+  evidencias separadas; profile existente nao significa autenticacao valida.
+  Esse inventario nao muda os alvos nem o comportamento atual do pipeline.
 - Modulos `src.platforms.<source>.commands.sync` web fazem captura + assets + reconcile, mas nao
   chamam o parser quando executados diretamente.
 - O dashboard/headless executa o `parse.py` da fonte depois de sync web

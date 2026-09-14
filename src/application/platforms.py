@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from src.accounts import AccountState, discover_accounts
 from src.platforms.registry import KNOWN_PLATFORMS, SCRIPT_PREFIX
 from src.runtime.project import find_project_root
 
@@ -19,6 +20,7 @@ PROJECT_ROOT = find_project_root(Path(__file__))
 DATA_RAW = PROJECT_ROOT / "data" / "raw"
 DATA_MERGED = PROJECT_ROOT / "data" / "merged"
 DATA_PROCESSED = PROJECT_ROOT / "data" / "processed"
+STORAGE_ROOT = PROJECT_ROOT / ".storage"
 
 PARSER_INPUT_SUFFIXES: dict[str, frozenset[str]] = {
     "Claude Code": frozenset({".jsonl"}),
@@ -70,6 +72,7 @@ class PlatformState:
     processed_dir: Optional[Path] = None
     capture_runs: list[CaptureRun] = field(default_factory=list)
     reconcile_runs: list[ReconcileRun] = field(default_factory=list)
+    accounts: tuple[AccountState, ...] = ()
     _health_cache: Optional[HealthStatus] = field(default=None, init=False, repr=False)
 
     @property
@@ -358,6 +361,13 @@ def load_platform_state(name: str) -> PlatformState:
         processed_dir=processed_dir,
         capture_runs=capture_runs,
         reconcile_runs=reconcile_runs,
+        accounts=discover_accounts(
+            name,
+            storage_root=STORAGE_ROOT,
+            raw_root=DATA_RAW,
+            merged_root=DATA_MERGED,
+            registry_path=STORAGE_ROOT / "accounts.json",
+        ),
     )
 
 

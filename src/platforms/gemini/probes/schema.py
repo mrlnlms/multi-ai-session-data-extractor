@@ -1,6 +1,6 @@
 """Probe profundo do schema raw do Gemini batchexecute.
 
-Itera todas as convs em data/merged/Gemini/account-{1,2}/conversations/ e
+Itera todas as convs em data/merged/Gemini/account-N/conversations/ e
 mapeia:
   - estrutura raw (lengths e types em cada nivel)
   - features detectadas (Deep Research, multi-modal, drafts, citations)

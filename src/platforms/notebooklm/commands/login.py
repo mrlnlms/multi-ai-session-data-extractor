@@ -10,8 +10,12 @@ import asyncio
 from src.platforms.notebooklm.extractor.auth import login, VALID_ACCOUNTS
 
 
-if __name__ == "__main__":
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--account", required=True, choices=list(VALID_ACCOUNTS))
-    args = parser.parse_args()
+    return parser
+
+
+if __name__ == "__main__":
+    args = build_parser().parse_args()
     asyncio.run(login(args.account))

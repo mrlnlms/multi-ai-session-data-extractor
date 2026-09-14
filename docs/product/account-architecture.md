@@ -1,7 +1,8 @@
 # Instancias de conta e arquitetura da aplicacao
 
-**Status:** exploracao arquitetural pausada; nao e especificacao, decisao final
-nem plano de implementacao.
+**Status:** exploracao arquitetural pausada; a fatia somente leitura descrita
+na secao 2.4 foi aprovada e implementada, mas este documento nao e a
+especificacao das decisoes maiores de identidade, lifecycle ou autenticacao.
 
 **Data:** 2026-08-31
 
@@ -85,6 +86,22 @@ O projeto `AI Interaction Analysis` consome `processed` e `unified` por DVC.
 Como ele e o unico consumidor e ambos os projetos sao pessoais, existe uma
 janela favoravel para revisar esse acoplamento antes de publicar um schema ou
 uma identidade novos.
+
+### 2.4 Inventario local somente leitura
+
+`src/accounts.py` consolida as instancias observaveis a partir de quatro
+evidencias independentes: defaults operacionais do catalogo de plataformas,
+chaves do registro privado, diretorios de profile e arvores preservadas em
+`raw`/`merged`. Contas com dados permanecem visiveis mesmo sem registro ou
+profile. Um profile presente indica apenas estado local; nao comprova cookies
+validos nem autenticacao upstream.
+
+O inventario e exposto por `PlatformState.accounts` para callers em `src/` e
+para uma interface futura. Ele nao escreve configuracao, nao abre browser, nao
+consulta servicos upstream e nao altera selecao de contas, comandos, pipeline,
+schema ou publicacao. Gemini e NotebookLM mantem nesta fatia os tres alvos
+operacionais existentes; listas dinamicas e lifecycle continuam decisoes de
+uma rodada posterior.
 
 ## 3. Distincao central
 

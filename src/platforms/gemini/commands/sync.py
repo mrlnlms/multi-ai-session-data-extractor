@@ -28,7 +28,7 @@ import sys
 import time
 from pathlib import Path
 
-from src.platforms.gemini.extractor.auth import load_context
+from src.platforms.gemini.extractor.auth import VALID_ACCOUNTS, load_context
 from src.platforms.gemini.extractor.api_client import GeminiAPIClient
 from src.platforms.gemini.extractor.batchexecute import load_session
 from src.platforms.gemini.extractor.asset_downloader import download_assets, extract_deep_research
@@ -112,7 +112,7 @@ async def main(args: argparse.Namespace) -> int:
 
     if args.dry_run:
         _section("DRY RUN")
-        accounts = [args.account] if args.account else [1, 2, 3]
+        accounts = [args.account] if args.account else list(VALID_ACCOUNTS)
         for acc in accounts:
             print(f"  Account {acc}:")
             print(f"    Capture:   data/raw/Gemini/account-{acc}/")
@@ -122,7 +122,7 @@ async def main(args: argparse.Namespace) -> int:
         print(f"  Etapa 3:     {'skipped' if args.no_reconcile else 'run'}")
         return 0
 
-    accounts = [args.account] if args.account else [1, 2, 3]
+    accounts = [args.account] if args.account else list(VALID_ACCOUNTS)
     overall = 0
     for acc in accounts:
         rc = await _sync_account(args, acc)
@@ -136,7 +136,7 @@ async def main(args: argparse.Namespace) -> int:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--account", type=int, choices=[1, 2, 3], default=None,
+    ap.add_argument("--account", type=int, choices=list(VALID_ACCOUNTS), default=None,
                     help="Roda so a conta indicada (default: todas)")
     ap.add_argument("--no-binaries", action="store_true", help="Pula etapa 2 (assets)")
     ap.add_argument("--no-reconcile", action="store_true")

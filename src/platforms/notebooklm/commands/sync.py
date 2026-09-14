@@ -5,10 +5,11 @@ Etapas (por conta):
     2. Assets      -> binarios (audio MP4, video MP4, slide PDF+PPTX, source PDFs)
     3. Reconcile   -> data/merged/NotebookLM/account-{N}/
 
-Multi-conta: por default roda ambas (1 e 2). Use --account N pra rodar so uma.
+Multi-conta: por default roda todas as contas ativas (1, 2 e 3). Use
+--account N pra rodar so uma.
 
 Flags:
-    --account {1,2}   roda so a conta indicada (default: ambas)
+    --account {1,2,3} roda so a conta indicada (default: todas)
     --no-binaries     pula etapa 2 (assets)
     --no-reconcile    pula etapa 3
     --full            forca refetch full (propagado pro reconcile — bug preventivo #3)
@@ -152,7 +153,7 @@ async def main(args: argparse.Namespace) -> int:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--account", choices=list(VALID_ACCOUNTS), default=None,
-                    help="Roda so a conta indicada (default: ambas)")
+                    help="Roda so a conta indicada (default: todas)")
     ap.add_argument("--no-binaries", action="store_true", help="Pula etapa 2 (assets)")
     ap.add_argument("--no-reconcile", action="store_true")
     ap.add_argument("--full", action="store_true")

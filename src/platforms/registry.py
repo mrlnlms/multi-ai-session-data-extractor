@@ -1,5 +1,7 @@
 """Canonical platform registry shared by workflows and presentation layers."""
 
+from dataclasses import dataclass
+
 KNOWN_PLATFORMS: list[str] = [
     "ChatGPT",
     "Claude.ai",
@@ -52,3 +54,32 @@ WEB_PLATFORMS = frozenset({
     "ChatGPT", "Claude.ai", "Gemini", "NotebookLM", "Qwen", "DeepSeek",
     "Perplexity", "Grok", "Kimi",
 })
+
+
+@dataclass(frozen=True)
+class PlatformAccountMetadata:
+    """Filesystem compatibility metadata for observable web accounts."""
+
+    registry_key: str
+    profile_prefix: str
+    fallback_keys: tuple[str, ...] = ("default",)
+    legacy_default_profiles: tuple[str, ...] = ()
+
+
+PLATFORM_ACCOUNT_METADATA: dict[str, PlatformAccountMetadata] = {
+    "ChatGPT": PlatformAccountMetadata("chatgpt", "chatgpt-profile-"),
+    "Claude.ai": PlatformAccountMetadata("claude_ai", "claude-ai-profile-"),
+    "Gemini": PlatformAccountMetadata("gemini", "gemini-profile-", ("1", "2", "3")),
+    "NotebookLM": PlatformAccountMetadata(
+        "notebooklm", "notebooklm-profile-", ("1", "2", "3")
+    ),
+    "Qwen": PlatformAccountMetadata("qwen", "qwen-profile-"),
+    "DeepSeek": PlatformAccountMetadata("deepseek", "deepseek-profile-"),
+    "Perplexity": PlatformAccountMetadata(
+        "perplexity", "perplexity-profile-", legacy_default_profiles=("perplexity-profile",)
+    ),
+    "Grok": PlatformAccountMetadata("grok", "grok-profile-"),
+    "Kimi": PlatformAccountMetadata("kimi", "kimi-profile-"),
+}
+
+assert set(PLATFORM_ACCOUNT_METADATA) == set(WEB_PLATFORMS)

@@ -4,10 +4,72 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
+
+from src.platforms.registry import PLATFORM_ACCOUNT_METADATA
 
 
 DEFAULT_ACCOUNTS_FILE = Path(".storage/accounts.json")
+
+
+@dataclass(frozen=True)
+class AccountDefinition:
+    """Canonical technical identity used by the current filesystem layout."""
+
+    platform: str
+    key: str
+    registry_key: str
+    profile_prefix: str
+
+
+@dataclass(frozen=True)
+class AccountEvidence:
+    """Independent local evidence for one account instance."""
+
+    registry_present: bool = False
+    profile_path: Path | None = None
+    raw_path: Path | None = None
+    merged_path: Path | None = None
+
+    @property
+    def profile_present(self) -> bool:
+        return self.profile_path is not None
+
+    @property
+    def raw_present(self) -> bool:
+        return self.raw_path is not None
+
+    @property
+    def merged_present(self) -> bool:
+        return self.merged_path is not None
+
+
+@dataclass(frozen=True)
+class AccountState:
+    """Read-only account inventory entry; authentication is never inferred."""
+
+    platform: str
+    key: str
+    label: str | None
+    evidence: AccountEvidence
+    authentication: str
+
+
+def account_definitions(platform: str) -> tuple[AccountDefinition, ...]:
+    """Return compatibility defaults for a supported web platform."""
+    metadata = PLATFORM_ACCOUNT_METADATA.get(platform)
+    if metadata is None:
+        return ()
+    return tuple(
+        AccountDefinition(platform, key, metadata.registry_key, metadata.profile_prefix)
+        for key in metadata.fallback_keys
+    )
+
+
+def account_keys(platform: str) -> tuple[str, ...]:
+    """Return canonical fallback keys in their operational order."""
+    return tuple(definition.key for definition in account_definitions(platform))
 
 
 def load_account_registry(path: Path = DEFAULT_ACCOUNTS_FILE) -> dict[str, dict[str, str]]:
@@ -52,3 +114,96 @@ def account_data_dir(base: Path, account_key: str) -> Path:
         return base
     suffix = account_key if account_key.startswith("account-") else f"account-{account_key}"
     return base / suffix
+
+
+def _technical_key(value: str) -> str:
+    return value.removeprefix("account-")
+
+
+def _contains_source_artifacts(path: Path) -> bool:
+    ignored = {"capture_log.jsonl", "reconcile_log.jsonl", "assets_log.json"}
+    try:
+        for child in path.iterdir():
+            if child.name.startswith("account-"):
+                continue
+            if child.is_file() and child.name not in ignored:
+                return True
+            if child.is_dir() and any(
+                item.is_file() and item.name not in ignored for item in child.rglob("*")
+            ):
+                return True
+        return False
+    except OSError:
+        return False
+
+
+def discover_accounts(
+    platform: str,
+    *,
+    storage_root: Path = Path(".storage"),
+    raw_root: Path = Path("data/raw"),
+    merged_root: Path = Path("data/merged"),
+    registry_path: Path = DEFAULT_ACCOUNTS_FILE,
+) -> tuple[AccountState, ...]:
+    """Inventory all locally observable accounts without validating login."""
+    metadata = PLATFORM_ACCOUNT_METADATA.get(platform)
+    if metadata is None:
+        return ()
+
+    registry = load_account_registry(registry_path).get(metadata.registry_key, {})
+    keys = set(metadata.fallback_keys) | {_technical_key(key) for key in registry}
+    profiles: dict[str, Path] = {}
+
+    if storage_root.exists():
+        try:
+            children = tuple(storage_root.iterdir())
+        except OSError:
+            children = ()
+        for path in children:
+            if not path.is_dir() or not path.name.startswith(metadata.profile_prefix):
+                continue
+            key = _technical_key(path.name[len(metadata.profile_prefix):])
+            if key:
+                keys.add(key)
+                profiles[key] = path
+        for legacy_name in metadata.legacy_default_profiles:
+            legacy_path = storage_root / legacy_name
+            if legacy_path.is_dir():
+                profiles.setdefault("default", legacy_path)
+                keys.add("default")
+
+    raw_platform = raw_root / platform
+    merged_platform = merged_root / platform
+    raw_paths: dict[str, Path] = {}
+    merged_paths: dict[str, Path] = {}
+    for base, paths in ((raw_platform, raw_paths), (merged_platform, merged_paths)):
+        if base.exists():
+            try:
+                children = tuple(base.iterdir())
+            except OSError:
+                children = ()
+            for path in children:
+                if path.is_dir() and path.name.startswith("account-"):
+                    key = _technical_key(path.name)
+                    if key:
+                        keys.add(key)
+                        paths[key] = path
+            if _contains_source_artifacts(base):
+                paths["default"] = base
+                keys.add("default")
+
+    fallback_order = {key: index for index, key in enumerate(metadata.fallback_keys)}
+    ordered_keys = sorted(keys, key=lambda key: (fallback_order.get(key, len(fallback_order)), key))
+    states = []
+    for key in ordered_keys:
+        registry_lookup = key if key in registry else f"account-{key}"
+        label = registry.get(registry_lookup)
+        evidence = AccountEvidence(
+            registry_present=label is not None,
+            profile_path=profiles.get(key),
+            raw_path=raw_paths.get(key),
+            merged_path=merged_paths.get(key),
+        )
+        authentication = "unknown" if evidence.profile_present else "not_configured"
+        states.append(AccountState(platform, key, label, evidence, authentication))
+    return tuple(states)

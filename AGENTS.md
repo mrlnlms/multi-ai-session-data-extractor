@@ -46,6 +46,34 @@ salva-los. Quando o usuario exigir revisao ou aprovacao antes de alterar codigo,
 esse gate se aplica a implementacao versionada e nao ao registro do plano no
 workbench privado.
 
+### Edicao segura atraves do symlink `private/`
+
+O destino de `private/` fica fora da raiz gravavel do checkout. Ferramentas de
+patch podem ler pelo symlink, mas normalmente nao conseguem escrever nele. Nao
+tente `apply_patch` diretamente em `private/...` e nunca inclua um arquivo de
+`private/` no mesmo patch que arquivos do repositorio: um patch multi-arquivo
+pode aplicar parcialmente os arquivos internos antes de falhar no destino do
+symlink, e uma repeticao pode duplicar mudancas.
+
+Para editar um arquivo existente em `private/`, faca corretamente na primeira
+tentativa:
+
+1. resolva e confira o destino com `readlink private`;
+2. copie o arquivo alvo para dois arquivos em `/private/tmp`: um snapshot
+   original e uma copia de trabalho;
+3. edite somente a copia de trabalho com `apply_patch`;
+4. revise `diff -u` entre snapshot e copia e confirme com `cmp` que o alvo
+   externo ainda e igual ao snapshot, evitando sobrescrever mudanca concorrente;
+5. solicite uma unica execucao escalada e copie a versao revisada para o path
+   externo exato; e
+6. releia o alvo pelo symlink e confirme o trecho alterado.
+
+Para arquivo privado novo, crie primeiro o conteudo completo em `/private/tmp`,
+revise-o e faca uma unica copia escalada ao destino resolvido. A autorizacao
+para registrar planos privados continua implicita; a escalacao e apenas uma
+exigencia tecnica do sandbox. Se a verificacao `cmp` indicar mudanca concorrente,
+nao sobrescreva: refaca a copia a partir do alvo atual.
+
 `data/`, `.dvc/cache/`, `.storage/` e artefatos renderizados continuam tendo
 seus proprios contratos de DVC ou de estado local; nao devem ser movidos para
 o workbench privado por conveniencia.
@@ -74,6 +102,10 @@ arquivo.
   ficam ali. Observacao de plataformas e perfis de dados ficam em
   `src/application/`; ordem, gating, locks e publicacao do pipeline ficam em
   `src/workflows/`. Modulos em `src/` nao importam `streamlit` nem `dashboard`.
+- `src/accounts.py` e a fonte somente leitura do inventario observavel de
+  contas. Registro privado, profile local e arvores preservadas em raw/merged
+  sao evidencias independentes; a existencia de profile nao comprova login
+  valido. A descoberta nao altera a selecao nem a execucao atual do pipeline.
 - Os modulos `src.platforms.<source>.commands.sync` das fontes web fazem captura + assets +
   reconcile e nao chamam o parser quando executados diretamente. O pipeline
   do dashboard/headless executa automaticamente o `parse.py` da fonte depois

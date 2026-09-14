@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 
+from src.application import platforms
 from src.application.platforms import CaptureRun, PlatformState, _load_capture_log
 
 
@@ -120,3 +121,25 @@ def test_capture_log_loads_optional_parser_coverage(tmp_path):
     assert run.files_seen == 251
     assert run.files_parsed == 251
     assert run.files_skipped == 0
+
+
+def test_platform_state_exposes_read_only_account_inventory(tmp_path, monkeypatch):
+    storage = tmp_path / ".storage"
+    raw_root = tmp_path / "raw"
+    merged_root = tmp_path / "merged"
+    storage.mkdir()
+    (storage / "chatgpt-profile-local").mkdir()
+    historical = merged_root / "ChatGPT" / "account-historical"
+    historical.mkdir(parents=True)
+
+    monkeypatch.setattr(platforms, "STORAGE_ROOT", storage)
+    monkeypatch.setattr(platforms, "DATA_RAW", raw_root)
+    monkeypatch.setattr(platforms, "DATA_MERGED", merged_root)
+
+    state = platforms.load_platform_state("ChatGPT")
+    by_key = {account.key: account for account in state.accounts}
+
+    assert isinstance(state.accounts, tuple)
+    assert by_key["local"].evidence.profile_present
+    assert by_key["historical"].evidence.merged_present
+    assert by_key["historical"].authentication == "not_configured"

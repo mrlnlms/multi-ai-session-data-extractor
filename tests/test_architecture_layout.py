@@ -205,3 +205,16 @@ def test_dashboard_resolves_every_web_parse_entrypoint(platform: str):
     command = parse_command(platform)
     assert command is not None
     assert command[1:3] == ["-m", f"src.platforms.{PLATFORM_PACKAGE[platform]}.commands.parse"]
+
+
+def test_account_service_is_ui_neutral_and_dashboard_does_not_scan_account_storage():
+    accounts_source = (PROJECT_ROOT / "src" / "accounts.py").read_text()
+    assert "streamlit" not in accounts_source
+    assert "dashboard" not in accounts_source
+
+    dashboard_source = "\n".join(
+        path.read_text() for path in (PROJECT_ROOT / "dashboard").rglob("*.py")
+    )
+    assert "accounts.json" not in dashboard_source
+    assert "account-*" not in dashboard_source
+    assert ".storage" not in dashboard_source

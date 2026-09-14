@@ -1,6 +1,6 @@
 """Parser canonico do Gemini — schema v3.
 
-Consome merged em data/merged/Gemini/account-{1,2}/conversations/<uuid>.json
+Consome merged em data/merged/Gemini/account-N/conversations/<uuid>.json
 + assets/. Schema raw eh posicional (Google batchexecute, sem keys).
 
 Cobertura (probe 2026-05-02 em 80 convs):

@@ -26,6 +26,12 @@ python -m src.platforms.codex.commands.sync
 As flags, requisitos de browser e particularidades de cada fonte ficam em
 `docs/extractor-engineering/platforms/<web|cli>/<source>/state.md`.
 
+O inventario tecnico de contas e lido por `src/accounts.py` a partir dos
+defaults compativeis, do registro privado, dos profiles e das arvores
+raw/merged preservadas. Essas evidencias nao validam autenticacao e nao mudam
+quais contas cada comando seleciona: Gemini e NotebookLM continuam executando
+suas tres contas por default; os demais comandos preservam seus defaults.
+
 ## Workflows transversais
 
 | Finalidade | Comando | Quando usar |

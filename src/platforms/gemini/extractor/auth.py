@@ -9,6 +9,11 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright, BrowserContext
 
+from src.accounts import account_keys
+
+
+VALID_ACCOUNTS = tuple(int(key) for key in account_keys("Gemini"))
+
 
 def get_profile_dir(account: int = 1) -> Path:
     return Path(f".storage/gemini-profile-{account}")

@@ -1,4 +1,4 @@
-"""Roda parser Gemini sobre data/merged/Gemini/account-{1,2}/.
+"""Roda parser Gemini sobre todas as arvores data/merged/Gemini/account-N/.
 
 Output em data/processed/Gemini/:
     gemini_conversations.parquet

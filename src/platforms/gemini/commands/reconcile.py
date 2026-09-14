@@ -9,21 +9,18 @@ import argparse
 import sys
 from pathlib import Path
 
+from src.platforms.gemini.extractor.auth import VALID_ACCOUNTS
 from src.platforms.gemini.reconciler import run_reconciliation
 
 
 def _find_latest_raw(account: int) -> Path | None:
     base = Path("data/raw/Gemini") / f"account-{account}"
-    if not base.exists():
-        return None
-    cs = sorted([p for p in base.iterdir() if p.is_dir() and len(p.name) == 16],
-                key=lambda p: p.stat().st_mtime)
-    return cs[-1] if cs else None
+    return base if base.is_dir() else None
 
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--account", type=int, required=True, choices=[1, 2, 3])
+    p.add_argument("--account", type=int, required=True, choices=list(VALID_ACCOUNTS))
     p.add_argument("raw_dir", nargs="?", default=None)
     p.add_argument("--full", action="store_true")
     p.add_argument("--previous-merged", default=None)
@@ -31,7 +28,7 @@ def main():
 
     raw = Path(a.raw_dir) if a.raw_dir else _find_latest_raw(a.account)
     if not raw:
-        print(f"ERRO: nenhum raw em data/raw/Gemini Data/account-{a.account}/")
+        print(f"ERRO: nenhum raw em data/raw/Gemini/account-{a.account}/")
         sys.exit(1)
     print(f"Raw: {raw}")
 
