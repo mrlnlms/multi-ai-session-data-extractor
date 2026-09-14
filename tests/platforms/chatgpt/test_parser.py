@@ -100,6 +100,17 @@ def test_parse_dalle_resolves_file_path_when_file_present(tmp_path):
     paths = [e.file_path for e in img_events if e.file_path]
     assert paths, "ToolEvent DALL-E deve ter file_path populado"
     assert any(file_id in p for p in paths)
+    asset = next(a for a in parser.assets if a.asset_id == file_id)
+    assert asset.asset_kind == "generated"
+    assert asset.asset_origin == "assistant"
+    assert asset.is_model_generated is True
+    assert asset.is_binary_available is True
+    assert asset.asset_path and not asset.asset_path.startswith("data/")
+    link = next(link for link in parser.asset_links if link.asset_id == file_id)
+    assert link.role == "output"
+    assert link.message_id in {message.message_id for message in parser.messages}
+    assert link.content_block_index is None
+    assert json.loads(link.metadata_json)["native_content_block_index"] == 0
 
 
 def test_parse_user_image_upload_populates_asset_paths_in_message(tmp_path):
@@ -147,6 +158,71 @@ def test_parse_user_image_upload_populates_asset_paths_in_message(tmp_path):
     assert msg.asset_paths is not None
     assert any("file-ABCDEF" in p for p in msg.asset_paths)
     assert "image_upload" in (msg.content_types or "")
+    assert len(parser.assets) == 1
+    asset = parser.assets[0]
+    assert asset.asset_id == "file-ABCDEF"
+    assert asset.asset_kind == "attachment"
+    assert asset.asset_origin == "user"
+    assert asset.is_model_generated is False
+    link = parser.asset_links[0]
+    assert link.object_id == "msg-user"
+    assert link.role == "input"
+    assert link.ordinal == 0
+    assert link.content_block_index == 0
+
+
+def test_repeated_chatgpt_pointer_reuses_asset_and_keeps_distinct_links(tmp_path):
+    pointer = {"content_type": "image_asset_pointer", "asset_pointer": "file-service://file-SHARED"}
+    conv = {
+        "id": "repeat", "title": "repeat", "create_time": 1, "update_time": 2,
+        "current_node": "msg-2",
+        "mapping": {
+            "root": {"id": "root", "parent": None, "children": ["msg-1"], "message": None},
+            "msg-1": {"id": "msg-1", "parent": "root", "children": ["msg-2"], "message": {
+                "id": "msg-1", "create_time": 1, "author": {"role": "user"},
+                "content": {"content_type": "multimodal_text", "parts": [pointer, "one"]}, "metadata": {},
+            }},
+            "msg-2": {"id": "msg-2", "parent": "msg-1", "children": [], "message": {
+                "id": "msg-2", "create_time": 2, "author": {"role": "user"},
+                "content": {"content_type": "multimodal_text", "parts": ["two", pointer]}, "metadata": {},
+            }},
+        },
+    }
+    merged = tmp_path / "chatgpt_merged.json"
+    merged.write_text(json.dumps({"conversations": {"repeat": conv}}))
+    parser = ChatGPTParser(raw_root=tmp_path)
+    parser.parse(merged)
+    assert len(parser.assets) == 1
+    assert parser.assets[0].is_binary_available is False
+    assert parser.assets[0].asset_path is None
+    assert len(parser.asset_links) == 2
+    assert {link.object_id for link in parser.asset_links} == {"msg-1", "msg-2"}
+    assert len({link.asset_link_id for link in parser.asset_links}) == 2
+
+
+def test_missing_image_binary_keeps_asset_and_exact_message_link(tmp_path):
+    conv = {
+        "id": "missing", "title": "missing", "create_time": 1, "update_time": 2,
+        "current_node": "msg-1", "mapping": {
+            "root": {"id": "root", "parent": None, "children": ["msg-1"], "message": None},
+            "msg-1": {"id": "msg-1", "parent": "root", "children": [], "message": {
+                "id": "msg-1", "create_time": 1, "author": {"role": "user"},
+                "content": {"content_type": "multimodal_text", "parts": [{
+                    "content_type": "image_asset_pointer",
+                    "asset_pointer": "file-service://file-MISSING",
+                }]}, "metadata": {},
+            }},
+        },
+    }
+    merged = tmp_path / "chatgpt_merged.json"
+    merged.write_text(json.dumps({"conversations": {"missing": conv}}))
+    parser = ChatGPTParser(raw_root=tmp_path)
+    parser.parse(merged)
+    assert len(parser.messages) == 1
+    assert len(parser.assets) == 1
+    assert parser.assets[0].is_binary_available is False
+    assert parser.asset_links[0].object_type == "message"
+    assert parser.asset_links[0].message_id == "msg-1"
 
 
 # ============================================================
@@ -347,6 +423,8 @@ def test_save_writes_parquets_with_source_prefix(tmp_path):
     parser.save(out)
     assert (out / "chatgpt_conversations.parquet").is_file()
     assert (out / "chatgpt_messages.parquet").is_file()
+    assert (out / "chatgpt_assets.parquet").is_file()
+    assert (out / "chatgpt_asset_links.parquet").is_file()
     # tool_events pode ou nao existir dependendo da fixture; voice nao tem
 
 

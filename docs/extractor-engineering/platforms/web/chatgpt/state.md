@@ -38,8 +38,8 @@ Each account tree resolves its immutable catalog UUID into `account_id`; the
 legacy `account` label and all existing native IDs remain unchanged.
 
 `src/platforms/chatgpt/parser.py` (`ChatGPTParser`, `source_name="chatgpt"`).
-Output in `data/processed/ChatGPT/`: conversations.parquet,
-messages.parquet, tool_events.parquet, branches.parquet.
+Output in `data/processed/ChatGPT/`: conversations, messages, tool_events,
+branches, assets and asset_links Parquets.
 
 ### Coverage
 
@@ -47,13 +47,21 @@ messages.parquet, tool_events.parquet, branches.parquet.
 - **Voice** with `direction in/out`.
 - **DALL-E** mapped as ToolEvent.
 - **User uploads** (Message with `image_asset_pointer`).
+- **Canonical assets** use the native file ID as identity. User pointers become
+  `input` links; DALL-E and other tool-file pointers become `output` links.
+  User-message block indexes are exact. Tool-only nodes link to the closest
+  retained canonical ancestor and keep their native tool-message/block locator
+  in metadata; if no ancestor exists, placement degrades to conversation level.
+- **Availability** is explicit: the current two-account base produces 684
+  assets and 689 links, with 614 local binaries and 70 metadata-only assets.
+  All links and available paths resolve, and no upstream pointer URL is published.
 - **Tether quote**, **canvas**, **deep_research**.
 - **Custom GPT vs project** distinguished.
 - **Preservation** via `is_preserved_missing` + `last_seen_in_server`.
 
 ### Typical volume
 
-1249 convs / 21,765 msgs / 4071 tool_events. Byte-for-byte idempotent after
+1255 convs / 22,039 msgs / 4,279 tool_events. Byte-for-byte idempotent after
 the source's volatile server fields are normalized by the pipeline.
 
 ## Descriptive Quarto

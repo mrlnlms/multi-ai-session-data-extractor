@@ -6,6 +6,9 @@ Output em data/processed/Claude.ai/:
     claude_ai_tool_events.parquet
     claude_ai_branches.parquet
     claude_ai_project_metadata.parquet (auxiliar — counts por project)
+    claude_ai_project_docs.parquet
+    claude_ai_assets.parquet
+    claude_ai_asset_links.parquet
 
 Uso:
     PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.parse
@@ -73,6 +76,8 @@ def main():
         parser.branches.extend(per_account.branches)
         parser.projects.extend(per_account.projects)
         parser.project_docs.extend(per_account.project_docs)
+        parser.assets.extend(per_account.assets)
+        parser.asset_links.extend(per_account.asset_links)
 
     log.info(
         f"Parseado: {len(parser.conversations)} convs, "
@@ -80,7 +85,8 @@ def main():
         f"{len(parser.events)} tool_events, "
         f"{len(parser.branches)} branches, "
         f"{len(parser.projects)} projects, "
-        f"{len(parser.project_docs)} project docs"
+        f"{len(parser.project_docs)} project docs, "
+        f"{len(parser.assets)} assets, {len(parser.asset_links)} asset links"
     )
 
     parser.save(args.output_dir)

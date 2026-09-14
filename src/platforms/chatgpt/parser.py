@@ -7,7 +7,7 @@ Cobertura:
 - Preservation (is_preserved_missing, last_seen_in_server) derivados de
   _last_seen_in_server vs max conhecido no merged
 
-Output: data/processed/ChatGPT/{conversations,messages,tool_events,branches}.parquet
+Output: data/processed/ChatGPT/{conversations,messages,tool_events,branches,assets,asset_links}.parquet
 
 Historico: veio do parser v3, validado em 2026-04-28. As versoes anteriores
 (chatgpt_v2 MVP e chatgpt legacy GPT2Claude bookmarklet) foram supersedidas
@@ -17,6 +17,7 @@ nessa promocao.
 from __future__ import annotations
 
 import json
+import mimetypes
 from pathlib import Path
 from typing import Optional
 
@@ -34,15 +35,21 @@ from src.platforms.chatgpt._parser_helpers import (
     extract_text,
     is_custom_gpt_gizmo_id,
     is_project_gizmo_id,
+    parse_asset_pointer,
     resolve_asset_path,
 )
 from src.schema.models import (
+    Asset,
+    AssetLink,
     Branch,
     Conversation,
     Message,
     ToolEvent,
+    asset_links_to_df,
+    assets_to_df,
     branches_to_df,
     conversations_to_df,
+    make_asset_link_id,
     messages_to_df,
     tool_events_to_df,
 )
@@ -59,6 +66,10 @@ class ChatGPTParser(BaseParser):
     def reset(self):
         super().reset()
         self.branches: list[Branch] = []
+        self.assets: list[Asset] = []
+        self.asset_links: list[AssetLink] = []
+        self._assets_by_id: dict[str, Asset] = {}
+        self._asset_link_ids: set[str] = set()
 
     @property
     def assets_root(self) -> Path:
@@ -225,6 +236,7 @@ class ChatGPTParser(BaseParser):
         last_assistant_model: Optional[str] = None
         seq = 0
         evt_seq = 0
+        asset_link_start = len(self.asset_links)
 
         for branch_id, _ct, node_id, node, msg in nodes_with_meta:
             parent_id = node.get("parent") or ""
@@ -233,6 +245,14 @@ class ChatGPTParser(BaseParser):
             content = msg.get("content") or {}
             ctype = content.get("content_type") or "text"
             metadata = msg.get("metadata") or {}
+
+            if role in ("user", "assistant", "tool"):
+                self._record_image_assets(
+                    msg=msg,
+                    conv_id=conv_id,
+                    canonical_message_id=(parent_id if role == "tool" else (msg.get("id") or node_id)),
+                    role=role,
+                )
 
             # ToolEvent pra tether_quote (content_type proprio)
             if ctype == "tether_quote":
@@ -321,7 +341,13 @@ class ChatGPTParser(BaseParser):
             ))
 
         if not messages and not tool_events:
+            del self.asset_links[asset_link_start:]
+            self._asset_link_ids = {link.asset_link_id for link in self.asset_links}
             return
+
+        self._repair_asset_link_targets(
+            conv_id, mapping, {message.message_id for message in messages}, asset_link_start,
+        )
 
         # message_count: msgs visiveis na branch ativa (pra ser comparable com dashboard)
         active_branch_ids = {b.branch_id for b in branches if b.is_active}
@@ -368,6 +394,144 @@ class ChatGPTParser(BaseParser):
         self.messages.extend(messages)
         self.events.extend(tool_events)
         self.branches.extend(branches)
+
+    def _data_relative_asset_path(self, path: Path) -> str:
+        for parent in (path, *path.parents):
+            if parent.name == "data":
+                return path.relative_to(parent).as_posix()
+        return (Path("raw/ChatGPT") / path.relative_to(self.raw_root)).as_posix()
+
+    def _repair_asset_link_targets(
+        self, conv_id: str, mapping: dict, canonical_message_ids: set[str], start: int,
+    ) -> None:
+        """Resolve links only to retained messages, otherwise degrade placement."""
+        node_by_message_id = {
+            (node.get("message") or {}).get("id"): node
+            for node in mapping.values()
+            if (node.get("message") or {}).get("id")
+        }
+        rebuilt_ids = {link.asset_link_id for link in self.asset_links[:start]}
+        repaired: list[AssetLink] = []
+        for link in self.asset_links[start:]:
+            metadata = json.loads(link.metadata_json) if link.metadata_json else {}
+            native_tool_id = metadata.get("native_tool_message_id")
+            if not native_tool_id:
+                if link.message_id not in canonical_message_ids:
+                    link.object_type = "conversation"
+                    link.object_id = conv_id
+                    link.message_id = None
+                    link.content_block_index = None
+                    link.asset_link_id = make_asset_link_id(
+                        self.source_name, self.account_id, link.asset_id,
+                        "conversation", conv_id, link.role, link.ordinal, None,
+                    )
+                if link.asset_link_id not in rebuilt_ids:
+                    repaired.append(link)
+                rebuilt_ids.add(link.asset_link_id)
+                continue
+            node = node_by_message_id.get(native_tool_id)
+            candidate = node.get("parent") if node else None
+            visited: set[str] = set()
+            while candidate and candidate not in canonical_message_ids and candidate not in visited:
+                visited.add(candidate)
+                parent_node = mapping.get(candidate) or node_by_message_id.get(candidate)
+                candidate = parent_node.get("parent") if parent_node else None
+            if candidate in canonical_message_ids:
+                link.object_id = candidate
+                link.message_id = candidate
+            else:
+                link.object_type = "conversation"
+                link.object_id = conv_id
+                link.message_id = None
+            link.asset_link_id = make_asset_link_id(
+                self.source_name, self.account_id, link.asset_id, link.object_type,
+                link.object_id, link.role, link.ordinal, link.content_block_index,
+            )
+            if link.asset_link_id not in rebuilt_ids:
+                repaired.append(link)
+                rebuilt_ids.add(link.asset_link_id)
+        self.asset_links[start:] = repaired
+        self._asset_link_ids = rebuilt_ids
+
+    def _record_image_assets(
+        self, *, msg: dict, conv_id: str, canonical_message_id: str, role: str,
+    ) -> None:
+        """Index native image pointers without publishing their upstream URLs."""
+        parts = (msg.get("content") or {}).get("parts") or []
+        asset_ordinal = 0
+        for block_index, part in enumerate(parts):
+            if not isinstance(part, dict) or part.get("content_type") != "image_asset_pointer":
+                continue
+            pointer = part.get("asset_pointer") or ""
+            asset_id = parse_asset_pointer(pointer)
+            if not asset_id:
+                continue
+            is_dalle = bool((part.get("metadata") or {}).get("dalle"))
+            if role == "user":
+                origin, kind, generated, link_role = "user", "attachment", False, "input"
+            else:
+                origin = "assistant"
+                kind = "generated" if is_dalle else "output"
+                generated, link_role = True, "output"
+
+            resolved_value = resolve_asset_path(pointer, conv_id, self.assets_root)
+            resolved = Path(resolved_value) if resolved_value else None
+            available = bool(resolved and resolved.is_file())
+            metadata_json = json.dumps({
+                "height": part.get("height"),
+                "pointer_scheme": pointer.split("://", 1)[0] if "://" in pointer else None,
+                "representation": "image_asset_pointer",
+                "width": part.get("width"),
+            }, ensure_ascii=False, sort_keys=True)
+            current = self._assets_by_id.get(asset_id)
+            if current is None:
+                current = Asset(
+                    asset_id=asset_id, source=self.source_name, account_id=self.account_id,
+                    asset_kind=kind, asset_origin=origin,
+                    file_name=resolved.name if available else None,
+                    mime_type=mimetypes.guess_type(resolved.name)[0] if available else part.get("mime_type"),
+                    size_bytes=(resolved.stat().st_size if available else part.get("size_bytes")),
+                    asset_path=self._data_relative_asset_path(resolved) if available else None,
+                    is_model_generated=generated, is_preserved_missing=False,
+                    is_binary_available=available, created_at=None, metadata_json=metadata_json,
+                )
+                self._assets_by_id[asset_id] = current
+                self.assets.append(current)
+            else:
+                if current.asset_origin != origin:
+                    current.asset_origin = "unknown"
+                    current.asset_kind = "other"
+                    current.is_model_generated = None
+                if available and not current.is_binary_available:
+                    current.file_name = resolved.name
+                    current.mime_type = mimetypes.guess_type(resolved.name)[0]
+                    current.size_bytes = resolved.stat().st_size
+                    current.asset_path = self._data_relative_asset_path(resolved)
+                    current.is_binary_available = True
+
+            link_id = make_asset_link_id(
+                self.source_name, self.account_id, asset_id, "message",
+                canonical_message_id, link_role, asset_ordinal, block_index,
+            )
+            if canonical_message_id and link_id not in self._asset_link_ids:
+                link_metadata = None
+                if role == "tool":
+                    link_metadata = json.dumps(
+                        {
+                            "native_content_block_index": block_index,
+                            "native_tool_message_id": msg.get("id"),
+                        }, sort_keys=True,
+                    )
+                self.asset_links.append(AssetLink(
+                    asset_link_id=link_id, source=self.source_name, account_id=self.account_id,
+                    asset_id=asset_id, object_type="message", object_id=canonical_message_id,
+                    conversation_id=conv_id, message_id=canonical_message_id, project_id=None,
+                    role=link_role, ordinal=asset_ordinal,
+                    content_block_index=(None if role == "tool" else block_index),
+                    metadata_json=link_metadata,
+                ))
+                self._asset_link_ids.add(link_id)
+            asset_ordinal += 1
 
     @staticmethod
     def _classify_gizmo(gizmo_id_raw: Optional[str], conv_data: dict) -> tuple[Optional[str], Optional[str], bool]:
@@ -495,6 +659,8 @@ class ChatGPTParser(BaseParser):
             <output_dir>/chatgpt_messages.parquet
             <output_dir>/chatgpt_tool_events.parquet
             <output_dir>/chatgpt_branches.parquet
+            <output_dir>/chatgpt_assets.parquet
+            <output_dir>/chatgpt_asset_links.parquet
         """
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -515,3 +681,8 @@ class ChatGPTParser(BaseParser):
         br_df = self.branches_df()
         if not br_df.empty:
             br_df.to_parquet(output_dir / "chatgpt_branches.parquet", index=False)
+
+        assets_to_df(self.assets).to_parquet(output_dir / "chatgpt_assets.parquet", index=False)
+        asset_links_to_df(self.asset_links).to_parquet(
+            output_dir / "chatgpt_asset_links.parquet", index=False,
+        )

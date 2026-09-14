@@ -32,7 +32,7 @@ SOURCE_COLOR   = "#CC785C"  # Anthropic burnt orange
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Claude.ai"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
-AUX_TABLES     = ["project_metadata", "project_docs"]
+AUX_TABLES     = ["project_metadata", "project_docs", "assets", "asset_links"]
 ACCOUNT_FILTER = None
 
 con = duckdb.connect()

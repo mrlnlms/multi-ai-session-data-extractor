@@ -368,6 +368,73 @@ def test_files_resolve_to_asset_paths(tmp_path):
     assert msg.asset_paths is not None
     assert any("abc-123_preview.webp" in p for p in msg.asset_paths)
     assert "file" in msg.content_types
+    assert len(parser.assets) == 1
+    asset = parser.assets[0]
+    assert asset.asset_id == "abc-123"
+    assert asset.asset_kind == "attachment"
+    assert asset.asset_origin == "user"
+    assert asset.mime_type == "image/webp"
+    assert asset.is_binary_available is True
+    link = parser.asset_links[0]
+    assert link.object_id == "msg-1"
+    assert link.role == "input"
+    assert link.ordinal == 0
+    assert link.content_block_index is None
+
+
+def test_claude_inline_attachment_does_not_create_binary_asset(tmp_path):
+    conv = _basic_conv()
+    conv["chat_messages"][0]["attachments"] = [
+        {"id": "inline-only", "file_name": "notes.txt", "extracted_content": "preserved text"},
+    ]
+    merged = _write_merged(tmp_path, [conv])
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+    assert parser.assets == []
+    assert parser.asset_links == []
+
+
+def test_claude_assistant_file_is_output_and_missing_binary_is_retained(tmp_path):
+    conv = _basic_conv()
+    conv["chat_messages"][1]["files"] = [
+        {"file_uuid": "output-1", "file_name": "result.png", "file_kind": "image"},
+    ]
+    merged = _write_merged(tmp_path, [conv])
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+    asset = parser.assets[0]
+    assert asset.asset_origin == "assistant"
+    assert asset.asset_kind == "output"
+    assert asset.is_model_generated is True
+    assert asset.is_binary_available is False
+    assert asset.asset_path is None
+    assert parser.asset_links[0].role == "output"
+
+
+def test_claude_project_file_is_context_and_reuses_message_asset(tmp_path):
+    shared = {
+        "file_uuid": "shared-1", "file_name": "source.pdf", "file_kind": "document",
+        "created_at": "2025-06-20T08:00:00Z",
+    }
+    conv = _basic_conv()
+    conv["chat_messages"][0]["files"] = [shared]
+    project = {
+        "uuid": "project-1", "name": "Project", "created_at": "2025-06-20T07:00:00Z",
+        "updated_at": "2025-06-20T08:00:00Z", "docs": [], "files": [shared],
+    }
+    merged = _write_merged(tmp_path, [conv], [project])
+    (merged / "assets" / "shared-1_thumbnail.webp").write_bytes(b"thumb")
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+    assert len(parser.assets) == 1
+    assert parser.assets[0].asset_kind == "project_file"
+    assert len(parser.asset_links) == 2
+    assert {(link.object_type, link.role) for link in parser.asset_links} == {
+        ("message", "input"), ("project", "context"),
+    }
+    project_link = next(link for link in parser.asset_links if link.object_type == "project")
+    assert project_link.project_id == "project-1"
+    assert project_link.ordinal == 0
 
 
 # ----------------------------------------------------------------------
@@ -651,6 +718,8 @@ def test_save_writes_parquets(tmp_path):
     assert (out / "claude_ai_messages.parquet").exists()
     assert (out / "claude_ai_tool_events.parquet").exists()
     assert (out / "claude_ai_branches.parquet").exists()
+    assert (out / "claude_ai_assets.parquet").exists()
+    assert (out / "claude_ai_asset_links.parquet").exists()
 
 
 def test_save_writes_project_docs_parquet(tmp_path):

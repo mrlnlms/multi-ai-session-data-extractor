@@ -1,7 +1,7 @@
 """Parser canonico do Claude.ai — schema v3.
 
 Consome merged em data/merged/Claude.ai/conversations/<uuid>.json (1 file por
-conv) + projects/<uuid>.json + assets/. Gera 4 parquets canonicos.
+conv) + projects/<uuid>.json + assets/. Gera tabelas canonicas e auxiliares.
 
 Cobertura:
 - Branches via parent_message_uuid + current_leaf_message_uuid (DAG plano,
@@ -9,13 +9,15 @@ Cobertura:
 - Thinking blocks → Message.thinking
 - Tool use/result blocks → ToolEvent (incl. MCP via integration_name)
 - Attachments com extracted_content → Message.attachment_names
-- Files (uploads binarios) → Message.asset_paths via assets_root
+- Files (entradas, saidas e contexto de projeto) → Message.asset_paths,
+  Asset e AssetLink via file_uuid; attachments inline continuam textuais
 - Pin (is_starred) → Conversation.is_pinned
 - is_temporary preservado em Conversation.is_temporary
 - Preservation: is_preserved_missing + last_seen_in_server
 - Project metadata em Conversation.project_id + .project (nome)
 
-Output: data/processed/Claude.ai/{conversations,messages,tool_events,branches}.parquet
+Output inclui data/processed/Claude.ai/{conversations,messages,tool_events,
+branches,project_metadata,project_docs,assets,asset_links}.parquet
 
 A versao anterior (legacy MVP de 159 linhas) foi supersedida na promocao
 validada de 2026-05-01.
@@ -24,6 +26,7 @@ validada de 2026-05-01.
 from __future__ import annotations
 
 import json
+import mimetypes
 from dataclasses import asdict, fields
 from pathlib import Path
 from typing import Optional
@@ -45,13 +48,18 @@ from src.platforms.claude_ai._parser_helpers import (
 )
 from src.parsing.base import BaseParser
 from src.schema.models import (
+    Asset,
+    AssetLink,
     Branch,
     Conversation,
     Message,
     ProjectDoc,
     ToolEvent,
+    asset_links_to_df,
+    assets_to_df,
     branches_to_df,
     conversations_to_df,
+    make_asset_link_id,
     messages_to_df,
     project_docs_to_df,
     tool_events_to_df,
@@ -81,6 +89,11 @@ class ClaudeAIParser(BaseParser):
         self.branches: list[Branch] = []
         self.projects = []
         self.project_docs: list[ProjectDoc] = []
+        self.assets: list[Asset] = []
+        self.asset_links: list[AssetLink] = []
+        self._assets_by_id: dict[str, Asset] = {}
+        self._asset_usage_types: dict[str, set[str]] = {}
+        self._asset_link_ids: set[str] = set()
 
     @property
     def conversations_dir(self) -> Path:
@@ -145,6 +158,7 @@ class ClaudeAIParser(BaseParser):
                     continue
                 self.projects.append(proj)
                 self._extract_project_docs(proj)
+                self._record_project_files(proj)
 
     @staticmethod
     def _compute_last_run_date(conv_dir: Path) -> Optional[str]:
@@ -291,6 +305,7 @@ class ClaudeAIParser(BaseParser):
         # Files (binarios) → asset_paths
         files = msg.get("files") or []
         asset_paths = resolve_file_assets(files, self.assets_root)
+        self._record_message_files(conv_uuid, msg_uuid, role, files)
 
         # Adicionar attachments aos content_types pra rastreabilidade
         if attachments and "attachment" not in block_types:
@@ -414,6 +429,119 @@ class ClaudeAIParser(BaseParser):
 
         return events
 
+    def _data_relative_asset_path(self, path: Path) -> str:
+        for parent in (path, *path.parents):
+            if parent.name == "data":
+                return path.relative_to(parent).as_posix()
+        return (Path("merged/Claude.ai") / path.relative_to(self.merged_root)).as_posix()
+
+    def _resolve_file_variant(self, file_uuid: str) -> Optional[Path]:
+        for variant in ("preview", "thumbnail"):
+            candidate = self.assets_root / f"{file_uuid}_{variant}.webp"
+            if candidate.is_file():
+                return candidate
+        return None
+
+    def _upsert_file_asset(self, file: dict, usage_type: str) -> Optional[str]:
+        asset_id = file.get("file_uuid")
+        if not asset_id:
+            return None
+        usage_types = self._asset_usage_types.setdefault(asset_id, set())
+        usage_types.add(usage_type)
+        if "assistant" in usage_types and len(usage_types) > 1:
+            origin, kind, generated = "unknown", "other", None
+        elif usage_types == {"assistant"}:
+            origin, kind, generated = "assistant", "output", True
+        elif "project" in usage_types:
+            origin, kind, generated = "user", "project_file", False
+        else:
+            origin, kind, generated = "user", "attachment", False
+
+        binary = self._resolve_file_variant(asset_id)
+        available = binary is not None
+        native_kind = file.get("file_kind")
+        representation = (
+            binary.stem.rsplit("_", 1)[-1] if binary is not None else "native_file_metadata"
+        )
+        metadata_json = json.dumps({
+            "native_file_kind": native_kind,
+            "representation": representation,
+            "success": file.get("success"),
+        }, ensure_ascii=False, sort_keys=True)
+        current = self._assets_by_id.get(asset_id)
+        if current is None:
+            current = Asset(
+                asset_id=asset_id, source=SOURCE, account_id=self.account_id,
+                asset_kind=kind, asset_origin=origin, file_name=file.get("file_name") or None,
+                mime_type=("image/webp" if available else mimetypes.guess_type(file.get("file_name") or "")[0]),
+                size_bytes=(binary.stat().st_size if binary is not None else file.get("size_bytes")),
+                asset_path=self._data_relative_asset_path(binary) if binary is not None else None,
+                is_model_generated=generated, is_preserved_missing=False,
+                is_binary_available=available,
+                created_at=self._ts(file.get("created_at")) if file.get("created_at") else None,
+                metadata_json=metadata_json,
+            )
+            self._assets_by_id[asset_id] = current
+            self.assets.append(current)
+        else:
+            current.asset_origin = origin
+            current.asset_kind = kind
+            current.is_model_generated = generated
+            if available and not current.is_binary_available:
+                current.mime_type = "image/webp"
+                current.size_bytes = binary.stat().st_size
+                current.asset_path = self._data_relative_asset_path(binary)
+                current.is_binary_available = True
+            if not current.file_name and file.get("file_name"):
+                current.file_name = file["file_name"]
+        return asset_id
+
+    def _record_message_files(
+        self, conversation_id: str, message_id: str, role: str, files: list[dict],
+    ) -> None:
+        for ordinal, file in enumerate(files):
+            if not isinstance(file, dict):
+                continue
+            asset_id = self._upsert_file_asset(file, role)
+            if not asset_id:
+                continue
+            link_role = "input" if role == "user" else "output"
+            link_id = make_asset_link_id(
+                SOURCE, self.account_id, asset_id, "message", message_id, link_role, ordinal,
+            )
+            if link_id in self._asset_link_ids:
+                continue
+            self.asset_links.append(AssetLink(
+                asset_link_id=link_id, source=SOURCE, account_id=self.account_id,
+                asset_id=asset_id, object_type="message", object_id=message_id,
+                conversation_id=conversation_id, message_id=message_id, project_id=None,
+                role=link_role, ordinal=ordinal, content_block_index=None, metadata_json=None,
+            ))
+            self._asset_link_ids.add(link_id)
+
+    def _record_project_files(self, project: dict) -> None:
+        project_id = project.get("uuid")
+        if not project_id:
+            return
+        for ordinal, file in enumerate(project.get("files") or []):
+            if not isinstance(file, dict):
+                continue
+            asset_id = self._upsert_file_asset(file, "project")
+            if not asset_id:
+                continue
+            link_id = make_asset_link_id(
+                SOURCE, self.account_id, asset_id, "project", project_id, "context", ordinal,
+            )
+            if link_id in self._asset_link_ids:
+                continue
+            self.asset_links.append(AssetLink(
+                asset_link_id=link_id, source=SOURCE, account_id=self.account_id,
+                asset_id=asset_id, object_type="project", object_id=project_id,
+                conversation_id=None, message_id=None, project_id=project_id,
+                role="context", ordinal=ordinal, content_block_index=None, metadata_json=None,
+            ))
+            self._asset_link_ids.add(link_id)
+
     # ------------------------------------------------------------------
     # Save
     # ------------------------------------------------------------------
@@ -485,7 +613,7 @@ class ClaudeAIParser(BaseParser):
         return pd.DataFrame(rows)
 
     def save(self, output_dir: Path) -> None:
-        """Salva 4 parquets canonicos + project_metadata auxiliar."""
+        """Salva tabelas canonicas, de projeto e do grafo de assets."""
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -513,3 +641,8 @@ class ClaudeAIParser(BaseParser):
         docs_df = self.project_docs_df()
         if not docs_df.empty:
             docs_df.to_parquet(output_dir / f"{self.source_name}_project_docs.parquet")
+
+        assets_to_df(self.assets).to_parquet(output_dir / f"{self.source_name}_assets.parquet")
+        asset_links_to_df(self.asset_links).to_parquet(
+            output_dir / f"{self.source_name}_asset_links.parquet"
+        )

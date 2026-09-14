@@ -1,6 +1,6 @@
 """Roda o parser ChatGPT sobre todas as arvores merged de conta.
 
-Output em data/processed/ChatGPT/{conversations,messages,tool_events,branches}.parquet.
+Output em data/processed/ChatGPT/{conversations,messages,tool_events,branches,assets,asset_links}.parquet.
 
 Uso:
     PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.parse
@@ -70,10 +70,13 @@ def main():
         parser.messages.extend(per_account.messages)
         parser.events.extend(per_account.events)
         parser.branches.extend(per_account.branches)
+        parser.assets.extend(per_account.assets)
+        parser.asset_links.extend(per_account.asset_links)
 
     log.info(
         f"Parseado: {len(parser.conversations)} convs, "
-        f"{len(parser.messages)} msgs, {len(parser.events)} tool_events"
+        f"{len(parser.messages)} msgs, {len(parser.events)} tool_events, "
+        f"{len(parser.assets)} assets, {len(parser.asset_links)} asset_links"
     )
 
     parser.save(args.output_dir)

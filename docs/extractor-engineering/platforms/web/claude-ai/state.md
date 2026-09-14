@@ -79,6 +79,14 @@ legacy `account` label and all existing native IDs remain unchanged.
   parser records `file_names` in `Message.attachment_names`.
 - **Files (binary uploads)** → `Message.asset_paths` resolved from
   `file_uuid`.
+- **Canonical file graph** keeps one Asset per native `file_uuid`: user-message
+  files are `input`, assistant-message files are `output`, and project files are
+  `context`. The current two-account base produces 2,449 assets and 2,500 links;
+  2,175 preview/thumbnail binaries resolve and 274 metadata-only/native file
+  records remain visible as unavailable.
+- **Inline `attachments` are not binary assets.** Their extracted text remains
+  in `Message.attachments_json`; extracted tool artifacts are also outside this
+  adapter until their own identity/relationship mapping is validated.
 - **`is_starred` → `is_pinned`** (cross-platform).
 - **`is_temporary`** preserved (ephemeral feature).
 - **Project metadata** in `claude_ai_project_metadata.parquet`
