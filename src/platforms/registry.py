@@ -64,6 +64,7 @@ class PlatformAccountMetadata:
     profile_prefix: str
     fallback_keys: tuple[str, ...] = ("default",)
     legacy_default_profiles: tuple[str, ...] = ()
+    historical_archive_root: str | None = None
 
 
 PLATFORM_ACCOUNT_METADATA: dict[str, PlatformAccountMetadata] = {
@@ -71,7 +72,10 @@ PLATFORM_ACCOUNT_METADATA: dict[str, PlatformAccountMetadata] = {
     "Claude.ai": PlatformAccountMetadata("claude_ai", "claude-ai-profile-"),
     "Gemini": PlatformAccountMetadata("gemini", "gemini-profile-", ("1", "2", "3")),
     "NotebookLM": PlatformAccountMetadata(
-        "notebooklm", "notebooklm-profile-", ("1", "2", "3")
+        "notebooklm",
+        "notebooklm-profile-",
+        ("1", "2", "3"),
+        historical_archive_root="notebooklm-snapshots",
     ),
     "Qwen": PlatformAccountMetadata("qwen", "qwen-profile-"),
     "DeepSeek": PlatformAccountMetadata("deepseek", "deepseek-profile-"),

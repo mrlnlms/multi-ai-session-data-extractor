@@ -77,6 +77,15 @@ def test_streamlit_entrypoint_lives_with_dashboard_package():
     assert not (PROJECT_ROOT / "dashboard.py").exists()
 
 
+def test_dashboard_exposes_read_only_accounts_page():
+    app_source = (PROJECT_ROOT / "dashboard" / "app.py").read_text()
+    assert (PROJECT_ROOT / "dashboard" / "views" / "accounts.py").is_file()
+    assert not (PROJECT_ROOT / "dashboard" / "pages").exists()
+    assert "accounts, overview, platform" in app_source
+    assert 'view == "accounts"' in app_source
+    assert "accounts.render(states)" in app_source
+
+
 def test_environment_generated_skill_directories_are_ignored():
     gitignore = (PROJECT_ROOT / ".gitignore").read_text().splitlines()
     assert ".agents/" in gitignore

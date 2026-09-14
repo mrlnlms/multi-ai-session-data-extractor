@@ -2,8 +2,8 @@
 
 Roda com: `PYTHONPATH=. .venv/bin/streamlit run dashboard/app.py`
 
-Roteamento simples via st.session_state["view"]: "overview" (default) ou
-"platform" + selected_platform.
+Roteamento simples via st.session_state["view"]: "overview" (default),
+"accounts" ou "platform" + selected_platform.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import webbrowser
 
 import streamlit as st
 
-from dashboard.pages import overview, platform
+from dashboard.views import accounts, overview, platform
 from src.application.platforms import discover_platforms, load_platform_state
 from src.workflows.execution import quarto_installed
 from src.workflows.serve_reports import DEFAULT_PORT, is_running, start_server, stop_server
@@ -22,6 +22,9 @@ def _sidebar() -> None:
     st.sidebar.caption("Cumulative multi-platform capture")
     if st.sidebar.button("🏠 Overview"):
         st.session_state["view"] = "overview"
+        st.rerun()
+    if st.sidebar.button("👤 Accounts"):
+        st.session_state["view"] = "accounts"
         st.rerun()
 
     st.sidebar.divider()
@@ -82,7 +85,9 @@ _sidebar()
 states = discover_platforms()
 
 view = st.session_state.get("view", "overview")
-if view == "platform":
+if view == "accounts":
+    accounts.render(states)
+elif view == "platform":
     name = st.session_state.get("selected_platform")
     if not name:
         st.session_state["view"] = "overview"

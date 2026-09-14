@@ -89,19 +89,36 @@ uma identidade novos.
 
 ### 2.4 Inventario local somente leitura
 
-`src/accounts.py` consolida as instancias observaveis a partir de quatro
-evidencias independentes: defaults operacionais do catalogo de plataformas,
-chaves do registro privado, diretorios de profile e arvores preservadas em
-`raw`/`merged`. Contas com dados permanecem visiveis mesmo sem registro ou
-profile. Um profile presente indica apenas estado local; nao comprova cookies
-validos nem autenticacao upstream.
+`src/accounts.py` consolida as instancias observaveis a partir de evidencias
+independentes: defaults operacionais do catalogo de plataformas, chaves do
+registro privado, diretorios de profile, arvores preservadas em `raw`/`merged`
+e archives historicos declarados pela plataforma em `data/external`. Contas com
+dados permanecem visiveis mesmo sem registro ou profile. Um profile presente
+indica apenas estado local; nao comprova cookies validos nem autenticacao
+upstream.
 
 O inventario e exposto por `PlatformState.accounts` para callers em `src/` e
-para uma interface futura. Ele nao escreve configuracao, nao abre browser, nao
-consulta servicos upstream e nao altera selecao de contas, comandos, pipeline,
-schema ou publicacao. Gemini e NotebookLM mantem nesta fatia os tres alvos
-operacionais existentes; listas dinamicas e lifecycle continuam decisoes de
-uma rodada posterior.
+para a visao **Accounts** do dashboard Streamlit. Essa interface e somente
+leitura e exibe cada evidencia separadamente, inclusive contas preservadas sem
+profile. O servico nao escreve configuracao, nao abre browser, nao consulta
+servicos upstream e nao altera selecao de contas, comandos, pipeline, schema ou
+publicacao. Gemini e NotebookLM mantem nesta fatia os tres alvos operacionais
+existentes; listas dinamicas e lifecycle continuam decisoes de uma rodada
+posterior.
+
+No NotebookLM, cada subdiretorio de `data/external/notebooklm-snapshots/`
+tambem materializa uma conta `archive:<nome-normalizado>`, igual a identidade
+emitida pelo parser historico. A evidencia permite mostrar o acervo corporativo
+inacessivel sem confundi-lo com as contas capturaveis `1`, `2` e `3`; ela nao
+afirma por si so se a conta foi excluida upstream.
+
+A mesma regra vale para qualquer fonte web: se uma conta perder token, profile
+ou acesso upstream, suas arvores `raw`/`merged` continuam materializando a
+identidade no inventario mesmo sem registro privado. Uma futura acao de
+"excluir conta" no produto deve significar retirar sua capacidade de captura e
+registrar lifecycle historico, nunca apagar a identidade ou o acervo. Enquanto
+esse lifecycle explicito nao existir, a interface descreve apenas as evidencias
+locais e nao presume a causa da perda de acesso.
 
 ## 3. Distincao central
 
@@ -156,8 +173,9 @@ implementacao:
    com as conversas preservadas.
 9. Credenciais nunca entram em Git, DVC, Parquet ou logs. Profiles continuam
    sendo estado local descartavel e recriavel por login.
-10. Uma futura interface de contas e uma entrega separada, mas o nucleo deve ser
-    desenhado desde o inicio para servi-la.
+10. A interface inicial de contas e uma visao somente leitura do inventario
+    local. Cadastro, lifecycle, login/relogin e sync seletivo permanecem uma
+    entrega operacional separada.
 11. Antes de mudar IDs ou schema, deve existir uma baseline validada dos
     Parquets atualmente consumidos pelo `AI Interaction Analysis`.
 12. Nenhum DVC push, commit ou publicacao faz parte desta exploracao.
@@ -262,6 +280,9 @@ ativo/desativado/historico, sync seletivo, erros e freshness. A conversa atual
 adicionou um requisito: registrar e sincronizar uma conta suportada deve ser uma
 operacao normal do produto, nao uma tarefa que dependa de um agente de IA ou de
 edicao de codigo.
+
+A pagina **Accounts** atual cobre apenas observacao local. Ela nao implementa
+nenhuma das mutacoes ou verificacoes upstream descritas abaixo.
 
 Fluxo candidato:
 

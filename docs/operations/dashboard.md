@@ -30,6 +30,29 @@ capturas, alertas de queda de discovery e uma linha do tempo cumulativa. Cada
 plataforma abre uma visão própria com logs de captura/reconciliação, estado do
 parquet, métricas e relatórios Quarto disponíveis.
 
+A barra lateral também abre **Accounts**, um inventário local somente leitura
+das contas web observáveis. A tabela mostra separadamente a chave técnica, o
+rótulo do registro privado e a presença de registro, profile, `raw`, `merged` e
+archive histórico. Uma conta com dados continua visível mesmo sem profile;
+nesse caso, a interface a identifica como acervo preservado sem profile ou como
+archive histórico, conforme a evidência disponível.
+
+Essa visão não testa login nem consulta serviços upstream. **Unknown (not
+checked)** significa apenas que existe um profile local e a autenticação não foi
+verificada; não significa sessão válida. **Not configured** indica ausência de
+profile local, sem fazer afirmações sobre a retenção dos dados históricos. Os
+rótulos privados são lidos pelo serviço canônico de contas e exibidos somente
+nesse dashboard local.
+
+Archives históricos aparecem com a identidade estável produzida pelo parser,
+como `archive:<nome-do-snapshot>`. Essa classificação confirma a preservação do
+acervo, mas não afirma que a conta foi excluída no serviço upstream.
+
+Para qualquer plataforma web, remover ou perder um profile não remove a conta
+da tabela enquanto existir `raw` ou `merged`. A interface preserva a conta como
+acervo sem profile; ausência de profile não distingue token expirado, logout ou
+exclusão upstream.
+
 A cor da plataforma representa a saúde da pipeline, não a idade da captura:
 
 - verde: captura sem erros e Parquet cobrindo as entradas do parser;

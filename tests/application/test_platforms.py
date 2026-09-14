@@ -143,3 +143,21 @@ def test_platform_state_exposes_read_only_account_inventory(tmp_path, monkeypatc
     assert by_key["local"].evidence.profile_present
     assert by_key["historical"].evidence.merged_present
     assert by_key["historical"].authentication == "not_configured"
+
+
+def test_platform_state_includes_notebooklm_external_archive(tmp_path, monkeypatch):
+    storage = tmp_path / ".storage"
+    external = tmp_path / "external"
+    storage.mkdir()
+    archive = external / "notebooklm-snapshots" / "former-work-2026-01-02"
+    archive.mkdir(parents=True)
+
+    monkeypatch.setattr(platforms, "STORAGE_ROOT", storage)
+    monkeypatch.setattr(platforms, "DATA_RAW", tmp_path / "raw")
+    monkeypatch.setattr(platforms, "DATA_MERGED", tmp_path / "merged")
+    monkeypatch.setattr(platforms, "DATA_EXTERNAL", external)
+
+    state = platforms.load_platform_state("NotebookLM")
+    by_key = {account.key: account for account in state.accounts}
+
+    assert by_key["archive:former-work-2026-01-02"].evidence.historical_path == archive

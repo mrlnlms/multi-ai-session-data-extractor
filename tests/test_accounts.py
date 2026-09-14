@@ -124,6 +124,58 @@ def test_legacy_perplexity_profile_and_preserved_inaccessible_account(tmp_path):
     assert by_key["historical"].authentication == "not_configured"
 
 
+def test_notebooklm_historical_archive_is_a_first_class_account_evidence(tmp_path):
+    storage = tmp_path / ".storage"
+    raw = tmp_path / "raw"
+    merged = tmp_path / "merged"
+    external = tmp_path / "external"
+    storage.mkdir()
+    archive = external / "notebooklm-snapshots" / "More Design 2026-03-30"
+    archive.mkdir(parents=True)
+
+    states = discover_accounts(
+        "NotebookLM",
+        storage_root=storage,
+        raw_root=raw,
+        merged_root=merged,
+        external_root=external,
+        registry_path=storage / "missing.json",
+    )
+    by_key = {state.key: state for state in states}
+
+    historical = by_key["archive:more-design-2026-03-30"]
+    assert historical.evidence.historical_path == archive
+    assert historical.evidence.historical_present
+    assert historical.authentication == "not_configured"
+
+
+def test_retired_web_account_survives_without_registry_or_profile(tmp_path):
+    storage = tmp_path / ".storage"
+    raw = tmp_path / "raw"
+    merged = tmp_path / "merged"
+    storage.mkdir()
+    preserved_raw = raw / "Qwen" / "account-retired"
+    preserved_merged = merged / "Qwen" / "account-retired"
+    preserved_raw.mkdir(parents=True)
+    preserved_merged.mkdir(parents=True)
+
+    states = discover_accounts(
+        "Qwen",
+        storage_root=storage,
+        raw_root=raw,
+        merged_root=merged,
+        registry_path=storage / "missing.json",
+    )
+    by_key = {state.key: state for state in states}
+
+    retired = by_key["retired"]
+    assert not retired.evidence.registry_present
+    assert not retired.evidence.profile_present
+    assert retired.evidence.raw_path == preserved_raw
+    assert retired.evidence.merged_path == preserved_merged
+    assert retired.authentication == "not_configured"
+
+
 def test_account_models_are_immutable():
     evidence = AccountEvidence()
     state = AccountState("ChatGPT", "default", None, evidence, "not_configured")

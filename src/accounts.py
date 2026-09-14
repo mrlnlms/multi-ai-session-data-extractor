@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,7 @@ class AccountEvidence:
     profile_path: Path | None = None
     raw_path: Path | None = None
     merged_path: Path | None = None
+    historical_path: Path | None = None
 
     @property
     def profile_present(self) -> bool:
@@ -43,6 +45,10 @@ class AccountEvidence:
     @property
     def merged_present(self) -> bool:
         return self.merged_path is not None
+
+    @property
+    def historical_present(self) -> bool:
+        return self.historical_path is not None
 
 
 @dataclass(frozen=True)
@@ -120,6 +126,12 @@ def _technical_key(value: str) -> str:
     return value.removeprefix("account-")
 
 
+def _historical_account_key(directory_name: str) -> str | None:
+    """Match the stable archive identity emitted by historical parsers."""
+    normalized = re.sub(r"[^a-z0-9]+", "-", directory_name.lower()).strip("-")
+    return f"archive:{normalized}" if normalized else None
+
+
 def _contains_source_artifacts(path: Path) -> bool:
     ignored = {"capture_log.jsonl", "reconcile_log.jsonl", "assets_log.json"}
     try:
@@ -143,6 +155,7 @@ def discover_accounts(
     storage_root: Path = Path(".storage"),
     raw_root: Path = Path("data/raw"),
     merged_root: Path = Path("data/merged"),
+    external_root: Path = Path("data/external"),
     registry_path: Path = DEFAULT_ACCOUNTS_FILE,
 ) -> tuple[AccountState, ...]:
     """Inventory all locally observable accounts without validating login."""
@@ -176,6 +189,7 @@ def discover_accounts(
     merged_platform = merged_root / platform
     raw_paths: dict[str, Path] = {}
     merged_paths: dict[str, Path] = {}
+    historical_paths: dict[str, Path] = {}
     for base, paths in ((raw_platform, raw_paths), (merged_platform, merged_paths)):
         if base.exists():
             try:
@@ -192,6 +206,21 @@ def discover_accounts(
                 paths["default"] = base
                 keys.add("default")
 
+    if metadata.historical_archive_root:
+        archive_root = external_root / metadata.historical_archive_root
+        if archive_root.exists():
+            try:
+                archives = tuple(archive_root.iterdir())
+            except OSError:
+                archives = ()
+            for path in archives:
+                if not path.is_dir():
+                    continue
+                key = _historical_account_key(path.name)
+                if key:
+                    keys.add(key)
+                    historical_paths[key] = path
+
     fallback_order = {key: index for index, key in enumerate(metadata.fallback_keys)}
     ordered_keys = sorted(keys, key=lambda key: (fallback_order.get(key, len(fallback_order)), key))
     states = []
@@ -203,6 +232,7 @@ def discover_accounts(
             profile_path=profiles.get(key),
             raw_path=raw_paths.get(key),
             merged_path=merged_paths.get(key),
+            historical_path=historical_paths.get(key),
         )
         authentication = "unknown" if evidence.profile_present else "not_configured"
         states.append(AccountState(platform, key, label, evidence, authentication))
