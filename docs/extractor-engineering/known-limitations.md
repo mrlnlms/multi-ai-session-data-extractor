@@ -211,11 +211,12 @@ These validations require a Pro Max account and remain open until someone tests:
 ## Cross-platform assets
 
 - **The unified asset index is intentionally partial.** Its current coverage
-  covers Grok, Kimi, Qwen, Gemini, ChatGPT, and Claude.ai. ChatGPT project
+  covers Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai, and Perplexity. ChatGPT project
   sources/canvas/deep-research files and Claude.ai extracted artifacts are not
   yet indexed by the canonical asset graph; Claude inline `attachments` remain
   text-bearing message metadata rather than fake binaries. File representations,
-  manifests and domain outputs from the other web sources remain preserved in
+  Perplexity third-party featured images remain external references rather than
+  preserved-file assets. Manifests and domain outputs from the other web sources remain preserved in
   their existing representations until source-specific adapters validate their
   identities and path semantics.
 

@@ -1,6 +1,7 @@
 """Testes do PerplexityParser v3 (consume merged_dir cumulativo)."""
 
 import json
+import hashlib
 import pandas as pd
 from pathlib import Path
 
@@ -158,6 +159,93 @@ def test_parser_assets_to_tool_events(tmp_path):
     assert types == ["CODE_FILE", "GENERATED_IMAGE"]
 
 
+def test_artifact_emits_available_asset_and_exact_output_link(tmp_path):
+    threads = {"t1": _make_thread("t1", "COPILOT", "T", [_entry("e1", "Q")])}
+    assets = [{
+        "asset_id": "native-1", "asset_slug": "report-abc", "asset_type": "CODE_FILE",
+        "entry_uuid": "e1", "caption": "report.md", "preview_image_url": "https://secret.invalid/?token=x",
+    }]
+    _write_merged(tmp_path, threads, assets=assets)
+    files = tmp_path / "assets" / "files"
+    files.mkdir()
+    (files / "report-abc.md").write_text("artifact")
+
+    parser = PerplexityParser(merged_root=tmp_path)
+    parser.parse()
+
+    assert len(parser.assets) == 1
+    asset = parser.assets[0]
+    assert asset.asset_id == "native-1"
+    assert asset.asset_kind == "artifact"
+    assert asset.asset_origin == "assistant"
+    assert asset.asset_path == "merged/Perplexity/assets/files/report-abc.md"
+    assert asset.is_binary_available is True
+    assert "token" not in (asset.metadata_json or "")
+    link = parser.asset_links[0]
+    assert link.object_id == "e1_asst"
+    assert link.conversation_id == "t1"
+    assert link.role == "output"
+
+
+def test_failed_upload_is_retained_without_publishing_signed_url(tmp_path):
+    signed = "https://ppl-ai-file-upload.s3.amazonaws.com/archive/source.pdf?X-Amz-Signature=secret"
+    threads = {"t1": _make_thread("t1", "COPILOT", "T", [_entry("e1", "Q", attachments=[signed])])}
+    _write_merged(tmp_path, threads)
+    manifest = {
+        hashlib.sha1(signed.encode()).hexdigest()[:16]: {
+            "status": "failed_upstream_deleted", "source_type": "user_upload",
+            "url_stale": signed, "error": "404 NoSuchKey",
+        }
+    }
+    (tmp_path / "thread_attachments_manifest.json").write_text(json.dumps(manifest))
+
+    parser = PerplexityParser(merged_root=tmp_path, raw_root=tmp_path)
+    parser.parse()
+
+    user = next(message for message in parser.messages if message.role == "user")
+    assert user.asset_paths is None
+    assert len(parser.assets) == 1
+    asset = parser.assets[0]
+    assert asset.asset_kind == "attachment"
+    assert asset.asset_origin == "user"
+    assert asset.is_preserved_missing is True
+    assert asset.is_binary_available is False
+    assert signed not in (asset.metadata_json or "")
+    assert parser.asset_links[0].object_id == "e1_user"
+    assert parser.asset_links[0].role == "input"
+
+
+def test_external_featured_image_is_not_a_preserved_asset(tmp_path):
+    entry = _entry("e1", "Q")
+    entry["featured_images"] = ["https://external.example/image.jpg?token=secret"]
+    threads = {"t1": _make_thread("t1", "COPILOT", "T", [entry])}
+    _write_merged(tmp_path, threads)
+
+    parser = PerplexityParser(merged_root=tmp_path)
+    parser.parse()
+
+    assistant = next(message for message in parser.messages if message.role == "assistant")
+    assert assistant.asset_paths is None
+    assert parser.assets == []
+    assert parser.asset_links == []
+
+
+def test_repeated_upload_reuses_asset_with_distinct_message_links(tmp_path):
+    url = "https://ppl-ai-file-upload.s3.amazonaws.com/archive/shared.pdf?signature=one"
+    threads = {"t1": _make_thread("t1", "COPILOT", "T", [
+        _entry("e1", "Q1", attachments=[url]), _entry("e2", "Q2", attachments=[url]),
+    ])}
+    _write_merged(tmp_path, threads)
+
+    parser = PerplexityParser(merged_root=tmp_path)
+    parser.parse()
+
+    assert len(parser.assets) == 1
+    assert len(parser.asset_links) == 2
+    assert {link.object_id for link in parser.asset_links} == {"e1_user", "e2_user"}
+    assert len({link.asset_link_id for link in parser.asset_links}) == 2
+
+
 def test_parser_preservation_flag(tmp_path):
     threads = {"t1": _make_thread("t1", "COPILOT", "Old", [_entry("e1", "Q")])}
     discovery = [
@@ -173,3 +261,14 @@ def test_parser_preservation_flag(tmp_path):
     # Deleted thread nao tem JSON file, mas se tivesse, is_preserved_missing seria True.
     # Aqui so validamos que threads existentes ficam com is_preserved_missing=False.
     assert all(not c.is_preserved_missing for c in p.conversations if c.conversation_id == "t1")
+
+
+def test_save_writes_asset_graph_parquets(tmp_path):
+    threads = {"t1": _make_thread("t1", "COPILOT", "T", [_entry("e1", "Q")])}
+    _write_merged(tmp_path, threads, assets=[])
+    parser = PerplexityParser(merged_root=tmp_path)
+    parser.parse()
+    output = tmp_path / "processed"
+    parser.save(output)
+    assert (output / "perplexity_assets.parquet").is_file()
+    assert (output / "perplexity_asset_links.parquet").is_file()

@@ -126,7 +126,7 @@ extractor → reconciler → parser → unify
 3. **Parser** converts the raw JSON into parquet with a unified schema:
    `Conversation`, `Message`, `ToolEvent`, `Branch` (and auxiliaries such as
    `Asset`, `AssetLink`, `ProjectDoc`, and `NotebookLMOutput`). The unified asset
-   index covers Grok, Kimi, Qwen, Gemini, ChatGPT, and Claude.ai; it is not yet a complete
+   index covers Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai, and Perplexity; it is not yet a complete
    inventory of every file representation in the archive.
    Web rows carry the immutable catalog UUID in `account_id`; the legacy
    display `account` remains available. CLI and manual rows keep

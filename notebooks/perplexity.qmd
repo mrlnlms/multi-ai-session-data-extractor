@@ -32,7 +32,7 @@ SOURCE_COLOR   = "#20808D"  # Perplexity teal
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Perplexity"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
-AUX_TABLES     = []
+AUX_TABLES     = ["assets", "asset_links"]
 ACCOUNT_FILTER = None
 
 con = duckdb.connect()
@@ -46,3 +46,5 @@ _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_
 > copilot/concise/research.
 
 {{< include _template.qmd >}}
+
+{{< include _template_aux.qmd >}}

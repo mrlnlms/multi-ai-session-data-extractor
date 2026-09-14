@@ -1,5 +1,5 @@
 """Parser canonico Perplexity v3 — consome data/merged/Perplexity/ (pasta unica)
-e gera 4 parquets em data/processed/Perplexity/.
+e gera tabelas canonicas em data/processed/Perplexity/.
 
 Cobertura:
 - Threads (CONCISE, COPILOT/Deep Research, ASI/Computer) -> Conversations + Messages
@@ -8,12 +8,14 @@ Cobertura:
 - Threads em spaces -> Conversation.project = space_uuid
 - Search sources -> ToolEvents tipo 'search_result'
 - Media items (refs externas) -> ToolEvents tipo 'media_reference'
-- Attachments URLs -> Message.asset_paths (path no manifest se baixado)
-- Featured_images -> Message.asset_paths
+- Native attachments/artifacts -> Assets + AssetLinks; only resolved local files
+  remain in Message.asset_paths
+- External featured_images remain references, not preserved-file assets
 - Preservation: is_preserved_missing + last_seen_in_server
 - Branches: 1 por thread (Perplexity e linear)
 
-Output: data/processed/Perplexity/{conversations,messages,tool_events,branches}.parquet
+Output: data/processed/Perplexity/{conversations,messages,tool_events,branches,
+assets,asset_links}.parquet
 
 O parser v2 (formato extracted_messages legado) foi supersedido na promocao
 validada de 2026-05-01.
@@ -24,24 +26,36 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import mimetypes
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit, urlunsplit
 
 import pandas as pd
 
 from src.parsing.base import BaseParser
 from src.schema.models import (
+    Asset,
+    AssetLink,
     Branch,
     Conversation,
     Message,
     ToolEvent,
+    asset_links_to_df,
+    assets_to_df,
     branches_to_df,
     conversations_to_df,
+    make_asset_link_id,
     messages_to_df,
     tool_events_to_df,
 )
-
 logger = logging.getLogger(__name__)
+
+_NATIVE_ASSET_DOMAINS = (
+    "ppl-ai-file-upload.s3.amazonaws.com",
+    "pplx-res.cloudinary.com",
+    "perplexity.ai",
+)
 
 
 # Mapping de mode da API Perplexity pra VALID_MODES do schema canonico
@@ -60,14 +74,14 @@ _MODE_MAP = {
 
 def _to_ts(s: Optional[str]) -> pd.Timestamp:
     if not s:
-        return pd.Timestamp.now(tz="UTC")
+        return pd.NaT
     try:
         ts = pd.Timestamp(s)
         if ts.tzinfo is None:
             ts = ts.tz_localize("UTC")
         return ts
     except Exception:
-        return pd.Timestamp.now(tz="UTC")
+        return pd.NaT
 
 
 def _block_text(block: dict) -> str:
@@ -102,33 +116,18 @@ def _entry_answer_text(entry: dict) -> str:
     return ""
 
 
-def _attachment_paths(entry: dict, manifest: dict) -> list[str]:
-    paths = []
-    for url in entry.get("attachments") or []:
-        if not isinstance(url, str):
-            continue
-        h = hashlib.sha1(url.encode()).hexdigest()[:16]
-        info = manifest.get(h)
-        if info and info.get("relpath") and info.get("status") != "failed_upstream_deleted":
-            paths.append(f"thread_attachments/{info['relpath']}")
-        else:
-            paths.append(url[:200])
-    return paths
+def _stable_url_identity(url: str) -> str:
+    """Strip expiring query/fragment material while retaining native object identity."""
+    parts = urlsplit(url)
+    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path, "", ""))
 
 
-def _featured_image_paths(entry: dict, manifest: dict) -> list[str]:
-    paths = []
-    for fi in entry.get("featured_images") or []:
-        u = fi if isinstance(fi, str) else (fi.get("url") if isinstance(fi, dict) else None)
-        if not u:
-            continue
-        h = hashlib.sha1(u.encode()).hexdigest()[:16]
-        info = manifest.get(h)
-        if info and info.get("relpath") and info.get("status") != "failed_upstream_deleted":
-            paths.append(f"thread_attachments/{info['relpath']}")
-        else:
-            paths.append(u[:200])
-    return paths
+def _is_native_asset_url(url: str) -> bool:
+    try:
+        host = urlsplit(url).hostname or ""
+    except ValueError:
+        return False
+    return any(host.endswith(domain) for domain in _NATIVE_ASSET_DOMAINS)
 
 
 class PerplexityParser(BaseParser):
@@ -149,6 +148,11 @@ class PerplexityParser(BaseParser):
         super().reset()
         self.branches: list[Branch] = []
         self.tool_events: list[ToolEvent] = []
+        self.assets: list[Asset] = []
+        self.asset_links: list[AssetLink] = []
+        self._asset_ids: set[str] = set()
+        self._asset_link_ids: set[str] = set()
+        self._entry_threads: dict[str, str] = {}
 
     def parse(self, *_, **__) -> None:
         """Parse threads + pages + assets do merged. merged_root setado no init."""
@@ -262,12 +266,14 @@ class PerplexityParser(BaseParser):
         last_msg_id = None
         for entry in entries:
             entry_uuid = entry.get("uuid") or entry.get("backend_uuid") or f"{uid}_{seq}"
+            self._entry_threads[entry_uuid] = uid
             entry_ts = _to_ts(entry.get("entry_created_datetime"))
-            entry_attachments = _attachment_paths(entry, att_manifest)
-            entry_featured = _featured_image_paths(entry, att_manifest)
 
             seq += 1
             user_msg_id = f"{entry_uuid}_user"
+            entry_attachments = self._record_url_assets(
+                entry.get("attachments") or [], att_manifest, uid, user_msg_id, "input"
+            )
             self.messages.append(Message(
                 message_id=user_msg_id,
                 conversation_id=uid,
@@ -289,6 +295,9 @@ class PerplexityParser(BaseParser):
 
             seq += 1
             asst_msg_id = f"{entry_uuid}_asst"
+            entry_featured = self._record_url_assets(
+                entry.get("featured_images") or [], att_manifest, uid, asst_msg_id, "output"
+            )
             self.messages.append(Message(
                 message_id=asst_msg_id,
                 conversation_id=uid,
@@ -491,8 +500,40 @@ class PerplexityParser(BaseParser):
         if not slug:
             return
         entry_uuid = asset.get("entry_uuid")
-        conv_id = entry_uuid or slug
+        conv_id = self._entry_threads.get(entry_uuid) if entry_uuid else None
+        conv_id = conv_id or entry_uuid or slug
         msg_id = f"{entry_uuid}_asst" if entry_uuid else f"asset:{slug}"
+
+        binary = next(
+            (path for path in sorted((self.merged_root / "assets" / "files").glob(f"{slug}.*")) if path.is_file()),
+            None,
+        )
+        asset_id = str(asset.get("asset_id") or slug)
+        asset_type = asset.get("asset_type")
+        kind = "generated" if asset_type == "GENERATED_IMAGE" else "artifact"
+        asset_path = self._data_relative_path(binary) if binary else None
+        metadata_json = json.dumps({
+            "asset_type": asset_type,
+            "is_pinned": bool(asset.get("is_pinned", False)),
+            "media_type": asset.get("media_type"),
+        }, ensure_ascii=False, sort_keys=True)
+        if asset_id not in self._asset_ids:
+            self.assets.append(Asset(
+                asset_id=asset_id, source=self.source_name, account_id=self.account_id,
+                asset_kind=kind, asset_origin="assistant",
+                file_name=binary.name if binary else None,
+                mime_type=(mimetypes.guess_type(binary.name)[0] if binary else asset.get("media_type")),
+                size_bytes=binary.stat().st_size if binary else None,
+                asset_path=asset_path, is_model_generated=True,
+                is_preserved_missing=bool(asset.get("_preserved_missing", False)),
+                is_binary_available=binary is not None,
+                created_at=_to_ts(asset.get("created_at")) if asset.get("created_at") else None,
+                metadata_json=metadata_json,
+            ))
+            self._asset_ids.add(asset_id)
+
+        if entry_uuid and entry_uuid in self._entry_threads:
+            self._append_asset_link(asset_id, conv_id, msg_id, "output", None)
 
         self.tool_events.append(ToolEvent(
             event_id=f"asset:{slug}",
@@ -502,15 +543,82 @@ class PerplexityParser(BaseParser):
             account_id=self.account_id,
             event_type="asset_generation",
             tool_name=asset.get("asset_type"),
-            file_path=f"assets/files/{slug}",
-            metadata_json=json.dumps({
-                "caption": asset.get("caption"),
-                "preview_image_url": asset.get("preview_image_url"),
-                "is_pinned": asset.get("is_pinned", False),
-                "media_type": asset.get("media_type"),
-                "_preserved_missing": asset.get("_preserved_missing", False),
-            }, ensure_ascii=False),
+            file_path=asset_path,
+            metadata_json=metadata_json,
         ))
+
+    def _data_relative_path(self, path: Path) -> str:
+        for parent in (path, *path.parents):
+            if parent.name == "data":
+                return path.relative_to(parent).as_posix()
+        return (Path("merged/Perplexity") / path.relative_to(self.merged_root)).as_posix()
+
+    def _manifest_info(self, url: str, manifest: dict) -> dict | None:
+        direct = manifest.get(hashlib.sha1(url.encode()).hexdigest()[:16])
+        if direct:
+            return direct
+        stable = _stable_url_identity(url)
+        for info in manifest.values():
+            for key in ("url_stale", "url_fresh"):
+                candidate = info.get(key)
+                if isinstance(candidate, str) and _stable_url_identity(candidate) == stable:
+                    return info
+        return None
+
+    def _record_url_assets(
+        self, values: list, manifest: dict, conversation_id: str, message_id: str, role: str,
+    ) -> list[str]:
+        paths: list[str] = []
+        for ordinal, value in enumerate(values):
+            url = value if isinstance(value, str) else value.get("url") if isinstance(value, dict) else None
+            if not url or not _is_native_asset_url(url):
+                continue
+            stable = _stable_url_identity(url)
+            asset_id = "url:" + hashlib.sha256(stable.encode()).hexdigest()
+            info = self._manifest_info(url, manifest) or {}
+            relpath = info.get("relpath")
+            binary = self.merged_root / "thread_attachments" / relpath if relpath else None
+            available = bool(binary and binary.is_file() and info.get("status") != "failed_upstream_deleted")
+            asset_path = self._data_relative_path(binary) if available and binary else None
+            if asset_path:
+                paths.append(asset_path)
+            if asset_id not in self._asset_ids:
+                is_input = role == "input"
+                self.assets.append(Asset(
+                    asset_id=asset_id, source=self.source_name, account_id=self.account_id,
+                    asset_kind="attachment" if is_input else "other",
+                    asset_origin="user" if is_input else "unknown",
+                    file_name=binary.name if available and binary else None,
+                    mime_type=mimetypes.guess_type(binary.name)[0] if available and binary else None,
+                    size_bytes=binary.stat().st_size if available and binary else None,
+                    asset_path=asset_path, is_model_generated=False if is_input else None,
+                    is_preserved_missing=info.get("status") == "failed_upstream_deleted",
+                    is_binary_available=available, created_at=None,
+                    metadata_json=json.dumps({
+                        "source_type": info.get("source_type") or ("user_upload" if is_input else "featured_image"),
+                        "status": info.get("status") or "metadata_only",
+                    }, ensure_ascii=False, sort_keys=True),
+                ))
+                self._asset_ids.add(asset_id)
+            self._append_asset_link(asset_id, conversation_id, message_id, role, ordinal)
+        return paths
+
+    def _append_asset_link(
+        self, asset_id: str, conversation_id: str, message_id: str, role: str,
+        ordinal: int | None,
+    ) -> None:
+        link_id = make_asset_link_id(
+            self.source_name, self.account_id, asset_id, "message", message_id, role, ordinal,
+        )
+        if link_id in self._asset_link_ids:
+            return
+        self.asset_links.append(AssetLink(
+            asset_link_id=link_id, source=self.source_name, account_id=self.account_id,
+            asset_id=asset_id, object_type="message", object_id=message_id,
+            conversation_id=conversation_id, message_id=message_id, project_id=None,
+            role=role, ordinal=ordinal, content_block_index=None, metadata_json=None,
+        ))
+        self._asset_link_ids.add(link_id)
 
     def save(self, output_dir: Optional[Path] = None) -> dict:
         """Override de BaseParser.save — alinha API com claude_ai/qwen/deepseek/
@@ -528,12 +636,16 @@ class PerplexityParser(BaseParser):
         msg_df.to_parquet(out / "perplexity_messages.parquet", index=False)
         tool_events_to_df(self.tool_events).to_parquet(out / "perplexity_tool_events.parquet", index=False)
         branches_to_df(self.branches).to_parquet(out / "perplexity_branches.parquet", index=False)
+        assets_to_df(self.assets).to_parquet(out / "perplexity_assets.parquet", index=False)
+        asset_links_to_df(self.asset_links).to_parquet(out / "perplexity_asset_links.parquet", index=False)
 
         return {
             "conversations": len(self.conversations),
             "messages": len(self.messages),
             "tool_events": len(self.tool_events),
             "branches": len(self.branches),
+            "assets": len(self.assets),
+            "asset_links": len(self.asset_links),
             "output_dir": str(out),
         }
 

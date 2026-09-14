@@ -1,7 +1,7 @@
-"""Parser canonico Perplexity v3 — merged -> 4 parquets.
+"""Parser canonico Perplexity v3 — merged -> canonical and asset parquets.
 
 Le data/merged/Perplexity/ e escreve data/processed/Perplexity/{
-  conversations, messages, tool_events, branches}.parquet.
+  conversations, messages, tool_events, branches, assets, asset_links}.parquet.
 
 Idempotente: rodar 2x produz mesmos bytes.
 Uso: PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.parse
@@ -43,6 +43,8 @@ def main():
         parser.messages.extend(per_account.messages)
         parser.tool_events.extend(per_account.tool_events)
         parser.branches.extend(per_account.branches)
+        parser.assets.extend(per_account.assets)
+        parser.asset_links.extend(per_account.asset_links)
     stats = parser.save(args.output_dir)
     print("=== Perplexity parse done ===")
     for k, v in stats.items():

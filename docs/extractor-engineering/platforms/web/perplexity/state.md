@@ -49,6 +49,15 @@ legacy `account` label and all existing native IDs remain unchanged.
 
 - Pages have `conversation_id='page:<slug>'`.
 - Search results extracted from `blocks[*].web_result_block.web_results`.
+- The canonical asset graph contains one row per native artifact/upload identity.
+  Artifacts with a retained binary link to the producing assistant message as
+  `output`; native thread uploads link to the user message as `input` even when
+  upstream deletion left only manifest evidence. External featured images remain
+  references and are not represented as preserved binaries.
+- Current coverage is 15 assets and 8 exact message links: 9 artifact binaries
+  resolve under `data/merged/Perplexity/assets/files`, while 6 old uploads remain
+  explicitly unavailable with `failed_upstream_deleted`. Signed URLs and errors
+  are excluded from processed metadata.
 - Idempotent (~1s to run).
 
 ## Descriptive Quarto
