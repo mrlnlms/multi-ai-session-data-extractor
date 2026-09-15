@@ -673,3 +673,48 @@ def test_preserved_project_canvas_research_and_export_files_become_assets(tmp_pa
     }
     assert all(asset.asset_path and (tmp_path / asset.asset_path).is_file()
                for asset in parser.assets)
+
+
+def test_reconstructed_canvas_supersedes_legacy_create_materialization(tmp_path):
+    raw_root = tmp_path / "raw" / "ChatGPT"
+    canvas_root = raw_root / "assets" / "canvases" / "conversation-1"
+    canvas_root.mkdir(parents=True)
+    merged = tmp_path / "chatgpt_merged.json"
+    merged.write_text(json.dumps({"conversations": {"conversation-1": {
+        "id": "conversation-1", "title": "fixture", "create_time": 1, "update_time": 2,
+        "current_node": "canvas-message-1", "mapping": {
+            "canvas-message-1": {
+                "id": "canvas-message-1", "parent": None, "children": [],
+                "message": {"id": "canvas-message-1", "create_time": 1,
+                            "author": {"role": "assistant"}, "recipient": "all",
+                            "content": {"content_type": "text", "parts": ["canvas"]},
+                            "metadata": {}},
+            },
+        },
+    }}}), encoding="utf-8")
+    legacy = canvas_root / "unknown_v1_output.md"
+    legacy.write_text("same output", encoding="utf-8")
+    legacy.with_suffix(".md.meta.json").write_text(json.dumps({
+        "conv_id": "conversation-1", "textdoc_id": "unknown", "version": 1,
+        "name": "output", "type": "document", "message_id": "canvas-message-1",
+    }), encoding="utf-8")
+    replay = canvas_root / "reconstructed__doc-1__canvas-message-1__v1_output.md"
+    replay.write_text("same output", encoding="utf-8")
+    replay.with_suffix(".md.meta.json").write_text(json.dumps({
+        "materialization": "canvas_replay_v1", "conv_id": "conversation-1",
+        "textdoc_id": "doc-1", "native_textdoc_id": "doc-1", "version": 1,
+        "name": "output", "type": "document", "message_id": "canvas-message-1",
+        "response_message_id": "tool-message-1", "evidence": "confirmed",
+        "asset_id": "canvas:doc-1:canvas-message-1",
+    }), encoding="utf-8")
+
+    parser = ChatGPTParser(raw_root=raw_root)
+    parser.parse(merged)
+
+    canvas_assets = [asset for asset in parser.assets if asset.asset_kind == "artifact"]
+    assert [asset.asset_id for asset in canvas_assets] == ["canvas:doc-1:canvas-message-1"]
+    assert len(parser.asset_links) == 1
+    assert parser.messages[0].asset_paths == [
+        "raw/ChatGPT/assets/canvases/conversation-1/"
+        "reconstructed__doc-1__canvas-message-1__v1_output.md"
+    ]

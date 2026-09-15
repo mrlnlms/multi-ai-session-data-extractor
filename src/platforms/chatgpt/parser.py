@@ -512,12 +512,27 @@ class ChatGPTParser(BaseParser):
             ("canvas", "canvases", "textdoc_id", "canvas"),
             ("deep_research_report", "deep_research", "async_task_id", "deep-research"),
         ):
-            for meta_path in sorted((self.assets_root / folder).glob("*/*.meta.json")):
+            meta_paths = sorted((self.assets_root / folder).glob("*/*.meta.json"))
+            reconstructed_canvas_messages: set[str] = set()
+            if representation == "canvas":
+                for candidate in meta_paths:
+                    try:
+                        candidate_meta = json.loads(candidate.read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError):
+                        continue
+                    if (candidate_meta.get("materialization") == "canvas_replay_v1"
+                            and candidate_meta.get("message_id")):
+                        reconstructed_canvas_messages.add(str(candidate_meta["message_id"]))
+            for meta_path in meta_paths:
                 try:
                     meta = json.loads(meta_path.read_text(encoding="utf-8"))
                 except (OSError, json.JSONDecodeError):
                     continue
                 message_id = meta.get("message_id")
+                if (representation == "canvas"
+                        and meta.get("materialization") != "canvas_replay_v1"
+                        and str(message_id) in reconstructed_canvas_messages):
+                    continue
                 native_id = meta.get(id_key)
                 conv_id = meta.get("conv_id") or meta_path.parent.name
                 if not native_id or (representation == "canvas" and native_id == "unknown"):
@@ -529,7 +544,7 @@ class ChatGPTParser(BaseParser):
                     version = meta.get("version")
                     if version is None:
                         continue
-                    asset_id = f"{prefix}:{native_id}:v{version}"
+                    asset_id = str(meta.get("asset_id") or f"{prefix}:{native_id}:v{version}")
                     kind = "artifact"
                 else:
                     asset_id = f"{prefix}:{native_id}"
@@ -539,7 +554,14 @@ class ChatGPTParser(BaseParser):
                     asset_id=asset_id, path=path if path.is_file() else None,
                     kind=kind, origin="assistant", generated=True,
                     created_at=meta.get("create_time"),
-                    metadata={"representation": representation},
+                    metadata={
+                        "representation": representation,
+                        "materialization": meta.get("materialization"),
+                        "native_textdoc_id": meta.get("native_textdoc_id"),
+                        "response_message_id": meta.get("response_message_id"),
+                        "replay_evidence": meta.get("evidence"),
+                        "version": meta.get("version"),
+                    },
                     object_type="message" if valid_message else ("conversation" if conv_id else None),
                     object_id=message_id if valid_message else conv_id,
                     conversation_id=conv_id, message_id=message_id if valid_message else None,

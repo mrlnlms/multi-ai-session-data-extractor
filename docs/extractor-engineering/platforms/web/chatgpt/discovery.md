@@ -133,7 +133,8 @@ marker `image_upload` em content_types. Distinção semântica clara entre
 - `author.name` começa com `canmore.`
 - `metadata.model_slug == "gpt-4o-canmore"` (variante específica)
 
-**Frequência:** 8 convs.
+**Frequência atual:** 28 conversas no raw cumulativo, com 42 pedidos de criação
+e 133 pedidos de atualização.
 
 **Tools relacionados (autores `canmore.*`):**
 - `canmore.create_textdoc` — cria canvas
@@ -141,9 +142,14 @@ marker `image_upload` em content_types. Distinção semântica clara entre
 - `canmore.get_textdoc_content` — leitura
 - `canmore.comment_textdoc` — anotação
 
-**Decisão informada:** tratar canvas como ToolEvent (não inline em
-Message). `tool_name = "canmore.<action>"`. Conteúdo do canvas (textdoc)
-fica em `result` ou `metadata_json` do ToolEvent.
+**Decisão informada:** a operação continua como ToolEvent (não como Message),
+com `tool_name = "canmore.<action>"`. Em paralelo, o extrator combina cada
+pedido assistant com a resposta `canmore.*` filha, recupera o `textdoc_id` e
+reaplica patches regex por branch. Cada estado completo reconstruído vira um
+arquivo e um Asset ligado como `output` à mensagem de pedido exata. O snapshot
+legado achatado pode suprir um payload ausente somente quando `conversation_id`
+e timestamp exato coincidem; falha upstream, resposta ausente ou replay
+indeterminado nunca geram conteúdo inventado.
 
 ---
 

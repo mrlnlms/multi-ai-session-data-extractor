@@ -131,7 +131,12 @@ def main():
         print("ETAPA 2/4: Download assets (delta)")
         print("=" * 60)
         c = extract_canvases(actual_raw_dir)
-        print(f"Canvas: extracted={c['extracted']}, skip={c['skipped_existing']}, err={len(c['errors'])}")
+        print(
+            f"Canvas: extracted={c['extracted']}, skip={c['skipped_existing']}, "
+            f"failed_upstream={c['failed_upstream']}, "
+            f"unreconstructable={c['unreconstructable']}, "
+            f"ambiguous={c['ambiguous']}, err={len(c['errors'])}"
+        )
         r = extract_deep_research(actual_raw_dir)
         print(f"Deep Research: extracted={r['extracted']}, skip={r['skipped_existing']}, err={len(r['errors'])}")
         asset_report = asyncio.run(run_asset_download(actual_raw_dir, profile_name=args.account))

@@ -87,6 +87,29 @@ def test_chatgpt_project_source_index_and_binary_are_distinct(tmp_path):
     assert (finding.status, finding.policy_disposition) == ("excluded", "operational")
 
 
+def test_chatgpt_legacy_canvas_is_duplicate_only_with_same_message_and_bytes(tmp_path):
+    data = tmp_path / "data"
+    root = data / "raw" / "ChatGPT" / "assets" / "canvases" / "conversation"
+    root.mkdir(parents=True)
+    legacy = root / "unknown_v1_report.md"
+    replay = root / "reconstructed__doc__message__v1_report.md"
+    legacy.write_text("same canvas", encoding="utf-8")
+    replay.write_text("same canvas", encoding="utf-8")
+    legacy.with_suffix(".md.meta.json").write_text(json.dumps({
+        "message_id": "message", "textdoc_id": "unknown", "version": 1,
+    }), encoding="utf-8")
+    replay.with_suffix(".md.meta.json").write_text(json.dumps({
+        "message_id": "message", "textdoc_id": "doc", "version": 1,
+        "materialization": "canvas_replay_v1",
+    }), encoding="utf-8")
+
+    evidence = inventory_preserved_session_assets(data)
+    by_name = {Path(item.evidence_path).name: item for item in evidence}
+
+    assert by_name[legacy.name].representation_kind == "verified_duplicate_representation"
+    assert by_name[replay.name].representation_kind == "preserved_binary"
+
+
 def test_chatgpt_canvas_patch_and_memory_export_are_not_generic_binaries(tmp_path):
     data = tmp_path / "data"
     canvas = data / "raw" / "ChatGPT" / "assets" / "canvases" / "conversation"

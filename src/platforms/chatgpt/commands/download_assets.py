@@ -45,8 +45,10 @@ def main():
     # Canvas + Deep Research (offline, le raw)
     print("=== Canvas / Deep Research (offline) ===")
     c = extract_canvases(args.raw_dir)
-    print(f"Canvas: extracted={c['extracted']}, patches={c['updates_patch']}, "
-          f"skip={c['skipped_existing']}, err={len(c['errors'])}")
+    print(f"Canvas: extracted={c['extracted']}, updates={c['updates_patch']}, "
+          f"skip={c['skipped_existing']}, failed_upstream={c['failed_upstream']}, "
+          f"unreconstructable={c['unreconstructable']}, ambiguous={c['ambiguous']}, "
+          f"err={len(c['errors'])}")
     if c['by_type']:
         print(f"  by_type: {c['by_type']}")
     r = extract_deep_research(args.raw_dir)

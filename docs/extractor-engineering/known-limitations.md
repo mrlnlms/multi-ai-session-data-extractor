@@ -237,10 +237,15 @@ These validations require a Pro Max account and remain open until someone tests:
   in the [source-by-source coverage matrix](asset-coverage.md). Every eligible
   file representation preserved in raw/merged across Grok, Kimi, Qwen, Gemini,
   ChatGPT, Claude.ai, DeepSeek, Perplexity, and NotebookLM is accounted for.
-  ChatGPT project sources, complete
-  Canvas versions, Deep Research reports and legacy/export images are indexed;
-  its Project indexes, Canvas operation patches and account-memory exports stay
-  in their operational/domain representations. Claude.ai extracted artifact
+  ChatGPT project sources, 149 reconstructed Canvas states, Deep Research
+  reports and legacy/export images are indexed. Its Project indexes and Canvas
+  operation records stay in their operational/domain representations; every
+  reconstructable successful Canvas state is a separate message-output Asset.
+  Fourteen Canvas mutations failed upstream, five update requests have no
+  preserved response, five create requests lack usable content evidence and two
+  successful regex patches cannot be reproduced exactly; none is fabricated as
+  a file. ChatGPT and Claude.ai account-memory exports remain explicitly queued
+  for a future memory/configuration domain rather than the Asset graph. Claude.ai extracted artifact
   versions are indexed as exact message outputs; Claude inline `attachments`
   remain text-bearing message metadata rather than fake binaries. Perplexity
   third-party featured images remain external references rather than

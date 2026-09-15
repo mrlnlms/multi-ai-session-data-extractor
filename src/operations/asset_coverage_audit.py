@@ -258,11 +258,37 @@ def _qwen_verified_manifest_lineage(
     return unique, duplicates
 
 
+def _chatgpt_verified_canvas_duplicates(account_root: Path) -> set[str]:
+    """Identify legacy Canvas files only when replay bytes and message lineage agree."""
+    canvas_root = account_root / "assets" / "canvases"
+    replay_by_message: dict[str, set[str]] = {}
+    legacy: list[tuple[Path, str]] = []
+    for meta_path in sorted(canvas_root.glob("*/*.meta.json")):
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        message_id = meta.get("message_id")
+        content_path = Path(str(meta_path)[:-len(".meta.json")])
+        if not message_id or not content_path.is_file():
+            continue
+        if meta.get("materialization") == "canvas_replay_v1":
+            replay_by_message.setdefault(str(message_id), set()).add(_sha256_file(content_path))
+        else:
+            legacy.append((content_path, str(message_id)))
+    return {
+        _logical_rel(path, account_root)
+        for path, message_id in legacy
+        if _sha256_file(path) in replay_by_message.get(message_id, set())
+    }
+
+
 def _filesystem_evidence(data_root: Path) -> list[RepresentationEvidence]:
     evidence: list[RepresentationEvidence] = []
     perplexity_duplicate_ids: dict[tuple[str, str], str] = {}
     qwen_manifest_ids: dict[tuple[str, str], str] = {}
     qwen_verified_duplicates: set[tuple[str, str]] = set()
+    chatgpt_canvas_duplicates: set[tuple[str, str]] = set()
     for account, account_root in iter_account_roots(data_root / "merged" / "Perplexity"):
         perplexity_duplicate_ids.update({
             (account, slug): native_id
@@ -278,6 +304,12 @@ def _filesystem_evidence(data_root: Path) -> list[RepresentationEvidence]:
             (account, logical) for logical in verified_duplicates
         )
     for layer in ("raw", "merged"):
+        for account, account_root in iter_account_roots(data_root / layer / "ChatGPT"):
+            chatgpt_canvas_duplicates.update(
+                (account, logical)
+                for logical in _chatgpt_verified_canvas_duplicates(account_root)
+            )
+    for layer in ("raw", "merged"):
         for source in KNOWN_PLATFORMS:
             source_root = data_root / layer / source
             for path in _safe_regular_files(source_root, data_root):
@@ -287,6 +319,8 @@ def _filesystem_evidence(data_root: Path) -> list[RepresentationEvidence]:
                 # from the path keeps each physical file in exactly one scope.
                 kind = _kind_for_file(path, source_root, source)
                 if source == "Qwen" and (account, logical) in qwen_verified_duplicates:
+                    kind = "verified_duplicate_representation"
+                if source == "ChatGPT" and (account, logical) in chatgpt_canvas_duplicates:
                     kind = "verified_duplicate_representation"
                 if kind == "notebooklm_note_materialization":
                     try:

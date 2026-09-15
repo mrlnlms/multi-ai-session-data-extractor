@@ -245,7 +245,7 @@
       "source": "ChatGPT",
       "representation_kind": "canvas_patch_record",
       "disposition": "domain_only",
-      "reason": "Incremental Canvas operation evidence rather than a separately delivered file"
+      "reason": "Preserved Canvas operation evidence; every reconstructable successful state is materialized separately as a message-output Asset"
     },
     {
       "source": "ChatGPT",

@@ -53,14 +53,25 @@ branches, assets and asset_links Parquets.
   retained canonical ancestor and keep their native tool-message/block locator
   in metadata; if no ancestor exists, placement degrades to conversation level.
 - Project knowledge files use their indexed `file_id` and link to the Project
-  as `context`. Complete Canvas versions and Deep Research reports link to the
+  as `context`. Canvas operations are replayed branch-by-branch into immutable
+  complete states, and these states plus Deep Research reports link to the
   producing message as `output`. Legacy/export images retain only the
   conversation relationship and unknown role when stronger evidence is absent.
-- **Availability** is explicit: the current two-account base produces 997
-  assets and 1,002 links, with 927 local binaries and 70 metadata-only assets.
+- **Canvas replay:** 42 create and 133 update requests are observed. The current
+  evidence materializes 149 exact states (37 creates plus 112 updates), all with
+  native `textdoc_id`. Fourteen upstream-declared failures produce no state;
+  five update requests lack a preserved response; five create requests have no
+  usable payload/response in raw and only a truncated legacy representation;
+  two successful regex patches cannot be applied to the preceding preserved
+  state. These exceptions remain visible as protocol limitations, not invented
+  files.
+- **Availability** is explicit: the current two-account base produces 1,117
+  assets and 1,122 links, with 1,047 local binaries and 70 metadata-only assets.
   All links and available paths resolve, and no upstream pointer URL is published.
-- Project `_files.json` indexes, incremental Canvas patch records and account
-  memory exports remain preserved outside the Asset domain.
+- Project `_files.json` indexes and Canvas operation records remain preserved
+  outside the Asset domain; their reconstructable successful Canvas states are
+  Assets. Account memory exports remain preserved for a named future
+  memory/configuration domain and are not Assets.
 - **Tether quote**, **canvas**, **deep_research**.
 - **Custom GPT vs project** distinguished.
 - **Preservation** via `is_preserved_missing` + `last_seen_in_server`.

@@ -25,6 +25,10 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from src.platforms.chatgpt.extractor.api_client import BASE_URL
+from src.platforms.chatgpt.extractor.canvas_materializer import (
+    parse_canvas_payload,
+    replay_canvas_snapshots,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -199,126 +203,145 @@ def _canvas_ext(textdoc_type: str, name: str = "") -> str:
     t = (textdoc_type or "").lower()
     if t == "document":
         return "md"
-    if t == "code":
+    if t == "code" or t.startswith("code/"):
         # Tenta inferir da extensao do nome (ex: "script.py" → "py")
         if "." in name:
             ext = name.rsplit(".", 1)[-1].lower()
             if len(ext) <= 6:
                 return ext
+        if "/" in t:
+            language = t.split("/", 1)[1]
+            return {"javascript": "js", "typescript": "ts", "python": "py"}.get(language, language)
         return "txt"
     if t == "html":
         return "html"
     return "txt"
 
 
+def _legacy_canvas_payloads(raw_dir: Path) -> dict[tuple[str, float], dict[str, Any]]:
+    """Load exact Canvas requests retained by legacy flattened snapshots."""
+    data_root = next((parent for parent in raw_dir.resolve().parents if parent.name == "data"), None)
+    if data_root is None:
+        return {}
+    snapshot_root = data_root / "external" / "chatgpt-extension-snapshot"
+    recovered: dict[tuple[str, float], dict[str, Any]] = {}
+    conflicts: set[tuple[str, float]] = set()
+    for snapshot_path in sorted(snapshot_root.glob("**/chatgpt_all_conversations.json")):
+        try:
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        for conversation in snapshot.get("conversations") or []:
+            if not isinstance(conversation, dict) or not conversation.get("id"):
+                continue
+            conv_id = str(conversation["id"])
+            for message in conversation.get("messages") or []:
+                if not isinstance(message, dict) or message.get("role") != "assistant":
+                    continue
+                timestamp = message.get("timestamp")
+                if not isinstance(timestamp, (int, float)):
+                    continue
+                payload = parse_canvas_payload(message.get("content"))
+                if payload and ("content" in payload or "updates" in payload):
+                    key = (conv_id, round(float(timestamp), 6))
+                    if key in recovered and recovered[key] != payload:
+                        conflicts.add(key)
+                    elif key not in conflicts:
+                        recovered[key] = payload
+    for key in conflicts:
+        recovered.pop(key, None)
+    return recovered
+
+
 def extract_canvases(raw_dir: Path, skip_existing: bool = True) -> dict:
-    """Extrai Canvas/textdoc do raw ChatGPT.
-
-    Varre msgs com recipient='canmore.*' (create/update/comment). Part[0] e JSON com
-    {name, type, content}. Salva cada versao como arquivo separado.
-
-    Output: assets/canvases/{conv_id}/{textdoc_id}_v{N}_{name}.{ext} + meta.json
-    """
+    """Replay Canvas operations and materialize every reconstructable state."""
     raw_path = raw_dir / "chatgpt_raw.json"
     if not raw_path.exists():
-        return {"extracted": 0, "skipped_existing": 0, "updates_patch": 0, "by_type": {}, "errors": []}
+        return {
+            "extracted": 0, "skipped_existing": 0, "updates_patch": 0,
+            "by_type": {}, "errors": [], "failed_upstream": 0,
+            "unreconstructable": 0, "ambiguous": 0,
+        }
 
     with open(raw_path) as f:
         data = json.load(f)
 
     out_root = raw_dir / "assets" / "canvases"
     out_root.mkdir(parents=True, exist_ok=True)
+    legacy_payloads = _legacy_canvas_payloads(raw_dir)
 
-    stats = {"extracted": 0, "skipped_existing": 0, "updates_patch": 0, "by_type": {}, "errors": []}
-    # Conta versoes por (conv, textdoc_id)
-    version_counter: dict[tuple[str, str], int] = {}
+    stats = {
+        "extracted": 0, "skipped_existing": 0, "updates_patch": 0,
+        "by_type": {}, "errors": [], "failed_upstream": 0,
+        "unreconstructable": 0, "ambiguous": 0,
+    }
 
     for cid, conv in data.get("conversations", {}).items():
-        # Ordena nodes por create_time pra numerar versoes na ordem
-        nodes = []
-        for nid, n in (conv.get("mapping") or {}).items():
-            m = (n or {}).get("message") or {}
-            if not m: continue
-            recipient = m.get("recipient") or ""
-            if not recipient.startswith("canmore."):
-                continue
-            if (m.get("author") or {}).get("role") != "assistant":
-                continue
-            ct = (m.get("create_time") or 0) or 0
-            nodes.append((ct, nid, m, recipient))
-        nodes.sort(key=lambda x: x[0])
-
-        for ct, nid, m, recipient in nodes:
-            parts = (m.get("content") or {}).get("parts") or []
-            if not parts or not isinstance(parts[0], str):
-                continue
-            raw_payload = parts[0]
-            try:
-                payload = json.loads(raw_payload)
-            except Exception as e:
-                stats["errors"].append((cid[:8], f"{recipient}: json parse: {str(e)[:80]}"))
-                continue
-
-            textdoc_id = payload.get("textdoc_id") or payload.get("id") or "unknown"
-            name = payload.get("name") or "untitled"
-            td_type = payload.get("type") or "document"
-            content = payload.get("content")
-
-            # update_textdoc usa pattern/replacement (patch, sem content full)
-            # Guarda como .patch.json pra historico
-            if recipient == "canmore.update_textdoc" and content is None:
-                updates = payload.get("updates") or []
-                if not updates:
-                    continue
-                out_conv = out_root / cid
-                out_conv.mkdir(parents=True, exist_ok=True)
-                patch_fname = f"{textdoc_id}__patch_{nid[:8]}.json"
-                out_path = out_conv / patch_fname
-                if skip_existing and out_path.exists():
-                    stats["skipped_existing"] += 1
-                    continue
-                out_path.write_text(json.dumps({
-                    "recipient": recipient,
-                    "textdoc_id": textdoc_id,
-                    "updates": updates,
-                    "message_id": nid,
-                    "create_time": ct,
-                }, indent=2, ensure_ascii=False))
-                stats["updates_patch"] += 1
-                continue
-
-            if content is None:
-                continue
-
-            key = (cid, textdoc_id)
-            version_counter[key] = version_counter.get(key, 0) + 1
-            v = version_counter[key]
-
-            ext = _canvas_ext(td_type, name)
+        fallbacks: dict[str, dict[str, Any]] = {}
+        for node_id, node in (conv.get("mapping") or {}).items():
+            message = (node or {}).get("message") or {}
+            timestamp = message.get("create_time")
+            if isinstance(timestamp, (int, float)):
+                recovered = legacy_payloads.get((str(cid), round(float(timestamp), 6)))
+                if recovered:
+                    fallbacks[str(node_id)] = recovered
+        snapshots, replay = replay_canvas_snapshots(conv, fallbacks)
+        stats["failed_upstream"] += replay["failed_upstream"]
+        stats["unreconstructable"] += replay["unreconstructable"]
+        stats["ambiguous"] += replay["ambiguous"]
+        stats["updates_patch"] += replay["updates"]
+        for snapshot in snapshots:
+            ext = _canvas_ext(snapshot.textdoc_type, snapshot.name)
             out_conv = out_root / cid
             out_conv.mkdir(parents=True, exist_ok=True)
-            fname = f"{_slug(textdoc_id, 30)}_v{v}_{_slug(name, 40)}.{ext}"
+            fname = (
+                f"reconstructed__{_slug(snapshot.document_id, 34)}"
+                f"__{_slug(snapshot.request_message_id, 36)}"
+                f"__v{snapshot.version}_{_slug(snapshot.name, 40)}.{ext}"
+            )
             out_path = out_conv / fname
-            if skip_existing and out_path.exists():
-                stats["skipped_existing"] += 1
-                continue
+            metadata = {
+                "materialization": "canvas_replay_v1",
+                "conv_id": cid,
+                "textdoc_id": snapshot.document_id,
+                "native_textdoc_id": snapshot.native_textdoc_id,
+                "version": snapshot.version,
+                "name": snapshot.name,
+                "type": snapshot.textdoc_type,
+                "message_id": snapshot.request_message_id,
+                "response_message_id": snapshot.response_message_id,
+                "create_time": snapshot.create_time,
+                "content_size": len(snapshot.content),
+                "evidence": snapshot.evidence,
+                "asset_id": f"canvas:{snapshot.document_id}:{snapshot.request_message_id}",
+            }
+            meta_path = out_path.with_suffix(out_path.suffix + ".meta.json")
+            expected_meta = json.dumps(metadata, indent=2, ensure_ascii=False, sort_keys=True)
+            if out_path.exists() or meta_path.exists():
+                content_matches = (not out_path.exists() or (
+                    out_path.is_file()
+                    and out_path.read_text(encoding="utf-8") == snapshot.content
+                ))
+                metadata_matches = (not meta_path.exists() or (
+                    meta_path.is_file()
+                    and meta_path.read_text(encoding="utf-8") == expected_meta
+                ))
+                if content_matches and metadata_matches and out_path.exists() and meta_path.exists():
+                    stats["skipped_existing"] += 1
+                    continue
+                if not content_matches or not metadata_matches:
+                    stats["errors"].append((fname, "existing Canvas snapshot differs"))
+                    continue
 
             try:
-                out_path.write_text(content, encoding="utf-8")
+                if not out_path.exists():
+                    out_path.write_text(snapshot.content, encoding="utf-8")
+                if not meta_path.exists():
+                    meta_path.write_text(expected_meta, encoding="utf-8")
                 stats["extracted"] += 1
-                stats["by_type"][td_type] = stats["by_type"].get(td_type, 0) + 1
-                meta_path = out_path.with_suffix(out_path.suffix + ".meta.json")
-                meta_path.write_text(json.dumps({
-                    "conv_id": cid,
-                    "textdoc_id": textdoc_id,
-                    "version": v,
-                    "name": name,
-                    "type": td_type,
-                    "recipient": recipient,
-                    "message_id": nid,
-                    "create_time": ct,
-                    "content_size": len(content),
-                }, indent=2, ensure_ascii=False))
+                stats["by_type"][snapshot.textdoc_type] = (
+                    stats["by_type"].get(snapshot.textdoc_type, 0) + 1
+                )
             except Exception as e:
                 stats["errors"].append((fname, str(e)[:100]))
 

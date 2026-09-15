@@ -17,7 +17,7 @@ paths are relative to `data/` and resolve to local files.
 
 | Source | Assets / unique canonical IDs | Origin distribution | Links / role distribution | Linked | Available / missing | Reader capability | Excluded or deliberately separate representations |
 |---|---:|---|---|---:|---:|---|---|
-| ChatGPT | 997 / 997 | user 696; assistant 208; unknown 93 | 1,002; input 559, output 213, context 137, unknown 93 | 100.0% | 927 / 70 | inline | Project indexes, Canvas patches and account-memory exports remain operational/domain evidence rather than files delivered through an interaction |
+| ChatGPT | 1,117 / 1,117 | user 696; assistant 328; unknown 93 | 1,122; input 559, output 333, context 137, unknown 93 | 100.0% | 1,047 / 70 | inline | 149 reconstructed Canvas states are outputs; their operation records remain domain evidence, and account-memory exports remain outside the Asset domain |
 | Claude.ai | 3,566 / 3,566 | user 2,082; assistant 1,484 | 3,617; input 1,892, output 1,484, context 241 | 100.0% | 3,292 / 274 | message | Extracted artifact versions are exact message outputs; inline text-bearing `attachments` and account-memory exports remain domain content rather than fake binaries |
 | Gemini | 364 / 364 | assistant 173; user 110; unknown 81 | 963; input 787, output 176 | 78.0% | 364 / 0 | message | 27 additional physical copies (25 images and 2 reports) are verified same-account/content duplicates; no placement is invented for manifest-only images |
 | NotebookLM | 5,252 / 5,252 | platform 4,499; assistant 740; user 13 | 5,252; context 4,512, output 740 | 100.0% | 5,252 / 0 | library | 179 real note Markdown files, 105 mind-map trees and 250 text-output envelopes retain exact note/output identity; 184 legacy UUID-reference/empty Markdown materializations are operational, not notes |
@@ -30,7 +30,7 @@ paths are relative to `data/` and resolve to local files.
 | Codex | 44 / 44 | user 44 | 44; input 44 | 100.0% | 44 / 0 | inline | User-message data URIs are materialized; image payloads inside tool/guardian envelopes are not user-facing assets |
 | Gemini CLI | 0 / 0 | — | 0 | — | 0 / 0 | library | Tool-output text spills and working-tree paths are operational evidence; no eligible session file is currently preserved |
 | Antigravity CLI | 12 / 12 | assistant 12 | 12; output 12 | 100.0% | 12 / 0 | message | Explicit `ArtifactMetadata` + preserved `CodeContent` is eligible; opaque containers and ordinary tool paths are not assets |
-| **Total** | **14,280 / 14,280** | user 6,840; assistant 2,680; platform 4,499; unknown 261 | **14,875**; input 7,107, output 2,679, context 4,909, unknown 180 | **98.9%** | **13,849 / 431** | mixed | Coverage expands only through source-specific evidence |
+| **Total** | **14,400 / 14,400** | user 6,840; assistant 2,800; platform 4,499; unknown 261 | **14,995**; input 7,107, output 2,799, context 4,909, unknown 180 | **98.8%** | **13,969 / 431** | mixed | Coverage expands only through source-specific evidence |
 
 ## Reader capability levels
 
@@ -56,6 +56,14 @@ defect rather than mislabeled as historical notes. Six historical generated
 briefs are covered from the immutable external archive. The note and output
 domain tables remain authoritative; Asset metadata does not duplicate their
 content.
+
+ChatGPT Canvas request/response records are replayed along the preserved
+conversation graph. The current archive yields 149 immutable file states: 37
+creates with complete content and 112 successful update states, including 21
+states recovered by joining the canonical raw with the immutable legacy
+flattened snapshot on conversation identity and exact message timestamp. Each
+state links to its producing request message. The 117 legacy patch JSON files
+remain reproducible operation evidence rather than duplicate Assets.
 
 ## Publication invariants
 
