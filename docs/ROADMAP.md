@@ -5,7 +5,7 @@ decisions. It intentionally links to the evidence and technical detail rather
 than duplicating it here. Shipped work belongs in `git log`; platform-specific
 behavior belongs in its own documentation.
 
-**Last reviewed:** 2026-08-31.
+**Last reviewed:** 2026-09-15.
 
 ## Current operational state
 
@@ -210,6 +210,7 @@ updated when the item is investigated or closed.
 
 | Area | Examples of open coverage | Authoritative source |
 |---|---|---|
+| Account memory/configuration domain | Model preserved ChatGPT and Claude.ai account-memory exports as durable, queryable domain records without misclassifying them as interaction-file Assets. | [known limitations](extractor-engineering/known-limitations.md) and the [ChatGPT](extractor-engineering/platforms/web/chatgpt/state.md) / [Claude.ai](extractor-engineering/platforms/web/claude-ai/state.md) state records |
 | Perplexity Max / Pro features | Computer mode, scheduled tasks, model council, modern Deep Research. | [known limitations](extractor-engineering/known-limitations.md#perplexity) |
 | Gemini | Draft/regenerate alternatives; additional account support; branches, grounding citations and Add to notebook. | [known limitations](extractor-engineering/known-limitations.md#gemini) and [Gemini server behavior](extractor-engineering/platforms/web/gemini/server-behavior.md) |
 | DeepSeek | Agent mode, full R1 reasoning sample and uploaded files. | [DeepSeek server behavior](extractor-engineering/platforms/web/deepseek/server-behavior.md) |
