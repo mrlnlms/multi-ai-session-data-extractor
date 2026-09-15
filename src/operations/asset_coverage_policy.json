@@ -1,0 +1,312 @@
+{
+  "policy_version": 1,
+  "rules": [
+    {
+      "source": "ChatGPT",
+      "representation_kind": "capture_log",
+      "disposition": "operational",
+      "reason": "Capture execution evidence, not an interaction file"
+    },
+    {
+      "source": "Claude.ai",
+      "representation_kind": "capture_log",
+      "disposition": "operational",
+      "reason": "Capture execution evidence, not an interaction file"
+    },
+    {
+      "source": "Gemini",
+      "representation_kind": "capture_log",
+      "disposition": "operational",
+      "reason": "Capture execution evidence, not an interaction file"
+    },
+    {
+      "source": "NotebookLM",
+      "representation_kind": "capture_log",
+      "disposition": "operational",
+      "reason": "Capture execution evidence, not an interaction file"
+    },
+    {
+      "source": "Qwen",
+      "representation_kind": "capture_log",
+      "disposition": "operational",
+      "reason": "Capture execution evidence, not an interaction file"
+    },
+    {
+      "source": "DeepSeek",
+      "representation_kind": "capture_log",
+      "disposition": "operational",
+      "reason": "Capture execution evidence, not an interaction file"
+    },
+    {
+      "source": "Perplexity",
+      "representation_kind": "capture_log",
+      "disposition": "operational",
+      "reason": "Capture execution evidence, not an interaction file"
+    },
+    {
+      "source": "Grok",
+      "representation_kind": "capture_log",
+      "disposition": "operational",
+      "reason": "Capture execution evidence, not an interaction file"
+    },
+    {
+      "source": "Kimi",
+      "representation_kind": "capture_log",
+      "disposition": "operational",
+      "reason": "Capture execution evidence, not an interaction file"
+    },
+    {
+      "source": "Claude Code",
+      "representation_kind": "capture_log",
+      "disposition": "operational",
+      "reason": "Capture execution evidence, not an interaction file"
+    },
+    {
+      "source": "Codex",
+      "representation_kind": "capture_log",
+      "disposition": "operational",
+      "reason": "Capture execution evidence, not an interaction file"
+    },
+    {
+      "source": "Gemini CLI",
+      "representation_kind": "capture_log",
+      "disposition": "operational",
+      "reason": "Capture execution evidence, not an interaction file"
+    },
+    {
+      "source": "Antigravity CLI",
+      "representation_kind": "capture_log",
+      "disposition": "operational",
+      "reason": "Capture execution evidence, not an interaction file"
+    },
+    {
+      "source": "ChatGPT",
+      "representation_kind": "operational_record",
+      "disposition": "operational",
+      "reason": "Discovery or reconciliation evidence, not an interaction file"
+    },
+    {
+      "source": "ChatGPT",
+      "representation_kind": "domain_record",
+      "disposition": "domain_only",
+      "reason": "Conversation or domain envelope; files evidenced inside remain independently eligible"
+    },
+    {
+      "source": "Claude.ai",
+      "representation_kind": "operational_record",
+      "disposition": "operational",
+      "reason": "Discovery or reconciliation evidence, not an interaction file"
+    },
+    {
+      "source": "Claude.ai",
+      "representation_kind": "domain_record",
+      "disposition": "domain_only",
+      "reason": "Conversation or domain envelope; files evidenced inside remain independently eligible"
+    },
+    {
+      "source": "Gemini",
+      "representation_kind": "operational_record",
+      "disposition": "operational",
+      "reason": "Discovery or reconciliation evidence, not an interaction file"
+    },
+    {
+      "source": "Gemini",
+      "representation_kind": "domain_record",
+      "disposition": "domain_only",
+      "reason": "Conversation or domain envelope; files evidenced inside remain independently eligible"
+    },
+    {
+      "source": "NotebookLM",
+      "representation_kind": "operational_record",
+      "disposition": "operational",
+      "reason": "Discovery or reconciliation evidence, not an interaction file"
+    },
+    {
+      "source": "NotebookLM",
+      "representation_kind": "domain_record",
+      "disposition": "domain_only",
+      "reason": "Conversation or domain envelope; files evidenced inside remain independently eligible"
+    },
+    {
+      "source": "Qwen",
+      "representation_kind": "operational_record",
+      "disposition": "operational",
+      "reason": "Discovery or reconciliation evidence, not an interaction file"
+    },
+    {
+      "source": "Qwen",
+      "representation_kind": "domain_record",
+      "disposition": "domain_only",
+      "reason": "Conversation or domain envelope; files evidenced inside remain independently eligible"
+    },
+    {
+      "source": "DeepSeek",
+      "representation_kind": "operational_record",
+      "disposition": "operational",
+      "reason": "Discovery or reconciliation evidence, not an interaction file"
+    },
+    {
+      "source": "DeepSeek",
+      "representation_kind": "domain_record",
+      "disposition": "domain_only",
+      "reason": "Conversation or domain envelope; files evidenced inside remain independently eligible"
+    },
+    {
+      "source": "Perplexity",
+      "representation_kind": "operational_record",
+      "disposition": "operational",
+      "reason": "Discovery or reconciliation evidence, not an interaction file"
+    },
+    {
+      "source": "Perplexity",
+      "representation_kind": "domain_record",
+      "disposition": "domain_only",
+      "reason": "Conversation or domain envelope; files evidenced inside remain independently eligible"
+    },
+    {
+      "source": "Grok",
+      "representation_kind": "operational_record",
+      "disposition": "operational",
+      "reason": "Discovery or reconciliation evidence, not an interaction file"
+    },
+    {
+      "source": "Grok",
+      "representation_kind": "domain_record",
+      "disposition": "domain_only",
+      "reason": "Conversation or domain envelope; files evidenced inside remain independently eligible"
+    },
+    {
+      "source": "Kimi",
+      "representation_kind": "operational_record",
+      "disposition": "operational",
+      "reason": "Discovery or reconciliation evidence, not an interaction file"
+    },
+    {
+      "source": "Kimi",
+      "representation_kind": "domain_record",
+      "disposition": "domain_only",
+      "reason": "Conversation or domain envelope; files evidenced inside remain independently eligible"
+    },
+    {
+      "source": "Gemini",
+      "representation_kind": "asset_manifest",
+      "disposition": "operational",
+      "reason": "Download and lineage metadata describing assets, not the represented file"
+    },
+    {
+      "source": "Grok",
+      "representation_kind": "asset_manifest",
+      "disposition": "operational",
+      "reason": "Download and lineage metadata describing assets, not the represented file"
+    },
+    {
+      "source": "Kimi",
+      "representation_kind": "asset_manifest",
+      "disposition": "operational",
+      "reason": "Download and lineage metadata describing assets, not the represented file"
+    },
+    {
+      "source": "NotebookLM",
+      "representation_kind": "asset_manifest",
+      "disposition": "operational",
+      "reason": "Download and lineage metadata describing assets, not the represented file"
+    },
+    {
+      "source": "Perplexity",
+      "representation_kind": "asset_manifest",
+      "disposition": "operational",
+      "reason": "Download and lineage metadata describing assets, not the represented file"
+    },
+    {
+      "source": "Qwen",
+      "representation_kind": "asset_manifest",
+      "disposition": "operational",
+      "reason": "Download and lineage metadata describing assets, not the represented file"
+    },
+    {
+      "source": "ChatGPT",
+      "representation_kind": "asset_metadata_sidecar",
+      "disposition": "operational",
+      "reason": "Companion metadata for a separately preserved file representation"
+    },
+    {
+      "source": "Claude.ai",
+      "representation_kind": "asset_metadata_sidecar",
+      "disposition": "operational",
+      "reason": "Companion metadata for a separately preserved file representation"
+    },
+    {
+      "source": "Gemini",
+      "representation_kind": "asset_metadata_sidecar",
+      "disposition": "operational",
+      "reason": "Companion metadata for a separately preserved file representation"
+    },
+    {
+      "source": "Claude Code",
+      "representation_kind": "cli_session_record",
+      "disposition": "domain_only",
+      "reason": "Session envelope; embedded inputs and delivered outputs remain independently eligible"
+    },
+    {
+      "source": "Codex",
+      "representation_kind": "cli_session_record",
+      "disposition": "domain_only",
+      "reason": "Session envelope; embedded inputs and delivered outputs remain independently eligible"
+    },
+    {
+      "source": "Gemini CLI",
+      "representation_kind": "cli_session_record",
+      "disposition": "domain_only",
+      "reason": "Session envelope; embedded inputs and delivered outputs remain independently eligible"
+    },
+    {
+      "source": "Antigravity CLI",
+      "representation_kind": "cli_session_record",
+      "disposition": "domain_only",
+      "reason": "Session envelope; embedded inputs and delivered outputs remain independently eligible"
+    },
+    {
+      "source": "Claude Code",
+      "representation_kind": "agent_memory",
+      "disposition": "domain_only",
+      "reason": "Canonical agent-memory domain content, not an interaction attachment"
+    },
+    {
+      "source": "Claude Code",
+      "representation_kind": "tool_file_reference",
+      "disposition": "external_reference",
+      "reason": "Tool-operated path without independently preserved attachment or output bytes"
+    },
+    {
+      "source": "Codex",
+      "representation_kind": "tool_file_reference",
+      "disposition": "external_reference",
+      "reason": "Tool-operated path without independently preserved attachment or output bytes"
+    },
+    {
+      "source": "Gemini CLI",
+      "representation_kind": "tool_file_reference",
+      "disposition": "external_reference",
+      "reason": "Tool-operated path without independently preserved attachment or output bytes"
+    },
+    {
+      "source": "Antigravity CLI",
+      "representation_kind": "tool_file_reference",
+      "disposition": "external_reference",
+      "reason": "Tool-operated path without independently preserved attachment or output bytes"
+    },
+    {
+      "source": "Gemini CLI",
+      "representation_kind": "cli_operational_state",
+      "disposition": "operational",
+      "reason": "Local profile, project, or parser state rather than interaction content"
+    },
+    {
+      "source": "Antigravity CLI",
+      "representation_kind": "storage_container",
+      "disposition": "domain_only",
+      "reason": "Preservation envelope; decoded attachment or output objects remain independently eligible"
+    }
+  ]
+}
+
