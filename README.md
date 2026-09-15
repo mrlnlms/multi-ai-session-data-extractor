@@ -132,6 +132,9 @@ extractor → reconciler → parser → unify
    inventory of every file representation in the archive; the
    [source-by-source matrix](docs/extractor-engineering/asset-coverage.md)
    records relationship precision, local availability, and deliberate gaps.
+   CLI session-file coverage is reported separately: Claude Code and Codex
+   publish embedded user images, Antigravity publishes explicit generated
+   artifacts, and the current Gemini CLI archive has no eligible session file.
    Web rows carry the immutable catalog UUID in `account_id`; the legacy
    display `account` remains available. CLI and manual rows keep
    `account_id` null until a durable identity is observable.

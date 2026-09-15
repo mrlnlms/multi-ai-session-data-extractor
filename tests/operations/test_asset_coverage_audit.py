@@ -33,10 +33,14 @@ def _fixture_archive(tmp_path: Path) -> Path:
             "type": "base64", "media_type": "image/png", "data": "YWJj",
         }}]},
     }) + "\n")
-    codex = data / "raw" / "Codex" / "rollout.jsonl"
-    codex.write_text(json.dumps({"type": "response_item", "payload": {
-        "type": "message", "content": [{"type": "input_image", "image_url": "data:image/png;base64,YWJj"}],
-    }}) + "\n")
+    codex = data / "raw" / "Codex" / "rollout-test.jsonl"
+    codex.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "session"}}),
+        json.dumps({"timestamp": "2026-01-01T00:00:00Z", "type": "response_item", "payload": {
+            "type": "message", "role": "user",
+            "content": [{"type": "input_image", "image_url": "data:image/png;base64,YWJj"}],
+        }}),
+    ]) + "\n")
     return data
 
 
@@ -73,6 +77,15 @@ def test_project_sources_are_preserved_binary_candidates(tmp_path):
     assert item.representation_kind == "preserved_binary"
 
 
+def test_cli_materialized_artifacts_are_preserved_binary_candidates(tmp_path):
+    data = tmp_path / "data"
+    path = data / "raw" / "Antigravity CLI" / "_artifacts" / "conv" / "report.md"
+    path.parent.mkdir(parents=True)
+    path.write_text("report")
+    [item] = inventory_preserved_session_assets(data)
+    assert item.representation_kind == "preserved_binary"
+
+
 def test_malformed_session_evidence_is_never_silently_ignored(tmp_path):
     data = tmp_path / "data"
     path = data / "raw" / "Codex" / "broken.jsonl"
@@ -80,6 +93,18 @@ def test_malformed_session_evidence_is_never_silently_ignored(tmp_path):
     path.write_text("not-json\n")
     evidence = inventory_preserved_session_assets(data)
     assert any(item.representation_kind == "malformed_evidence" for item in evidence)
+
+
+def test_claude_code_jsonl_keeps_unicode_line_separator_inside_json_string(tmp_path):
+    data = tmp_path / "data"
+    path = data / "raw" / "Claude Code" / "project" / "session.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({
+        "type": "user", "uuid": "message", "sessionId": "session",
+        "message": {"content": [{"type": "text", "text": "a\u2028b"}]},
+    }, ensure_ascii=False) + "\n")
+    evidence = inventory_preserved_session_assets(data)
+    assert not any(item.representation_kind == "malformed_evidence" for item in evidence)
 
 
 def test_every_fixture_lands_in_exactly_one_status(tmp_path):
@@ -152,9 +177,35 @@ def test_public_policy_has_bounded_unique_nonsecret_rules():
 
 
 def test_unmatched_class_stays_unresolved():
-    item = RepresentationEvidence("Gemini CLI", "default", "tool_output_record", "raw/Gemini CLI/output", None, None, None, None, None, None)
+    item = RepresentationEvidence("Gemini CLI", "default", "new_unknown_shape", "raw/Gemini CLI/output", None, None, None, None, None, None)
     [finding] = reconcile_asset_coverage([item], pd.DataFrame(), pd.DataFrame(), load_policy())
     assert finding.status == "unresolved"
+
+
+def test_gemini_cli_tool_output_spill_is_operational():
+    item = RepresentationEvidence("Gemini CLI", "default", "tool_output_record", "raw/Gemini CLI/tool-outputs/x.txt", None, None, None, None, None, None)
+    [finding] = reconcile_asset_coverage([item], pd.DataFrame(), pd.DataFrame(), load_policy())
+    assert finding.status == "excluded"
+    assert finding.policy_disposition == "operational"
+
+
+@pytest.mark.parametrize("relative,kind,disposition", [
+    ("background-processes/process.log", "cli_background_log", "operational"),
+    ("bin/tool", "cli_bundled_binary", "cache"),
+    ("logs.json.invalid_json.1.bak", "cli_recovery_backup", "operational"),
+])
+def test_gemini_cli_non_session_files_are_bounded_exclusions(
+    tmp_path, relative, kind, disposition
+):
+    data = tmp_path / "data"
+    path = data / "raw" / "Gemini CLI" / relative
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"operational")
+    [item] = inventory_preserved_session_assets(data)
+    assert item.representation_kind == kind
+    [finding] = reconcile_asset_coverage([item], pd.DataFrame(), pd.DataFrame(), load_policy())
+    assert finding.status == "excluded"
+    assert finding.policy_disposition == disposition
 
 
 def test_native_file_record_reconciles_by_source_and_native_id():
@@ -162,3 +213,22 @@ def test_native_file_record_reconciles_by_source_and_native_id():
     assets = pd.DataFrame({"source": ["deepseek"], "asset_id": ["file-1"], "asset_path": [None]})
     [finding] = reconcile_asset_coverage([item], assets, pd.DataFrame(), load_policy())
     assert finding.status == "covered"
+
+
+def test_antigravity_explicit_artifact_record_is_eligible(tmp_path):
+    data = tmp_path / "data"
+    path = data / "raw" / "Antigravity CLI" / "brain" / "conv" / ".system_generated" / "logs" / "transcript.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({
+        "step_index": 2, "type": "PLANNER_RESPONSE", "source": "MODEL",
+        "tool_calls": [{"name": "write_to_file", "args": {
+            "TargetFile": "report.md", "CodeContent": "report",
+            "ArtifactMetadata": {"UserFacing": True},
+        }}],
+    }) + "\n")
+    evidence = inventory_preserved_session_assets(data)
+    item = next(x for x in evidence if x.representation_kind == "generated_artifact_record")
+    assert item.observed_role == "output"
+    assert item.message_id == "conv_step_2"
+    [finding] = reconcile_asset_coverage([item], pd.DataFrame(), pd.DataFrame())
+    assert finding.status == "eligible_uncovered"

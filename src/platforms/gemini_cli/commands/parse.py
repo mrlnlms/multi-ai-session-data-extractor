@@ -1,4 +1,4 @@
-"""Parse data/raw/Gemini CLI/ → 4 parquets canonicos."""
+"""Parse data/raw/Gemini CLI/ → 6 parquets canonicos."""
 
 from __future__ import annotations
 

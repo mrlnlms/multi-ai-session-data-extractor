@@ -11,7 +11,7 @@ Schema empirico (JSON, NAO JSONL como Codex/Claude Code):
 - `.project_root` file resolve nome do projeto (senao usa dir name)
 
 Output: data/processed/Gemini CLI/{gemini_cli_conversations,messages,
-tool_events,branches}.parquet.
+tool_events,branches,assets,asset_links}.parquet.
 
 Branches: 1 _main por Conversation.
 """
@@ -31,6 +31,8 @@ from src.schema.models import (
     Conversation,
     Message,
     ToolEvent,
+    asset_links_to_df,
+    assets_to_df,
     branches_to_df,
     conversations_to_df,
     messages_to_df,
@@ -385,9 +387,15 @@ class GeminiCLIParser(BaseParser):
             output_dir / "gemini_cli_tool_events.parquet", index=False)
         branches_to_df(self.branches).to_parquet(
             output_dir / "gemini_cli_branches.parquet", index=False)
+        assets_to_df([]).to_parquet(
+            output_dir / "gemini_cli_assets.parquet", index=False)
+        asset_links_to_df([]).to_parquet(
+            output_dir / "gemini_cli_asset_links.parquet", index=False)
         return {
             "conversations": len(self.conversations),
             "messages": len(self.messages),
             "tool_events": len(self.events),
             "branches": len(self.branches),
+            "assets": 0,
+            "asset_links": 0,
         }

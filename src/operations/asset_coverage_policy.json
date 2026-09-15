@@ -302,6 +302,30 @@
       "reason": "Local profile, project, or parser state rather than interaction content"
     },
     {
+      "source": "Gemini CLI",
+      "representation_kind": "tool_output_record",
+      "disposition": "operational",
+      "reason": "Text spill from tool execution, not a user-supplied or delivered file"
+    },
+    {
+      "source": "Gemini CLI",
+      "representation_kind": "cli_background_log",
+      "disposition": "operational",
+      "reason": "Background process log rather than user or model file content"
+    },
+    {
+      "source": "Gemini CLI",
+      "representation_kind": "cli_bundled_binary",
+      "disposition": "cache",
+      "reason": "Replaceable executable bundled by the CLI, not interaction content"
+    },
+    {
+      "source": "Gemini CLI",
+      "representation_kind": "cli_recovery_backup",
+      "disposition": "operational",
+      "reason": "Recovery copy of CLI operational state rather than a session asset"
+    },
+    {
       "source": "Antigravity CLI",
       "representation_kind": "storage_container",
       "disposition": "domain_only",
@@ -309,4 +333,3 @@
     }
   ]
 }
-

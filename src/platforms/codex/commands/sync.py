@@ -23,7 +23,7 @@ def main() -> int:
     ap.add_argument("--full", action="store_true",
                     help="Forca re-parse mesmo sem arquivos novos (CLIs nao re-copiam — sem servidor pra refetch)")
     ap.add_argument("--no-binaries", action="store_true",
-                    help="(no-op pra CLI: dado eh local, sem assets binarios separados)")
+                    help="(no-op: input_image data URIs pertencem ao rollout e sao materializadas pelo parser)")
     ap.add_argument("--no-reconcile", action="store_true",
                     help="(no-op pra CLI: preservation eh implicita no cli-copy — nao deleta destino)")
     ap.add_argument("--dry-run", action="store_true",

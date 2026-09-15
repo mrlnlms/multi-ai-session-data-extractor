@@ -16,6 +16,11 @@ Source: `gemini_cli`. Mode: `cli`. Local data — incremental copy from
   `is_preserved_missing=True` + Messages role=user (preservation policy).
   Sessions que existem em `chats/` sao ignoradas no `logs.json` — `chats/`
   eh a fonte canonica.
+- **Assets de sessao:** nenhuma representacao elegivel foi observada no acervo
+  atual. `tool-outputs/**/*.txt` sao spills operacionais de resultados de
+  ferramentas; `write_file`/`replace` operam arquivos do working tree e ficam
+  como `ToolEvent.file_path`, sem transformar paths externos em assets. O
+  parser publica tabelas `assets`/`asset_links` vazias com schema canonico.
 
 ## Why there is no `server-behavior.md`
 

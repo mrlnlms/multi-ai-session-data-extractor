@@ -169,10 +169,14 @@ def test_gemini_cli_write_parquets(tmp_path):
         "gemini_cli_messages.parquet",
         "gemini_cli_tool_events.parquet",
         "gemini_cli_branches.parquet",
+        "gemini_cli_assets.parquet",
+        "gemini_cli_asset_links.parquet",
     }
     assert {p.name for p in out_dir.glob("*.parquet")} == expected
     assert stats["conversations"] == 1
     assert stats["branches"] == 1
+    assert stats["assets"] == 0
+    assert stats["asset_links"] == 0
 
 
 def test_gemini_cli_idempotent(tmp_path):

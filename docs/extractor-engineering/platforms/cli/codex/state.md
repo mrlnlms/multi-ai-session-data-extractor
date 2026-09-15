@@ -23,6 +23,11 @@ Source: `codex`. Mode: `cli`. Local data — incremental copy from
   do arquivo. Alguns rollouts atuais incorporam historico contendo um segundo
   `session_meta` de uma sessao anterior; esse meta posterior nao pode substituir
   a identidade do arquivo atual.
+- `response_item.message` pode trazer imagens de entrada como data URI. O
+  parser materializa os bytes em `data/raw/Codex/_images/`, verifica SHA-256
+  antes de reutilizar um arquivo e publica `Asset` + `AssetLink` de entrada no
+  bloco exato. Em rollouts mistos, a mensagem legada imediatamente adjacente
+  recebe o vínculo sem duplicar a mensagem textual.
 
 ## Why there is no `server-behavior.md`
 
@@ -33,6 +38,8 @@ the "preservation at the raw level via cli-copy" pattern.
 
 - `codex_conversations.parquet`, `codex_messages.parquet`, `codex_tool_events.parquet`, `codex_branches.parquet` — schema canonico v3
 - `codex_agent_memories.parquet` — le `data/raw/Codex/memories/**/*.md` (vazio hoje, schema valido pra populacao futura quando user comecar a usar Codex memory features)
+- `codex_assets.parquet`, `codex_asset_links.parquet` — imagens de entrada
+  embutidas e suas relações exatas com mensagens
 
 ## Cobertura do parser
 

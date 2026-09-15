@@ -19,6 +19,12 @@ from typing import Iterable, Iterator, Mapping, Sequence
 import pandas as pd
 
 from src.platforms.registry import KNOWN_PLATFORMS, WEB_PLATFORMS
+from src.platforms.claude_code.parser import make_embedded_image_asset_id
+from src.platforms.codex.parser import make_input_image_asset_id
+from src.platforms.antigravity_cli.parser import (
+    AntigravityCLIParser,
+    make_artifact_asset_id,
+)
 
 
 CLI_PLATFORMS = frozenset(set(KNOWN_PLATFORMS) - set(WEB_PLATFORMS))
@@ -125,10 +131,16 @@ def _kind_for_file(path: Path, source_root: Path, source: str) -> str:
         or "download_report" in lower_name
     ):
         return "asset_metadata_sidecar"
-    if "assets" in parts or "_images" in parts or "project_sources" in parts:
+    if "assets" in parts or "_images" in parts or "_artifacts" in parts or "project_sources" in parts:
         return "preserved_binary"
     if source == "Gemini CLI" and ("tool-outputs" in parts or "tool_output" in parts):
         return "tool_output_record"
+    if source == "Gemini CLI" and "background-processes" in parts:
+        return "cli_background_log"
+    if source == "Gemini CLI" and "bin" in parts:
+        return "cli_bundled_binary"
+    if source == "Gemini CLI" and ".invalid_json." in lower_name:
+        return "cli_recovery_backup"
     if lower_name == ".project_root" or lower_name == "logs.json":
         return "cli_operational_state"
     if "memory" in parts:
@@ -192,8 +204,10 @@ def _record_evidence(data_root: Path) -> list[RepresentationEvidence]:
         for path in _safe_regular_files(root, data_root):
             if path.suffix.lower() not in {".json", ".jsonl"}:
                 continue
+            if source == "Claude Code":
+                continue
             try:
-                records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()] if path.suffix.lower() == ".jsonl" else [json.loads(path.read_text(encoding="utf-8"))]
+                records = [json.loads(line) for line in path.read_text(encoding="utf-8").split("\n") if line.strip()] if path.suffix.lower() == ".jsonl" else [json.loads(path.read_text(encoding="utf-8"))]
             except (OSError, UnicodeDecodeError, json.JSONDecodeError):
                 found.append(RepresentationEvidence(
                     source, _account_for(path, root), "malformed_evidence",
@@ -207,7 +221,7 @@ def _record_evidence(data_root: Path) -> list[RepresentationEvidence]:
                     node_type = str(node.get("type") or "").lower()
                     source_obj = node.get("source") if isinstance(node.get("source"), dict) else {}
                     payload = source_obj.get("data") if node_type == "image" else node.get("image_url")
-                    if node_type in {"image", "input_image"} and isinstance(payload, str) and (source_obj.get("type") == "base64" or payload.startswith("data:")):
+                    if source != "Codex" and node_type in {"image", "input_image"} and isinstance(payload, str) and (source_obj.get("type") == "base64" or payload.startswith("data:")):
                         digest = _decoded_digest(payload)
                         if digest:
                             found.append(RepresentationEvidence(
@@ -242,6 +256,310 @@ def _record_evidence(data_root: Path) -> list[RepresentationEvidence]:
     return found
 
 
+def _claude_code_embedded_evidence(data_root: Path) -> list[RepresentationEvidence]:
+    """Inventory Claude Code images with the parser's exact locator semantics."""
+    source = "Claude Code"
+    root = data_root / "raw" / source
+    found: list[RepresentationEvidence] = []
+    for path in _safe_regular_files(root, data_root):
+        if path.suffix.lower() != ".jsonl":
+            continue
+        events: list[dict] = []
+        seen_uuids: set[str] = set()
+        malformed = False
+        try:
+            # JSON strings may legally contain Unicode separators that
+            # str.splitlines() treats as boundaries. JSONL is delimited only
+            # by LF here, matching the source parser.
+            lines = path.read_text(encoding="utf-8").split("\n")
+        except (OSError, UnicodeDecodeError):
+            lines = []
+            malformed = True
+        for line in lines:
+            if not line.strip():
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                malformed = True
+                continue
+            uuid = event.get("uuid")
+            if uuid and uuid in seen_uuids:
+                continue
+            if uuid:
+                seen_uuids.add(uuid)
+            events.append(event)
+        if malformed:
+            found.append(RepresentationEvidence(
+                source, "default", "malformed_evidence",
+                _relative_to_data(path, data_root), None, None,
+                None, None, None, None,
+            ))
+
+        is_subagent = "subagents" in path.parts
+        if not is_subagent:
+            events = [event for event in events if not event.get("isSidechain", False)]
+        session_id = path.stem if is_subagent else None
+        sequence = 0
+        for event in events:
+            if not session_id:
+                session_id = event.get("sessionId")
+            event_type = event.get("type")
+            if event_type == "assistant":
+                sequence += 1
+                continue
+            if event_type != "user":
+                continue
+            content = (event.get("message") or {}).get("content", [])
+            if isinstance(content, str):
+                if content.strip():
+                    sequence += 1
+                continue
+            if not isinstance(content, list):
+                continue
+            images = [
+                (index, item) for index, item in enumerate(content)
+                if isinstance(item, dict) and item.get("type") == "image"
+            ]
+            has_text = any(
+                isinstance(item, dict) and item.get("type") == "text"
+                for item in content
+            )
+            if not has_text and not images:
+                continue
+            sequence += 1
+            message_id = str(event.get("uuid") or f"{session_id}_{sequence}")
+            for image_ordinal, (content_index, block) in enumerate(images):
+                source_obj = block.get("source") or {}
+                data = source_obj.get("data")
+                if source_obj.get("type") != "base64" or not isinstance(data, str):
+                    continue
+                digest = _decoded_digest(data)
+                if not digest or not session_id:
+                    continue
+                extension = {
+                    "image/jpeg": ".jpg", "image/jpg": ".jpg",
+                    "image/png": ".png", "image/gif": ".gif",
+                    "image/webp": ".webp",
+                }.get(source_obj.get("media_type") or "", ".bin")
+                binary_path = (
+                    f"raw/Claude Code/_images/{session_id}/"
+                    f"{sequence}_{image_ordinal}{extension}"
+                )
+                found.append(RepresentationEvidence(
+                    source=source,
+                    account_scope="default",
+                    representation_kind="embedded_attachment",
+                    evidence_path=_relative_to_data(path, data_root),
+                    native_id=make_embedded_image_asset_id(
+                        str(session_id), message_id, content_index, digest
+                    ),
+                    binary_path=binary_path,
+                    conversation_id=str(session_id),
+                    message_id=message_id,
+                    project_id=None,
+                    observed_role="input",
+                ))
+    return found
+
+
+def _codex_embedded_evidence(data_root: Path) -> list[RepresentationEvidence]:
+    """Inventory only user-message input images, excluding tool envelopes."""
+    source = "Codex"
+    root = data_root / "raw" / source
+    found: list[RepresentationEvidence] = []
+    for path in _safe_regular_files(root, data_root):
+        if not path.name.startswith("rollout-") or path.suffix != ".jsonl":
+            continue
+        events: list[dict] = []
+        malformed = False
+        try:
+            lines = path.read_text(encoding="utf-8").split("\n")
+        except (OSError, UnicodeDecodeError):
+            lines = []
+            malformed = True
+        for line in lines:
+            if not line.strip():
+                continue
+            try:
+                events.append(json.loads(line))
+            except json.JSONDecodeError:
+                malformed = True
+        if malformed:
+            found.append(RepresentationEvidence(
+                source, "default", "malformed_evidence",
+                _relative_to_data(path, data_root), None, None,
+                None, None, None, None,
+            ))
+        meta = next(
+            ((event.get("payload") or {}) for event in events
+             if event.get("type") == "session_meta"),
+            None,
+        )
+        if not meta or not meta.get("id"):
+            continue
+        session_id = str(meta["id"])
+        legacy: list[dict] = []
+        response: list[dict] = []
+        for index, event in enumerate(events):
+            payload = event.get("payload") or {}
+            if event.get("type") == "event_msg" and payload.get("type") in {
+                "user_message", "agent_message",
+            }:
+                images: list[tuple[int, str]] = []
+                if payload.get("type") == "user_message" and index > 0:
+                    previous = events[index - 1]
+                    previous_payload = previous.get("payload") or {}
+                    if (
+                        previous.get("type") == "response_item"
+                        and previous_payload.get("type") == "message"
+                        and previous_payload.get("role") == "user"
+                    ):
+                        images = [
+                            (block_index, item["image_url"])
+                            for block_index, item in enumerate(previous_payload.get("content") or [])
+                            if isinstance(item, dict)
+                            and item.get("type") == "input_image"
+                            and isinstance(item.get("image_url"), str)
+                            and item["image_url"].startswith("data:")
+                        ]
+                legacy.append({
+                    "role": "user" if payload.get("type") == "user_message" else "assistant",
+                    "timestamp": event.get("timestamp"), "images": images,
+                })
+            elif (
+                event.get("type") == "response_item"
+                and payload.get("type") == "message"
+                and payload.get("role") in {"user", "assistant"}
+            ):
+                response.append({
+                    "role": payload["role"], "timestamp": event.get("timestamp"),
+                    "images": [
+                        (block_index, item["image_url"])
+                        for block_index, item in enumerate(payload.get("content") or [])
+                        if isinstance(item, dict)
+                        and item.get("type") == "input_image"
+                        and isinstance(item.get("image_url"), str)
+                        and item["image_url"].startswith("data:")
+                    ],
+                })
+        selected = legacy if legacy else response
+        for sequence, message in enumerate(
+            sorted(selected, key=lambda item: item["timestamp"] or ""), 1
+        ):
+            message_id = f"{session_id}_{sequence}"
+            for image_ordinal, (content_index, data_uri) in enumerate(message["images"]):
+                digest = _decoded_digest(data_uri)
+                if not digest:
+                    continue
+                header = data_uri.split(",", 1)[0]
+                mime_type = header[5:].split(";", 1)[0]
+                extension = {
+                    "image/jpeg": ".jpg", "image/png": ".png",
+                    "image/gif": ".gif", "image/webp": ".webp",
+                }.get(mime_type, ".bin")
+                found.append(RepresentationEvidence(
+                    source=source, account_scope="default",
+                    representation_kind="embedded_attachment",
+                    evidence_path=_relative_to_data(path, data_root),
+                    native_id=make_input_image_asset_id(
+                        session_id, message_id, content_index, digest
+                    ),
+                    binary_path=(
+                        f"raw/Codex/_images/{session_id}/"
+                        f"{sequence}_{image_ordinal}{extension}"
+                    ),
+                    conversation_id=session_id, message_id=message_id,
+                    project_id=None, observed_role="input",
+                ))
+    return found
+
+
+def _antigravity_artifact_evidence(data_root: Path) -> list[RepresentationEvidence]:
+    """Inventory explicit artifact payloads from decoded trajectories."""
+    source = "Antigravity CLI"
+    root = data_root / "raw" / source
+    found: list[RepresentationEvidence] = []
+
+    def add_tool_calls(
+        evidence_path: Path,
+        conversation_id: str,
+        message_id: str,
+        tool_calls: object,
+    ) -> None:
+        if not isinstance(tool_calls, list):
+            return
+        for tool_index, tool_call in enumerate(tool_calls):
+            payload = AntigravityCLIParser._artifact_payload(tool_call)
+            if payload is None:
+                continue
+            target, content, _metadata = payload
+            digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            suffix = Path(target).suffix or ".txt"
+            found.append(RepresentationEvidence(
+                source=source, account_scope="default",
+                representation_kind="generated_artifact_record",
+                evidence_path=_relative_to_data(evidence_path, data_root),
+                native_id=make_artifact_asset_id(
+                    conversation_id, message_id, tool_index, digest
+                ),
+                binary_path=(
+                    f"raw/Antigravity CLI/_artifacts/{conversation_id}/"
+                    f"{message_id.rsplit('_', 1)[-1]}_{tool_index}{suffix}"
+                ),
+                conversation_id=conversation_id, message_id=message_id,
+                project_id=None, observed_role="output",
+            ))
+
+    current_ids: set[str] = set()
+    brain = root / "brain"
+    for path in sorted(brain.glob("*/.system_generated/logs/transcript.jsonl")):
+        conversation_id = path.parent.parent.parent.name
+        current_ids.add(conversation_id)
+        try:
+            lines = path.read_text(encoding="utf-8").split("\n")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for record_index, line in enumerate(line for line in lines if line.strip()):
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if record.get("type") != "PLANNER_RESPONSE" or record.get("source") != "MODEL":
+                continue
+            step_index = record.get("step_index", record_index)
+            if not isinstance(step_index, int):
+                step_index = record_index
+            add_tool_calls(
+                path, conversation_id, f"{conversation_id}_step_{step_index}",
+                record.get("tool_calls"),
+            )
+
+    for path in sorted((root / "recovered").glob("*.trajectory.json")):
+        fallback_id = path.name.removesuffix(".trajectory.json")
+        if fallback_id in current_ids:
+            continue
+        try:
+            trajectory = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        conversation_id = str(trajectory.get("cascadeId") or fallback_id)
+        for step_index, step in enumerate(trajectory.get("steps") or []):
+            if not isinstance(step, dict):
+                continue
+            kind = str(step.get("type") or "").removeprefix("CORTEX_STEP_TYPE_")
+            if kind != "PLANNER_RESPONSE":
+                continue
+            response = step.get("plannerResponse") or {}
+            add_tool_calls(
+                path, conversation_id,
+                f"{conversation_id}_legacy_step_{step_index}",
+                response.get("toolCalls", response.get("tool_calls"))
+                if isinstance(response, dict) else None,
+            )
+    return found
+
+
 def _deduplicate(evidence: Iterable[RepresentationEvidence]) -> list[RepresentationEvidence]:
     """Collapse raw/merged copies while preferring merged paths."""
     chosen: dict[tuple, RepresentationEvidence] = {}
@@ -261,7 +579,13 @@ def _deduplicate(evidence: Iterable[RepresentationEvidence]) -> list[Representat
 
 def inventory_preserved_session_assets(data_root: Path) -> list[RepresentationEvidence]:
     data_root = Path(data_root)
-    return _deduplicate([*_filesystem_evidence(data_root), *_record_evidence(data_root)])
+    return _deduplicate([
+        *_filesystem_evidence(data_root),
+        *_record_evidence(data_root),
+        *_claude_code_embedded_evidence(data_root),
+        *_codex_embedded_evidence(data_root),
+        *_antigravity_artifact_evidence(data_root),
+    ])
 
 
 def _policy_matches(item: RepresentationEvidence, policy: Sequence[Mapping[str, str]]) -> list[Mapping[str, str]]:
@@ -318,12 +642,24 @@ def reconcile_asset_coverage(
             status = "covered" if item.binary_path in asset_paths else "eligible_uncovered"
             findings.append(CoverageFinding(item, status))
         elif item.representation_kind == "embedded_attachment":
-            findings.append(CoverageFinding(item, "eligible_uncovered"))
-        elif item.representation_kind == "native_file_record" and item.native_id:
+            source_key = "".join(ch for ch in item.source.lower() if ch.isalnum())
+            identity_count = asset_identity_counts.get((source_key, item.native_id or ""), 0)
+            path_is_covered = item.binary_path is None or item.binary_path in asset_paths
+            findings.append(CoverageFinding(
+                item,
+                "covered" if identity_count == 1 and path_is_covered else
+                "eligible_uncovered" if identity_count == 0 or not path_is_covered else
+                "unresolved",
+            ))
+        elif item.representation_kind in {"native_file_record", "generated_artifact_record"} and item.native_id:
             source_key = "".join(ch for ch in item.source.lower() if ch.isalnum())
             count = asset_identity_counts.get((source_key, item.native_id), 0)
+            path_is_covered = item.binary_path is None or item.binary_path in asset_paths
             findings.append(CoverageFinding(
-                item, "covered" if count == 1 else "eligible_uncovered" if count == 0 else "unresolved"
+                item,
+                "covered" if count == 1 and path_is_covered else
+                "eligible_uncovered" if count == 0 or not path_is_covered else
+                "unresolved",
             ))
         elif matches:
             findings.append(CoverageFinding(item, "excluded", matches[0].get("disposition")))

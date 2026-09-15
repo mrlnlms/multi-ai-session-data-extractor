@@ -1,4 +1,4 @@
-"""Parse data/raw/Codex/ → 5 parquets canonicos."""
+"""Parse data/raw/Codex/ → 7 parquets canonicos, incluindo assets de entrada."""
 
 from __future__ import annotations
 

@@ -23,11 +23,11 @@ paths are relative to `data/` and resolve to local files.
 | Perplexity | 15 / 15 | assistant 9; user 6 | 8; input 8 | 40.0% | 9 / 6 | message | Third-party featured images are external references; deleted upstream uploads retain metadata only |
 | Grok | 53 / 53 | user 53 | 0 | 0.0% | 53 / 0 | library | The global catalog has no evidence-backed use placement; none is inferred from names or timestamps |
 | Kimi | 87 / 87 | unknown 87 | 87; unknown 87 | 100.0% | 86 / 1 | conversation | `chat.files[]` proves conversation membership, not author, direction, message or inline position |
-| Claude Code | 0 / 0 | — | 0 | — | 0 / 0 | library | Inline base64 image blocks and disposable image caches are not first-class canonical assets |
-| Codex | 0 / 0 | — | 0 | — | 0 / 0 | library | No validated preserved-file adapter |
-| Gemini CLI | 0 / 0 | — | 0 | — | 0 / 0 | library | No validated preserved-file adapter |
-| Antigravity CLI | 0 / 0 | — | 0 | — | 0 / 0 | library | Opaque containers remain raw evidence; no validated preserved-file adapter |
-| **Total** | **8,811 / 8,811** | user 3,203; assistant 941; platform 4,499; unknown 168 | **9,406**; input 3,620, output 940, context 4,759, unknown 87 | **98.4%** | **8,380 / 431** | mixed | Coverage expands only through source-specific evidence |
+| Claude Code | 3,443 / 3,443 | user 3,443 | 3,443; input 3,443 | 100.0% | 3,443 / 0 | inline | Inline base64 user images are verified against their materialized bytes; disposable home-directory caches are excluded |
+| Codex | 44 / 44 | user 44 | 44; input 44 | 100.0% | 44 / 0 | inline | User-message data URIs are materialized; image payloads inside tool/guardian envelopes are not user-facing assets |
+| Gemini CLI | 0 / 0 | — | 0 | — | 0 / 0 | library | Tool-output text spills and working-tree paths are operational evidence; no eligible session file is currently preserved |
+| Antigravity CLI | 12 / 12 | assistant 12 | 12; output 12 | 100.0% | 12 / 0 | message | Explicit `ArtifactMetadata` + preserved `CodeContent` is eligible; opaque containers and ordinary tool paths are not assets |
+| **Total** | **12,310 / 12,310** | user 6,690; assistant 953; platform 4,499; unknown 168 | **12,905**; input 7,107, output 952, context 4,759, unknown 87 | **98.8%** | **11,879 / 431** | mixed | Coverage expands only through source-specific evidence |
 
 ## Reader capability levels
 

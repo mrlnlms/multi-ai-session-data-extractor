@@ -23,13 +23,17 @@ same way — sessions are JSONL files in the user's filesystem.
   `src/platforms/claude_code/parser.py` (Phase 1: `_build_chain_links`).
 - **Repeated events in raw JSONL:** defensive dedup by `uuid`.
 
-## Deferred enrichment
+## Preserved session assets
 
-- **Inline user images:** JSONL can contain `content[]` blocks of
-  `type='image'` whose `source.data` is base64 and whose `source.media_type`
-  identifies the binary. The parser does not currently materialize those
-  images or publish their paths. The disposable `~/.claude/image-cache/` is
-  not authoritative; any future extraction must derive assets from the JSONL.
+- **Inline user images:** JSONL `content[]` blocks of `type='image'` are the
+  authoritative source. The parser verifies/materializes their base64 bytes in
+  `data/raw/Claude Code/_images/`, publishes one user `Asset` and exact input
+  `AssetLink` per block, and enriches `Message.asset_paths`. Identity combines
+  the session/message/block locator with the content SHA-256. Existing bytes
+  are reused only when their hash matches; the disposable
+  `~/.claude/image-cache/` is not authoritative.
+
+## Deferred enrichment
 - **Operational metadata:** `message.usage`, `gitBranch`, `cwd`,
   `permissionMode` and attachment records are preserved in raw but are not
   first-class fields in the unified output. Promote them only with a concrete
@@ -42,6 +46,8 @@ same way — sessions are JSONL files in the user's filesystem.
 - `claude_code_tool_events.parquet` — tool calls/results
 - `claude_code_branches.parquet` — 1 _main por sessao
 - `claude_code_agent_memories.parquet` — parser le `<encoded-cwd>/memory/*.md` por projeto, materializa parquet com kind/name/description da frontmatter; preservation tracked via `home_memory_files` do `current_source_files("claude_code")`
+- `claude_code_assets.parquet` — imagens de entrada embutidas e preservadas
+- `claude_code_asset_links.parquet` — relacao exata imagem → mensagem/bloco
 - `_memory_metadata.json` no raw preserva o `mtime_ns` observado na fonte para
   que `created_at`/`updated_at` das memorias sejam reproduziveis apos um
   checkout DVC. Entradas de arquivos ausentes permanecem no sidecar junto do

@@ -11,13 +11,16 @@ Schema empirico:
 - `event_msg.exec_command_end`: enriquece tool event com duration_ms + success
 - `response_item.function_call`: tool_use, correlacionado com exec_command_end via call_id
 
-Output: data/processed/Codex/{codex_conversations,messages,tool_events,branches}.parquet.
+Output: data/processed/Codex/{codex_conversations,messages,tool_events,branches,
+agent_memories,assets,asset_links}.parquet.
 
 Branches: 1 _main por Conversation (Codex nao tem fork).
 """
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -29,19 +32,34 @@ from src.parsing.agent_memory import parse_memories_for_source
 from src.parsing.base import BaseParser
 from src.schema.models import (
     AgentMemory,
+    Asset,
+    AssetLink,
     Branch,
     Conversation,
     Message,
     ToolEvent,
     agent_memories_to_df,
+    asset_links_to_df,
+    assets_to_df,
     branches_to_df,
     conversations_to_df,
     messages_to_df,
+    make_asset_link_id,
     tool_events_to_df,
 )
 
 
 logger = logging.getLogger(__name__)
+
+
+def make_input_image_asset_id(
+    session_id: str,
+    message_id: str,
+    content_block_index: int,
+    content_sha256: str,
+) -> str:
+    locator = "\x1f".join((session_id, message_id, str(content_block_index), content_sha256))
+    return hashlib.sha256(locator.encode("utf-8")).hexdigest()
 
 
 class CodexParser(BaseParser):
@@ -63,6 +81,62 @@ class CodexParser(BaseParser):
         self.files_seen = 0
         self.files_parsed = 0
         self.files_skipped = 0
+        self.assets: list[Asset] = []
+        self.asset_links: list[AssetLink] = []
+
+    def _materialize_input_image(
+        self,
+        data_uri: str,
+        session_id: str,
+        message_id: str,
+        sequence: int,
+        image_ordinal: int,
+        content_block_index: int,
+        created_at: pd.Timestamp,
+    ) -> str:
+        header, encoded = data_uri.split(",", 1)
+        if not header.startswith("data:") or ";base64" not in header:
+            raise ValueError("Codex input_image must use a base64 data URI")
+        mime_type = header[5:].split(";", 1)[0] or "application/octet-stream"
+        decoded = base64.b64decode(encoded, validate=True)
+        digest = hashlib.sha256(decoded).hexdigest()
+        extension = {
+            "image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif",
+            "image/webp": ".webp",
+        }.get(mime_type, ".bin")
+        if self._input_path is None:
+            raise ValueError("Codex input root is required to materialize images")
+        out = self._input_path / "_images" / session_id / f"{sequence}_{image_ordinal}{extension}"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        if out.exists():
+            if hashlib.sha256(out.read_bytes()).hexdigest() != digest:
+                raise ValueError(f"preserved Codex image hash mismatch: {out}")
+        else:
+            out.write_bytes(decoded)
+        asset_path = f"raw/Codex/_images/{session_id}/{out.name}"
+        asset_id = make_input_image_asset_id(
+            session_id, message_id, content_block_index, digest
+        )
+        self.assets.append(Asset(
+            asset_id=asset_id, source=self.source_name, account_id=self.account_id,
+            asset_kind="attachment", asset_origin="user", file_name=out.name,
+            mime_type=mime_type, size_bytes=len(decoded), asset_path=asset_path,
+            is_model_generated=False, is_preserved_missing=False,
+            is_binary_available=True, created_at=created_at,
+            metadata_json=json.dumps({"content_sha256": digest}, sort_keys=True),
+        ))
+        self.asset_links.append(AssetLink(
+            asset_link_id=make_asset_link_id(
+                self.source_name, self.account_id, asset_id, "message", message_id,
+                "input", image_ordinal, content_block_index,
+            ),
+            source=self.source_name, account_id=self.account_id, asset_id=asset_id,
+            object_type="message", object_id=message_id,
+            conversation_id=session_id, message_id=message_id, project_id=None,
+            role="input", ordinal=image_ordinal,
+            content_block_index=content_block_index, metadata_json=None,
+        ))
+        return asset_path
 
     def parse(self, input_path: Path, home_memory_files: Optional[set[str]] = None) -> None:
         """Le todas sessoes em year/month/day/rollout-*.jsonl + memorias globais.
@@ -167,7 +241,27 @@ class CodexParser(BaseParser):
         exec_ends: dict[str, dict] = {}
         timestamps = []
 
-        for evt in events:
+        adjacent_legacy_images: dict[int, list[tuple[int, str]]] = {}
+        for index, evt in enumerate(events[:-1]):
+            payload = evt.get("payload", {}) or {}
+            next_payload = events[index + 1].get("payload", {}) or {}
+            if (
+                evt.get("type") == "response_item"
+                and payload.get("type") == "message"
+                and payload.get("role") == "user"
+                and events[index + 1].get("type") == "event_msg"
+                and next_payload.get("type") == "user_message"
+            ):
+                adjacent_legacy_images[index + 1] = [
+                    (block_index, item["image_url"])
+                    for block_index, item in enumerate(payload.get("content") or [])
+                    if isinstance(item, dict)
+                    and item.get("type") == "input_image"
+                    and isinstance(item.get("image_url"), str)
+                    and item["image_url"].startswith("data:")
+                ]
+
+        for event_index, evt in enumerate(events):
             ts = evt.get("timestamp")
             if ts:
                 timestamps.append(ts)
@@ -188,7 +282,10 @@ class CodexParser(BaseParser):
                     if agent_msgs and reasoning_parts:
                         agent_msgs[-1]["_thinking"] = "\n\n".join(reasoning_parts)
                         reasoning_parts = []
-                    user_msgs.append({"content": payload.get("message", ""), "ts": ts})
+                    user_msgs.append({
+                        "content": payload.get("message", ""), "ts": ts,
+                        "_images": adjacent_legacy_images.get(event_index, []),
+                    })
                 elif ptype == "agent_message":
                     # Attach accumulated reasoning
                     thinking = "\n\n".join(reasoning_parts) if reasoning_parts else None
@@ -211,6 +308,14 @@ class CodexParser(BaseParser):
                         "role": payload["role"],
                         "content": self._response_message_text(payload),
                         "ts": ts,
+                        "_images": [
+                            (block_index, item["image_url"])
+                            for block_index, item in enumerate(payload.get("content") or [])
+                            if isinstance(item, dict)
+                            and item.get("type") == "input_image"
+                            and isinstance(item.get("image_url"), str)
+                            and item["image_url"].startswith("data:")
+                        ],
                     })
                 elif ptype == "function_call":
                     call_id = payload.get("call_id")
@@ -227,7 +332,10 @@ class CodexParser(BaseParser):
         if not user_msgs and not agent_msgs:
             for msg in response_msgs:
                 if msg["role"] == "user":
-                    user_msgs.append({"content": msg["content"], "ts": msg["ts"]})
+                    user_msgs.append({
+                        "content": msg["content"], "ts": msg["ts"],
+                        "_images": msg.get("_images", []),
+                    })
                 else:
                     agent_msgs.append({
                         "content": msg["content"],
@@ -264,18 +372,31 @@ class CodexParser(BaseParser):
             if m.get("_thinking"):
                 ct_parts.insert(0, "thinking")
 
+            message_id = f"{session_id}_{seq}"
+            created_at = self._ts(m["ts"])
+            asset_paths = [
+                self._materialize_input_image(
+                    data_uri, session_id, message_id, seq, image_ordinal,
+                    content_block_index, created_at,
+                )
+                for image_ordinal, (content_block_index, data_uri)
+                in enumerate(m.get("_images", []))
+            ]
+            content_types = ct_parts + (["image"] if asset_paths else [])
             messages.append(Message(
-                message_id=f"{session_id}_{seq}",
+                message_id=message_id,
                 conversation_id=session_id,
                 source=self.source_name,
                 sequence=seq,
                 role=m["role"],
                 content=m["content"],
                 model=model if m["role"] == "assistant" else None,
-                created_at=self._ts(m["ts"]),
+                created_at=created_at,
                 account=self.account,
                 thinking=m.get("_thinking"),
-                content_types=",".join(ct_parts),
+                content_types=",".join(content_types),
+                asset_paths=asset_paths or None,
+                account_id=self.account_id,
             ))
 
         # Tool events (function_call enriquecido com exec_command_end)
@@ -332,7 +453,7 @@ class CodexParser(BaseParser):
         return branches_to_df(self.branches)
 
     def write_parquets(self, output_dir: Path) -> dict[str, int]:
-        """Escreve 5 parquets canonicos. Idempotente."""
+        """Escreve 7 parquets canonicos. Idempotente."""
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         conversations_to_df(self.conversations).to_parquet(
@@ -345,10 +466,16 @@ class CodexParser(BaseParser):
             output_dir / "codex_branches.parquet", index=False)
         agent_memories_to_df(self.agent_memories).to_parquet(
             output_dir / "codex_agent_memories.parquet", index=False)
+        assets_to_df(self.assets).to_parquet(
+            output_dir / "codex_assets.parquet", index=False)
+        asset_links_to_df(self.asset_links).to_parquet(
+            output_dir / "codex_asset_links.parquet", index=False)
         return {
             "conversations": len(self.conversations),
             "messages": len(self.messages),
             "tool_events": len(self.events),
             "branches": len(self.branches),
             "agent_memories": len(self.agent_memories),
+            "assets": len(self.assets),
+            "asset_links": len(self.asset_links),
         }

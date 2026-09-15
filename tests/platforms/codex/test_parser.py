@@ -1,9 +1,11 @@
 # tests/parsers/test_codex.py
+import base64
+import hashlib
 import json
 import pytest
 import pandas as pd
 from pathlib import Path
-from src.platforms.codex.parser import CodexParser
+from src.platforms.codex.parser import CodexParser, make_input_image_asset_id
 
 # Fixture: sessao minima com user msg, agent msg, function call, exec_command_end
 FIXTURE_LINES = [
@@ -180,11 +182,15 @@ def test_codex_write_parquets(tmp_path):
         "codex_tool_events.parquet",
         "codex_branches.parquet",
         "codex_agent_memories.parquet",
+        "codex_assets.parquet",
+        "codex_asset_links.parquet",
     }
     assert {p.name for p in out_dir.glob("*.parquet")} == expected
     assert stats["conversations"] == 1
     assert stats["branches"] == 1
     assert stats["agent_memories"] == 0
+    assert stats["assets"] == 0
+    assert stats["asset_links"] == 0
 
 
 def test_codex_idempotent(tmp_path):
@@ -215,7 +221,7 @@ def test_codex_parses_response_item_messages(tmp_path):
         {"timestamp": "2026-09-12T12:35:01Z", "type": "response_item", "payload": {
             "type": "message", "role": "user", "content": [
                 {"type": "input_text", "text": "First paragraph"},
-                {"type": "input_image", "image_url": "data:image/png;base64,abc"},
+                {"type": "input_image", "image_url": "data:image/png;base64,YWJj"},
                 {"type": "input_text", "text": "Second paragraph"},
             ],
         }},
@@ -235,6 +241,58 @@ def test_codex_parses_response_item_messages(tmp_path):
         ("user", "First paragraph\n\nSecond paragraph"),
         ("assistant", "Current-format answer"),
     ]
+    assert len(parser.assets) == len(parser.asset_links) == 1
+    digest = hashlib.sha256(b"abc").hexdigest()
+    asset = parser.assets[0]
+    assert asset.asset_id == make_input_image_asset_id(
+        FIXTURE_LINES[0]["payload"]["id"],
+        f'{FIXTURE_LINES[0]["payload"]["id"]}_1',
+        1,
+        digest,
+    )
+    assert asset.asset_origin == "user"
+    assert asset.asset_path.endswith("/1_0.png")
+    assert parser.asset_links[0].content_block_index == 1
+    assert parser.asset_links[0].role == "input"
+    assert parser.messages[0].asset_paths == [asset.asset_path]
+
+
+def test_codex_adjacent_legacy_user_receives_response_item_image(tmp_path):
+    data_uri = "data:image/png;base64," + base64.b64encode(b"image").decode()
+    image_response = {
+        "timestamp": "2026-03-02T12:35:38Z", "type": "response_item",
+        "payload": {"type": "message", "role": "user", "content": [
+            {"type": "input_text", "text": "UI envelope"},
+            {"type": "input_image", "image_url": data_uri},
+        ]},
+    }
+    lines = FIXTURE_LINES[:2] + [image_response] + FIXTURE_LINES[2:]
+    path = _write_session(tmp_path, lines)
+
+    parser = CodexParser()
+    parser.parse(path)
+
+    assert len(parser.messages) == 2
+    assert len(parser.assets) == len(parser.asset_links) == 1
+    assert parser.asset_links[0].message_id == parser.messages[0].message_id
+    assert parser.messages[0].asset_paths == [parser.assets[0].asset_path]
+
+
+def test_codex_existing_materialized_image_requires_matching_hash(tmp_path):
+    data_uri = "data:image/png;base64," + base64.b64encode(b"image").decode()
+    lines = [FIXTURE_LINES[0], FIXTURE_LINES[1], {
+        "timestamp": "2026-09-12T12:35:01Z", "type": "response_item",
+        "payload": {"type": "message", "role": "user", "content": [
+            {"type": "input_image", "image_url": data_uri},
+        ]},
+    }]
+    path = _write_session(tmp_path, lines)
+    CodexParser().parse(path)
+    materialized = next((path / "_images").rglob("*.png"))
+    CodexParser().parse(path)
+    materialized.write_bytes(b"mismatch")
+    with pytest.raises(ValueError, match="Codex image hash mismatch"):
+        CodexParser().parse(path)
 
 
 def test_codex_legacy_messages_win_in_mixed_session(tmp_path):

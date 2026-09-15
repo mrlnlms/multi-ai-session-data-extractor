@@ -6,12 +6,16 @@ SQLite databases. Both are preserved in raw. Current readable transcripts live
 under ``brain/<id>/.system_generated/logs/transcript.jsonl``. Legacy PBs can
 also have a decoded ``recovered/<id>.trajectory.json`` sidecar produced through
 Antigravity's local daemon; the current transcript always takes precedence.
+Explicit artifact writes whose trajectory preserves ``ArtifactMetadata`` and
+``CodeContent`` are materialized as assistant output assets.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import mimetypes
 import sqlite3
 from pathlib import Path
 from typing import Any, Optional
@@ -21,17 +25,32 @@ import pandas as pd
 from src.parsing.base import BaseParser
 from src.schema.models import (
     Branch,
+    Asset,
+    AssetLink,
     Conversation,
     Message,
     ToolEvent,
     branches_to_df,
+    asset_links_to_df,
+    assets_to_df,
     conversations_to_df,
     messages_to_df,
+    make_asset_link_id,
     tool_events_to_df,
 )
 
 
 logger = logging.getLogger(__name__)
+
+
+def make_artifact_asset_id(
+    conversation_id: str,
+    message_id: str,
+    tool_index: int,
+    content_sha256: str,
+) -> str:
+    locator = "\x1f".join((conversation_id, message_id, str(tool_index), content_sha256))
+    return hashlib.sha256(locator.encode("utf-8")).hexdigest()
 
 
 class AntigravityCLIParser(BaseParser):
@@ -56,6 +75,95 @@ class AntigravityCLIParser(BaseParser):
         self._history = {}
         self._metadata = {}
         self._summaries = {}
+        self.assets: list[Asset] = []
+        self.asset_links: list[AssetLink] = []
+
+    @staticmethod
+    def _decoded_string(value: Any) -> Optional[str]:
+        if not isinstance(value, str):
+            return None
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError:
+            return value
+        return decoded if isinstance(decoded, str) else value
+
+    @classmethod
+    def _artifact_payload(cls, tool_call: Any) -> Optional[tuple[str, str, dict]]:
+        if not isinstance(tool_call, dict) or not isinstance(tool_call.get("args"), dict):
+            return None
+        args = tool_call["args"]
+        metadata = args.get("ArtifactMetadata")
+        if isinstance(metadata, str):
+            try:
+                metadata = json.loads(metadata)
+            except json.JSONDecodeError:
+                return None
+        if not isinstance(metadata, dict):
+            return None
+        target = cls._decoded_string(args.get("TargetFile"))
+        content = cls._decoded_string(args.get("CodeContent"))
+        if not target or content is None:
+            return None
+        return target, content, metadata
+
+    def _record_artifact(
+        self,
+        tool_call: Any,
+        conversation_id: str,
+        message_id: str,
+        tool_index: int,
+        created_at: pd.Timestamp,
+    ) -> Optional[str]:
+        payload = self._artifact_payload(tool_call)
+        if payload is None or self._input_path is None:
+            return None
+        target, content, metadata = payload
+        encoded = content.encode("utf-8")
+        digest = hashlib.sha256(encoded).hexdigest()
+        suffix = Path(target).suffix or ".txt"
+        out = (
+            self._input_path / "_artifacts" / conversation_id
+            / f"{message_id.rsplit('_', 1)[-1]}_{tool_index}{suffix}"
+        )
+        out.parent.mkdir(parents=True, exist_ok=True)
+        if out.exists():
+            if hashlib.sha256(out.read_bytes()).hexdigest() != digest:
+                raise ValueError(f"preserved Antigravity artifact hash mismatch: {out}")
+        else:
+            out.write_bytes(encoded)
+        asset_path = f"raw/Antigravity CLI/_artifacts/{conversation_id}/{out.name}"
+        asset_id = make_artifact_asset_id(
+            conversation_id, message_id, tool_index, digest
+        )
+        public_metadata = {
+            key: metadata[key]
+            for key in ("ArtifactType", "RequestFeedback", "UserFacing")
+            if key in metadata
+        }
+        self.assets.append(Asset(
+            asset_id=asset_id, source=self.source_name, account_id=self.account_id,
+            asset_kind="artifact", asset_origin="assistant",
+            file_name=Path(target).name, mime_type=mimetypes.guess_type(target)[0],
+            size_bytes=len(encoded), asset_path=asset_path,
+            is_model_generated=True, is_preserved_missing=False,
+            is_binary_available=True, created_at=created_at,
+            metadata_json=json.dumps(
+                {"content_sha256": digest, **public_metadata}, sort_keys=True
+            ),
+        ))
+        self.asset_links.append(AssetLink(
+            asset_link_id=make_asset_link_id(
+                self.source_name, self.account_id, asset_id, "message", message_id,
+                "output", tool_index,
+            ),
+            source=self.source_name, account_id=self.account_id, asset_id=asset_id,
+            object_type="message", object_id=message_id,
+            conversation_id=conversation_id, message_id=message_id,
+            project_id=None, role="output", ordinal=tool_index,
+            content_block_index=None, metadata_json=None,
+        ))
+        return asset_path
 
     def parse(self, input_path: Path) -> None:
         """Parse all readable trajectories and retain opaque containers as stubs."""
@@ -270,6 +378,13 @@ class AntigravityCLIParser(BaseParser):
                     content_types=",".join(content_types),
                 ))
                 for tool_idx, tool_call in enumerate(tool_calls):
+                    artifact_path = self._record_artifact(
+                        tool_call, conv_id, message_id, tool_idx, timestamp
+                    )
+                    if artifact_path:
+                        messages[-1].asset_paths = [
+                            *(messages[-1].asset_paths or []), artifact_path
+                        ]
                     tool_name, file_path, command, metadata_json = self._tool_details(tool_call)
                     events.append(ToolEvent(
                         event_id=f"{message_id}_tool_{tool_idx}",
@@ -403,6 +518,13 @@ class AntigravityCLIParser(BaseParser):
                         content_types=",".join(content_types),
                     ))
                     for tool_index, tool_call in enumerate(tool_calls):
+                        artifact_path = self._record_artifact(
+                            tool_call, conv_id, message_id, tool_index, timestamp
+                        )
+                        if artifact_path:
+                            messages[-1].asset_paths = [
+                                *(messages[-1].asset_paths or []), artifact_path
+                            ]
                         tool_name, file_path, command, metadata_json = self._tool_details(tool_call)
                         events.append(ToolEvent(
                             event_id=f"{message_id}_tool_{tool_index}",
@@ -513,9 +635,15 @@ class AntigravityCLIParser(BaseParser):
             output_dir / "antigravity_cli_tool_events.parquet", index=False)
         branches_to_df(self.branches).to_parquet(
             output_dir / "antigravity_cli_branches.parquet", index=False)
+        assets_to_df(self.assets).to_parquet(
+            output_dir / "antigravity_cli_assets.parquet", index=False)
+        asset_links_to_df(self.asset_links).to_parquet(
+            output_dir / "antigravity_cli_asset_links.parquet", index=False)
         return {
             "conversations": len(self.conversations),
             "messages": len(self.messages),
             "tool_events": len(self.events),
             "branches": len(self.branches),
+            "assets": len(self.assets),
+            "asset_links": len(self.asset_links),
         }

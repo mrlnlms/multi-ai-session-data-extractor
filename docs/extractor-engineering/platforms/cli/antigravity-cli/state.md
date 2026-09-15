@@ -50,6 +50,11 @@ trajetória legacy recuperada e, por último, stub opaco.
   discovery because the indexes can lag behind the physical conversations.
 - Recovered legacy steps use the same canonical records as current
   trajectories and set `capture_method='legacy_antigravity_daemon'`.
+- Escritas com `ArtifactMetadata` e `CodeContent` constituem artefatos
+  explicitamente entregues. O parser materializa o conteudo preservado em
+  `data/raw/Antigravity CLI/_artifacts/`, valida SHA-256 e publica um Asset de
+  origem assistant com AssetLink `output` para a `PLANNER_RESPONSE` exata.
+  `TargetFile` sem esse marcador continua apenas como caminho operado por tool.
 
 ## Parquets generated
 
@@ -57,6 +62,8 @@ trajetória legacy recuperada e, por último, stub opaco.
 - `antigravity_cli_messages.parquet`
 - `antigravity_cli_tool_events.parquet`
 - `antigravity_cli_branches.parquet`
+- `antigravity_cli_assets.parquet`
+- `antigravity_cli_asset_links.parquet`
 
 ## Where the real info lives
 

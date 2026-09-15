@@ -1,9 +1,14 @@
 # tests/parsers/test_claude_code.py
+import base64
+import hashlib
 import json
 import pytest
 import pandas as pd
 from pathlib import Path
-from src.platforms.claude_code.parser import ClaudeCodeParser
+from src.platforms.claude_code.parser import (
+    ClaudeCodeParser,
+    make_embedded_image_asset_id,
+)
 
 FIXTURE_LINES = [
     {"type": "user", "uuid": "u1", "timestamp": "2026-03-02T16:04:29.025Z",
@@ -281,7 +286,7 @@ def test_branches_one_per_conversation(tmp_path):
 
 
 def test_write_parquets(tmp_path):
-    """v3: write_parquets gera 4 arquivos canonicos com naming claude_code_*."""
+    """write_parquets gera todas as tabelas publicadas do Claude Code."""
     raw_root = tmp_path / "raw"
     raw_root.mkdir()
     raw_path = _write_session(raw_root)
@@ -296,6 +301,8 @@ def test_write_parquets(tmp_path):
         "claude_code_tool_events.parquet",
         "claude_code_branches.parquet",
         "claude_code_agent_memories.parquet",
+        "claude_code_assets.parquet",
+        "claude_code_asset_links.parquet",
     }
     assert {p.name for p in out_dir.glob("*.parquet")} == expected
     assert stats["conversations"] == 1
@@ -303,6 +310,77 @@ def test_write_parquets(tmp_path):
     assert stats["tool_events"] == 1
     assert stats["branches"] == 1
     assert "agent_memories" in stats
+    assert stats["assets"] == 0
+    assert stats["asset_links"] == 0
+
+
+def _image_lines(payload: bytes) -> list[dict]:
+    image = {
+        "type": "image",
+        "source": {
+            "type": "base64",
+            "media_type": "image/png",
+            "data": base64.b64encode(payload).decode("ascii"),
+        },
+    }
+    return [{
+        "type": "user",
+        "uuid": "image-message",
+        "timestamp": "2026-03-02T16:04:29Z",
+        "sessionId": "session-001",
+        "cwd": "/test",
+        "isSidechain": False,
+        "message": {"role": "user", "content": [
+            {"type": "text", "text": "Inspect this."}, image,
+        ]},
+    }]
+
+
+def test_embedded_user_image_becomes_asset_and_exact_message_link(tmp_path):
+    payload = b"synthetic png bytes"
+    path = _write_session(tmp_path, _image_lines(payload))
+
+    parser = ClaudeCodeParser()
+    parser.parse(path)
+
+    digest = hashlib.sha256(payload).hexdigest()
+    expected_id = make_embedded_image_asset_id(
+        "session-001", "image-message", 1, digest
+    )
+    assert len(parser.assets) == len(parser.asset_links) == 1
+    asset = parser.assets[0]
+    assert asset.asset_id == expected_id
+    assert asset.asset_kind == "attachment"
+    assert asset.asset_origin == "user"
+    assert asset.is_model_generated is False
+    assert asset.asset_path == "raw/Claude Code/_images/session-001/1_0.png"
+    assert asset.is_binary_available is True
+    link = parser.asset_links[0]
+    assert link.asset_id == expected_id
+    assert link.object_id == link.message_id == "image-message"
+    assert link.conversation_id == "session-001"
+    assert link.role == "input"
+    assert link.ordinal == 0
+    assert link.content_block_index == 1
+    assert parser.messages[0].asset_paths == [asset.asset_path]
+
+
+def test_embedded_image_reuses_matching_bytes_and_rejects_mismatch(tmp_path):
+    payload = b"authoritative embedded bytes"
+    path = _write_session(tmp_path, _image_lines(payload))
+    parser = ClaudeCodeParser()
+    parser.parse(path)
+    materialized = path / "_images/session-001/1_0.png"
+    assert materialized.read_bytes() == payload
+
+    second = ClaudeCodeParser()
+    second.parse(path)
+    assert materialized.read_bytes() == payload
+    assert second.assets[0].asset_id == parser.assets[0].asset_id
+
+    materialized.write_bytes(b"different bytes")
+    with pytest.raises(ValueError, match="image hash mismatch"):
+        ClaudeCodeParser().parse(path)
 
 
 def test_idempotent_parquets(tmp_path):

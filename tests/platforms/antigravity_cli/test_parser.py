@@ -1,8 +1,14 @@
+import hashlib
 import json
 import sqlite3
 from pathlib import Path
 
-from src.platforms.antigravity_cli.parser import AntigravityCLIParser
+import pytest
+
+from src.platforms.antigravity_cli.parser import (
+    AntigravityCLIParser,
+    make_artifact_asset_id,
+)
 
 
 CONVERSATION_ID = "conv-readable"
@@ -97,16 +103,75 @@ def test_antigravity_parses_readable_trajectory_and_opaque_stub(tmp_path, monkey
     assert len(parser.branches) == 2
 
 
-def test_antigravity_writes_four_canonical_parquets(tmp_path, monkeypatch):
+def test_antigravity_writes_six_canonical_parquets(tmp_path, monkeypatch):
     raw = _setup_raw(tmp_path)
     monkeypatch.setattr("src.capture.cli.preservation.mark_cli_preservation", lambda parser: 0)
     parser = AntigravityCLIParser()
     parser.parse(raw)
     output = tmp_path / "processed"
     stats = parser.write_parquets(output)
-    assert stats == {"conversations": 2, "messages": 2, "tool_events": 2, "branches": 2}
-    for table in ("conversations", "messages", "tool_events", "branches"):
+    assert stats == {"conversations": 2, "messages": 2, "tool_events": 2, "branches": 2, "assets": 0, "asset_links": 0}
+    for table in ("conversations", "messages", "tool_events", "branches", "assets", "asset_links"):
         assert (output / f"antigravity_cli_{table}.parquet").exists()
+
+
+def test_explicit_artifact_content_becomes_assistant_output_asset(tmp_path, monkeypatch):
+    raw = _setup_raw(tmp_path)
+    content = "# Generated report\n"
+    records = [
+        {"step_index": 0, "type": "USER_INPUT", "source": "USER_EXPLICIT", "status": "DONE", "created_at": "2026-08-30T14:00:00Z", "content": "Create a report."},
+        {"step_index": 1, "type": "PLANNER_RESPONSE", "source": "MODEL", "status": "DONE", "created_at": "2026-08-30T14:00:01Z", "content": "Created it.", "tool_calls": [{
+            "name": "write_to_file",
+            "args": {
+                "TargetFile": json.dumps("report.md"),
+                "CodeContent": json.dumps(content),
+                "ArtifactMetadata": json.dumps({"ArtifactType": "other", "UserFacing": True}),
+                "IsArtifact": "true",
+            },
+        }]},
+    ]
+    transcript = raw / "brain" / CONVERSATION_ID / ".system_generated" / "logs" / "transcript.jsonl"
+    transcript.write_text("\n".join(json.dumps(record) for record in records) + "\n")
+    monkeypatch.setattr("src.capture.cli.preservation.mark_cli_preservation", lambda parser: 0)
+
+    parser = AntigravityCLIParser()
+    parser.parse(raw)
+
+    digest = hashlib.sha256(content.encode()).hexdigest()
+    message_id = f"{CONVERSATION_ID}_step_1"
+    assert len(parser.assets) == len(parser.asset_links) == 1
+    asset = parser.assets[0]
+    assert asset.asset_id == make_artifact_asset_id(CONVERSATION_ID, message_id, 0, digest)
+    assert asset.asset_kind == "artifact"
+    assert asset.asset_origin == "assistant"
+    assert asset.is_model_generated is True
+    assert asset.asset_path == f"raw/Antigravity CLI/_artifacts/{CONVERSATION_ID}/1_0.md"
+    assert (raw / "_artifacts" / CONVERSATION_ID / "1_0.md").read_text() == content
+    link = parser.asset_links[0]
+    assert link.message_id == message_id
+    assert link.role == "output"
+    assert parser.messages[1].asset_paths == [asset.asset_path]
+
+
+def test_antigravity_artifact_existing_bytes_must_match(tmp_path, monkeypatch):
+    raw = _setup_raw(tmp_path)
+    transcript = raw / "brain" / CONVERSATION_ID / ".system_generated" / "logs" / "transcript.jsonl"
+    records = [
+        {"step_index": 1, "type": "PLANNER_RESPONSE", "source": "MODEL", "status": "DONE", "created_at": "2026-08-30T14:00:01Z", "content": "Done", "tool_calls": [{
+            "name": "write_to_file", "args": {
+                "TargetFile": "report.md", "CodeContent": "content",
+                "ArtifactMetadata": {"UserFacing": True},
+            },
+        }]},
+    ]
+    transcript.write_text("\n".join(json.dumps(record) for record in records) + "\n")
+    monkeypatch.setattr("src.capture.cli.preservation.mark_cli_preservation", lambda parser: 0)
+    AntigravityCLIParser().parse(raw)
+    materialized = raw / "_artifacts" / CONVERSATION_ID / "1_0.md"
+    AntigravityCLIParser().parse(raw)
+    materialized.write_text("mismatch")
+    with pytest.raises(ValueError, match="Antigravity artifact hash mismatch"):
+        AntigravityCLIParser().parse(raw)
 
 
 def test_antigravity_parses_recovered_legacy_trajectory(tmp_path, monkeypatch):

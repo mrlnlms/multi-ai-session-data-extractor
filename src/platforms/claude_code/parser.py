@@ -16,7 +16,7 @@ Gotchas mapeados:
    `parent_session_id` no subagent.
 
 Output: data/processed/Claude Code/{claude_code_conversations,messages,
-tool_events,branches}.parquet (4 parquets canonicos v3).
+tool_events,branches,agent_memories,assets,asset_links}.parquet.
 
 Branches: 1 _main por Conversation (Claude Code nao tem fork — chat eh linear).
 """
@@ -24,6 +24,7 @@ Branches: 1 _main por Conversation (Claude Code nao tem fork — chat eh linear)
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -43,14 +44,19 @@ _MIME_EXT = {
 }
 from src.schema.models import (
     AgentMemory,
+    Asset,
+    AssetLink,
     Branch,
     Conversation,
     Message,
     ToolEvent,
     agent_memories_to_df,
+    asset_links_to_df,
+    assets_to_df,
     branches_to_df,
     conversations_to_df,
     messages_to_df,
+    make_asset_link_id,
     tool_events_to_df,
 )
 
@@ -61,6 +67,17 @@ logger = logging.getLogger(__name__)
 # Metadados de sessao ficam em ~/.claude/usage-data/session-meta/<uuid>.json
 # Mesmo quando o JSONL raiz some, o meta geralmente sobrevive (first_prompt, stats)
 _SESSION_META_DIR = Path.home() / ".claude" / "usage-data" / "session-meta"
+
+
+def make_embedded_image_asset_id(
+    session_id: str,
+    message_id: str,
+    content_block_index: int,
+    content_sha256: str,
+) -> str:
+    """Return the deterministic identity of one embedded user image use."""
+    locator = "\x1f".join((session_id, message_id, str(content_block_index), content_sha256))
+    return hashlib.sha256(locator.encode("utf-8")).hexdigest()
 
 
 class ClaudeCodeParser(BaseParser):
@@ -81,6 +98,8 @@ class ClaudeCodeParser(BaseParser):
         self._conv_source_files = {}
         self._input_path = None
         self.agent_memories = []
+        self.assets: list[Asset] = []
+        self.asset_links: list[AssetLink] = []
 
     def parse(self, input_path: Path, home_memory_files: Optional[set[str]] = None) -> None:
         """Le sessoes JSONL de todos os projetos em input_path.
@@ -358,10 +377,10 @@ class ClaudeCodeParser(BaseParser):
         session_id: str,
         msg_seq: int,
         block_idx: int,
-    ) -> Optional[str]:
+    ) -> Optional[tuple[str, str, int, str]]:
         # Imagens user-attached em sessoes Claude Code chegam inline base64.
         # Decodifica e salva em <raw_root>/_images/<session_id>/seq_idx.<ext>;
-        # retorna path relativo pra registrar em attachment_names.
+        # retorna path, hash, tamanho e MIME para o catalogo canonico.
         source = block.get("source") or {}
         if source.get("type") != "base64":
             return None
@@ -374,13 +393,22 @@ class ClaudeCodeParser(BaseParser):
         out_dir = Path(raw_root) / "_images" / session_id
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / f"{msg_seq}_{block_idx}{ext}"
-        if not out_path.exists():
-            try:
-                out_path.write_bytes(base64.b64decode(data))
-            except Exception as e:
-                logger.warning(f"  {session_file}: falha decode imagem msg={msg_seq}: {e}")
-                return None
-        return f"_images/{session_id}/{out_path.name}"
+        try:
+            decoded = base64.b64decode(data, validate=True)
+        except Exception as e:
+            logger.warning(f"  {session_file}: falha decode imagem msg={msg_seq}: {e}")
+            return None
+        digest = hashlib.sha256(decoded).hexdigest()
+        if out_path.exists():
+            existing_digest = hashlib.sha256(out_path.read_bytes()).hexdigest()
+            if existing_digest != digest:
+                raise ValueError(
+                    f"preserved Claude Code image hash mismatch: {out_path}"
+                )
+        else:
+            out_path.write_bytes(decoded)
+        rel_path = f"raw/Claude Code/_images/{session_id}/{out_path.name}"
+        return rel_path, digest, len(decoded), media_type or None
 
     def _parse_session(
         self,
@@ -462,19 +490,19 @@ class ClaudeCodeParser(BaseParser):
                 # GOTCHA: content pode ser string direta ou lista de blocos
                 # Bug pre-a391e5d descartava string content, perdendo 10.7k msgs
                 text_parts: list[str] = []
-                image_blocks: list[dict] = []
+                image_blocks: list[tuple[int, dict]] = []
                 if isinstance(content, str):
                     if content.strip():
                         text_parts.append(content)
                 elif isinstance(content, list):
-                    for item in content:
+                    for content_idx, item in enumerate(content):
                         if not isinstance(item, dict):
                             continue
                         itype = item.get("type")
                         if itype == "text":
                             text_parts.append(item.get("text", ""))
                         elif itype == "image":
-                            image_blocks.append(item)
+                            image_blocks.append((content_idx, item))
                 else:
                     continue
 
@@ -482,18 +510,70 @@ class ClaudeCodeParser(BaseParser):
                     continue  # So tem tool_result, nao gera Message
 
                 seq += 1
+                message_id = evt.get("uuid", f"{session_id}_{seq}")
                 ct_set: set[str] = set()
                 if text_parts:
                     ct_set.add("text")
                 attachment_names: list[str] = []
-                for idx, block in enumerate(image_blocks):
-                    saved = self._save_image_block(block, session_file, session_id, seq, idx)
+                asset_paths: list[str] = []
+                for image_ordinal, (content_idx, block) in enumerate(image_blocks):
+                    saved = self._save_image_block(
+                        block, session_file, session_id, seq, image_ordinal
+                    )
                     if saved:
-                        attachment_names.append(saved)
+                        asset_path, digest, size_bytes, media_type = saved
+                        attachment_names.append(asset_path.removeprefix("raw/Claude Code/"))
+                        asset_paths.append(asset_path)
                         ct_set.add("image")
+                        asset_id = make_embedded_image_asset_id(
+                            session_id, message_id, content_idx, digest
+                        )
+                        self.assets.append(Asset(
+                            asset_id=asset_id,
+                            source=self.source_name,
+                            account_id=self.account_id,
+                            asset_kind="attachment",
+                            asset_origin="user",
+                            file_name=Path(asset_path).name,
+                            mime_type=media_type,
+                            size_bytes=size_bytes,
+                            asset_path=asset_path,
+                            is_model_generated=False,
+                            is_preserved_missing=False,
+                            is_binary_available=True,
+                            created_at=self._ts(evt.get("timestamp")),
+                            metadata_json=json.dumps(
+                                {"content_sha256": digest}, sort_keys=True
+                            ),
+                        ))
+                        relationship_conv_id = override_conv_id or session_id
+                        self.asset_links.append(AssetLink(
+                            asset_link_id=make_asset_link_id(
+                                self.source_name,
+                                self.account_id,
+                                asset_id,
+                                "message",
+                                message_id,
+                                "input",
+                                image_ordinal,
+                                content_idx,
+                            ),
+                            source=self.source_name,
+                            account_id=self.account_id,
+                            asset_id=asset_id,
+                            object_type="message",
+                            object_id=message_id,
+                            conversation_id=relationship_conv_id,
+                            message_id=message_id,
+                            project_id=None,
+                            role="input",
+                            ordinal=image_ordinal,
+                            content_block_index=content_idx,
+                            metadata_json=None,
+                        ))
 
                 messages.append(Message(
-                    message_id=evt.get("uuid", f"{session_id}_{seq}"),
+                    message_id=message_id,
                     conversation_id=session_id,
                     source=self.source_name,
                     sequence=seq,
@@ -504,6 +584,8 @@ class ClaudeCodeParser(BaseParser):
                     account=self.account,
                     content_types=",".join(sorted(ct_set)) if ct_set else "text",
                     attachment_names=",".join(attachment_names) if attachment_names else None,
+                    asset_paths=asset_paths or None,
+                    account_id=self.account_id,
                 ))
 
             elif etype == "assistant":
@@ -635,7 +717,7 @@ class ClaudeCodeParser(BaseParser):
         return branches_to_df(self.branches)
 
     def write_parquets(self, output_dir: Path) -> dict[str, int]:
-        """Escreve 5 parquets canonicos em output_dir. Idempotente."""
+        """Escreve os 7 parquets canonicos em output_dir. Idempotente."""
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         conversations_to_df(self.conversations).to_parquet(
@@ -648,10 +730,16 @@ class ClaudeCodeParser(BaseParser):
             output_dir / "claude_code_branches.parquet", index=False)
         agent_memories_to_df(self.agent_memories).to_parquet(
             output_dir / "claude_code_agent_memories.parquet", index=False)
+        assets_to_df(self.assets).to_parquet(
+            output_dir / "claude_code_assets.parquet", index=False)
+        asset_links_to_df(self.asset_links).to_parquet(
+            output_dir / "claude_code_asset_links.parquet", index=False)
         return {
             "conversations": len(self.conversations),
             "messages": len(self.messages),
             "tool_events": len(self.events),
             "branches": len(self.branches),
             "agent_memories": len(self.agent_memories),
+            "assets": len(self.assets),
+            "asset_links": len(self.asset_links),
         }
