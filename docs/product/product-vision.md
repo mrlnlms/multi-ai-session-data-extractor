@@ -3,7 +3,7 @@
 **Status:** visão de produto validada em conversa; não é especificação nem
 plano de implementação.
 
-**Data:** 2026-08-31
+**Data da visao:** 2026-08-31. **Horizonte revisto:** 2026-09-15.
 
 ## 1. Decisão de produto
 
@@ -26,11 +26,16 @@ deliberadamente iterativa. Ferramentas curatoriais podem aparecer dentro do
 leitor, onde existe contexto para usá-las, sem transformar a renderização do
 chat e a curadoria no mesmo componente ou domínio.
 
-A próxima frente de exploração do produto é o **arquivo e leitor**. A coleta e
-a análise já possuem infraestrutura utilizável, mas ainda falta a superfície
+O **arquivo e leitor** continua sendo uma frente central do produto: a coleta
+e a análise já possuem infraestrutura utilizável, mas ainda falta a superfície
 que permita inspecionar diretamente o principal dado preservado: a conversa.
-Essa prioridade não congela uma ordem definitiva de implementação das três
-frentes; ela ataca o gap de uso e visibilidade mais evidente no estado atual.
+Isso descreve um gap de uso, não a próxima tarefa. No horizonte atual, memória/
+configuração de conta, a dimensão analítica derivada do trabalho de
+`account_id` já publicado e a centralização física dos assets preservados são
+frentes próximas;
+o leitor fica no futuro, provavelmente antes de uma eventual mudança do remoto
+DVC. O [roadmap](../ROADMAP.md) registra a prioridade temporal; esta visão
+descreve o produto-alvo e não fixa a ordem de implementação das três frentes.
 
 O arquivo substitui a necessidade de consultar o histórico diretamente em cada
 plataforma, sem substituir a preservação: chats removidos upstream continuam

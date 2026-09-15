@@ -92,6 +92,16 @@ git push
 autorizacao explicita do usuario. Para o operador, fazem parte normal de uma
 publicacao deliberada; marcar Publish no dashboard e uma autorizacao clara.
 
+O Publish automatizado registra sua conclusao em
+`.runtime/archive-assurance.json` depois do push de DVC e Git. Para validar
+deliberadamente a base ja publicada, sem alterar dados ou publicar outra vez,
+execute `PYTHONPATH=. .venv/bin/python -m src.operations.archive_assurance
+verify`: ele exige Parquets locais atualizados, `dvc status` limpo, cache/remoto
+em sincronia e Git HEAD igual a `origin/main` antes de renovar o baseline.
+Depois disso, `... archive_assurance status` consulta apenas o registro e
+fingerprints locais; nao acessa o Drive. O procedimento e seus limites ficam
+no [guia do pipeline](pipeline.md#baseline-de-validacao-entre-sessoes).
+
 ## Recuperar a base atual em outra maquina
 
 O cenario suportado e apagar `data/` localmente para liberar espaco e, mais

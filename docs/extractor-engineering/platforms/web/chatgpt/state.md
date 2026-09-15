@@ -70,7 +70,7 @@ branches, assets and asset_links Parquets.
   All links and available paths resolve, and no upstream pointer URL is published.
 - Project `_files.json` indexes and Canvas operation records remain preserved
   outside the Asset domain; their reconstructable successful Canvas states are
-  Assets. Account memory exports remain preserved for a named future
+  Assets. Account memory exports remain preserved for the separately planned
   memory/configuration domain and are not Assets.
 - **Tether quote**, **canvas**, **deep_research**.
 - **Custom GPT vs project** distinguished.

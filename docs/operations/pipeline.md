@@ -19,6 +19,29 @@ manifestos e outros arquivos que podem ser anotados continuam independentes.
 Use `PYTHONPATH=. .venv/bin/python` para executar scripts sem depender do
 Python global.
 
+## Baseline de validacao entre sessoes
+
+O registro local `.runtime/archive-assurance.json` guarda a ultima base
+verificada/publicada: horario, commit Git e fingerprints dos ponteiros DVC e
+do checkout de dados. Depois de um Publish completo, o pipeline o atualiza.
+O hook de inicio de sessao do Codex mostra apenas uma linha; ele nao faz
+consultas ao remoto nem carrega uma auditoria no contexto do agente.
+
+```bash
+# Leitura rapida, local e sem rede
+PYTHONPATH=. .venv/bin/python -m src.operations.archive_assurance status
+
+# Verificacao deliberada da base atual: frescor local, DVC, remoto e Git
+PYTHONPATH=. .venv/bin/python -m src.operations.archive_assurance verify
+```
+
+`verify` atualiza o registro somente se todas as checagens concluirem. Um
+registro ausente ou alterado indica que a nova base precisa ser validada; nao
+significa que o remoto desapareceu. O fingerprint local detecta mudancas
+posteriores sem recalcular hashes de conteudo nem cobrar requisicoes remotas
+em toda abertura de chat. O DVC calcula/verifica conteudo na publicacao e na
+verificacao deliberada.
+
 Uma conta web ativa e vinculada localmente pode ser selecionada pelo UUID
 imutavel. `python -m src.workflows.account_sync ACCOUNT_ID` mostra um preview;
 `--apply` executa somente sync + parse da plataforma, sem unify, DVC ou Git.

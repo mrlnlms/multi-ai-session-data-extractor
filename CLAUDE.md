@@ -109,6 +109,19 @@ Nao conclua que houve consolidacao apenas pelo nome, idade ou status do arquivo.
 - Ao promover uma fonte, atualize `src/platforms/registry.py`, valide o dashboard
   Streamlit e os relatorios Quarto. Nao declare a pipeline verde se o parquet
   estiver anterior a `raw` ou `merged`.
+- Para alinhar produto e roadmap, comece pela linha de desenvolvimento em
+  `docs/ROADMAP.md` e abra detalhes apenas da frente discutida. O core
+  reutilizavel fica em `src/`, nao em Streamlit ou Quarto.
+- Em uma nova sessao, consulte o baseline por
+  `python -m src.operations.archive_assurance status` antes de levantar duvidas
+  genericas sobre frescor ou publicacao. O registro completo fica em
+  `.runtime/archive-assurance.json`, fora do Git. `status` compara o checkout
+  local com o ultimo estado verificado sem DVC ou rede. Se o registro estiver
+  ausente ou os dados tiverem mudado, informe isso objetivamente; execute
+  `verify` somente quando a tarefa exigir nova verificacao profunda. `verify`
+  confere entradas/Parquets, dados DVC, remoto e Git antes de renovar o
+  registro; nao e etapa automatica de abertura de chat. Nao repita ressalvas
+  abstratas quando o baseline registrado for atual.
 - Rode a suite de testes antes de merge; nao fixe quantidades de testes na
   documentacao.
 - Ao alterar um fato canonico (plataformas, contagem, comando, etapa de
@@ -151,8 +164,8 @@ validada, commitada e enviada; rode primeiro a simulacao e obtenha autorizacao
 explicita para excluir. O procedimento exato esta em
 `docs/operations/dvc-runbook.md`.
 
-Uma alternativa ao Drive e pesquisa futura, nao uma migracao ativa nem motivo
-para bloquear coleta ou publicacao normal.
+Uma alternativa ao Drive e pesquisa futura e nao prioridade de curto prazo,
+migracao ativa ou motivo para bloquear coleta ou publicacao normal.
 
 ## Investigacao por plataforma
 

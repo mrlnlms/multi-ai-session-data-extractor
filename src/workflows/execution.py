@@ -51,6 +51,7 @@ DVC_PATHS: list[str] = [
     "data/merged",
     "data/processed",
     "data/unified",
+    "data/accounts",
     "data/external/manual-saves",
     "data/external/deep-research-md",
     "data/external/perplexity-orphan-threads",
@@ -542,6 +543,27 @@ def run_publish_streaming(
         on_line(f"ERROR: {venv_dvc} not found. Setup .venv first.")
         return 1, "dvc binary missing"
 
+    def record_completed_push() -> tuple[int, str] | None:
+        from src.operations.archive_assurance import write_assurance
+        from src.operations.local_freshness import inspect_archive
+
+        freshness = inspect_archive(PROJECT_ROOT)
+        if freshness.status != "current":
+            on_line(f"ERROR: publication completed but validation record not written: {freshness.compact()}")
+            return 1, "publication completed, local archive freshness requires review"
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT,
+            text=True, capture_output=True, check=False,
+        )
+        if head.returncode != 0:
+            return 1, "publication completed, could not resolve Git commit for validation record"
+        try:
+            write_assurance(PROJECT_ROOT, git_head=head.stdout.strip(), method="completed_push")
+        except OSError as exc:
+            return 1, f"publication completed, could not write validation record: {exc}"
+        on_line("[record] archive validation and publication baseline saved locally")
+        return None
+
     # Pre-check: evita commit fantasma quando nada mudou
     on_line("[pre] checking dvc status + git ahead…")
     dvc_clean = _dvc_working_dir_clean()
@@ -569,6 +591,9 @@ def run_publish_streaming(
         rc, tail = _stream(["git", "push"], on_line, timeout=T_GIT)
         if rc != 0:
             return rc, f"git push failed (rc={rc}):\n{tail}"
+        record_error = record_completed_push()
+        if record_error is not None:
+            return record_error
         return 0, f"pushed {git_ahead} commits (no new dvc add needed)"
 
     # Caso comum: dvc working dir mudou — pipeline completo.
@@ -628,6 +653,10 @@ def run_publish_streaming(
     rc, tail = _stream(["git", "push"], on_line, timeout=T_GIT)
     if rc != 0:
         return rc, f"git push failed (rc={rc}):\n{tail}"
+
+    record_error = record_completed_push()
+    if record_error is not None:
+        return record_error
 
     return 0, "all publish steps ok"
 

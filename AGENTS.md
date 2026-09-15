@@ -122,6 +122,20 @@ arquivo.
   Streamlit e nos relatorios Quarto. O dashboard e iniciado por
   `PYTHONPATH=. .venv/bin/streamlit run dashboard/app.py`.
 - Nao declarar uma pipeline verde se o parquet for anterior ao raw/merged.
+- Para alinhar produto e roadmap, leia primeiro a linha de desenvolvimento em
+  `docs/ROADMAP.md`; aprofunde apenas a frente em pauta. A reestruturacao
+  move o core reutilizavel para `src/`, nao torna Streamlit ou Quarto o produto.
+- Em uma nova sessao, use o baseline local de
+  `python -m src.operations.archive_assurance status` antes de levantar duvidas
+  genericas sobre frescor ou publicacao. O hook `SessionStart` em `.codex/`
+  apresenta uma unica linha ao Codex; o registro completo fica em
+  `.runtime/archive-assurance.json`, fora do Git. `status` compara o checkout
+  local com o ultimo estado verificado, sem consultar DVC ou rede. Se o registro
+  estiver ausente ou os dados tiverem mudado, informe isso objetivamente e
+  rode `verify` somente quando a tarefa exigir uma nova verificacao profunda.
+  `verify` confere entradas/Parquets, dados DVC, remoto e Git antes de renovar
+  o registro; nao e etapa automatica de abertura de chat. Nao repetir
+  ressalvas abstratas quando o baseline registrado e atual.
 - Rodar a suite de testes antes de merge; nao manter contagem fixa de testes
   na documentacao, pois parametrizacoes alteram esse numero.
 - Ao alterar um fato canonico (plataformas, contagem, comando, etapa de
@@ -148,7 +162,7 @@ produto.
   canonico atual esta commitado e enviado, executar primeiro em modo seco e
   obter autorizacao explicita do usuario para a exclusao.
 - Uma alternativa ao Drive continua sendo pesquisa futura, nao uma migracao ou
-  bloqueio operacional em andamento.
+  bloqueio operacional em andamento, nem prioridade de curto prazo.
 
 ## Convencoes
 

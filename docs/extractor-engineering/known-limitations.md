@@ -245,7 +245,8 @@ These validations require a Pro Max account and remain open until someone tests:
   preserved response, five create requests lack usable content evidence and two
   successful regex patches cannot be reproduced exactly; none is fabricated as
   a file. ChatGPT and Claude.ai account-memory exports remain explicitly queued
-  for a future memory/configuration domain rather than the Asset graph. Claude.ai extracted artifact
+  for a separately planned memory/configuration domain rather than the Asset
+  graph. Claude.ai extracted artifact
   versions are indexed as exact message outputs; Claude inline `attachments`
   remain text-bearing message metadata rather than fake binaries. Perplexity
   third-party featured images remain external references rather than

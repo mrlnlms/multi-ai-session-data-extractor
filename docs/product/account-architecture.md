@@ -454,7 +454,10 @@ local, em vez de ser incorporado ao binario desktop.
 1. Contas legadas usam UUIDv5 determinístico já persistido no catálogo.
 2. A identidade arquivável vive em `data/accounts/catalog.json`, sob DVC.
 3. `account_id` foi acrescentado; `account` foi preservado para compatibilidade.
-4. Não existe `accounts.parquet` nesta migração; o catálogo é a dimensão.
+4. A migração de `account_id` não criou `accounts.parquet`; o catálogo continuou
+   sendo a fonte autoritativa. Uma dimensão analítica derivada, somente leitura,
+   é a próxima etapa analítica do mesmo trabalho de identidade de contas, não
+   uma revisão dessa decisão de escopo.
 5. `account_id` compõe as chaves sem alterar IDs existentes.
 6. Web e NotebookLM histórico recebem UUID; CLI/manual permanecem nulos.
 7. `upstream_subject` continua fora do contrato até existir evidência estável.
