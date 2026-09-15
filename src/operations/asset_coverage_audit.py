@@ -130,6 +130,10 @@ def _kind_for_file(path: Path, source_root: Path, source: str) -> str:
     if source == "NotebookLM" and "assets" in parts:
         if "notes" in parts:
             return "notebooklm_note_materialization"
+    if source == "Perplexity" and "assets" in parts and lower_name in {
+        "_index.json", "_pinned_raw.json",
+    }:
+        return "domain_record"
     if lower_name in OPERATIONAL_NAMES:
         return "capture_log" if "capture" in lower_name else "operational_record"
     if lower_name.endswith("manifest.json") or lower_name in {"assets_manifest.json", "assets_log.json"}:
@@ -163,8 +167,50 @@ def _kind_for_file(path: Path, source_root: Path, source: str) -> str:
     return "unclassified_file"
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _perplexity_verified_duplicate_ids(account_root: Path) -> dict[str, str]:
+    """Map slugs only when native lineage and preserved bytes both agree."""
+    index_path = account_root / "assets" / "_index.json"
+    files_root = account_root / "assets" / "files"
+    if not index_path.is_file() or not files_root.is_dir():
+        return {}
+    try:
+        rows = json.loads(index_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return {}
+    by_native_id: dict[str, list[tuple[str, Path]]] = {}
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict) or not row.get("asset_id") or not row.get("asset_slug"):
+            continue
+        slug = str(row["asset_slug"])
+        matches = [path for path in files_root.glob(f"{slug}.*") if path.is_file()]
+        if len(matches) == 1:
+            by_native_id.setdefault(str(row["asset_id"]), []).append((slug, matches[0]))
+    verified: dict[str, str] = {}
+    for native_id, representations in by_native_id.items():
+        if len(representations) < 2:
+            continue
+        digests = {_sha256_file(path) for _, path in representations}
+        if len(digests) == 1:
+            verified.update({slug: native_id for slug, _ in representations})
+    return verified
+
+
 def _filesystem_evidence(data_root: Path) -> list[RepresentationEvidence]:
     evidence: list[RepresentationEvidence] = []
+    perplexity_duplicate_ids: dict[tuple[str, str], str] = {}
+    for account, account_root in iter_account_roots(data_root / "merged" / "Perplexity"):
+        perplexity_duplicate_ids.update({
+            (account, slug): native_id
+            for slug, native_id in _perplexity_verified_duplicate_ids(account_root).items()
+        })
     for layer in ("raw", "merged"):
         for source in KNOWN_PLATFORMS:
             source_root = data_root / layer / source
@@ -187,17 +233,16 @@ def _filesystem_evidence(data_root: Path) -> list[RepresentationEvidence]:
                     if kind in {"preserved_binary", "notebooklm_note_materialization"}
                     else None
                 )
-                # Gemini's canonical identity is the preserved content digest.
+                # Gemini and Qwen generated files without an upstream file ID
+                # use the preserved content digest as canonical identity.
                 # Carry it in the census so a second physical copy can be
                 # distinguished from genuinely uncovered content. Other
                 # sources may use native IDs and are left unchanged here.
                 native_id = None
-                if source == "Gemini" and kind == "preserved_binary":
-                    digest = hashlib.sha256()
-                    with path.open("rb") as handle:
-                        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-                            digest.update(chunk)
-                    native_id = f"sha256:{digest.hexdigest()}"
+                if source in {"Gemini", "Qwen"} and kind == "preserved_binary":
+                    native_id = f"sha256:{_sha256_file(path)}"
+                elif source == "Perplexity" and kind == "preserved_binary":
+                    native_id = perplexity_duplicate_ids.get((account, path.stem))
                 evidence.append(RepresentationEvidence(
                     source=source,
                     account_scope=account,
@@ -655,6 +700,17 @@ def load_policy(path: Path = POLICY_PATH) -> list[dict[str, str]]:
     return rules
 
 
+def _asset_path_matches_account(path: str, source: str, account_scope: str) -> bool:
+    """Match canonical paths to the census account tree without display labels."""
+    parts = PurePosixPath(path).parts
+    try:
+        source_index = parts.index(source)
+    except ValueError:
+        return False
+    child = parts[source_index + 1] if source_index + 1 < len(parts) else ""
+    return child == account_scope if account_scope.startswith("account-") else not child.startswith("account-")
+
+
 def reconcile_asset_coverage(
     evidence: Iterable[RepresentationEvidence],
     assets: pd.DataFrame,
@@ -686,8 +742,10 @@ def reconcile_asset_coverage(
             if status == "eligible_uncovered" and item.native_id:
                 source_key = "".join(ch for ch in item.source.lower() if ch.isalnum())
                 identity_paths = asset_identity_paths.get((source_key, item.native_id), set())
-                account_part = f"/{item.account_scope}/"
-                if any(account_part in f"/{path}" for path in identity_paths):
+                if any(
+                    _asset_path_matches_account(path, item.source, item.account_scope)
+                    for path in identity_paths
+                ):
                     status = "duplicate_representation"
             findings.append(CoverageFinding(item, status))
         elif item.representation_kind == "embedded_attachment":

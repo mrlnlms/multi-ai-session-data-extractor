@@ -295,6 +295,101 @@ def test_gemini_identical_bytes_in_another_account_do_not_prove_duplicate(tmp_pa
     assert statuses[next(item.binary_path for item in evidence if item.binary_path.endswith("second.png"))] == "eligible_uncovered"
 
 
+def test_qwen_content_duplicate_in_default_account_is_not_uncovered(tmp_path):
+    data = tmp_path / "data"
+    assets_dir = data / "merged" / "Qwen" / "assets"
+    assets_dir.mkdir(parents=True)
+    canonical = assets_dir / "canonical.png"
+    duplicate = assets_dir / "different-name.png"
+    canonical.write_bytes(b"same generated output")
+    duplicate.write_bytes(b"same generated output")
+
+    evidence = inventory_preserved_session_assets(data)
+    canonical_item = next(item for item in evidence if item.binary_path.endswith("canonical.png"))
+    duplicate_item = next(item for item in evidence if item.binary_path.endswith("different-name.png"))
+    assert canonical_item.native_id == duplicate_item.native_id
+    assets = pd.DataFrame({
+        "source": ["qwen"],
+        "asset_id": [canonical_item.native_id],
+        "asset_path": [canonical_item.binary_path],
+    })
+
+    findings = reconcile_asset_coverage(evidence, assets, pd.DataFrame())
+    statuses = {finding.evidence.binary_path: finding.status for finding in findings}
+    assert statuses[canonical_item.binary_path] == "covered"
+    assert statuses[duplicate_item.binary_path] == "duplicate_representation"
+
+
+def test_perplexity_duplicate_requires_native_lineage_and_identical_bytes(tmp_path):
+    data = tmp_path / "data"
+    root = data / "merged" / "Perplexity"
+    files = root / "assets" / "files"
+    files.mkdir(parents=True)
+    (files / "old-slug.md").write_bytes(b"same artifact")
+    (files / "current-slug.md").write_bytes(b"same artifact")
+    (files / "different-slug.md").write_bytes(b"different artifact")
+    (root / "assets" / "_index.json").write_text(json.dumps([
+        {"asset_id": "native-1", "asset_slug": "old-slug"},
+        {"asset_id": "native-1", "asset_slug": "current-slug"},
+        {"asset_id": "native-1", "asset_slug": "different-slug"},
+    ]))
+
+    evidence = inventory_preserved_session_assets(data)
+    by_name = {Path(item.binary_path).name: item for item in evidence if item.binary_path}
+    # A differing representation prevents native-lineage-only deduplication.
+    assert by_name["old-slug.md"].native_id is None
+    assert by_name["current-slug.md"].native_id is None
+    assert by_name["different-slug.md"].native_id is None
+
+    (files / "different-slug.md").unlink()
+    (root / "assets" / "_index.json").write_text(json.dumps([
+        {"asset_id": "native-1", "asset_slug": "old-slug"},
+        {"asset_id": "native-1", "asset_slug": "current-slug"},
+    ]))
+    evidence = inventory_preserved_session_assets(data)
+    by_name = {Path(item.binary_path).name: item for item in evidence if item.binary_path}
+    assets = pd.DataFrame({
+        "source": ["perplexity"],
+        "asset_id": ["native-1"],
+        "asset_path": [by_name["current-slug.md"].binary_path],
+    })
+    findings = reconcile_asset_coverage(evidence, assets, pd.DataFrame())
+    statuses = {finding.evidence.binary_path: finding.status for finding in findings if finding.evidence.binary_path}
+    assert statuses[by_name["current-slug.md"].binary_path] == "covered"
+    assert statuses[by_name["old-slug.md"].binary_path] == "duplicate_representation"
+
+
+def test_perplexity_asset_indexes_are_domain_records(tmp_path):
+    data = tmp_path / "data"
+    assets = data / "merged" / "Perplexity" / "assets"
+    assets.mkdir(parents=True)
+    (assets / "_index.json").write_text("[]")
+    (assets / "_pinned_raw.json").write_text("[]")
+    evidence = inventory_preserved_session_assets(data)
+    assert {item.representation_kind for item in evidence} == {"domain_record"}
+
+
+def test_perplexity_verified_identity_still_deduplicates_raw_and_merged(tmp_path):
+    data = tmp_path / "data"
+    rows = [
+        {"asset_id": "native-1", "asset_slug": "old-slug"},
+        {"asset_id": "native-1", "asset_slug": "current-slug"},
+    ]
+    for layer in ("raw", "merged"):
+        root = data / layer / "Perplexity" / "assets"
+        files = root / "files"
+        files.mkdir(parents=True)
+        (files / "old-slug.md").write_bytes(b"same artifact")
+        (files / "current-slug.md").write_bytes(b"same artifact")
+        (root / "_index.json").write_text(json.dumps(rows))
+
+    evidence = inventory_preserved_session_assets(data)
+    binaries = [item for item in evidence if item.binary_path]
+    assert len(binaries) == 2
+    assert all(item.evidence_path.startswith("merged/") for item in binaries)
+    assert {item.native_id for item in binaries} == {"native-1"}
+
+
 def test_redacted_serialization_contains_no_paths_ids_filenames_or_content():
     item = RepresentationEvidence("ChatGPT", "account-private", "domain_record", "raw/ChatGPT/private-name.json", "native-secret", None, "conversation-secret", "message-secret", None, None)
     text = json.dumps(redacted_finding(CoverageFinding(item, "unresolved")))

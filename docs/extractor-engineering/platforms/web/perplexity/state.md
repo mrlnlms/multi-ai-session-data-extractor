@@ -58,6 +58,11 @@ legacy `account` label and all existing native IDs remain unchanged.
   resolve under `data/merged/Perplexity/assets/files`, while 6 old uploads remain
   explicitly unavailable with `failed_upstream_deleted`. Signed URLs and errors
   are excluded from processed metadata.
+- Nine additional preserved artifact paths are older physical representations
+  of those same native outputs: both their upstream `asset_id` and SHA-256 bytes
+  match the canonical representation in the same account. The audit retains and
+  reports them as `duplicate_representation`. The asset index and raw pinned
+  listing are domain envelopes, not user-facing file outputs.
 - Idempotent (~1s to run).
 
 ## Descriptive Quarto

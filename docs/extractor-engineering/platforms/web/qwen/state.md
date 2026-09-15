@@ -86,8 +86,12 @@ The current archive materializes 367 distinct assets: 294 user uploads, 54
 assistant-generated outputs, and 19 project sources. Each has one evidenced
 link: uploads and generated outputs resolve to their exact input/output message,
 while project files resolve to the matching `ProjectDoc` with `role=context`.
-All 367 binaries are locally available. Existing `Message.asset_paths` and
-`ProjectDoc` rows remain intact for compatibility and domain-specific analysis.
+All 367 binaries are locally available. Seven additional PNG paths are verified
+same-account, byte-identical physical copies of generated outputs whose canonical
+identity is already their SHA-256 content digest; the coverage audit reports
+them as `duplicate_representation`, not missing Assets. Existing
+`Message.asset_paths` and `ProjectDoc` rows remain intact for compatibility and
+domain-specific analysis.
 
 ## Descriptive Quarto
 
