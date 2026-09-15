@@ -74,6 +74,8 @@ def test_historical_snapshot_has_stable_provenance_and_ids(tmp_path):
     assert len(first.sources) == 1
     assert len(first.notes) == 1
     assert len(first.outputs) == 1
+    assert len(first.assets) == 1
+    assert len(first.asset_links) == 1
     assert len(first.guide_questions) == 1
     assert first.conversations[0].account == "archive:former-work-account-2026-01-02"
     assert first.conversations[0].capture_method == HISTORICAL_CAPTURE_METHOD
@@ -99,11 +101,18 @@ def test_official_parser_combines_live_and_historical_rows(tmp_path):
     conversations = pd.read_parquet(output / "notebooklm_conversations.parquet")
     messages = pd.read_parquet(output / "notebooklm_messages.parquet")
     outputs = pd.read_parquet(output / "notebooklm_outputs.parquet")
+    assets = pd.read_parquet(output / "notebooklm_assets.parquet")
+    asset_links = pd.read_parquet(output / "notebooklm_asset_links.parquet")
 
     assert len(conversations) == 1
     assert set(conversations["capture_method"]) == {HISTORICAL_CAPTURE_METHOD}
     assert len(messages) == 3
     assert len(outputs) == 1
+    assert len(assets) == 1
+    assert len(asset_links) == 1
+    assert assets.iloc[0]["asset_id"] == outputs.iloc[0]["output_id"]
+    assert asset_links.iloc[0]["object_type"] == "output"
+    assert assets.iloc[0]["asset_path"].startswith("external/notebooklm-snapshots/")
 
 
 def test_multiple_archives_get_distinct_stable_accounts(tmp_path):

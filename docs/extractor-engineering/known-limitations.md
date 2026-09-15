@@ -143,6 +143,11 @@ These validations require a Pro Max account and remain open until someone tests:
   of hierarchy). The remaining 66 mind maps end up with metadata only
   because the asset wasn't downloaded (upstream regenerate or download
   failure — not blocking).
+- **Asset graph covers preserved files, not every domain row.** Rendered source
+  pages and generated binary outputs are indexed with exact source/output
+  relationships across all three current accounts and the historical archive.
+  Text-only sources and outputs remain authoritative in `sources`/`outputs`;
+  missing downloads and expiring signed URLs are not represented as binaries.
 - **Real chat — not a bug, it's the state of the data.** Of the 143 current
   notebooks, 0 have chat populated upstream (the user did not have real
   chats in the notebooks). The 138 captured messages are `role=system`
@@ -211,12 +216,14 @@ These validations require a Pro Max account and remain open until someone tests:
 ## Cross-platform assets
 
 - **The unified asset index is intentionally partial.** Its current coverage
-  covers Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai, and Perplexity. ChatGPT project
+  covers Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai, Perplexity, and NotebookLM. ChatGPT project
   sources/canvas/deep-research files and Claude.ai extracted artifacts are not
   yet indexed by the canonical asset graph; Claude inline `attachments` remain
   text-bearing message metadata rather than fake binaries. File representations,
   Perplexity third-party featured images remain external references rather than
-  preserved-file assets. Manifests and domain outputs from the other web sources remain preserved in
+  preserved-file assets. NotebookLM indexes preserved source-page representations
+  and binary outputs, while its text-only domain rows remain in their specialized
+  tables. Manifests and domain outputs from the other web sources remain preserved in
   their existing representations until source-specific adapters validate their
   identities and path semantics.
 

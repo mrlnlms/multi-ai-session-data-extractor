@@ -33,7 +33,7 @@ SOURCE_COLOR   = "#DB8B00"  # Darker orange
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "NotebookLM"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
-AUX_TABLES     = ["sources", "notes", "outputs", "guide_questions", "source_guides"]
+AUX_TABLES     = ["sources", "notes", "outputs", "guide_questions", "source_guides", "assets", "asset_links"]
 ACCOUNT_FILTER = account_email("notebooklm", "account-2") or "2"
 
 con = duckdb.connect()

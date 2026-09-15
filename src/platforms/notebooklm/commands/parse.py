@@ -1,7 +1,7 @@
 """Parse current and historical NotebookLM data into canonical Parquets.
 
 Reads every account under data/merged/NotebookLM/ plus immutable old-format
-snapshots under data/external/notebooklm-snapshots/. Writes one family of nine
+snapshots under data/external/notebooklm-snapshots/. Writes one family of eleven
 Parquets under data/processed/NotebookLM/. Idempotent.
 
 Uso: PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.parse
@@ -71,6 +71,7 @@ def _load_account(
         nb["account"] = account_label
         nb["account_key"] = account_key
         nb["account_id"] = account_id
+        nb["_account_dir"] = str(account_dir)
 
         # Merge timestamps from discovery se disponivel
         disc = discovery.get(nb_uuid)

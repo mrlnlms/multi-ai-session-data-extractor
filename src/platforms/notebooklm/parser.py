@@ -1,6 +1,6 @@
 """Parser canonico v3 pra NotebookLM.
 
-Le merged em data/merged/NotebookLM/account-{N}/ e gera 9 parquets em
+Le merged em data/merged/NotebookLM/account-{N}/ e gera 11 parquets em
 data/processed/NotebookLM/:
 - 4 canonicos (conversations, messages, tool_events, branches)
 - 5 auxiliares (sources, notes, outputs, guide_questions, source_guides)
@@ -17,19 +17,22 @@ Decisoes de design:
 """
 
 import json
+import mimetypes
+import uuid as uuid_lib
 from pathlib import Path
 from typing import Optional, TYPE_CHECKING
 
 import pandas as pd
 
 from src.schema.models import (
-    Conversation, Message, ToolEvent, Branch, ProjectDoc,
+    Conversation, Message, ToolEvent, Branch, ProjectDoc, Asset, AssetLink,
     NotebookLMNote, NotebookLMOutput, NotebookLMGuideQuestion, NotebookLMSourceGuide,
     VALID_OUTPUT_TYPES,
     conversations_to_df, messages_to_df, tool_events_to_df, branches_to_df,
     project_docs_to_df,
     notebooklm_notes_to_df, notebooklm_outputs_to_df, notebooklm_guide_questions_to_df,
     notebooklm_source_guides_to_df,
+    assets_to_df, asset_links_to_df, make_asset_link_id,
 )
 from src.platforms.notebooklm._parser_helpers import (
     extract_sources_from_metadata, extract_guide, extract_chat_turns,
@@ -42,6 +45,31 @@ if TYPE_CHECKING:
 
 
 SOURCE = "notebooklm"
+_ASSET_NAMESPACE = uuid_lib.UUID("0463b48b-99c2-4f22-a61d-35b76a67f012")
+
+
+def _data_relative(path: Path) -> str:
+    """Return a portable path below data/, as required by the asset contract."""
+    resolved = path.resolve()
+    parts = resolved.parts
+    try:
+        data_index = len(parts) - 1 - tuple(reversed(parts)).index("data")
+    except ValueError:
+        # Custom parser roots (notably tests) still publish paths in the same
+        # logical data namespace as the production layout.
+        if "snapshots" in parts:
+            marker = parts.index("snapshots")
+            return Path("external", "notebooklm-snapshots", *parts[marker + 1:]).as_posix()
+        account_parts = [i for i, part in enumerate(parts) if part.startswith("account-")]
+        if account_parts:
+            marker = account_parts[-1]
+            return Path("merged", "NotebookLM", *parts[marker:]).as_posix()
+        raise ValueError(f"NotebookLM asset has no recognizable data layout: {path}")
+    return Path(*parts[data_index + 1:]).as_posix()
+
+
+def _child_asset_id(parent_id: str, relative_path: str) -> str:
+    return str(uuid_lib.uuid5(_ASSET_NAMESPACE, f"{parent_id}\x1f{relative_path}"))
 
 
 class NotebookLMParser:
@@ -55,7 +83,7 @@ class NotebookLMParser:
         output_dir: Path,
         historical: "NotebookLMHistoricalResult | None" = None,
     ) -> dict:
-        """Parse the merged payload and write nine Parquets to output_dir.
+        """Parse the merged payload and write eleven Parquets to output_dir.
 
         merged dict format:
             {
@@ -91,6 +119,8 @@ class NotebookLMParser:
         outputs: list[NotebookLMOutput] = []
         questions: list[NotebookLMGuideQuestion] = []
         source_guides: list[NotebookLMSourceGuide] = []
+        assets: list[Asset] = []
+        asset_links: list[AssetLink] = []
 
         sources_raw = merged.get("sources", {})
         source_guides_raw = merged.get("source_guides", {})
@@ -100,6 +130,7 @@ class NotebookLMParser:
                 nb, sources_raw, source_guides_raw,
                 convs, msgs, events, branches,
                 sources, notes, outputs, questions, source_guides,
+                assets, asset_links,
             )
 
         if historical is not None:
@@ -111,6 +142,8 @@ class NotebookLMParser:
             notes.extend(historical.notes)
             outputs.extend(historical.outputs)
             questions.extend(historical.guide_questions)
+            assets.extend(historical.assets)
+            asset_links.extend(historical.asset_links)
 
         # Enforce the published output PK at the parser boundary. NotebookLM's
         # artifact RPC can repeat an artifact row; keep the last representation,
@@ -139,6 +172,10 @@ class NotebookLMParser:
             output_dir / "notebooklm_guide_questions.parquet", index=False)
         notebooklm_source_guides_to_df(source_guides).to_parquet(
             output_dir / "notebooklm_source_guides.parquet", index=False)
+        assets_to_df(assets).to_parquet(
+            output_dir / "notebooklm_assets.parquet", index=False)
+        asset_links_to_df(asset_links).to_parquet(
+            output_dir / "notebooklm_asset_links.parquet", index=False)
 
         return {
             "conversations": len(convs),
@@ -150,6 +187,8 @@ class NotebookLMParser:
             "outputs": len(outputs),
             "guide_questions": len(questions),
             "source_guides": len(source_guides),
+            "assets": len(assets),
+            "asset_links": len(asset_links),
         }
 
     def _parse_notebook(
@@ -157,6 +196,7 @@ class NotebookLMParser:
         convs: list, msgs: list, events: list, branches: list,
         sources: list, notes: list, outputs: list, questions: list,
         source_guides: list,
+        assets: list, asset_links: list,
     ):
         account = str(nb.get("account", "1"))
         account_key = str(nb.get("account_key", account))
@@ -214,6 +254,10 @@ class NotebookLMParser:
                         tags_json=json.dumps(g.get("tags", [])) if g.get("tags") else None,
                         questions_json=json.dumps(g.get("questions", [])) if g.get("questions") else None,
                     ))
+
+            self._append_source_assets(
+                nb, s["uuid"], conv_id, account_id, created_at, assets, asset_links,
+            )
 
         # === Messages: system summary + chat turns ===
         chat_turns = extract_chat_turns(nb.get("chat")) or []
@@ -300,6 +344,10 @@ class NotebookLMParser:
             content = None
             if t in {2, 4, 7, 9} and art["uuid"] in individual:
                 content = extract_artifact_content(individual[art["uuid"]].get("raw"), t)
+            preserved_paths = self._append_output_assets(
+                nb, art["uuid"], conv_id, account_id,
+                parse_timestamp(art.get("created_at")), assets, asset_links,
+            )
             outputs.append(NotebookLMOutput(
                 output_id=art["uuid"],
                 conversation_id=conv_id,
@@ -310,7 +358,7 @@ class NotebookLMParser:
                 output_type_name=VALID_OUTPUT_TYPES[t],
                 title=art.get("title"),
                 status=art.get("status"),
-                asset_path=art.get("asset_paths"),
+                asset_path=preserved_paths or art.get("asset_paths"),
                 content=content,
                 source_refs_json=json.dumps(art.get("source_refs", [])) if art.get("source_refs") else None,
                 created_at=parse_timestamp(art.get("created_at")),
@@ -382,3 +430,71 @@ class NotebookLMParser:
             is_preserved_missing=is_preserved,
             last_seen_in_server=last_seen_ts,
         ))
+
+    @staticmethod
+    def _append_asset(
+        path: Path, asset_id: str, account_id: str | None, kind: str,
+        origin: str, generated: bool, created_at, metadata: dict,
+        object_type: str, object_id: str, conversation_id: str,
+        role: str, ordinal: int, assets: list, links: list,
+    ) -> None:
+        relative = _data_relative(path)
+        assets.append(Asset(
+            asset_id=asset_id, source=SOURCE, account_id=account_id,
+            asset_kind=kind, asset_origin=origin, file_name=path.name,
+            mime_type=mimetypes.guess_type(path.name)[0], size_bytes=path.stat().st_size,
+            asset_path=relative, is_model_generated=generated,
+            is_preserved_missing=False, is_binary_available=True,
+            created_at=created_at,
+            metadata_json=json.dumps(metadata, sort_keys=True),
+        ))
+        links.append(AssetLink(
+            asset_link_id=make_asset_link_id(
+                SOURCE, account_id, asset_id, object_type, object_id, role, ordinal,
+            ),
+            source=SOURCE, account_id=account_id, asset_id=asset_id,
+            object_type=object_type, object_id=object_id,
+            conversation_id=conversation_id, message_id=None,
+            project_id=conversation_id, role=role, ordinal=ordinal,
+            content_block_index=None, metadata_json=None,
+        ))
+
+    def _append_source_assets(
+        self, nb: dict, source_id: str, conv_id: str, account_id: str | None,
+        created_at, assets: list, links: list,
+    ) -> None:
+        account_dir = nb.get("_account_dir")
+        if not account_dir:
+            return
+        page_dir = Path(account_dir) / "assets" / "source_pages" / source_id
+        for ordinal, path in enumerate(sorted(p for p in page_dir.glob("*") if p.is_file())):
+            relative = _data_relative(path)
+            self._append_asset(
+                path, _child_asset_id(source_id, relative), account_id,
+                "artifact", "platform", False, created_at,
+                {"representation": "rendered_source_page", "source_id": source_id},
+                "source", source_id, conv_id, "context", ordinal, assets, links,
+            )
+
+    def _append_output_assets(
+        self, nb: dict, output_id: str, conv_id: str, account_id: str | None,
+        created_at, assets: list, links: list,
+    ) -> list[str]:
+        account_dir = nb.get("_account_dir")
+        if not account_dir:
+            return []
+        root = Path(account_dir) / "assets"
+        matches = []
+        for subdir in ("audio_overviews", "video_overviews"):
+            matches.extend(root.joinpath(subdir).glob(f"{nb['uuid']}_{output_id}.*"))
+        matches.extend(root.joinpath("slide_decks", f"{nb['uuid']}_{output_id}").glob("*"))
+        paths = sorted(p for p in matches if p.is_file())
+        for ordinal, path in enumerate(paths):
+            relative = _data_relative(path)
+            asset_id = output_id if len(paths) == 1 else _child_asset_id(output_id, relative)
+            self._append_asset(
+                path, asset_id, account_id, "output", "assistant", True, created_at,
+                {"representation": "generated_output", "output_id": output_id},
+                "output", output_id, conv_id, "output", ordinal, assets, links,
+            )
+        return [_data_relative(path) for path in paths]

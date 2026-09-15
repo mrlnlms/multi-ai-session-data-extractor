@@ -8,6 +8,7 @@ directory below a configured root to the same schema used by the live parser.
 from __future__ import annotations
 
 import json
+import mimetypes
 import re
 import uuid as uuid_lib
 from dataclasses import dataclass, field
@@ -23,7 +24,11 @@ from src.schema.models import (
     NotebookLMNote,
     NotebookLMOutput,
     ProjectDoc,
+    Asset,
+    AssetLink,
+    make_asset_link_id,
 )
+from src.platforms.notebooklm.parser import _data_relative
 
 
 SOURCE = "notebooklm"
@@ -48,6 +53,8 @@ class NotebookLMHistoricalResult:
     notes: list[NotebookLMNote] = field(default_factory=list)
     outputs: list[NotebookLMOutput] = field(default_factory=list)
     guide_questions: list[NotebookLMGuideQuestion] = field(default_factory=list)
+    assets: list[Asset] = field(default_factory=list)
+    asset_links: list[AssetLink] = field(default_factory=list)
 
     def extend(self, other: "NotebookLMHistoricalResult") -> None:
         for name in (
@@ -59,6 +66,8 @@ class NotebookLMHistoricalResult:
             "notes",
             "outputs",
             "guide_questions",
+            "assets",
+            "asset_links",
         ):
             getattr(self, name).extend(getattr(other, name))
 
@@ -247,11 +256,12 @@ class NotebookLMHistoricalParser:
                 elif extension in _EXT_TO_OUTPUT:
                     output_type, output_name = _EXT_TO_OUTPUT[extension]
                     relative_asset = asset.relative_to(notebook_dir.parent).as_posix()
+                    output_id = _stable_id(
+                        self.archive_key, notebook_id, "asset", relative_asset
+                    )
                     result.outputs.append(
                         NotebookLMOutput(
-                            output_id=_stable_id(
-                                self.archive_key, notebook_id, "asset", relative_asset
-                            ),
+                            output_id=output_id,
                             conversation_id=conversation_id,
                             source=SOURCE,
                             account_id=self.account_id,
@@ -260,12 +270,36 @@ class NotebookLMHistoricalParser:
                             output_type_name=output_name,
                             title=None if asset.stem == "unnamed" else asset.stem,
                             status="completed",
-                            asset_path=[str(asset)],
+                            asset_path=[_data_relative(asset)],
                             content=None,
                             source_refs_json=None,
                             created_at=captured_at,
                         )
                     )
+                    asset_path = _data_relative(asset)
+                    result.assets.append(Asset(
+                        asset_id=output_id, source=SOURCE, account_id=self.account_id,
+                        asset_kind="output", asset_origin="assistant",
+                        file_name=asset.name, mime_type=mimetypes.guess_type(asset.name)[0],
+                        size_bytes=asset.stat().st_size, asset_path=asset_path,
+                        is_model_generated=True, is_preserved_missing=False,
+                        is_binary_available=True, created_at=captured_at,
+                        metadata_json=json.dumps({
+                            "representation": "historical_generated_output",
+                            "archive": self.archive_key,
+                        }, sort_keys=True),
+                    ))
+                    result.asset_links.append(AssetLink(
+                        asset_link_id=make_asset_link_id(
+                            SOURCE, self.account_id, output_id, "output", output_id,
+                            "output", 0,
+                        ),
+                        source=SOURCE, account_id=self.account_id, asset_id=output_id,
+                        object_type="output", object_id=output_id,
+                        conversation_id=conversation_id, message_id=None,
+                        project_id=conversation_id, role="output", ordinal=0,
+                        content_block_index=None, metadata_json=None,
+                    ))
 
         questions = guide.get("questions") or []
         if isinstance(questions, list):

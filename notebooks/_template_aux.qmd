@@ -3,7 +3,7 @@
 Some platforms have auxiliary tables beyond the 4 canonical ones
 (conversations / messages / tool_events / branches):
 
-- **NotebookLM**: sources, notes, outputs, guide_questions, source_guides
+- **NotebookLM**: sources, notes, outputs, guide_questions, source_guides, assets, asset links
 - **Qwen / Claude.ai**: project_metadata, project_docs
 - **Grok / Kimi / Qwen / Gemini / ChatGPT / Claude.ai / Perplexity**: assets and asset links (native catalogs and file structures; evidence-based placement)
 

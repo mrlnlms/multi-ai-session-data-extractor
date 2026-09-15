@@ -29,7 +29,8 @@ Os nove tipos observados sao audio overview, blog post, video overview,
 flashcards/quiz, data table, slide deck (PDF + PPTX), infographic, mind map e
 os artefatos associados ao notebook. Alem das quatro tabelas canonicas, o
 parser produz `notebooklm_sources`, `notebooklm_source_guides`,
-`notebooklm_notes`, `notebooklm_outputs` e `notebooklm_guide_questions`.
+`notebooklm_notes`, `notebooklm_outputs`, `notebooklm_guide_questions`,
+`notebooklm_assets` e `notebooklm_asset_links`.
 Essa combinacao e particular do NotebookLM; detalhes de schema e RPC ficam na
 [discovery](discovery.md).
 
@@ -67,11 +68,18 @@ Current account trees and historical archives resolve immutable catalog UUIDs
 into `account_id`; legacy labels and all existing native IDs remain unchanged.
 
 `src/platforms/notebooklm/parser.py` + `_parser_helpers.py`. Full rewrite.
-**9 parquets** (4 canonical + 5 auxiliary):
+**11 parquets** (4 canonical + 7 auxiliary):
 
 - **Canonical:** conversations / messages / tool_events / branches.
 - **Auxiliary:** sources / source_guides / notes (kind ∈ {note, brief}) /
-  outputs (covers 8 of the 9 types + `mind_map=10`) / guide_questions.
+  outputs (covers 8 of the 9 types + `mind_map=10`) / guide_questions /
+  assets / asset_links.
+
+The asset graph indexes only preserved files: rendered source pages link to
+their `source` with role `context`, while generated audio, video, slide-deck,
+and historical binaries link to their authoritative `output`
+with role `output`. Multi-file slide decks use deterministic child asset IDs;
+signed upstream URLs and text-only domain records are not assets.
 
 ### Key decision
 

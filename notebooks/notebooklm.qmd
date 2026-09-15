@@ -32,7 +32,7 @@ SOURCE_COLOR   = "#F4B400"  # Google yellow/orange
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "NotebookLM"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
-AUX_TABLES     = ["sources", "notes", "outputs", "guide_questions", "source_guides"]
+AUX_TABLES     = ["sources", "notes", "outputs", "guide_questions", "source_guides", "assets", "asset_links"]
 ACCOUNT_FILTER = None  # consolidated
 
 con = duckdb.connect()
@@ -50,8 +50,8 @@ _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_
 > NotebookLM is not pure chat — each notebook generates up to 9 types of
 > outputs (audio, blog, video, flashcards, quiz, data table, slide deck,
 > infographic, mind map). The canonical schema
-> (Conversation/Message/ToolEvent/Branch) is complemented by 5 auxiliary
-> tables (sources, notes, outputs, guide_questions, source_guides).
+> (Conversation/Message/ToolEvent/Branch) is complemented by domain tables
+> plus the canonical asset catalog and exact source/output relationships.
 >
 > `guide.summary` becomes a system message (sequence=0) on every notebook —
 > ensures `message_count >= 1` even when chat=None.

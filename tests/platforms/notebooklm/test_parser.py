@@ -1,6 +1,6 @@
 """Tests pro parser v3 do NotebookLM.
 
-Cobertura: 9 parquets canonicos+auxiliares + idempotencia + system summary.
+Cobertura: 11 parquets canonicos+auxiliares + idempotencia + system summary.
 """
 
 import json
@@ -83,7 +83,7 @@ def _build_minimal_merged():
     }
 
 
-def test_parser_generates_9_parquets(tmp_path):
+def test_parser_generates_11_parquets(tmp_path):
     parser = NotebookLMParser()
     parser.parse(_build_minimal_merged(), output_dir=tmp_path)
     expected = {
@@ -96,9 +96,83 @@ def test_parser_generates_9_parquets(tmp_path):
         "notebooklm_outputs.parquet",
         "notebooklm_guide_questions.parquet",
         "notebooklm_source_guides.parquet",
+        "notebooklm_assets.parquet",
+        "notebooklm_asset_links.parquet",
     }
     files = {p.name for p in tmp_path.glob("*.parquet")}
     assert expected.issubset(files)
+
+
+def test_binary_source_pages_and_outputs_become_assets_with_exact_links(tmp_path):
+    merged = _build_minimal_merged()
+    account_id = "11111111-1111-4111-8111-111111111111"
+    merged["notebooks"][0]["account_id"] = account_id
+    account_dir = tmp_path / "data" / "merged" / "NotebookLM" / "account-1"
+    source_page = account_dir / "assets" / "source_pages" / "src-uuid-1" / "page_000_x.webp"
+    audio = account_dir / "assets" / "audio_overviews" / "nb-uuid-1_art-1.m4a"
+    source_page.parent.mkdir(parents=True)
+    audio.parent.mkdir(parents=True)
+    source_page.write_bytes(b"page")
+    audio.write_bytes(b"audio")
+    merged["notebooks"][0]["_account_dir"] = str(account_dir)
+
+    NotebookLMParser().parse(merged, output_dir=tmp_path / "processed")
+
+    assets = pd.read_parquet(tmp_path / "processed" / "notebooklm_assets.parquet")
+    links = pd.read_parquet(tmp_path / "processed" / "notebooklm_asset_links.parquet")
+    outputs = pd.read_parquet(tmp_path / "processed" / "notebooklm_outputs.parquet")
+    assert len(assets) == 2
+    assert set(assets["account_id"]) == {account_id}
+    assert set(links["object_type"]) == {"source", "output"}
+    assert set(links["role"]) == {"context", "output"}
+    assert all(not str(path).startswith(("http://", "https://")) for path in assets["asset_path"])
+    assert assets["is_binary_available"].all()
+    assert outputs.loc[outputs["output_id"] == "art-1", "asset_path"].iloc[0] == [
+        "merged/NotebookLM/account-1/assets/audio_overviews/nb-uuid-1_art-1.m4a"
+    ]
+    assert '"output_id": "art-1"' in assets.loc[
+        assets["asset_id"] == "art-1", "metadata_json"
+    ].iloc[0]
+
+
+def test_missing_binary_and_presigned_url_do_not_create_assets(tmp_path):
+    merged = _build_minimal_merged()
+    merged["notebooks"][0]["audios"][0][0].extend(
+        [None, None, [None, None, "https://lh3.googleusercontent.com/notebooklm/signed?token=secret"]]
+    )
+    account_dir = tmp_path / "data" / "merged" / "NotebookLM" / "account-1"
+    merged["notebooks"][0]["_account_dir"] = str(account_dir)
+
+    NotebookLMParser().parse(merged, output_dir=tmp_path / "processed")
+
+    assets = pd.read_parquet(tmp_path / "processed" / "notebooklm_assets.parquet")
+    links = pd.read_parquet(tmp_path / "processed" / "notebooklm_asset_links.parquet")
+    assert assets.empty
+    assert links.empty
+
+
+def test_slide_deck_files_get_deterministic_child_assets(tmp_path):
+    merged = _build_minimal_merged()
+    merged["notebooks"][0]["audios"][0].append(
+        ["deck-1", "Deck", 8, [], "ARTIFACT_STATUS_READY"]
+    )
+    account_dir = tmp_path / "data" / "merged" / "NotebookLM" / "account-1"
+    deck_dir = account_dir / "assets" / "slide_decks" / "nb-uuid-1_deck-1"
+    deck_dir.mkdir(parents=True)
+    (deck_dir / "detailed_deck.pdf").write_bytes(b"pdf")
+    (deck_dir / "presenter_slides.pptx").write_bytes(b"pptx")
+    merged["notebooks"][0]["_account_dir"] = str(account_dir)
+
+    parser = NotebookLMParser()
+    parser.parse(merged, output_dir=tmp_path / "first")
+    parser.parse(merged, output_dir=tmp_path / "second")
+    first = pd.read_parquet(tmp_path / "first" / "notebooklm_assets.parquet")
+    second = pd.read_parquet(tmp_path / "second" / "notebooklm_assets.parquet")
+    first = first[first["metadata_json"].str.contains('"output_id": "deck-1"')]
+    second = second[second["metadata_json"].str.contains('"output_id": "deck-1"')]
+    assert len(first) == 2
+    assert first["asset_id"].tolist() == second["asset_id"].tolist()
+    assert "deck-1" not in set(first["asset_id"])
 
 
 def test_source_guides_parsed_when_present(tmp_path):

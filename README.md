@@ -55,7 +55,7 @@ canonical parsing, and descriptive visualization (Quarto):
 | **Qwen** | web | 8 chat types (search, research, dalle, etc.), projects |
 | **DeepSeek** | web | R1 reasoning (thinking in ~31% of msgs), token usage |
 | **Gemini** | web | multi-account (3 Google accounts), 8 models |
-| **NotebookLM** | web | 3 active accounts plus a separate legacy archive; 9 output types (audio, video, slide deck, etc.) |
+| **NotebookLM** | web | 3 active accounts plus a legacy archive; 9 output types and exact source/output asset links |
 | **Grok** | web | conversations, workspaces, tool events, assets, scheduled tasks |
 | **Kimi** | web | chats, installed skills, tool events, signed asset downloads |
 | **Claude Code** | CLI | local sessions (`~/.claude/projects/`), subagents |
@@ -126,8 +126,9 @@ extractor → reconciler → parser → unify
 3. **Parser** converts the raw JSON into parquet with a unified schema:
    `Conversation`, `Message`, `ToolEvent`, `Branch` (and auxiliaries such as
    `Asset`, `AssetLink`, `ProjectDoc`, and `NotebookLMOutput`). The unified asset
-   index covers Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai, and Perplexity; it is not yet a complete
-   inventory of every file representation in the archive.
+   index covers Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai, Perplexity, and
+   NotebookLM; it is not yet a complete inventory of every file representation
+   in the archive.
    Web rows carry the immutable catalog UUID in `account_id`; the legacy
    display `account` remains available. CLI and manual rows keep
    `account_id` null until a durable identity is observable.
