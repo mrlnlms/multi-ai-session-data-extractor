@@ -18,8 +18,20 @@ projects (DeepSeek does not expose them).
 
 Binary assets are immutable and enter `merged` through a hardlink when the
 filesystem supports it, with a normal copy as the portability fallback.
-They do not yet have a validated canonical `assets`/`asset_links` adapter, so
-DeepSeek remains library-only in the archive-wide asset coverage matrix.
+The canonical parser indexes every `files[].id` as a user-origin attachment and
+records each exact message use as an `input` AssetLink. Missing local binaries
+remain metadata-only assets rather than being dropped or assigned fabricated
+paths.
+
+### Canonical asset validation — 2026-09-14
+
+- The two-account archive produces 80 native assets and 80 exact message links.
+- No current DeepSeek binary or asset manifest is present in merged, so all 80
+  rows correctly have `asset_path=null` and `is_binary_available=False`.
+- Conversation, message, tool-event and branch identities/content are unchanged;
+  only `Message.asset_paths` is eligible for enrichment when a binary exists.
+- Two independent temporary parses produced byte-identical six-table outputs,
+  and canonical asset metadata contains no signed URL material.
 
 ### Latest validated collection — 2026-08-30
 
@@ -70,7 +82,8 @@ legacy `account` label and all existing native IDs remain unchanged.
   ToolEvent + `Message.citations_json`.
 - **`incomplete_message` + `status`** → `Message.finish_reason` (100% cov.).
 - **`status` enum:** `FINISHED`/`INCOMPLETE`/`WIP`.
-- **Files per msg** → `attachment_names`.
+- **Files per msg** → `attachment_names`, canonical `assets` and exact
+  message-level `asset_links` (`role=input`).
 - **`feedback`/`tips`/`ban_edit`/`ban_regenerate`/`thinking_elapsed_secs`**
   preserved in `Message.attachments_json`.
 

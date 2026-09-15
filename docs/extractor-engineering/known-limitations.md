@@ -218,7 +218,8 @@ These validations require a Pro Max account and remain open until someone tests:
 - **The unified asset index is intentionally partial.** The exact counts,
   relationship rates, reader capability and exclusions are maintained in the
   [source-by-source coverage matrix](asset-coverage.md). Its current coverage
-  spans Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai, Perplexity, and NotebookLM. ChatGPT project
+  spans all nine web sources: Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai,
+  DeepSeek, Perplexity, and NotebookLM. ChatGPT project
   sources/canvas/deep-research files and Claude.ai extracted artifacts are not
   yet indexed by the canonical asset graph; Claude inline `attachments` remain
   text-bearing message metadata rather than fake binaries. File representations,
@@ -228,9 +229,11 @@ These validations require a Pro Max account and remain open until someone tests:
   tables. Manifests and domain outputs from the other web sources remain preserved in
   their existing representations until source-specific adapters validate their
   identities and path semantics.
-- **DeepSeek has no canonical asset adapter yet.** Because one selected web
-  source and the representation-level gaps above remain open, the published
-  scope is not named `preserved_web_files`.
+- **DeepSeek's adapter publishes metadata-only assets.** It materializes stable
+  `files[].id` records as metadata-only Assets
+  when no binary survived and creates exact input links. Representation-level
+  gaps across the archive remain open, so the published scope is not yet named
+  `preserved_web_files`.
 
 ## Test coverage
 

@@ -1,7 +1,7 @@
 """Parser canonico do DeepSeek — schema v3.
 
 Consome merged em data/merged/DeepSeek/conversations/<uuid>.json (1 file por
-session). Gera 4 parquets canonicos.
+session). Gera 6 parquets canonicos.
 
 Cobertura (probe 2026-05-01):
 - Branches via parent_id + current_message_id (DAG plano)
@@ -13,17 +13,20 @@ Cobertura (probe 2026-05-01):
 - agent (chat/agent) + model_type → Conversation.mode + settings_json
 - incomplete_message + status → Message.finish_reason
 - files per msg → Message.attachment_names
+- files com ID nativo → Asset + AssetLink de input por uso observavel
 - feedback per msg preservado em settings_json (per-conv consolidado)
 
 DeepSeek nao tem projects nem folders — schema mais simples que Qwen/Claude.ai.
 
-Output: data/processed/DeepSeek/{conversations,messages,tool_events,branches}.parquet
+Output: data/processed/DeepSeek/{conversations,messages,tool_events,branches,
+assets,asset_links}.parquet
 """
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
+import mimetypes
+from pathlib import Path, PurePath
 from typing import Optional
 
 import pandas as pd
@@ -34,13 +37,18 @@ from src.platforms.deepseek._parser_helpers import (
 )
 from src.parsing.base import BaseParser
 from src.schema.models import (
+    Asset,
+    AssetLink,
     Branch,
     Conversation,
     Message,
     ToolEvent,
+    asset_links_to_df,
+    assets_to_df,
     branches_to_df,
     conversations_to_df,
     messages_to_df,
+    make_asset_link_id,
     tool_events_to_df,
 )
 
@@ -64,6 +72,11 @@ class DeepSeekParser(BaseParser):
     def reset(self):
         super().reset()
         self.branches: list[Branch] = []
+        self.assets: list[Asset] = []
+        self.asset_links: list[AssetLink] = []
+        self._assets_by_id: dict[str, Asset] = {}
+        self._asset_link_ids: set[str] = set()
+        self._asset_manifest: dict[str, dict] = {}
 
     @property
     def conversations_dir(self) -> Path:
@@ -82,6 +95,7 @@ class DeepSeekParser(BaseParser):
 
     def _parse_merged_dir(self, merged_root: Path) -> None:
         self.merged_root = merged_root
+        self._asset_manifest = self._load_asset_manifest(merged_root)
         conv_dir = merged_root / "conversations"
         last_run_date = self._compute_last_run_date(conv_dir)
 
@@ -144,6 +158,7 @@ class DeepSeekParser(BaseParser):
         for seq, msg in enumerate(chat_messages, start=1):
             built = self._build_message(conv_id, sess, msg, seq, msg_to_branch)
             if built is not None:
+                built.asset_paths = self._record_message_files(conv_id, built.message_id, msg)
                 messages.append(built)
                 tool_events.extend(self._extract_tool_events(conv_id, msg))
 
@@ -224,6 +239,111 @@ class DeepSeekParser(BaseParser):
 
         self.messages.extend(messages)
         self.events.extend(tool_events)
+
+    @staticmethod
+    def _load_asset_manifest(merged_root: Path) -> dict[str, dict]:
+        path = merged_root / "assets_manifest.json"
+        if not path.is_file():
+            return {}
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return payload if isinstance(payload, dict) else {}
+
+    def _relative_asset_path(self, path: Path) -> str | None:
+        """Return a POSIX path relative to data/, never an absolute path."""
+        try:
+            parts = path.resolve().parts
+            data_indexes = [idx for idx, part in enumerate(parts) if part == "data"]
+            if data_indexes:
+                return PurePath(*parts[data_indexes[-1] + 1:]).as_posix()
+        except OSError:
+            return None
+        return None
+
+    def _record_message_files(self, conv_id: str, message_id: str, msg: dict) -> list[str] | None:
+        resolved_paths: list[str] = []
+        for ordinal, file_record in enumerate(msg.get("files") or []):
+            if not isinstance(file_record, dict):
+                continue
+            native_id = file_record.get("id") or file_record.get("file_id")
+            if native_id is None:
+                continue
+            asset_id = str(native_id)
+            manifest = self._asset_manifest.get(asset_id) or {}
+            file_name = file_record.get("file_name") or file_record.get("name") or manifest.get("file_name")
+            relpath = manifest.get("relpath")
+            binary_path: str | None = None
+            if isinstance(relpath, str):
+                candidate = self.merged_root / "assets" / relpath
+                try:
+                    candidate.resolve().relative_to((self.merged_root / "assets").resolve())
+                except (OSError, ValueError):
+                    candidate = Path()
+                if candidate and candidate.is_file():
+                    binary_path = self._relative_asset_path(candidate)
+
+            if asset_id not in self._assets_by_id:
+                mime_type = manifest.get("content_type")
+                if not mime_type and file_name:
+                    mime_type = mimetypes.guess_type(str(file_name))[0]
+                size = manifest.get("size", file_record.get("file_size"))
+                try:
+                    size = int(size) if size is not None else None
+                except (TypeError, ValueError):
+                    size = None
+                metadata = {
+                    key: file_record[key]
+                    for key in ("status", "previewable", "token_usage")
+                    if file_record.get(key) is not None
+                }
+                asset = Asset(
+                    asset_id=asset_id,
+                    source=SOURCE,
+                    account_id=self.account_id,
+                    asset_kind="attachment",
+                    asset_origin="user",
+                    file_name=str(file_name) if file_name else None,
+                    mime_type=str(mime_type) if mime_type else None,
+                    size_bytes=size,
+                    asset_path=binary_path,
+                    is_model_generated=False,
+                    is_preserved_missing=None,
+                    is_binary_available=binary_path is not None,
+                    created_at=self._ts(file_record.get("inserted_at")) if file_record.get("inserted_at") else None,
+                    metadata_json=json.dumps(metadata, ensure_ascii=False, sort_keys=True) if metadata else None,
+                )
+                self.assets.append(asset)
+                self._assets_by_id[asset_id] = asset
+            elif binary_path and not self._assets_by_id[asset_id].is_binary_available:
+                self._assets_by_id[asset_id].asset_path = binary_path
+                self._assets_by_id[asset_id].is_binary_available = True
+
+            link_id = make_asset_link_id(
+                SOURCE, self.account_id, asset_id, "message", message_id, "input", ordinal
+            )
+            if link_id not in self._asset_link_ids:
+                self.asset_links.append(AssetLink(
+                    asset_link_id=link_id,
+                    source=SOURCE,
+                    account_id=self.account_id,
+                    asset_id=asset_id,
+                    object_type="message",
+                    object_id=message_id,
+                    conversation_id=conv_id,
+                    message_id=message_id,
+                    project_id=None,
+                    role="input",
+                    ordinal=ordinal,
+                    content_block_index=None,
+                    metadata_json=None,
+                ))
+                self._asset_link_ids.add(link_id)
+            asset_path = self._assets_by_id[asset_id].asset_path
+            if asset_path and asset_path not in resolved_paths:
+                resolved_paths.append(asset_path)
+        return resolved_paths or None
 
     def _build_message(
         self,
@@ -400,3 +520,10 @@ class DeepSeekParser(BaseParser):
         br_df = self.branches_df()
         if not br_df.empty:
             br_df.to_parquet(output_dir / f"{self.source_name}_branches.parquet")
+
+        assets_to_df(self.assets).to_parquet(
+            output_dir / f"{self.source_name}_assets.parquet", index=False
+        )
+        asset_links_to_df(self.asset_links).to_parquet(
+            output_dir / f"{self.source_name}_asset_links.parquet", index=False
+        )

@@ -126,8 +126,9 @@ extractor → reconciler → parser → unify
 3. **Parser** converts the raw JSON into parquet with a unified schema:
    `Conversation`, `Message`, `ToolEvent`, `Branch` (and auxiliaries such as
    `Asset`, `AssetLink`, `ProjectDoc`, and `NotebookLMOutput`). The unified asset
-   index covers Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai, Perplexity, and
-   NotebookLM. Its scope is partial preserved-file coverage, not a complete
+   index covers all nine web sources: Grok, Kimi, Qwen, Gemini, ChatGPT,
+   Claude.ai, DeepSeek, Perplexity, and NotebookLM. Its scope is partial
+   preserved-file coverage, not a complete
    inventory of every file representation in the archive; the
    [source-by-source matrix](docs/extractor-engineering/asset-coverage.md)
    records relationship precision, local availability, and deliberate gaps.

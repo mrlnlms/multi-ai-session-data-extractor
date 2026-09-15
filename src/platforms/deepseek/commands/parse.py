@@ -47,12 +47,16 @@ def main():
         parser.messages.extend(per_account.messages)
         parser.events.extend(per_account.events)
         parser.branches.extend(per_account.branches)
+        parser.assets.extend(per_account.assets)
+        parser.asset_links.extend(per_account.asset_links)
 
     log.info(
         f"Parseado: {len(parser.conversations)} convs, "
         f"{len(parser.messages)} msgs, "
         f"{len(parser.events)} tool_events, "
-        f"{len(parser.branches)} branches"
+        f"{len(parser.branches)} branches, "
+        f"{len(parser.assets)} assets, "
+        f"{len(parser.asset_links)} asset_links"
     )
 
     parser.save(args.output_dir)

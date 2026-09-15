@@ -62,7 +62,8 @@ delete validated later via the live UI CRUD battery (section below).
 - ✅ `ban_edit` / `ban_regenerate` (UI flags) → `attachments_json`
 - ✅ `incomplete_message` → `Message.finish_reason='incomplete'` +
   `attachments_json.incomplete_message`
-- ✅ `files` per msg → `Message.attachment_names`
+- ✅ `files` per msg → `Message.attachment_names` + canonical metadata-only
+  Asset when a native ID exists + exact input AssetLink
 
 ## UI CRUD battery — 2026-05-01
 
@@ -117,7 +118,9 @@ which is why sync ran clean on the first attempt:
 - [ ] **Agent mode session:** open agent, capture, check schema diff
 - [ ] **R1 reasoner (expert):** session with full reasoning_content +
   thinking_elapsed (1 already captured)
-- [ ] **Files per msg in account with upload:** full schema of `files[]`
+- [x] **Files per msg in account with upload:** stable `id`, `file_name`,
+  `file_size`, timestamps, status, previewability and token usage observed;
+  current preserved binaries are unavailable, so canonical rows are metadata-only
 ## Authentication probe boundary
 
 Account health reuses only the minimal listing contract documented below. A

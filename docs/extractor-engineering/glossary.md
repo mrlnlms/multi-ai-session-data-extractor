@@ -100,9 +100,9 @@ a `data/`; um binario ausente mantem sua linha com
 `is_binary_available=False`. `asset_origin` registra quem originou o arquivo
 (`user`, `assistant`, `platform`, `imported` ou `unknown`) sem confundir essa
 propriedade com o uso do arquivo em uma conversa. A cobertura unificada e
-explicitamente parcial: Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai,
-Perplexity e NotebookLM publicam assets, mas isso ainda nao equivale a todos os
-arquivos preservados nas nove fontes web. A
+explicitamente parcial: todas as nove fontes web publicam assets — Grok, Kimi,
+Qwen, Gemini, ChatGPT, Claude.ai, DeepSeek, Perplexity e NotebookLM —, mas isso
+ainda nao equivale a todos os arquivos preservados nas nove fontes web. A
 [matriz de cobertura](asset-coverage.md) registra por fonte as representacoes
 incluidas, excluidas e a capacidade do leitor. Adaptadores posteriores nao
 devem substituir tabelas de dominio como `project_docs` e outputs do NotebookLM.

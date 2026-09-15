@@ -33,6 +33,9 @@ thinking, tokens, eventos de busca, finish reason e anexos pelo parser.
 
 DeepSeek nao expoe projetos, pastas ou fontes de conhecimento separadas. O
 modelo de preservacao e, portanto, centrado em sessoes e suas mensagens.
+Cada `files[]` observado com `id` estavel e um upload elegivel para o indice
+canonico, mesmo quando o binario expirou antes de ser preservado; nomes sem ID
+nativo permanecem apenas como metadata da mensagem.
 
 Planos de migracao do parser que acompanhavam este probe foram concluidos; a
 cobertura canonica atual pertence ao `state.md` e os gaps remanescentes a

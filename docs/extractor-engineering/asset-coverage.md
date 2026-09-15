@@ -2,9 +2,10 @@
 
 This is the archive-wide coverage contract for `assets.parquet` and
 `asset_links.parquet`. The current scope is **partial preserved-file coverage**,
-not `preserved_web_files`: eight of nine web sources publish the graph, and
-several preserved representations remain outside it until their identity and
-placement semantics are validated.
+not `preserved_web_files`: all nine web sources now publish the graph, but
+several preserved input, generated-output and project/notebook file
+representations remain outside it until their identity and placement semantics
+are validated.
 
 Counts below describe the canonical archive materialized on 2026-09-14.
 “Linked” is the percentage of source/account/asset identities with at least one
@@ -18,7 +19,7 @@ paths are relative to `data/` and resolve to local files.
 | Gemini | 364 / 364 | assistant 173; user 110; unknown 81 | 963; input 787, output 176 | 78.0% | 364 / 0 | message | No placement is invented for manifest-only images; repeated signed-URL representations are not published |
 | NotebookLM | 4,712 / 4,712 | platform 4,499; assistant 213 | 4,712; context 4,499, output 213 | 100.0% | 4,712 / 0 | library | Text-only sources/outputs, missing downloads and expiring signed URLs stay in domain/raw evidence |
 | Qwen | 367 / 367 | user 313; assistant 54 | 367; input 294, output 54, context 19 | 100.0% | 367 / 0 | inline | Rotated signed-URL manifest entries are consolidated; inline document text stays in domain tables |
-| DeepSeek | 0 / 0 | — | 0 | — | 0 / 0 | library | Preserved file/image representations have no validated canonical asset adapter yet |
+| DeepSeek | 80 / 80 | user 80 | 80; input 80 | 100.0% | 0 / 80 | message | Native upload records remain metadata-only because no current binary or manifest survived in merged |
 | Perplexity | 15 / 15 | assistant 9; user 6 | 8; input 8 | 40.0% | 9 / 6 | message | Third-party featured images are external references; deleted upstream uploads retain metadata only |
 | Grok | 53 / 53 | user 53 | 0 | 0.0% | 53 / 0 | library | The global catalog has no evidence-backed use placement; none is inferred from names or timestamps |
 | Kimi | 87 / 87 | unknown 87 | 87; unknown 87 | 100.0% | 86 / 1 | conversation | `chat.files[]` proves conversation membership, not author, direction, message or inline position |
@@ -26,7 +27,7 @@ paths are relative to `data/` and resolve to local files.
 | Codex | 0 / 0 | — | 0 | — | 0 / 0 | library | No validated preserved-file adapter |
 | Gemini CLI | 0 / 0 | — | 0 | — | 0 / 0 | library | No validated preserved-file adapter |
 | Antigravity CLI | 0 / 0 | — | 0 | — | 0 / 0 | library | Opaque containers remain raw evidence; no validated preserved-file adapter |
-| **Total** | **8,731 / 8,731** | user 3,123; assistant 941; platform 4,499; unknown 168 | **9,326**; input 3,540, output 940, context 4,759, unknown 87 | **98.4%** | **8,380 / 351** | mixed | Coverage expands only through source-specific evidence |
+| **Total** | **8,811 / 8,811** | user 3,203; assistant 941; platform 4,499; unknown 168 | **9,406**; input 3,620, output 940, context 4,759, unknown 87 | **98.4%** | **8,380 / 431** | mixed | Coverage expands only through source-specific evidence |
 
 ## Reader capability levels
 

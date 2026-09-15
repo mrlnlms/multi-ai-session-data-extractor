@@ -21,6 +21,7 @@ import pandas as pd
 import pytest
 
 from src.platforms.deepseek.parser import DeepSeekParser
+from src.schema.models import Asset, AssetLink
 
 
 def _write_merged(tmp_path: Path, sessions: list[dict]) -> Path:
@@ -288,6 +289,93 @@ def test_files_to_attachment_names(tmp_path):
     msg_user = next(m for m in p.messages if m.role == "user")
     names = json.loads(msg_user.attachment_names)
     assert "data.csv" in names
+
+
+def test_native_user_file_builds_asset_link_and_path(tmp_path):
+    sess = _basic_session()
+    sess["chat_messages"][0]["files"] = [{
+        "id": "file-1", "file_name": "data.csv", "file_size": 3,
+        "inserted_at": 1774238950.0, "status": "SUCCESS", "previewable": True,
+    }]
+    merged = tmp_path / "data" / "merged" / "DeepSeek"
+    (merged / "conversations").mkdir(parents=True)
+    (merged / "conversations" / "sess-1.json").write_text(json.dumps(sess))
+    (merged / "assets" / "sess-1").mkdir(parents=True)
+    (merged / "assets" / "sess-1" / "data.csv").write_bytes(b"a,b")
+    (merged / "assets_manifest.json").write_text(json.dumps({"file-1": {
+        "file_id": "file-1", "file_name": "data.csv", "conv_id": "sess-1",
+        "message_id": 1, "content_type": "text/csv", "size": 3,
+        "relpath": "sess-1/data.csv", "url": "https://example.invalid/?signature=secret",
+    }}))
+
+    parser = DeepSeekParser(account_id="00000000-0000-0000-0000-000000000001", merged_root=merged)
+    parser.parse(merged)
+
+    assert len(parser.assets) == 1
+    asset = parser.assets[0]
+    assert isinstance(asset, Asset)
+    assert asset.asset_id == "file-1"
+    assert asset.asset_kind == "attachment"
+    assert asset.asset_origin == "user"
+    assert asset.is_model_generated is False
+    assert asset.asset_path == "merged/DeepSeek/assets/sess-1/data.csv"
+    assert asset.is_binary_available is True
+    assert "signature" not in (asset.metadata_json or "")
+    assert len(parser.asset_links) == 1
+    link = parser.asset_links[0]
+    assert isinstance(link, AssetLink)
+    assert (link.object_type, link.object_id, link.role, link.ordinal) == ("message", "1", "input", 0)
+    assert (link.conversation_id, link.message_id, link.content_block_index) == ("sess-1", "1", None)
+    message = next(m for m in parser.messages if m.message_id == "1")
+    assert message.asset_paths == [asset.asset_path]
+
+
+def test_repeated_native_file_is_one_asset_with_distinct_message_links(tmp_path):
+    sess = _basic_session()
+    record = {"id": "file-1", "file_name": "data.csv", "file_size": 3}
+    sess["chat_messages"][0]["files"] = [record]
+    sess["chat_messages"][1]["files"] = [record]
+    merged = _write_merged(tmp_path, [sess])
+    parser = DeepSeekParser(merged_root=merged)
+    parser.parse(merged)
+    assert len(parser.assets) == 1
+    assert len(parser.asset_links) == 2
+    assert len({link.asset_link_id for link in parser.asset_links}) == 2
+
+
+def test_manifest_only_missing_binary_remains_metadata_only(tmp_path):
+    sess = _basic_session()
+    sess["chat_messages"][0]["files"] = [{"id": "file-1", "file_name": "gone.pdf"}]
+    merged = _write_merged(tmp_path, [sess])
+    (merged / "assets_manifest.json").write_text(json.dumps({"file-1": {
+        "file_id": "file-1", "file_name": "gone.pdf", "relpath": "sess-1/gone.pdf",
+        "content_type": "application/pdf", "size": 99,
+    }}))
+    parser = DeepSeekParser(merged_root=merged)
+    parser.parse(merged)
+    [asset] = parser.assets
+    assert asset.asset_path is None
+    assert asset.is_binary_available is False
+
+
+def test_name_only_file_does_not_get_fabricated_asset_id(tmp_path):
+    sess = _basic_session()
+    sess["chat_messages"][0]["files"] = [{"file_name": "unknown.txt"}]
+    merged = _write_merged(tmp_path, [sess])
+    parser = DeepSeekParser(merged_root=merged)
+    parser.parse(merged)
+    assert parser.assets == []
+    assert parser.asset_links == []
+
+
+def test_save_always_writes_asset_tables(tmp_path):
+    merged = _write_merged(tmp_path, [_basic_session()])
+    parser = DeepSeekParser(merged_root=merged)
+    parser.parse(merged)
+    out = tmp_path / "processed"
+    parser.save(out)
+    assert (out / "deepseek_assets.parquet").exists()
+    assert (out / "deepseek_asset_links.parquet").exists()
 
 
 def test_settings_json_includes_thinking_total(tmp_path):
