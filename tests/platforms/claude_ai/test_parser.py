@@ -748,3 +748,31 @@ def test_save_writes_project_docs_parquet(tmp_path):
     parser.save(out)
     assert (out / "claude_ai_project_docs.parquet").exists()
     assert (out / "claude_ai_project_metadata.parquet").exists()
+
+
+def test_extracted_artifact_version_becomes_message_output_asset(tmp_path):
+    merged = _write_merged(tmp_path, [_basic_conv()])
+    root = merged / "assets" / "artifacts" / "conv-1"
+    root.mkdir(parents=True)
+    artifact = root / "artifact_v1_version.md"
+    artifact.write_text("# Delivered artifact", encoding="utf-8")
+    artifact.with_suffix(".md.meta.json").write_text(json.dumps({
+        "artifact_id": "artifact-1", "version": 1, "version_uuid": "version-1",
+        "conv_uuid": "conv-1", "message_uuid": "msg-2", "title": "Artifact",
+        "type": "text/markdown", "language": None,
+        "start_timestamp": "2025-06-20T09:00:20Z",
+        "stop_timestamp": "2025-06-20T09:00:30Z", "content_size": 20,
+    }), encoding="utf-8")
+
+    parser = ClaudeAIParser(merged_root=merged)
+    parser.parse(merged)
+
+    asset = next(asset for asset in parser.assets if asset.asset_id == "artifact-version:version-1")
+    assert asset.asset_kind == "artifact"
+    assert asset.asset_origin == "assistant"
+    assert asset.is_model_generated is True
+    assert asset.is_binary_available is True
+    link = next(link for link in parser.asset_links if link.asset_id == asset.asset_id)
+    assert (link.object_type, link.object_id, link.role) == ("message", "msg-2", "output")
+    message = next(message for message in parser.messages if message.message_id == "msg-2")
+    assert asset.asset_path in message.asset_paths

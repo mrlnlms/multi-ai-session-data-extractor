@@ -230,10 +230,34 @@
       "reason": "Companion metadata for a separately preserved file representation"
     },
     {
+      "source": "ChatGPT",
+      "representation_kind": "project_source_index",
+      "disposition": "operational",
+      "reason": "Downloader-maintained index for project source identity and preservation state"
+    },
+    {
+      "source": "ChatGPT",
+      "representation_kind": "canvas_patch_record",
+      "disposition": "domain_only",
+      "reason": "Incremental Canvas operation evidence rather than a separately delivered file"
+    },
+    {
+      "source": "ChatGPT",
+      "representation_kind": "memory_export",
+      "disposition": "domain_only",
+      "reason": "Account memory domain content rather than an interaction attachment or delivered file"
+    },
+    {
       "source": "Claude.ai",
       "representation_kind": "asset_metadata_sidecar",
       "disposition": "operational",
       "reason": "Companion metadata for a separately preserved file representation"
+    },
+    {
+      "source": "Claude.ai",
+      "representation_kind": "memory_export",
+      "disposition": "domain_only",
+      "reason": "Account memory domain content rather than an interaction attachment or delivered file"
     },
     {
       "source": "Gemini",

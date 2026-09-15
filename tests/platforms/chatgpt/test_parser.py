@@ -594,3 +594,82 @@ def test_parse_preservation_fields_present(tmp_path):
     assert by_id["preserved-1"].is_preserved_missing is True
     assert by_id["fresh-1"].is_preserved_missing is False
     assert by_id["preserved-1"].last_seen_in_server is not None
+
+
+def test_preserved_project_canvas_research_and_export_files_become_assets(tmp_path):
+    raw_root = tmp_path / "raw" / "ChatGPT"
+    raw_root.mkdir(parents=True)
+    conv_id = "conversation-1"
+    project_id = "g-p-project-1"
+    canvas_message_id = "canvas-message-1"
+    research_message_id = "research-message-1"
+    merged = tmp_path / "chatgpt_merged.json"
+    merged.write_text(json.dumps({"conversations": {conv_id: {
+        "id": conv_id, "title": "fixture", "gizmo_id": project_id,
+        "create_time": 1700000000, "update_time": 1700000100,
+        "current_node": research_message_id,
+        "mapping": {
+            "root": {"id": "root", "parent": None, "children": ["user-1"], "message": None},
+            "user-1": {"id": "user-1", "parent": "root", "children": [canvas_message_id],
+                       "message": {"id": "user-1", "create_time": 1700000001,
+                                   "author": {"role": "user"},
+                                   "content": {"content_type": "text", "parts": ["make files"]},
+                                   "metadata": {}}},
+            canvas_message_id: {"id": canvas_message_id, "parent": "user-1",
+                                "children": [research_message_id],
+                                "message": {"id": canvas_message_id, "create_time": 1700000002,
+                                            "author": {"role": "assistant"}, "recipient": "all",
+                                            "content": {"content_type": "text", "parts": ["canvas"]},
+                                            "metadata": {}}},
+            research_message_id: {"id": research_message_id, "parent": canvas_message_id,
+                                  "children": [],
+                                  "message": {"id": research_message_id, "create_time": 1700000003,
+                                              "author": {"role": "assistant"},
+                                              "content": {"content_type": "text", "parts": ["report"]},
+                                              "metadata": {}}},
+        },
+    }}}), encoding="utf-8")
+
+    project_root = raw_root / "project_sources" / project_id
+    project_root.mkdir(parents=True)
+    (project_root / "source.pdf").write_bytes(b"project source")
+    (project_root / "_files.json").write_text(json.dumps([{
+        "file_id": "file-project-1", "name": "source.pdf", "size": 14,
+        "created_at": 1700000000,
+    }]), encoding="utf-8")
+
+    canvas_root = raw_root / "assets" / "canvases" / conv_id
+    canvas_root.mkdir(parents=True)
+    canvas_path = canvas_root / "textdoc_v1_output.md"
+    canvas_path.write_text("canvas output", encoding="utf-8")
+    canvas_path.with_suffix(".md.meta.json").write_text(json.dumps({
+        "conv_id": conv_id, "textdoc_id": "textdoc-1", "version": 1,
+        "name": "output", "type": "document", "message_id": canvas_message_id,
+        "create_time": 1700000002, "content_size": 13,
+    }), encoding="utf-8")
+
+    research_root = raw_root / "assets" / "deep_research" / conv_id
+    research_root.mkdir(parents=True)
+    research_path = research_root / "task_report.md"
+    research_path.write_text("research output", encoding="utf-8")
+    research_path.with_suffix(".md.meta.json").write_text(json.dumps({
+        "conv_id": conv_id, "async_task_id": "task-1", "message_id": research_message_id,
+        "create_time": 1700000003, "content_size": 15,
+    }), encoding="utf-8")
+
+    exported = raw_root / "assets" / "images_from_zip" / conv_id / "exported.png"
+    exported.parent.mkdir(parents=True)
+    exported.write_bytes(b"\x89PNG\r\n\x1a\nfixture")
+
+    parser = ChatGPTParser(account_id="11111111-1111-4111-8111-111111111111", raw_root=raw_root)
+    parser.parse(merged)
+
+    by_id = {asset.asset_id: asset for asset in parser.assets}
+    assert {"file-project-1", "canvas:textdoc-1:v1", "deep-research:task-1"} <= set(by_id)
+    assert any(asset.metadata_json and '"representation": "export_image"' in asset.metadata_json
+               for asset in parser.assets)
+    assert {(link.object_type, link.role) for link in parser.asset_links} >= {
+        ("project", "context"), ("message", "output"), ("conversation", "unknown"),
+    }
+    assert all(asset.asset_path and (tmp_path / asset.asset_path).is_file()
+               for asset in parser.assets)

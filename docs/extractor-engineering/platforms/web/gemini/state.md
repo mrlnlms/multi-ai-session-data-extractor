@@ -67,6 +67,21 @@ copy fallback; mutable conversation JSON remains independent.
   asset/message relationship resolves, repeated parses are byte-identical, and
   neither canonical asset table contains signed source URLs.
 
+### Preserved-file audit closure — 2026-09-15
+
+- All 391 physical files under the per-account merged asset trees are now
+  accounted for: 364 canonical available assets and 27 additional physical
+  representations of those same content identities.
+- The 27 duplicates comprise 25 hosted images and 2 Deep Research Markdown
+  reports. Each matches a canonical file byte for byte inside the same account;
+  filenames and timestamps are not used as duplicate evidence.
+- The duplicate files remain preserved. The audit classifies them as
+  `duplicate_representation`, so Gemini has zero eligible-uncovered and zero
+  unresolved file representations without creating duplicate Asset rows.
+- Two temporary parses were byte-identical to each other and to the current
+  five processed Gemini tables. All 364 available paths and all asset/message/
+  conversation relationships resolve.
+
 ## Canonical parser
 
 Each account tree resolves its immutable catalog UUID into `account_id`; the

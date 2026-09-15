@@ -26,6 +26,7 @@ validada de 2026-05-01.
 from __future__ import annotations
 
 import json
+import hashlib
 import mimetypes
 from dataclasses import asdict, fields
 from pathlib import Path
@@ -159,6 +160,7 @@ class ClaudeAIParser(BaseParser):
                 self.projects.append(proj)
                 self._extract_project_docs(proj)
                 self._record_project_files(proj)
+        self._record_artifacts()
 
     @staticmethod
     def _compute_last_run_date(conv_dir: Path) -> Optional[str]:
@@ -541,6 +543,79 @@ class ClaudeAIParser(BaseParser):
                 role="context", ordinal=ordinal, content_block_index=None, metadata_json=None,
             ))
             self._asset_link_ids.add(link_id)
+
+    def _record_artifacts(self) -> None:
+        """Index complete artifact versions extracted from authoritative tool blocks."""
+        message_keys = {message.message_id for message in self.messages}
+        conversation_keys = {conversation.conversation_id for conversation in self.conversations}
+        for meta_path in sorted((self.assets_root / "artifacts").glob("*/*.meta.json")):
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            conv_uuid = meta.get("conv_uuid") or meta_path.parent.name
+            message_uuid = meta.get("message_uuid")
+            version_uuid = meta.get("version_uuid")
+            if not conv_uuid:
+                continue
+            artifact_path = Path(str(meta_path)[:-len(".meta.json")])
+            available = artifact_path.is_file()
+            if version_uuid:
+                asset_id = f"artifact-version:{version_uuid}"
+            else:
+                locator = "\x1f".join(str(value or "") for value in (
+                    conv_uuid, message_uuid, meta.get("artifact_id"), meta.get("version"),
+                ))
+                asset_id = f"artifact-version:{hashlib.sha256(locator.encode()).hexdigest()}"
+            metadata_json = json.dumps({
+                "artifact_id": meta.get("artifact_id"),
+                "language": meta.get("language"),
+                "representation": "artifact_version",
+                "version": meta.get("version"),
+            }, ensure_ascii=False, sort_keys=True)
+            self.assets.append(Asset(
+                asset_id=asset_id, source=SOURCE, account_id=self.account_id,
+                asset_kind="artifact", asset_origin="assistant",
+                file_name=artifact_path.name if available else None,
+                mime_type=meta.get("type") or (
+                    mimetypes.guess_type(artifact_path.name)[0] if available else None
+                ),
+                size_bytes=artifact_path.stat().st_size if available else meta.get("content_size"),
+                asset_path=self._data_relative_asset_path(artifact_path) if available else None,
+                is_model_generated=True, is_preserved_missing=not available,
+                is_binary_available=available,
+                created_at=self._ts(meta.get("start_timestamp")) if meta.get("start_timestamp") else None,
+                metadata_json=metadata_json,
+            ))
+            self._assets_by_id[asset_id] = self.assets[-1]
+
+            if message_uuid in message_keys:
+                object_type, object_id = "message", message_uuid
+            elif conv_uuid in conversation_keys:
+                object_type, object_id = "conversation", conv_uuid
+                message_uuid = None
+            else:
+                continue
+            link_id = make_asset_link_id(
+                SOURCE, self.account_id, asset_id, object_type, object_id, "output", 0,
+            )
+            if link_id not in self._asset_link_ids:
+                self.asset_links.append(AssetLink(
+                    asset_link_id=link_id, source=SOURCE, account_id=self.account_id,
+                    asset_id=asset_id, object_type=object_type, object_id=object_id,
+                    conversation_id=conv_uuid, message_id=message_uuid, project_id=None,
+                    role="output", ordinal=0, content_block_index=None, metadata_json=None,
+                ))
+                self._asset_link_ids.add(link_id)
+            if available and message_uuid:
+                value = self._data_relative_asset_path(artifact_path)
+                for message in self.messages:
+                    if message.message_id == message_uuid:
+                        paths = list(message.asset_paths or [])
+                        if value not in paths:
+                            paths.append(value)
+                            message.asset_paths = paths
+                        break
 
     # ------------------------------------------------------------------
     # Save

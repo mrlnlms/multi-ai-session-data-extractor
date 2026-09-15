@@ -105,6 +105,11 @@ These validations require a Pro Max account and remain open until someone tests:
   message and observed ordinal, but the positional payload does not expose a
   trustworthy content-block index. Manifest-only images remain library-level
   with unknown origin until a message reference is observable.
+- **Physical duplicate representations:** the preservation tree currently has
+  27 extra same-account copies whose bytes already resolve to a canonical
+  content identity (25 hosted images and 2 Deep Research reports). They remain
+  preserved on disk and are reported as duplicate representations rather than
+  additional assets; no filename- or timestamp-based deduplication is used.
 - **Drafts/alternative regenerate:** when you regenerate a response,
   the previous state stays in `turn[1]` but parser v3 does not capture it — only
   the active state. (Backlog: implement when a representative real
@@ -220,11 +225,13 @@ These validations require a Pro Max account and remain open until someone tests:
   relationship rates, reader capability and exclusions are maintained in the
   [source-by-source coverage matrix](asset-coverage.md). Its current coverage
   spans all nine web sources: Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai,
-  DeepSeek, Perplexity, and NotebookLM. ChatGPT project
-  sources/canvas/deep-research files and Claude.ai extracted artifacts are not
-  yet indexed by the canonical asset graph; Claude inline `attachments` remain
-  text-bearing message metadata rather than fake binaries. File representations,
-  Perplexity third-party featured images remain external references rather than
+  DeepSeek, Perplexity, and NotebookLM. ChatGPT project sources, complete
+  Canvas versions, Deep Research reports and legacy/export images are indexed;
+  its Project indexes, Canvas operation patches and account-memory exports stay
+  in their operational/domain representations. Claude.ai extracted artifact
+  versions are indexed as exact message outputs; Claude inline `attachments`
+  remain text-bearing message metadata rather than fake binaries. Perplexity
+  third-party featured images remain external references rather than
   preserved-file assets. NotebookLM indexes preserved source-page representations
   and binary outputs, while its text-only domain rows remain in their specialized
   tables. Manifests and domain outputs from the other web sources remain preserved in

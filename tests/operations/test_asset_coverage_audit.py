@@ -68,13 +68,46 @@ def test_inventory_accounts_for_all_13_sources_and_attachment_shapes(tmp_path):
     assert any(item.source == "Codex" and item.representation_kind == "embedded_attachment" for item in evidence)
 
 
-def test_project_sources_are_preserved_binary_candidates(tmp_path):
+def test_chatgpt_project_source_index_and_binary_are_distinct(tmp_path):
     data = tmp_path / "data"
-    path = data / "raw" / "ChatGPT" / "project_sources" / "project" / "source.pdf"
+    root = data / "raw" / "ChatGPT" / "project_sources" / "project"
+    root.mkdir(parents=True)
+    (root / "source.pdf").write_bytes(b"pdf")
+    (root / "_files.json").write_text("[]")
+    evidence = inventory_preserved_session_assets(data)
+    assert {item.representation_kind for item in evidence} == {
+        "preserved_binary", "project_source_index",
+    }
+    index = next(item for item in evidence if item.representation_kind == "project_source_index")
+    [finding] = reconcile_asset_coverage([index], pd.DataFrame(), pd.DataFrame(), load_policy())
+    assert (finding.status, finding.policy_disposition) == ("excluded", "operational")
+
+
+def test_chatgpt_canvas_patch_and_memory_export_are_not_generic_binaries(tmp_path):
+    data = tmp_path / "data"
+    canvas = data / "raw" / "ChatGPT" / "assets" / "canvases" / "conversation"
+    canvas.mkdir(parents=True)
+    (canvas / "textdoc__patch_message.json").write_text("{}")
+    (data / "raw" / "ChatGPT" / "chatgpt_memories.md").write_text("memory")
+    evidence = inventory_preserved_session_assets(data)
+    assert {item.representation_kind for item in evidence} == {
+        "canvas_patch_record", "memory_export",
+    }
+    findings = reconcile_asset_coverage(evidence, pd.DataFrame(), pd.DataFrame(), load_policy())
+    assert {(finding.evidence.representation_kind, finding.policy_disposition)
+            for finding in findings} == {
+        ("canvas_patch_record", "domain_only"),
+        ("memory_export", "domain_only"),
+    }
+
+
+def test_claude_ai_memory_export_is_a_domain_record(tmp_path):
+    data = tmp_path / "data"
+    path = data / "raw" / "Claude.ai" / "claude_ai_memory.md"
     path.parent.mkdir(parents=True)
-    path.write_bytes(b"pdf")
+    path.write_text("memory")
     [item] = inventory_preserved_session_assets(data)
-    assert item.representation_kind == "preserved_binary"
+    assert item.representation_kind == "memory_export"
 
 
 def test_cli_materialized_artifacts_are_preserved_binary_candidates(tmp_path):
@@ -153,6 +186,53 @@ def test_policy_is_exact_and_cannot_hide_eligible_binary():
     rule = {"source": "ChatGPT", "representation_kind": "preserved_binary", "disposition": "cache"}
     [finding] = reconcile_asset_coverage([binary], pd.DataFrame(), pd.DataFrame(), [rule])
     assert finding.status == "eligible_uncovered"
+
+
+def test_gemini_content_duplicate_in_same_account_is_not_uncovered(tmp_path):
+    data = tmp_path / "data"
+    assets_dir = data / "merged" / "Gemini" / "account-1" / "assets"
+    assets_dir.mkdir(parents=True)
+    canonical = assets_dir / "canonical.png"
+    duplicate = assets_dir / "different-name.png"
+    canonical.write_bytes(b"same preserved bytes")
+    duplicate.write_bytes(b"same preserved bytes")
+
+    evidence = inventory_preserved_session_assets(data)
+    canonical_item = next(item for item in evidence if item.binary_path.endswith("canonical.png"))
+    duplicate_item = next(item for item in evidence if item.binary_path.endswith("different-name.png"))
+    assets = pd.DataFrame({
+        "source": ["gemini"],
+        "asset_id": [canonical_item.native_id],
+        "asset_path": [canonical_item.binary_path],
+    })
+
+    findings = reconcile_asset_coverage(evidence, assets, pd.DataFrame())
+    statuses = {finding.evidence.binary_path: finding.status for finding in findings}
+    assert statuses[canonical_item.binary_path] == "covered"
+    assert statuses[duplicate_item.binary_path] == "duplicate_representation"
+
+
+def test_gemini_identical_bytes_in_another_account_do_not_prove_duplicate(tmp_path):
+    data = tmp_path / "data"
+    first = data / "merged" / "Gemini" / "account-1" / "assets" / "first.png"
+    second = data / "merged" / "Gemini" / "account-2" / "assets" / "second.png"
+    first.parent.mkdir(parents=True)
+    second.parent.mkdir(parents=True)
+    first.write_bytes(b"same preserved bytes")
+    second.write_bytes(b"same preserved bytes")
+
+    evidence = inventory_preserved_session_assets(data)
+    first_item = next(item for item in evidence if item.binary_path.endswith("first.png"))
+    assets = pd.DataFrame({
+        "source": ["gemini"],
+        "asset_id": [first_item.native_id],
+        "asset_path": [first_item.binary_path],
+    })
+
+    findings = reconcile_asset_coverage(evidence, assets, pd.DataFrame())
+    statuses = {finding.evidence.binary_path: finding.status for finding in findings}
+    assert statuses[first_item.binary_path] == "covered"
+    assert statuses[next(item.binary_path for item in evidence if item.binary_path.endswith("second.png"))] == "eligible_uncovered"
 
 
 def test_redacted_serialization_contains_no_paths_ids_filenames_or_content():

@@ -47,14 +47,20 @@ branches, assets and asset_links Parquets.
 - **Voice** with `direction in/out`.
 - **DALL-E** mapped as ToolEvent.
 - **User uploads** (Message with `image_asset_pointer`).
-- **Canonical assets** use the native file ID as identity. User pointers become
+- **Canonical assets** use native file IDs where available. User pointers become
   `input` links; DALL-E and other tool-file pointers become `output` links.
   User-message block indexes are exact. Tool-only nodes link to the closest
   retained canonical ancestor and keep their native tool-message/block locator
   in metadata; if no ancestor exists, placement degrades to conversation level.
-- **Availability** is explicit: the current two-account base produces 684
-  assets and 689 links, with 614 local binaries and 70 metadata-only assets.
+- Project knowledge files use their indexed `file_id` and link to the Project
+  as `context`. Complete Canvas versions and Deep Research reports link to the
+  producing message as `output`. Legacy/export images retain only the
+  conversation relationship and unknown role when stronger evidence is absent.
+- **Availability** is explicit: the current two-account base produces 997
+  assets and 1,002 links, with 927 local binaries and 70 metadata-only assets.
   All links and available paths resolve, and no upstream pointer URL is published.
+- Project `_files.json` indexes, incremental Canvas patch records and account
+  memory exports remain preserved outside the Asset domain.
 - **Tether quote**, **canvas**, **deep_research**.
 - **Custom GPT vs project** distinguished.
 - **Preservation** via `is_preserved_missing` + `last_seen_in_server`.

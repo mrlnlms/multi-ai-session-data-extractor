@@ -17,6 +17,7 @@ nessa promocao.
 from __future__ import annotations
 
 import json
+import hashlib
 import mimetypes
 from pathlib import Path
 from typing import Optional
@@ -90,6 +91,7 @@ class ChatGPTParser(BaseParser):
 
         for conv_id, conv_data in convs.items():
             self._extract_conv(conv_id, conv_data, last_run_date)
+        self._record_preserved_file_assets()
 
     @staticmethod
     def _compute_last_run_date(convs: dict) -> Optional[str]:
@@ -400,6 +402,179 @@ class ChatGPTParser(BaseParser):
             if parent.name == "data":
                 return path.relative_to(parent).as_posix()
         return (Path("raw/ChatGPT") / path.relative_to(self.raw_root)).as_posix()
+
+    @staticmethod
+    def _mime_type(path: Path) -> Optional[str]:
+        guessed = mimetypes.guess_type(path.name)[0]
+        if guessed:
+            return guessed
+        try:
+            prefix = path.read_bytes()[:12]
+        except OSError:
+            return None
+        if prefix.startswith(b"\x89PNG\r\n\x1a\n"):
+            return "image/png"
+        if prefix.startswith(b"\xff\xd8\xff"):
+            return "image/jpeg"
+        if prefix.startswith((b"GIF87a", b"GIF89a")):
+            return "image/gif"
+        if prefix.startswith(b"RIFF") and prefix[8:12] == b"WEBP":
+            return "image/webp"
+        return None
+
+    def _add_preserved_asset(
+        self, *, asset_id: str, path: Optional[Path], kind: str, origin: str,
+        generated: Optional[bool], created_at: object = None,
+        metadata: Optional[dict] = None, object_type: Optional[str] = None,
+        object_id: Optional[str] = None, conversation_id: Optional[str] = None,
+        message_id: Optional[str] = None, project_id: Optional[str] = None,
+        role: Optional[str] = None, ordinal: Optional[int] = None,
+    ) -> None:
+        available = bool(path and path.is_file())
+        current = self._assets_by_id.get(asset_id)
+        if current is None:
+            current = Asset(
+                asset_id=asset_id, source=self.source_name, account_id=self.account_id,
+                asset_kind=kind, asset_origin=origin,
+                file_name=path.name if available else None,
+                mime_type=self._mime_type(path) if available and path else None,
+                size_bytes=path.stat().st_size if available and path else None,
+                asset_path=self._data_relative_asset_path(path) if available and path else None,
+                is_model_generated=generated, is_preserved_missing=not available,
+                is_binary_available=available,
+                created_at=self._ts(created_at) if created_at is not None else None,
+                metadata_json=(json.dumps(metadata, ensure_ascii=False, sort_keys=True)
+                               if metadata else None),
+            )
+            self._assets_by_id[asset_id] = current
+            self.assets.append(current)
+        elif available and not current.is_binary_available and path:
+            current.file_name = path.name
+            current.mime_type = self._mime_type(path)
+            current.size_bytes = path.stat().st_size
+            current.asset_path = self._data_relative_asset_path(path)
+            current.is_binary_available = True
+            current.is_preserved_missing = False
+
+        if not (object_type and object_id and role):
+            return
+        link_id = make_asset_link_id(
+            self.source_name, self.account_id, asset_id, object_type, object_id,
+            role, ordinal, None,
+        )
+        if link_id in self._asset_link_ids:
+            return
+        self.asset_links.append(AssetLink(
+            asset_link_id=link_id, source=self.source_name, account_id=self.account_id,
+            asset_id=asset_id, object_type=object_type, object_id=object_id,
+            conversation_id=conversation_id, message_id=message_id,
+            project_id=project_id, role=role, ordinal=ordinal,
+            content_block_index=None, metadata_json=None,
+        ))
+        self._asset_link_ids.add(link_id)
+
+    def _attach_message_path(self, message_id: str, path: Path) -> None:
+        value = self._data_relative_asset_path(path)
+        for message in self.messages:
+            if message.message_id != message_id:
+                continue
+            paths = list(message.asset_paths or [])
+            if value not in paths:
+                paths.append(value)
+                message.asset_paths = paths
+            return
+
+    def _record_preserved_file_assets(self) -> None:
+        """Index files materialized beside the raw conversation envelope."""
+        for index_path in sorted(self.raw_root.glob("project_sources/*/_files.json")):
+            project_id = index_path.parent.name
+            try:
+                records = json.loads(index_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(records, list):
+                continue
+            for ordinal, record in enumerate(records):
+                if not isinstance(record, dict) or not record.get("file_id"):
+                    continue
+                candidate = index_path.parent / str(record.get("name") or "")
+                path = candidate if candidate.is_file() else None
+                self._add_preserved_asset(
+                    asset_id=str(record["file_id"]), path=path, kind="project_file",
+                    origin="user", generated=False,
+                    created_at=record.get("created_at"),
+                    metadata={"representation": "project_source"},
+                    object_type="project", object_id=project_id,
+                    project_id=project_id, role="context", ordinal=ordinal,
+                )
+
+        for representation, folder, id_key, prefix in (
+            ("canvas", "canvases", "textdoc_id", "canvas"),
+            ("deep_research_report", "deep_research", "async_task_id", "deep-research"),
+        ):
+            for meta_path in sorted((self.assets_root / folder).glob("*/*.meta.json")):
+                try:
+                    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                message_id = meta.get("message_id")
+                native_id = meta.get(id_key)
+                conv_id = meta.get("conv_id") or meta_path.parent.name
+                if not native_id or (representation == "canvas" and native_id == "unknown"):
+                    native_id = message_id if representation == "canvas" else native_id
+                if not native_id:
+                    continue
+                path = Path(str(meta_path)[:-len(".meta.json")])
+                if representation == "canvas":
+                    version = meta.get("version")
+                    if version is None:
+                        continue
+                    asset_id = f"{prefix}:{native_id}:v{version}"
+                    kind = "artifact"
+                else:
+                    asset_id = f"{prefix}:{native_id}"
+                    kind = "output"
+                valid_message = bool(message_id and any(m.message_id == message_id for m in self.messages))
+                self._add_preserved_asset(
+                    asset_id=asset_id, path=path if path.is_file() else None,
+                    kind=kind, origin="assistant", generated=True,
+                    created_at=meta.get("create_time"),
+                    metadata={"representation": representation},
+                    object_type="message" if valid_message else ("conversation" if conv_id else None),
+                    object_id=message_id if valid_message else conv_id,
+                    conversation_id=conv_id, message_id=message_id if valid_message else None,
+                    role="output", ordinal=0,
+                )
+                if valid_message and path.is_file():
+                    self._attach_message_path(message_id, path)
+
+        known_conversations = {c.conversation_id for c in self.conversations}
+        for folder, representation in (("images", "orphan_image"),
+                                       ("images_from_zip", "export_image")):
+            for path in sorted((self.assets_root / folder).glob("*/*")):
+                if not path.is_file() or path.name.endswith((".meta.json", "_meta.json")):
+                    continue
+                conv_id = path.parent.name
+                if folder == "images":
+                    asset_id = path.name.split("__", 1)[0]
+                    if asset_id in self._assets_by_id:
+                        continue
+                else:
+                    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                    locator = f"{conv_id}\x1f{path.name}"
+                    asset_id = f"export-image:{hashlib.sha256(locator.encode()).hexdigest()}"
+                has_conversation = conv_id in known_conversations
+                self._add_preserved_asset(
+                    asset_id=asset_id, path=path, kind="other", origin="unknown",
+                    generated=None, metadata={
+                        "content_sha256": digest if folder == "images_from_zip" else None,
+                        "representation": representation,
+                    },
+                    object_type="conversation" if has_conversation else None,
+                    object_id=conv_id if has_conversation else None,
+                    conversation_id=conv_id if has_conversation else None,
+                    role="unknown" if has_conversation else None,
+                )
 
     def _repair_asset_link_targets(
         self, conv_id: str, mapping: dict, canonical_message_ids: set[str], start: int,

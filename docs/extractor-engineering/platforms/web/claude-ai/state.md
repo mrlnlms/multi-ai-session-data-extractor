@@ -81,12 +81,15 @@ legacy `account` label and all existing native IDs remain unchanged.
   `file_uuid`.
 - **Canonical file graph** keeps one Asset per native `file_uuid`: user-message
   files are `input`, assistant-message files are `output`, and project files are
-  `context`. The current two-account base produces 2,449 assets and 2,500 links;
-  2,175 preview/thumbnail binaries resolve and 274 metadata-only/native file
+  `context`. Extracted artifact versions use `version_uuid` (or an exact
+  message/artifact/version locator when the version UUID is absent), link to
+  their producing message as `output`, and enrich its `asset_paths`. The current
+  two-account base produces 3,566 assets and 3,617 links; 3,292 binaries resolve
+  and 274 metadata-only/native file
   records remain visible as unavailable.
 - **Inline `attachments` are not binary assets.** Their extracted text remains
-  in `Message.attachments_json`; extracted tool artifacts are also outside this
-  adapter until their own identity/relationship mapping is validated.
+  in `Message.attachments_json`. Account-memory exports remain separate domain
+  content rather than interaction assets.
 - **`is_starred` → `is_pinned`** (cross-platform).
 - **`is_temporary`** preserved (ephemeral feature).
 - **Project metadata** in `claude_ai_project_metadata.parquet`

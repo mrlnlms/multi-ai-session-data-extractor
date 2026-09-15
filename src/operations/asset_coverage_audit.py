@@ -119,6 +119,14 @@ def _kind_for_file(path: Path, source_root: Path, source: str) -> str:
     logical = PurePosixPath(_logical_rel(path, source_root))
     lower_name = logical.name.lower()
     parts = {part.lower() for part in logical.parts}
+    if source in {"ChatGPT", "Claude.ai"} and lower_name in {
+        "chatgpt_memories.md", "claude_ai_memory.md",
+    }:
+        return "memory_export"
+    if source == "ChatGPT" and "project_sources" in parts and lower_name == "_files.json":
+        return "project_source_index"
+    if source == "ChatGPT" and "canvases" in parts and "__patch_" in lower_name:
+        return "canvas_patch_record"
     if lower_name in OPERATIONAL_NAMES:
         return "capture_log" if "capture" in lower_name else "operational_record"
     if lower_name.endswith("manifest.json") or lower_name in {"assets_manifest.json", "assets_log.json"}:
@@ -162,13 +170,25 @@ def _filesystem_evidence(data_root: Path) -> list[RepresentationEvidence]:
                 logical = _logical_rel(path, source_root)
                 # Default-root traversal also sees account-* children. Assigning
                 # from the path keeps each physical file in exactly one scope.
-                binary = _relative_to_data(path, data_root) if _kind_for_file(path, source_root, source) == "preserved_binary" else None
+                kind = _kind_for_file(path, source_root, source)
+                binary = _relative_to_data(path, data_root) if kind == "preserved_binary" else None
+                # Gemini's canonical identity is the preserved content digest.
+                # Carry it in the census so a second physical copy can be
+                # distinguished from genuinely uncovered content. Other
+                # sources may use native IDs and are left unchanged here.
+                native_id = None
+                if source == "Gemini" and kind == "preserved_binary":
+                    digest = hashlib.sha256()
+                    with path.open("rb") as handle:
+                        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                            digest.update(chunk)
+                    native_id = f"sha256:{digest.hexdigest()}"
                 evidence.append(RepresentationEvidence(
                     source=source,
                     account_scope=account,
-                    representation_kind=_kind_for_file(path, source_root, source),
+                    representation_kind=kind,
                     evidence_path=_relative_to_data(path, data_root),
-                    native_id=None,
+                    native_id=native_id,
                     binary_path=binary,
                     conversation_id=None,
                     message_id=None,
@@ -628,11 +648,17 @@ def reconcile_asset_coverage(
 ) -> list[CoverageFinding]:
     del links  # Relationship reconciliation is added once evidence identities are source-complete.
     asset_paths = set(assets.get("asset_path", pd.Series(dtype="string")).dropna().astype(str))
+    asset_identity_paths: dict[tuple[str, str], set[str]] = {}
     asset_identity_counts: dict[tuple[str, str], int] = {}
     if not assets.empty and {"source", "asset_id"}.issubset(assets.columns):
         for source, asset_id in assets[["source", "asset_id"]].dropna().astype(str).itertuples(index=False, name=None):
             key = ("".join(ch for ch in source.lower() if ch.isalnum()), asset_id)
             asset_identity_counts[key] = asset_identity_counts.get(key, 0) + 1
+        for source, asset_id, asset_path in assets[
+            ["source", "asset_id", "asset_path"]
+        ].dropna().astype(str).itertuples(index=False, name=None):
+            key = ("".join(ch for ch in source.lower() if ch.isalnum()), asset_id)
+            asset_identity_paths.setdefault(key, set()).add(asset_path)
     findings: list[CoverageFinding] = []
     for item in evidence:
         matches = _policy_matches(item, policy)
@@ -640,6 +666,12 @@ def reconcile_asset_coverage(
             findings.append(CoverageFinding(item, "unresolved"))
         elif item.representation_kind == "preserved_binary":
             status = "covered" if item.binary_path in asset_paths else "eligible_uncovered"
+            if status == "eligible_uncovered" and item.native_id:
+                source_key = "".join(ch for ch in item.source.lower() if ch.isalnum())
+                identity_paths = asset_identity_paths.get((source_key, item.native_id), set())
+                account_part = f"/{item.account_scope}/"
+                if any(account_part in f"/{path}" for path in identity_paths):
+                    status = "duplicate_representation"
             findings.append(CoverageFinding(item, status))
         elif item.representation_kind == "embedded_attachment":
             source_key = "".join(ch for ch in item.source.lower() if ch.isalnum())

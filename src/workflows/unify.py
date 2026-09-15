@@ -292,6 +292,11 @@ def _validate_asset_integrity(
         (str(row.source), _identity(row.account_id), str(row.project_id))
         for row in projects.itertuples(index=False)
     }
+    if not conversations.empty and "project_id" in conversations.columns:
+        project_keys.update({
+            (str(row.source), _identity(row.account_id), str(row.project_id))
+            for row in conversations.loc[conversations["project_id"].notna()].itertuples(index=False)
+        })
     sources = frames.get("sources", pd.DataFrame())
     source_keys = {
         (str(row.source), _identity(row.account_id), str(row.doc_id))
