@@ -99,10 +99,13 @@ preservado, sem incorporar o binario. O caminho, quando disponivel, e relativo
 a `data/`; um binario ausente mantem sua linha com
 `is_binary_available=False`. `asset_origin` registra quem originou o arquivo
 (`user`, `assistant`, `platform`, `imported` ou `unknown`) sem confundir essa
-propriedade com o uso do arquivo em uma conversa. A cobertura unificada e
-explicitamente parcial: todas as nove fontes web publicam assets — Grok, Kimi,
-Qwen, Gemini, ChatGPT, Claude.ai, DeepSeek, Perplexity e NotebookLM —, mas isso
-ainda nao equivale a todos os arquivos preservados nas nove fontes web. A
+propriedade com o uso do arquivo em uma conversa. O escopo web publicado e
+`preserved_web_files`: em Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai,
+DeepSeek, Perplexity e NotebookLM, toda representacao de arquivo elegivel
+preservada em raw/merged vira um Asset canonico, e as demais representacoes
+observadas precisam corresponder a uma regra de exclusao aprovada e auditavel.
+O escopo independente das quatro CLIs e `preserved_cli_session_assets`; um path
+em ToolEvent, por si so, nao comprova um asset de sessao. A
 [matriz de cobertura](asset-coverage.md) registra por fonte as representacoes
 incluidas, excluidas e a capacidade do leitor. Adaptadores posteriores nao
 devem substituir tabelas de dominio como `project_docs` e outputs do NotebookLM.

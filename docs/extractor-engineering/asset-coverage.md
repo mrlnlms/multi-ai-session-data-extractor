@@ -1,11 +1,14 @@
 # Canonical asset coverage
 
 This is the archive-wide coverage contract for `assets.parquet` and
-`asset_links.parquet`. The current scope is **partial preserved-file coverage**,
-not `preserved_web_files`: all nine web sources now publish the graph, but
-several preserved input, generated-output and project/notebook file
-representations remain outside it until their identity and placement semantics
-are validated.
+`asset_links.parquet`. The nine-source web scope is published as
+**`preserved_web_files`**: every eligible file representation preserved in
+raw/merged for all nine web sources is represented by a canonical Asset, while
+every other observed representation is matched by an approved, auditable
+exclusion rule. The four-source CLI scope is independently published as
+**`preserved_cli_session_assets`** under the same evidence requirement; it is
+not inferred merely from a path appearing in a ToolEvent or from a zero-row
+source.
 
 Counts below describe the canonical archive materialized on 2026-09-15.
 “Linked” is the percentage of source/account/asset identities with at least one
@@ -18,7 +21,7 @@ paths are relative to `data/` and resolve to local files.
 | Claude.ai | 3,566 / 3,566 | user 2,082; assistant 1,484 | 3,617; input 1,892, output 1,484, context 241 | 100.0% | 3,292 / 274 | message | Extracted artifact versions are exact message outputs; inline text-bearing `attachments` and account-memory exports remain domain content rather than fake binaries |
 | Gemini | 364 / 364 | assistant 173; user 110; unknown 81 | 963; input 787, output 176 | 78.0% | 364 / 0 | message | 27 additional physical copies (25 images and 2 reports) are verified same-account/content duplicates; no placement is invented for manifest-only images |
 | NotebookLM | 5,252 / 5,252 | platform 4,499; assistant 740; user 13 | 5,252; context 4,512, output 740 | 100.0% | 5,252 / 0 | library | 179 real note Markdown files, 105 mind-map trees and 250 text-output envelopes retain exact note/output identity; 184 legacy UUID-reference/empty Markdown materializations are operational, not notes |
-| Qwen | 367 / 367 | user 313; assistant 54 | 367; input 294, output 54, context 19 | 100.0% | 367 / 0 | inline | Seven additional PNG paths are verified same-account/content duplicates; rotated signed-URL entries are consolidated and inline document text stays in domain tables |
+| Qwen | 367 / 367 | user 313; assistant 54 | 367; input 294, output 54, context 19 | 100.0% | 367 / 0 | inline | Collision-safe filenames and recapture resolved all 11 historical upload-path collisions; 200 byte-proven legacy paths and seven generated PNG copies remain preserved as verified duplicate representations |
 | DeepSeek | 80 / 80 | user 80 | 80; input 80 | 100.0% | 0 / 80 | message | Native upload records remain metadata-only because no current binary or manifest survived in merged |
 | Perplexity | 15 / 15 | assistant 9; user 6 | 8; input 8 | 40.0% | 9 / 6 | message | Nine older artifact paths match canonical native identity and content; third-party featured images are external references and deleted upstream uploads retain metadata only |
 | Grok | 53 / 53 | user 53 | 0 | 0.0% | 53 / 0 | library | The global catalog has no evidence-backed use placement; none is inferred from names or timestamps |
@@ -62,6 +65,19 @@ project, source or output relationship does not resolve in the same
 source/account namespace; an available path is unsafe or absent; a position is
 negative; or any published asset-graph string exposes a recognized signed-query
 credential.
+
+The stricter archive-wide pre-publication gate is:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.operations.asset_coverage_audit --check
+```
+
+It prints independent web and CLI blocks and exits nonzero for uncovered or
+unresolved evidence, ambiguous policy matches, available paths that do not
+resolve, dangling AssetLinks, non-unique eligible identities or incomplete
+accounting. Both the nine-source web block and four-source CLI block are green.
+These independent gates are the publication evidence for
+`preserved_web_files` and `preserved_cli_session_assets`, respectively.
 
 The matrix is an observed snapshot. Source state documents remain authoritative
 for extractor behavior and known limitations remain authoritative for gaps.

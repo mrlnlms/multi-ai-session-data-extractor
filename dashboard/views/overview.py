@@ -15,6 +15,7 @@ from dashboard.components import (
 )
 from src.application.platforms import PlatformState
 from src.application.profiles import compute_merged_stats, discovery_drop_flag
+from src.platforms.registry import SOURCE_TO_CATALOG_PLATFORM
 from dashboard.pipeline import (
     render_last_run_summary,
     render_recent_runs_section,
@@ -38,10 +39,11 @@ def _cached_processed_stats(parquet_path_str: str, mtime: float):
 def _cached_asset_graph_stats(assets_path_str: str, links_path_str: str, mtimes: tuple):
     assets = pd.read_parquet(assets_path_str, columns=["source", "is_binary_available"])
     links = pd.read_parquet(links_path_str, columns=["asset_link_id"])
+    observed_sources = set(assets["source"].dropna().unique())
     return {
         "assets": len(assets),
         "links": len(links),
-        "sources": assets["source"].nunique(),
+        "web_sources": len(observed_sources & set(SOURCE_TO_CATALOG_PLATFORM)),
         "available": int(assets["is_binary_available"].fillna(False).sum()),
     }
 
@@ -213,7 +215,8 @@ def render(states: list[PlatformState]) -> None:
             "Canonical asset graph: "
             f"{asset_stats['assets']:,} assets · {asset_stats['links']:,} links · "
             f"{asset_stats['available']:,} local binaries · "
-            f"{asset_stats['sources']}/9 web sources. Coverage is partial."
+            f"{asset_stats['web_sources']}/9 web sources · preserved_web_files · "
+            "preserved_cli_session_assets."
         )
 
     st.caption("For details, pick a platform:")

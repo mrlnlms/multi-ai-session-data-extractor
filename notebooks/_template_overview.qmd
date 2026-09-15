@@ -57,8 +57,10 @@ show_df(pd.DataFrame(_meta_rows))
 
 ## Canonical asset graph
 
-The graph is partial preserved-file coverage. It does not claim every file
-representation in every source; see the maintained
+The web graph publishes the `preserved_web_files` scope, and CLI coverage is
+independently published as `preserved_cli_session_assets`. Every eligible
+preserved representation is canonicalized and every other observed
+representation must match an approved exclusion; see the maintained
 [source-by-source contract](../docs/extractor-engineering/asset-coverage.md).
 
 ```{python}

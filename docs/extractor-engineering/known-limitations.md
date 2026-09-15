@@ -89,6 +89,11 @@ These validations require a Pro Max account and remain open until someone tests:
   field stays `None`.
 - **`/v2/chats/archived` always returns empty** even after archive
   request. Documented.
+- ~~**Colliding upload materializations**~~ **CLOSED 2026-09-15:** 104
+  historical upload identities had reused 11 local paths. Collision-safe
+  native-ID-derived filenames were implemented and all affected identities
+  were recaptured separately. The downloader preserves old paths, records
+  their lineage and never overwrites an already materialized destination.
 
 ### DeepSeek
 
@@ -227,11 +232,12 @@ These validations require a Pro Max account and remain open until someone tests:
 
 ## Cross-platform assets
 
-- **The unified asset index is intentionally partial.** The exact counts,
-  relationship rates, reader capability and exclusions are maintained in the
-  [source-by-source coverage matrix](asset-coverage.md). Its current coverage
-  spans all nine web sources: Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai,
-  DeepSeek, Perplexity, and NotebookLM. ChatGPT project sources, complete
+- **The published web scope is `preserved_web_files`.** The exact counts,
+  relationship rates, reader capability and approved exclusions are maintained
+  in the [source-by-source coverage matrix](asset-coverage.md). Every eligible
+  file representation preserved in raw/merged across Grok, Kimi, Qwen, Gemini,
+  ChatGPT, Claude.ai, DeepSeek, Perplexity, and NotebookLM is accounted for.
+  ChatGPT project sources, complete
   Canvas versions, Deep Research reports and legacy/export images are indexed;
   its Project indexes, Canvas operation patches and account-memory exports stay
   in their operational/domain representations. Claude.ai extracted artifact
@@ -240,14 +246,21 @@ These validations require a Pro Max account and remain open until someone tests:
   third-party featured images remain external references rather than
   preserved-file assets. NotebookLM indexes preserved source-page representations
   and binary outputs, while its text-only domain rows remain in their specialized
-  tables. Manifests and domain outputs from the other web sources remain preserved in
-  their existing representations until source-specific adapters validate their
-  identities and path semantics.
+  tables. Operational manifests, domain rows and external references excluded
+  by the matrix remain preserved in their authoritative representations; the
+  scope name does not reclassify them as user-facing files.
 - **DeepSeek's adapter publishes metadata-only assets.** It materializes stable
   `files[].id` records as metadata-only Assets
-  when no binary survived and creates exact input links. Representation-level
-  gaps across the archive remain open, so the published scope is not yet named
-  `preserved_web_files`.
+  when no binary survived and creates exact input links. Metadata-only does not
+  mean unaccounted: the native identity and exact relationship are preserved,
+  while binary availability remains explicitly false.
+- **The archive-wide coverage check is independently gated for web and CLI.**
+  `python -m src.operations.asset_coverage_audit --check` currently passes both
+  the nine-web-source and four-CLI blocks. It rejects uncovered or unresolved
+  evidence, ambiguous policy, absent available paths and dangling AssetLinks.
+  The green blocks publish `preserved_web_files` and
+  `preserved_cli_session_assets`, respectively; the CLI name is never granted
+  merely because paths were excluded.
 
 ## Test coverage
 

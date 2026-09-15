@@ -9,7 +9,8 @@ Fontes de URLs nos raws:
      - URLs cdn.qwenlm.ai/output/{user_id}/t2i/{conv_id}/ ou /t2v/
 
 Naming:
-  - User uploads: {conv_id}/{file_name_original} — preserva nome legivel
+  - User/project files: {conv_id}/{stem}__{identity_hash}{suffix}
+    (nome legivel sem colisao entre IDs distintos)
   - Imagens geradas: {conv_id}/gen_{hash}.{ext}
   - Manifest em assets_manifest.json com mapping hash→{url, conv_id, filename, source_type, size}
 """
@@ -137,7 +138,11 @@ def _target_path(assets_dir: Path, url: str, info: dict, content_type: str) -> P
     folder = assets_dir / conv_id
     folder.mkdir(parents=True, exist_ok=True)
     if info["source_type"] in ("user_upload", "project_file") and info.get("file_name"):
-        return folder / _safe_filename(info["file_name"])
+        safe_name = _safe_filename(info["file_name"])
+        path = Path(safe_name)
+        identity = str(info.get("file_id") or url)
+        identity_hash = hashlib.sha256(identity.encode()).hexdigest()[:16]
+        return folder / f"{path.stem}__{identity_hash}{path.suffix}"
     # Pra generated: tenta pegar nome do path (ex: deep research PDF tem titulo no URL)
     from urllib.parse import urlparse, unquote
     h = hashlib.sha1(url.encode()).hexdigest()[:12]
@@ -216,9 +221,14 @@ async def download_assets(
         nonlocal done
         h = hashlib.sha1(url.encode()).hexdigest()[:16]
         async with sem:
+            old_entry = manifest.get(h) if isinstance(manifest.get(h), dict) else {}
             if skip_existing and h in manifest:
                 existing = assets_dir / manifest[h].get("relpath", "")
-                if (assets_dir / existing).exists() or existing.exists():
+                expected = _target_path(
+                    assets_dir, url, info,
+                    str(manifest[h].get("content_type") or "application/octet-stream"),
+                )
+                if existing.is_file() and existing == expected:
                     stats["skipped"] += 1
                     done += 1
                     return
@@ -248,9 +258,16 @@ async def download_assets(
 
             try:
                 target = _target_path(assets_dir, url, info, ct)
-                target.write_bytes(blob)
+                if target.is_file():
+                    # A rotated URL or repeated reference to the same native
+                    # file must reuse the first preserved bytes, never replace
+                    # them with a later response.
+                    stats["skipped"] += 1
+                else:
+                    target.write_bytes(blob)
+                    stats["downloaded"] += 1
                 relpath = target.relative_to(assets_dir).as_posix()
-                manifest[h] = {
+                record = {
                     "url": url,
                     "conv_id": info["conv_id"],
                     "source_type": info["source_type"],
@@ -258,10 +275,19 @@ async def download_assets(
                     "file_name": info.get("file_name"),
                     "file_id": info.get("file_id"),
                     "content_type": ct,
-                    "size": len(blob),
+                    "size": target.stat().st_size,
                     "relpath": relpath,
                 }
-                stats["downloaded"] += 1
+                previous_relpaths = {
+                    str(path) for path in old_entry.get("previous_relpaths", [])
+                    if path
+                }
+                old_relpath = old_entry.get("relpath")
+                if old_relpath and old_relpath != relpath:
+                    previous_relpaths.add(str(old_relpath))
+                if previous_relpaths:
+                    record["previous_relpaths"] = sorted(previous_relpaths)
+                manifest[h] = record
             except Exception as e:
                 stats["errors"].append((url[:100], f"write: {str(e)[:150]}"))
             done += 1

@@ -69,6 +69,21 @@ class CoverageFinding:
             raise ValueError(f"unsupported coverage status: {self.status}")
 
 
+@dataclass(frozen=True)
+class CoverageReport:
+    """Complete reconciliation result used by publication gates."""
+
+    findings: tuple[CoverageFinding, ...]
+    web_sources: tuple[str, ...]
+    cli_sources: tuple[str, ...]
+    ambiguous_policy_matches: int
+    available_path_failures: int
+    unresolved_asset_links: int
+    eligible_identity_failures: int
+    accounting_failures: int
+    scope_integrity: Mapping[str, Mapping[str, int]]
+
+
 def _relative_to_data(path: Path, data_root: Path) -> str:
     return path.relative_to(data_root).as_posix()
 
@@ -203,14 +218,65 @@ def _perplexity_verified_duplicate_ids(account_root: Path) -> dict[str, str]:
     return verified
 
 
+def _qwen_verified_manifest_lineage(
+    account_root: Path,
+) -> tuple[dict[str, str], set[str]]:
+    """Resolve current/legacy paths only when preserved bytes prove lineage."""
+    manifest_path = account_root / "assets_manifest.json"
+    if not manifest_path.is_file():
+        return {}, set()
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return {}, set()
+    candidates: dict[str, set[str]] = {}
+    listed: dict[str, set[str]] = {}
+    for entry in payload.values() if isinstance(payload, dict) else []:
+        if not isinstance(entry, dict) or not entry.get("file_id") or not entry.get("relpath"):
+            continue
+        current_rel = str(entry["relpath"])
+        current = account_root / "assets" / current_rel
+        if not current.is_file():
+            continue
+        native_id = str(entry["file_id"])
+        candidates.setdefault(current_rel, set()).add(native_id)
+        for previous_rel in entry.get("previous_relpaths") or []:
+            listed.setdefault(str(previous_rel), set()).add(native_id)
+            previous = account_root / "assets" / str(previous_rel)
+            if previous.is_file() and _sha256_file(previous) == _sha256_file(current):
+                candidates.setdefault(str(previous_rel), set()).add(native_id)
+    unique = {
+        f"assets/{relpath}": next(iter(native_ids))
+        for relpath, native_ids in candidates.items()
+        if len(native_ids) == 1
+    }
+    duplicates = {
+        f"assets/{relpath}"
+        for relpath, native_ids in candidates.items()
+        if len(native_ids) > 1 and native_ids == listed.get(relpath)
+    }
+    return unique, duplicates
+
+
 def _filesystem_evidence(data_root: Path) -> list[RepresentationEvidence]:
     evidence: list[RepresentationEvidence] = []
     perplexity_duplicate_ids: dict[tuple[str, str], str] = {}
+    qwen_manifest_ids: dict[tuple[str, str], str] = {}
+    qwen_verified_duplicates: set[tuple[str, str]] = set()
     for account, account_root in iter_account_roots(data_root / "merged" / "Perplexity"):
         perplexity_duplicate_ids.update({
             (account, slug): native_id
             for slug, native_id in _perplexity_verified_duplicate_ids(account_root).items()
         })
+    for account, account_root in iter_account_roots(data_root / "merged" / "Qwen"):
+        manifest_ids, verified_duplicates = _qwen_verified_manifest_lineage(account_root)
+        qwen_manifest_ids.update({
+            (account, logical): native_id
+            for logical, native_id in manifest_ids.items()
+        })
+        qwen_verified_duplicates.update(
+            (account, logical) for logical in verified_duplicates
+        )
     for layer in ("raw", "merged"):
         for source in KNOWN_PLATFORMS:
             source_root = data_root / layer / source
@@ -220,6 +286,8 @@ def _filesystem_evidence(data_root: Path) -> list[RepresentationEvidence]:
                 # Default-root traversal also sees account-* children. Assigning
                 # from the path keeps each physical file in exactly one scope.
                 kind = _kind_for_file(path, source_root, source)
+                if source == "Qwen" and (account, logical) in qwen_verified_duplicates:
+                    kind = "verified_duplicate_representation"
                 if kind == "notebooklm_note_materialization":
                     try:
                         lines = path.read_text(encoding="utf-8").splitlines()
@@ -239,7 +307,11 @@ def _filesystem_evidence(data_root: Path) -> list[RepresentationEvidence]:
                 # distinguished from genuinely uncovered content. Other
                 # sources may use native IDs and are left unchanged here.
                 native_id = None
-                if source in {"Gemini", "Qwen"} and kind == "preserved_binary":
+                if source == "Qwen" and kind == "preserved_binary":
+                    native_id = qwen_manifest_ids.get((account, logical))
+                    if native_id is None:
+                        native_id = f"sha256:{_sha256_file(path)}"
+                elif source == "Gemini" and kind == "preserved_binary":
                     native_id = f"sha256:{_sha256_file(path)}"
                 elif source == "Perplexity" and kind == "preserved_binary":
                     native_id = perplexity_duplicate_ids.get((account, path.stem))
@@ -768,6 +840,8 @@ def reconcile_asset_coverage(
                 "eligible_uncovered" if count == 0 or not path_is_covered else
                 "unresolved",
             ))
+        elif item.representation_kind == "verified_duplicate_representation":
+            findings.append(CoverageFinding(item, "duplicate_representation"))
         elif matches:
             findings.append(CoverageFinding(item, "excluded", matches[0].get("disposition")))
         elif item.representation_kind in {"capture_log", "operational_record"}:
@@ -775,6 +849,129 @@ def reconcile_asset_coverage(
         else:
             findings.append(CoverageFinding(item, "unresolved"))
     return findings
+
+
+def _source_key(value: object) -> str:
+    return "".join(ch for ch in str(value).lower() if ch.isalnum())
+
+
+def _account_key(value: object) -> str | None:
+    return None if pd.isna(value) else str(value)
+
+
+def build_coverage_report(
+    evidence: Iterable[RepresentationEvidence],
+    assets: pd.DataFrame,
+    links: pd.DataFrame,
+    policy: Sequence[Mapping[str, str]] = (),
+    *,
+    data_root: Path | None = None,
+) -> CoverageReport:
+    """Build the invariant report without weakening source-specific policy."""
+    evidence_rows = list(evidence)
+    findings = tuple(reconcile_asset_coverage(evidence_rows, assets, links, policy))
+    ambiguous = sum(len(_policy_matches(item, policy)) > 1 for item in evidence_rows)
+
+    asset_rows_by_path: dict[str, set[tuple[str, str | None, str]]] = {}
+    asset_keys: set[tuple[str, str | None, str]] = set()
+    integrity_by_scope = {
+        "web": {"ambiguous_policy_matches": 0, "available_path_failures": 0,
+                "unresolved_asset_links": 0, "eligible_identity_failures": 0},
+        "cli": {"ambiguous_policy_matches": 0, "available_path_failures": 0,
+                "unresolved_asset_links": 0, "eligible_identity_failures": 0},
+    }
+    for item in evidence_rows:
+        if len(_policy_matches(item, policy)) > 1:
+            scope = "web" if item.source in WEB_PLATFORMS else "cli"
+            integrity_by_scope[scope]["ambiguous_policy_matches"] += 1
+
+    available_path_failures = 0
+    for row in assets.itertuples(index=False):
+        key = (_source_key(row.source), _account_key(row.account_id), str(row.asset_id))
+        asset_keys.add(key)
+        path_value = None if pd.isna(row.asset_path) else str(row.asset_path)
+        if path_value:
+            asset_rows_by_path.setdefault(path_value, set()).add(key)
+        if bool(row.is_binary_available):
+            if not path_value or data_root is None or not (Path(data_root) / path_value).is_file():
+                available_path_failures += 1
+                scope = "web" if any(_source_key(row.source) == _source_key(source) for source in WEB_PLATFORMS) else "cli"
+                integrity_by_scope[scope]["available_path_failures"] += 1
+
+    eligible_identity_failures = 0
+    ambiguous_evidence_ids: set[int] = set()
+    eligible_kinds = {
+        "preserved_binary", "notebooklm_note_materialization",
+        "embedded_attachment", "native_file_record", "generated_artifact_record",
+    }
+    for item in evidence_rows:
+        if item.representation_kind not in eligible_kinds:
+            continue
+        identities = set(asset_rows_by_path.get(item.binary_path or "", set()))
+        if not identities and item.native_id:
+            identities = {
+                key for key in asset_keys
+                if key[0] == _source_key(item.source) and key[2] == item.native_id
+            }
+        if len(identities) != 1:
+            eligible_identity_failures += 1
+            scope = "web" if item.source in WEB_PLATFORMS else "cli"
+            integrity_by_scope[scope]["eligible_identity_failures"] += 1
+            if len(identities) > 1:
+                ambiguous_evidence_ids.add(id(item))
+
+    if ambiguous_evidence_ids:
+        findings = tuple(
+            CoverageFinding(row.evidence, "unresolved")
+            if id(row.evidence) in ambiguous_evidence_ids else row
+            for row in findings
+        )
+
+    unresolved_links = 0
+    for row in links.itertuples(index=False):
+        key = (_source_key(row.source), _account_key(row.account_id), str(row.asset_id))
+        if key not in asset_keys:
+            unresolved_links += 1
+            scope = "web" if any(_source_key(row.source) == _source_key(source) for source in WEB_PLATFORMS) else "cli"
+            integrity_by_scope[scope]["unresolved_asset_links"] += 1
+
+    return CoverageReport(
+        findings=findings,
+        web_sources=tuple(WEB_PLATFORMS),
+        cli_sources=tuple(source for source in KNOWN_PLATFORMS if source in CLI_PLATFORMS),
+        ambiguous_policy_matches=ambiguous,
+        available_path_failures=available_path_failures,
+        unresolved_asset_links=unresolved_links,
+        eligible_identity_failures=eligible_identity_failures,
+        accounting_failures=abs(len(evidence_rows) - len(findings)),
+        scope_integrity=integrity_by_scope,
+    )
+
+
+def _assert_scope_coverage(report: CoverageReport, sources: set[str], label: str) -> None:
+    scoped = [row for row in report.findings if row.evidence.source in sources]
+    failures = {
+        "eligible_uncovered": sum(row.status == "eligible_uncovered" for row in scoped),
+        "unresolved": sum(row.status == "unresolved" for row in scoped),
+        **report.scope_integrity[label.lower()],
+        "accounting_failures": report.accounting_failures,
+    }
+    failed = {name: count for name, count in failures.items() if count}
+    if failed:
+        details = ", ".join(f"{name}={count}" for name, count in failed.items())
+        raise AssertionError(f"{label} preserved-file coverage failed: {details}")
+
+
+def assert_preserved_web_file_coverage(report: CoverageReport) -> None:
+    if set(report.web_sources) != set(WEB_PLATFORMS):
+        raise AssertionError(f"web source census is incomplete: {len(report.web_sources)}/9")
+    _assert_scope_coverage(report, set(WEB_PLATFORMS), "web")
+
+
+def assert_preserved_cli_session_asset_coverage(report: CoverageReport) -> None:
+    if set(report.cli_sources) != set(CLI_PLATFORMS):
+        raise AssertionError(f"CLI source census is incomplete: {len(report.cli_sources)}/4")
+    _assert_scope_coverage(report, set(CLI_PLATFORMS), "CLI")
 
 
 def _secret_hash(value: str | None) -> str | None:
@@ -816,17 +1013,51 @@ def summarize_findings(findings: Iterable[CoverageFinding]) -> dict[str, object]
     }
 
 
+def _check_block(report: CoverageReport, scope: str) -> dict[str, int]:
+    sources = set(WEB_PLATFORMS if scope == "web" else CLI_PLATFORMS)
+    scoped = [row for row in report.findings if row.evidence.source in sources]
+    return {
+        f"{scope}_sources": len(report.web_sources if scope == "web" else report.cli_sources),
+        "eligible_uncovered": sum(row.status == "eligible_uncovered" for row in scoped),
+        "unresolved": sum(row.status == "unresolved" for row in scoped),
+        "ambiguous_policy_matches": report.scope_integrity[scope]["ambiguous_policy_matches"],
+        "available_path_failures": report.scope_integrity[scope]["available_path_failures"],
+        "unresolved_asset_links": report.scope_integrity[scope]["unresolved_asset_links"],
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-root", type=Path, default=Path("data"))
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--check", action="store_true")
     args = parser.parse_args(argv)
     assets = pd.read_parquet(args.data_root / "unified/assets.parquet")
     links = pd.read_parquet(args.data_root / "unified/asset_links.parquet")
-    findings = reconcile_asset_coverage(
-        inventory_preserved_session_assets(args.data_root), assets, links, load_policy()
+    report = build_coverage_report(
+        inventory_preserved_session_assets(args.data_root), assets, links,
+        load_policy(), data_root=args.data_root,
     )
-    summary = summarize_findings(findings)
+    summary = summarize_findings(report.findings)
+    if args.check:
+        blocks = {scope: _check_block(report, scope) for scope in ("web", "cli")}
+        if args.json:
+            print(json.dumps(blocks, indent=2, sort_keys=True))
+        else:
+            for scope, block in blocks.items():
+                print(f"[{scope}]")
+                for name, value in block.items():
+                    print(f"{name}={value}")
+        failures = []
+        for assertion in (
+            assert_preserved_web_file_coverage,
+            assert_preserved_cli_session_asset_coverage,
+        ):
+            try:
+                assertion(report)
+            except AssertionError as exc:
+                failures.append(str(exc))
+        return 1 if failures else 0
     print(json.dumps(summary, indent=2, sort_keys=True) if args.json else summary)
     return 0
 

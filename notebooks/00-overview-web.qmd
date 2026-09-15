@@ -4,6 +4,8 @@ subtitle: "Subset: 9 web platforms (ChatGPT, Claude.ai, Perplexity, Qwen, DeepSe
 jupyter: python3
 ---
 
+This profile uses the published `preserved_web_files` coverage contract.
+
 ```{python}
 #| label: setup
 #| code-summary: "Setup — paths, DuckDB connection, helpers"

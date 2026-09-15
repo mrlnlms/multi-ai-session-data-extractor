@@ -42,6 +42,7 @@ suas tres contas por default; os demais comandos preservam seus defaults.
 | Servir relatorios | `python -m src.workflows.serve_reports open` | Depois de renderizar os HTMLs Quarto |
 | Snapshot de configuracoes CLI | `python -m src.capture.cli.snapshot` | Preservar versoes sanitizadas de skills, hooks e configuracoes locais |
 | Sync de uma conta | `python -m src.workflows.account_sync ACCOUNT_ID` | Preview por UUID; `--apply` executa sync + parse, sem unify/publicacao |
+| Validar cobertura de arquivos | `python -m src.operations.asset_coverage_audit --check` | Gate pre-publicacao independente para as 9 fontes web e as 4 CLIs; retorno diferente de zero indica gap |
 
 ## Operacoes de conta
 

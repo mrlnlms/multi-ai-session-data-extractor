@@ -127,12 +127,14 @@ extractor → reconciler → parser → unify
    `Conversation`, `Message`, `ToolEvent`, `Branch` (and auxiliaries such as
    `Asset`, `AssetLink`, `ProjectDoc`, and `NotebookLMOutput`). The unified asset
    index covers all nine web sources: Grok, Kimi, Qwen, Gemini, ChatGPT,
-   Claude.ai, DeepSeek, Perplexity, and NotebookLM. Its scope is partial
-   preserved-file coverage, not a complete
-   inventory of every file representation in the archive; the
+   Claude.ai, DeepSeek, Perplexity, and NotebookLM. Its published web scope is
+   `preserved_web_files`: every eligible file representation preserved in
+   raw/merged is either represented by a canonical Asset or matched by an
+   approved, auditable exclusion rule. The
    [source-by-source matrix](docs/extractor-engineering/asset-coverage.md)
    records relationship precision, local availability, and deliberate gaps.
-   CLI session-file coverage is reported separately: Claude Code and Codex
+   CLI session-file scope is independently published as
+   `preserved_cli_session_assets`: Claude Code and Codex
    publish embedded user images, Antigravity publishes explicit generated
    artifacts, and the current Gemini CLI archive has no eligible session file.
    Web rows carry the immutable catalog UUID in `account_id`; the legacy

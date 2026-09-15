@@ -86,12 +86,29 @@ The current archive materializes 367 distinct assets: 294 user uploads, 54
 assistant-generated outputs, and 19 project sources. Each has one evidenced
 link: uploads and generated outputs resolve to their exact input/output message,
 while project files resolve to the matching `ProjectDoc` with `role=context`.
-All 367 binaries are locally available. Seven additional PNG paths are verified
+All 367 Asset rows carry a locally resolving path, subject to the collision
+qualification below. Seven additional PNG paths are verified
 same-account, byte-identical physical copies of generated outputs whose canonical
 identity is already their SHA-256 content digest; the coverage audit reports
 them as `duplicate_representation`, not missing Assets. Existing
 `Message.asset_paths` and `ProjectDoc` rows remain intact for compatibility and
 domain-specific analysis.
+
+The Task 7 identity invariant exposed and closed a separate historical
+collision: 104 native upload identities in the default account's manifest had
+reused 11 physical paths. The downloader now keeps the readable filename plus
+a deterministic hash of the stable native `file_id`, so rotated URLs reuse the
+same destination while distinct IDs cannot collide. A recovery run wrote 293
+collision-safe files without overwriting the legacy tree; this included every
+identity in the 11 ambiguous groups. The manifest retains old-path lineage.
+Two separately recaptured, byte-identical uploads shared one legacy text path;
+that old copy and 199 other byte-proven legacy paths are reported as duplicate
+representations. Together with the seven generated-output duplicates described
+above, Qwen now has 367 covered canonical Assets, 207 verified physical
+duplicates, zero eligible-uncovered and zero unresolved findings.
+This source result contributes to the green nine-source gate that publishes the
+archive-wide `preserved_web_files` scope; the 207 physical duplicates remain
+preserved and are accounted for rather than silently removed.
 
 ## Descriptive Quarto
 

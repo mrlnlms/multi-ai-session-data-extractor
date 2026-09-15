@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -7,6 +8,9 @@ import pytest
 from src.operations.asset_coverage_audit import (
     CoverageFinding,
     RepresentationEvidence,
+    assert_preserved_cli_session_asset_coverage,
+    assert_preserved_web_file_coverage,
+    build_coverage_report,
     inventory_preserved_session_assets,
     iter_account_roots,
     load_policy,
@@ -14,7 +18,7 @@ from src.operations.asset_coverage_audit import (
     redacted_finding,
     summarize_findings,
 )
-from src.platforms.registry import KNOWN_PLATFORMS
+from src.platforms.registry import KNOWN_PLATFORMS, WEB_PLATFORMS
 
 
 def _fixture_archive(tmp_path: Path) -> Path:
@@ -320,6 +324,50 @@ def test_qwen_content_duplicate_in_default_account_is_not_uncovered(tmp_path):
     assert statuses[duplicate_item.binary_path] == "duplicate_representation"
 
 
+def test_qwen_legacy_path_uses_manifest_lineage_only_when_bytes_match(tmp_path):
+    data = tmp_path / "data"
+    root = data / "merged" / "Qwen"
+    assets_dir = root / "assets" / "conv"
+    assets_dir.mkdir(parents=True)
+    legacy = assets_dir / "image.png"
+    current = assets_dir / "image__safe.png"
+    legacy.write_bytes(b"same")
+    current.write_bytes(b"same")
+    (root / "assets_manifest.json").write_text(json.dumps({"entry": {
+        "file_id": "native-1", "relpath": "conv/image__safe.png",
+        "previous_relpaths": ["conv/image.png"],
+    }}))
+    evidence = inventory_preserved_session_assets(data)
+    by_name = {Path(item.binary_path).name: item for item in evidence if item.binary_path}
+    assert by_name["image.png"].native_id == "native-1"
+    assert by_name["image__safe.png"].native_id == "native-1"
+
+    legacy.write_bytes(b"different")
+    evidence = inventory_preserved_session_assets(data)
+    by_name = {Path(item.binary_path).name: item for item in evidence if item.binary_path}
+    assert by_name["image.png"].native_id.startswith("sha256:")
+
+
+def test_qwen_legacy_path_can_prove_duplicate_of_repeated_identical_upload(tmp_path):
+    data = tmp_path / "data"
+    root = data / "merged" / "Qwen"
+    assets_dir = root / "assets" / "conv"
+    assets_dir.mkdir(parents=True)
+    for name in ("legacy.txt", "first__safe.txt", "second__safe.txt"):
+        (assets_dir / name).write_bytes(b"identical upload")
+    (root / "assets_manifest.json").write_text(json.dumps({
+        "first": {"file_id": "native-1", "relpath": "conv/first__safe.txt",
+                  "previous_relpaths": ["conv/legacy.txt"]},
+        "second": {"file_id": "native-2", "relpath": "conv/second__safe.txt",
+                   "previous_relpaths": ["conv/legacy.txt"]},
+    }))
+    evidence = inventory_preserved_session_assets(data)
+    legacy = next(item for item in evidence if item.evidence_path.endswith("legacy.txt"))
+    assert legacy.representation_kind == "verified_duplicate_representation"
+    [finding] = reconcile_asset_coverage([legacy], pd.DataFrame(), pd.DataFrame())
+    assert finding.status == "duplicate_representation"
+
+
 def test_perplexity_duplicate_requires_native_lineage_and_identical_bytes(tmp_path):
     data = tmp_path / "data"
     root = data / "merged" / "Perplexity"
@@ -375,13 +423,18 @@ def test_perplexity_verified_identity_still_deduplicates_raw_and_merged(tmp_path
         {"asset_id": "native-1", "asset_slug": "old-slug"},
         {"asset_id": "native-1", "asset_slug": "current-slug"},
     ]
-    for layer in ("raw", "merged"):
-        root = data / layer / "Perplexity" / "assets"
-        files = root / "files"
-        files.mkdir(parents=True)
-        (files / "old-slug.md").write_bytes(b"same artifact")
-        (files / "current-slug.md").write_bytes(b"same artifact")
-        (root / "_index.json").write_text(json.dumps(rows))
+    raw_root = data / "raw" / "Perplexity" / "assets"
+    raw_files = raw_root / "files"
+    raw_files.mkdir(parents=True)
+    (raw_files / "old-slug.md").write_bytes(b"same artifact")
+    (raw_files / "current-slug.md").write_bytes(b"same artifact")
+    (raw_root / "_index.json").write_text(json.dumps(rows))
+    merged_root = data / "merged" / "Perplexity" / "assets"
+    merged_files = merged_root / "files"
+    merged_files.mkdir(parents=True)
+    for name in ("old-slug.md", "current-slug.md"):
+        os.link(raw_files / name, merged_files / name)
+    os.link(raw_root / "_index.json", merged_root / "_index.json")
 
     evidence = inventory_preserved_session_assets(data)
     binaries = [item for item in evidence if item.binary_path]
@@ -467,3 +520,98 @@ def test_antigravity_explicit_artifact_record_is_eligible(tmp_path):
     assert item.message_id == "conv_step_2"
     [finding] = reconcile_asset_coverage([item], pd.DataFrame(), pd.DataFrame())
     assert finding.status == "eligible_uncovered"
+
+
+def _asset_frame(item, *, available=True, rows=1):
+    return pd.DataFrame({
+        "source": [item.source.lower().replace(".", "_").replace(" ", "_")] * rows,
+        "account_id": [None] * rows,
+        "asset_id": [f"{item.native_id or 'asset'}-{index}" for index in range(rows)],
+        "asset_path": [item.binary_path] * rows,
+        "is_binary_available": [available] * rows,
+    })
+
+
+def test_report_requires_exactly_one_identity_for_eligible_binary(tmp_path):
+    path = tmp_path / "raw/ChatGPT/assets/file.bin"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"x")
+    item = RepresentationEvidence(
+        "ChatGPT", "default", "preserved_binary",
+        "raw/ChatGPT/assets/file.bin", "native", "raw/ChatGPT/assets/file.bin",
+        None, None, None, "input",
+    )
+    report = build_coverage_report(
+        [item], _asset_frame(item, rows=2), pd.DataFrame(), data_root=tmp_path
+    )
+    assert sum(row.status == "unresolved" for row in report.findings) == 1
+    with pytest.raises(AssertionError, match="unresolved=1"):
+        assert_preserved_web_file_coverage(report)
+
+
+def test_report_rejects_available_asset_without_physical_file(tmp_path):
+    item = RepresentationEvidence(
+        "ChatGPT", "default", "preserved_binary", "raw/ChatGPT/assets/x",
+        "native", "raw/ChatGPT/assets/x", None, None, None, None,
+    )
+    report = build_coverage_report(
+        [item], _asset_frame(item), pd.DataFrame(), data_root=tmp_path
+    )
+    with pytest.raises(AssertionError, match="available_path_failures=1"):
+        assert_preserved_web_file_coverage(report)
+
+
+def test_report_permits_metadata_only_asset_and_repeated_links(tmp_path):
+    item = RepresentationEvidence(
+        "DeepSeek", "default", "native_file_record", "merged/DeepSeek/x.json",
+        "native", None, "c", "m", None, "input",
+    )
+    assets = _asset_frame(item, available=False).assign(asset_id="native")
+    links = pd.DataFrame({
+        "source": ["deepseek", "deepseek"], "account_id": [None, None],
+        "asset_id": ["native", "native"],
+    })
+    report = build_coverage_report([item], assets, links, data_root=tmp_path)
+    assert_preserved_web_file_coverage(report)
+
+
+def test_report_keeps_nine_web_and_four_cli_sources_when_empty(tmp_path):
+    columns = ["source", "account_id", "asset_id", "asset_path", "is_binary_available"]
+    report = build_coverage_report(
+        [], pd.DataFrame(columns=columns),
+        pd.DataFrame(columns=["source", "account_id", "asset_id"]),
+        data_root=tmp_path,
+    )
+    assert set(report.web_sources) == set(WEB_PLATFORMS)
+    assert len(report.web_sources) == 9
+    assert len(report.cli_sources) == 4
+    assert_preserved_web_file_coverage(report)
+    assert_preserved_cli_session_asset_coverage(report)
+
+
+def test_report_scopes_web_and_cli_failures_independently(tmp_path):
+    item = RepresentationEvidence(
+        "ChatGPT", "default", "preserved_binary", "raw/ChatGPT/assets/x",
+        None, "raw/ChatGPT/assets/x", None, None, None, None,
+    )
+    columns = ["source", "account_id", "asset_id", "asset_path", "is_binary_available"]
+    report = build_coverage_report(
+        [item], pd.DataFrame(columns=columns),
+        pd.DataFrame(columns=["source", "account_id", "asset_id"]),
+        data_root=tmp_path,
+    )
+    with pytest.raises(AssertionError, match="eligible_uncovered=1"):
+        assert_preserved_web_file_coverage(report)
+    assert_preserved_cli_session_asset_coverage(report)
+
+
+def test_report_rejects_unresolved_asset_link(tmp_path):
+    assets = pd.DataFrame(columns=[
+        "source", "account_id", "asset_id", "asset_path", "is_binary_available",
+    ])
+    links = pd.DataFrame({
+        "source": ["codex"], "account_id": [None], "asset_id": ["missing"],
+    })
+    report = build_coverage_report([], assets, links, data_root=tmp_path)
+    with pytest.raises(AssertionError, match="unresolved_asset_links=1"):
+        assert_preserved_cli_session_asset_coverage(report)

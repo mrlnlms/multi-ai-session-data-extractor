@@ -24,7 +24,8 @@ define as regras de trabalho para agentes.
   validacao cross-platform, [limites conhecidos](extractor-engineering/known-limitations.md)
   [cobertura canonica de assets](extractor-engineering/asset-coverage.md) e
   [termos de captura](extractor-engineering/glossary.md), alem dos documentos
-  tecnicos por plataforma.
+  tecnicos por plataforma. O contrato publica separadamente os escopos
+  `preserved_web_files` e `preserved_cli_session_assets`.
 - [product/](product/) — mapa da arquitetura da aplicacao e da transicao entre
   dashboard, leitor, curadoria e analise exploratoria; aponta para a visao do
   produto, a arquitetura de contas e o contrato do leitor.
