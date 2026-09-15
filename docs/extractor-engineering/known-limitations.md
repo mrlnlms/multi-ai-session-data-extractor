@@ -1,7 +1,7 @@
 # Known limitations
 
 Honest list of what **does not work** or **has not been validated**. Updated
-on 2026-05-04.
+on 2026-09-14.
 
 Limitations fall into 3 categories:
 
@@ -215,8 +215,10 @@ These validations require a Pro Max account and remain open until someone tests:
 
 ## Cross-platform assets
 
-- **The unified asset index is intentionally partial.** Its current coverage
-  covers Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai, Perplexity, and NotebookLM. ChatGPT project
+- **The unified asset index is intentionally partial.** The exact counts,
+  relationship rates, reader capability and exclusions are maintained in the
+  [source-by-source coverage matrix](asset-coverage.md). Its current coverage
+  spans Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai, Perplexity, and NotebookLM. ChatGPT project
   sources/canvas/deep-research files and Claude.ai extracted artifacts are not
   yet indexed by the canonical asset graph; Claude inline `attachments` remain
   text-bearing message metadata rather than fake binaries. File representations,
@@ -226,6 +228,9 @@ These validations require a Pro Max account and remain open until someone tests:
   tables. Manifests and domain outputs from the other web sources remain preserved in
   their existing representations until source-specific adapters validate their
   identities and path semantics.
+- **DeepSeek has no canonical asset adapter yet.** Because one selected web
+  source and the representation-level gaps above remain open, the published
+  scope is not named `preserved_web_files`.
 
 ## Test coverage
 

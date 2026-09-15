@@ -22,7 +22,8 @@ define as regras de trabalho para agentes.
   [runbook de coleta web](operations/web-collection.md).
 - [extractor-engineering/](extractor-engineering/) — engenharia da captura,
   validacao cross-platform, [limites conhecidos](extractor-engineering/known-limitations.md)
-  e [termos de captura](extractor-engineering/glossary.md), alem dos documentos
+  [cobertura canonica de assets](extractor-engineering/asset-coverage.md) e
+  [termos de captura](extractor-engineering/glossary.md), alem dos documentos
   tecnicos por plataforma.
 - [product/](product/) — mapa da arquitetura da aplicacao e da transicao entre
   dashboard, leitor, curadoria e analise exploratoria; aponta para a visao do

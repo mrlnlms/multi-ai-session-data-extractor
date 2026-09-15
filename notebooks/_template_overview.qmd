@@ -17,7 +17,7 @@ subset like Web Chat / CLI / RAG).
 _rows = []
 for table in ["conversations","messages","tool_events","branches",
               "sources","notes","outputs","guide_questions","source_guides",
-              "project_metadata","project_docs"]:
+              "project_metadata","project_docs","assets","asset_links"]:
     n = table_count(con, table)
     if n:
         _rows.append({"Table": f"{table}.parquet", "Rows": fmt_int(n)})
@@ -37,7 +37,7 @@ _last = _period["last_update"].iloc[0]
 
 _meta_rows = [
     {"Field": "Subset", "Value": SUBSET_TITLE},
-    {"Field": "Sources included", "Value": ", ".join(SOURCES_FILTER) if SOURCES_FILTER else "all (10)"},
+    {"Field": "Sources included", "Value": ", ".join(SOURCES_FILTER) if SOURCES_FILTER else "all (13)"},
     {"Field": "Creation period", "Value": f"{_oldest:%Y-%m-%d} → {_newest:%Y-%m-%d}" if pd.notna(_oldest) else "—"},
     {"Field": "Last update", "Value": f"{_last:%Y-%m-%d %H:%M}" if pd.notna(_last) else "—"},
 ]
@@ -53,6 +53,39 @@ if has_col(con, "conversations", "account_id"):
         "Value": f"{_account_count} · {fmt_pct(_account_covered, table_count(con, 'conversations'))} coverage",
     })
 show_df(pd.DataFrame(_meta_rows))
+```
+
+## Canonical asset graph
+
+The graph is partial preserved-file coverage. It does not claim every file
+representation in every source; see the maintained
+[source-by-source contract](../docs/extractor-engineering/asset-coverage.md).
+
+```{python}
+#| label: asset-coverage-cross
+
+if table_count(con, "assets") > 0:
+    _asset_coverage = con.execute("""
+        WITH linked AS (
+            SELECT DISTINCT source, account_id, asset_id
+            FROM asset_links
+        )
+        SELECT
+            a.source AS platform,
+            COUNT(*) AS assets,
+            SUM(a.is_binary_available::INT) AS available,
+            COUNT(*) - SUM(a.is_binary_available::INT) AS missing,
+            COUNT(l.asset_id) AS linked_assets,
+            ROUND(100.0 * COUNT(l.asset_id) / COUNT(*), 1) AS linked_pct
+        FROM assets a
+        LEFT JOIN linked l
+          ON a.source = l.source
+         AND a.account_id IS NOT DISTINCT FROM l.account_id
+         AND a.asset_id = l.asset_id
+        GROUP BY a.source
+        ORDER BY assets DESC
+    """).df()
+    show_df(_asset_coverage)
 ```
 
 # 1. Platform × metrics comparison

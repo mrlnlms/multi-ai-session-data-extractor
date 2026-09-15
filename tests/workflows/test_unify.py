@@ -334,6 +334,110 @@ def test_asset_source_link_resolves_against_project_docs(tmp_path):
     unify_module._validate_asset_integrity(frames, tmp_path)
 
 
+def test_asset_integrity_rejects_unresolved_non_object_relationships(tmp_path):
+    account_id = "810f3e91-ae10-5cb1-931a-53b80630af16"
+    frames = {
+        "conversations": pd.DataFrame({
+            "source": ["chatgpt"], "account_id": [account_id],
+            "conversation_id": ["conversation-1"],
+        }),
+        "messages": pd.DataFrame({
+            "source": ["chatgpt"], "account_id": [account_id],
+            "conversation_id": ["conversation-1"], "message_id": ["message-1"],
+        }),
+        "project_metadata": pd.DataFrame({
+            "source": ["chatgpt"], "account_id": [account_id],
+            "project_id": ["project-1"],
+        }),
+        "assets": pd.DataFrame({
+            "asset_id": ["asset-1"], "source": ["chatgpt"],
+            "account_id": [account_id], "asset_origin": ["user"],
+            "is_model_generated": [False], "asset_path": [None],
+            "is_binary_available": [False], "metadata_json": [None],
+        }),
+        "asset_links": pd.DataFrame({
+            "asset_link_id": ["link-1"], "source": ["chatgpt"],
+            "account_id": [account_id], "asset_id": ["asset-1"],
+            "object_type": ["message"], "object_id": ["message-1"],
+            "conversation_id": ["conversation-1"], "message_id": ["message-1"],
+            "project_id": ["project-1"], "role": ["input"],
+            "ordinal": [0], "content_block_index": [0], "metadata_json": [None],
+        }),
+    }
+
+    for field, value, match in [
+        ("conversation_id", "missing-conversation", "conversation_id"),
+        ("message_id", "missing-message", "message_id"),
+        ("project_id", "missing-project", "project_id"),
+    ]:
+        broken = {name: frame.copy() for name, frame in frames.items()}
+        broken["asset_links"].loc[0, field] = value
+        with pytest.raises(ValueError, match=match):
+            unify_module._validate_asset_integrity(broken, tmp_path)
+
+
+@pytest.mark.parametrize("field", ["ordinal", "content_block_index"])
+def test_asset_integrity_rejects_negative_link_positions(tmp_path, field):
+    account_id = "810f3e91-ae10-5cb1-931a-53b80630af16"
+    frames = {
+        "conversations": pd.DataFrame({
+            "source": ["kimi"], "account_id": [account_id],
+            "conversation_id": ["conversation-1"],
+        }),
+        "messages": pd.DataFrame({
+            "source": ["kimi"], "account_id": [account_id],
+            "conversation_id": ["conversation-1"], "message_id": ["message-1"],
+        }),
+        "assets": pd.DataFrame({
+            "asset_id": ["asset-1"], "source": ["kimi"], "account_id": [account_id],
+            "asset_origin": ["unknown"], "is_model_generated": [None],
+            "asset_path": [None], "is_binary_available": [False], "metadata_json": [None],
+        }),
+        "asset_links": pd.DataFrame({
+            "asset_link_id": ["link-1"], "source": ["kimi"], "account_id": [account_id],
+            "asset_id": ["asset-1"], "object_type": ["message"],
+            "object_id": ["message-1"], "conversation_id": ["conversation-1"],
+            "message_id": ["message-1"], "project_id": [None], "role": ["input"],
+            "ordinal": [0], "content_block_index": [0], "metadata_json": [None],
+        }),
+    }
+    frames["asset_links"].loc[0, field] = -1
+    with pytest.raises(ValueError, match=field):
+        unify_module._validate_asset_integrity(frames, tmp_path)
+
+
+@pytest.mark.parametrize("table,column", [
+    ("assets", "file_name"),
+    ("asset_links", "metadata_json"),
+])
+def test_asset_integrity_rejects_signed_query_material_in_any_graph_string(
+    tmp_path, table, column
+):
+    account_id = "810f3e91-ae10-5cb1-931a-53b80630af16"
+    frames = {
+        "conversations": pd.DataFrame({
+            "source": ["grok"], "account_id": [account_id],
+            "conversation_id": ["conversation-1"],
+        }),
+        "assets": pd.DataFrame({
+            "asset_id": ["asset-1"], "source": ["grok"], "account_id": [account_id],
+            "asset_origin": ["user"], "is_model_generated": [False],
+            "file_name": ["safe.png"], "asset_path": [None],
+            "is_binary_available": [False], "metadata_json": [None],
+        }),
+        "asset_links": pd.DataFrame({
+            "asset_link_id": ["link-1"], "source": ["grok"], "account_id": [account_id],
+            "asset_id": ["asset-1"], "object_type": ["conversation"],
+            "object_id": ["conversation-1"], "conversation_id": ["conversation-1"],
+            "message_id": [None], "project_id": [None], "role": ["unknown"],
+            "ordinal": [None], "content_block_index": [None], "metadata_json": [None],
+        }),
+    }
+    frames[table].loc[0, column] = "https://example.test/file?X-Amz-Signature=secret"
+    with pytest.raises(ValueError, match="signed query"):
+        unify_module._validate_asset_integrity(frames, tmp_path)
+
+
 # === unify (end-to-end) ===
 
 

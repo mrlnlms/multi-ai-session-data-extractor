@@ -34,6 +34,18 @@ def _cached_processed_stats(parquet_path_str: str, mtime: float):
     return compute_processed_stats(Path(parquet_path_str))
 
 
+@st.cache_data(show_spinner=False)
+def _cached_asset_graph_stats(assets_path_str: str, links_path_str: str, mtimes: tuple):
+    assets = pd.read_parquet(assets_path_str, columns=["source", "is_binary_available"])
+    links = pd.read_parquet(links_path_str, columns=["asset_link_id"])
+    return {
+        "assets": len(assets),
+        "links": len(links),
+        "sources": assets["source"].nunique(),
+        "available": int(assets["is_binary_available"].fillna(False).sum()),
+    }
+
+
 def _quick_stats(state: PlatformState) -> tuple[int, int, int, "datetime | None"]:
     """Retorna (total, active, preserved, newest_update_time) — None/0 se sem dados.
     Prefere parquet canonico; fallback pro merged JSON (legacy ChatGPT)."""
@@ -188,6 +200,21 @@ def render(states: list[PlatformState]) -> None:
     st.subheader("Platforms")
     df = _platform_table(states)
     st.dataframe(df, hide_index=True, width="stretch")
+
+    project_root = Path(__file__).resolve().parents[2]
+    assets_path = project_root / "data" / "unified" / "assets.parquet"
+    links_path = project_root / "data" / "unified" / "asset_links.parquet"
+    if assets_path.is_file() and links_path.is_file():
+        asset_stats = _cached_asset_graph_stats(
+            str(assets_path), str(links_path),
+            (assets_path.stat().st_mtime, links_path.stat().st_mtime),
+        )
+        st.caption(
+            "Canonical asset graph: "
+            f"{asset_stats['assets']:,} assets · {asset_stats['links']:,} links · "
+            f"{asset_stats['available']:,} local binaries · "
+            f"{asset_stats['sources']}/9 web sources. Coverage is partial."
+        )
 
     st.caption("For details, pick a platform:")
     cols = st.columns(min(len(states), 4))

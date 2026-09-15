@@ -127,8 +127,10 @@ extractor → reconciler → parser → unify
    `Conversation`, `Message`, `ToolEvent`, `Branch` (and auxiliaries such as
    `Asset`, `AssetLink`, `ProjectDoc`, and `NotebookLMOutput`). The unified asset
    index covers Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai, Perplexity, and
-   NotebookLM; it is not yet a complete inventory of every file representation
-   in the archive.
+   NotebookLM. Its scope is partial preserved-file coverage, not a complete
+   inventory of every file representation in the archive; the
+   [source-by-source matrix](docs/extractor-engineering/asset-coverage.md)
+   records relationship precision, local availability, and deliberate gaps.
    Web rows carry the immutable catalog UUID in `account_id`; the legacy
    display `account` remains available. CLI and manual rows keep
    `account_id` null until a durable identity is observable.

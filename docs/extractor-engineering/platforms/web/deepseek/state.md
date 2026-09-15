@@ -18,6 +18,8 @@ projects (DeepSeek does not expose them).
 
 Binary assets are immutable and enter `merged` through a hardlink when the
 filesystem supports it, with a normal copy as the portability fallback.
+They do not yet have a validated canonical `assets`/`asset_links` adapter, so
+DeepSeek remains library-only in the archive-wide asset coverage matrix.
 
 ### Latest validated collection — 2026-08-30
 

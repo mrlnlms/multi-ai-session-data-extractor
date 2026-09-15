@@ -99,10 +99,13 @@ preservado, sem incorporar o binario. O caminho, quando disponivel, e relativo
 a `data/`; um binario ausente mantem sua linha com
 `is_binary_available=False`. `asset_origin` registra quem originou o arquivo
 (`user`, `assistant`, `platform`, `imported` ou `unknown`) sem confundir essa
-propriedade com o uso do arquivo em uma conversa. A cobertura unificada inicial e explicitamente
-`native_asset_catalogs`: Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai e Perplexity. Arquivos representados apenas em outras
-fontes serao incorporados por adaptadores posteriores, sem substituir tabelas
-de dominio como `project_docs` e os outputs do NotebookLM.
+propriedade com o uso do arquivo em uma conversa. A cobertura unificada e
+explicitamente parcial: Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai,
+Perplexity e NotebookLM publicam assets, mas isso ainda nao equivale a todos os
+arquivos preservados nas nove fontes web. A
+[matriz de cobertura](asset-coverage.md) registra por fonte as representacoes
+incluidas, excluidas e a capacidade do leitor. Adaptadores posteriores nao
+devem substituir tabelas de dominio como `project_docs` e outputs do NotebookLM.
 
 ### AssetLink
 

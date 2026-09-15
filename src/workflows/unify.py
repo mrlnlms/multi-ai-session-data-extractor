@@ -18,6 +18,7 @@ import argparse
 import logging
 from pathlib import Path
 import json
+import re
 
 from src.runtime.project import find_project_root
 
@@ -30,6 +31,12 @@ from src.schema.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+_SIGNED_QUERY_PATTERN = re.compile(
+    r"[?&](?:x-amz-[^=&]*|x-goog-[^=&]*|token|signature|sig|key|api[_-]?key|"
+    r"credential|authorization)=",
+    re.IGNORECASE,
+)
 
 
 # Tabelas canonicas + auxiliares + chave primaria composta pra dedup.
@@ -212,6 +219,17 @@ def _validate_asset_integrity(
         "signurl", "signed_url", "upstream_url",
     }
 
+    for table_name in ("assets", "asset_links"):
+        frame = frames.get(table_name)
+        if frame is None or frame.empty:
+            continue
+        for column in frame.columns:
+            for value in frame.loc[frame[column].notna(), column]:
+                if isinstance(value, str) and _SIGNED_QUERY_PATTERN.search(value):
+                    raise ValueError(
+                        f"{table_name}.{column} contains forbidden signed query material"
+                    )
+
     def metadata_values(value):
         if isinstance(value, dict):
             for nested in value.values():
@@ -284,6 +302,14 @@ def _validate_asset_integrity(
         (str(row.source), _identity(row.account_id), str(row.doc_id))
         for row in project_docs.itertuples(index=False)
     })
+    # NotebookLM notebooks use the canonical conversation ID as project ID;
+    # source rows provide a second authoritative project namespace.
+    project_keys.update(conversation_keys)
+    if not sources.empty and "project_id" in sources.columns:
+        project_keys.update({
+            (str(row.source), _identity(row.account_id), str(row.project_id))
+            for row in sources.loc[sources["project_id"].notna()].itertuples(index=False)
+        })
     outputs = frames.get("outputs", pd.DataFrame())
     output_keys = {
         (str(row.source), _identity(row.account_id), str(row.output_id))
@@ -305,9 +331,28 @@ def _validate_asset_integrity(
             raise ValueError("asset_link message_id requires conversation_id")
         if pd.notna(row.content_block_index) and _identity(row.message_id) is None:
             raise ValueError("asset_link content_block_index requires message_id")
+        for field in ("ordinal", "content_block_index"):
+            value = getattr(row, field, None)
+            if pd.notna(value) and int(value) < 0:
+                raise ValueError(f"asset_link {field} must be nonnegative")
         asset_key = (*prefix, str(row.asset_id))
         if asset_key not in asset_keys:
             raise ValueError(f"asset_link asset_id does not resolve: {asset_key}")
+        conversation_id = _identity(row.conversation_id)
+        if conversation_id is not None and (*prefix, conversation_id) not in conversation_keys:
+            raise ValueError(
+                f"asset_link conversation_id does not resolve: {(*prefix, conversation_id)}"
+            )
+        message_id = _identity(row.message_id)
+        if message_id is not None:
+            message_key = (*prefix, conversation_id, message_id)
+            if message_key not in message_keys:
+                raise ValueError(f"asset_link message_id does not resolve: {message_key}")
+        project_id = _identity(getattr(row, "project_id", None))
+        if project_id is not None and (*prefix, project_id) not in project_keys:
+            raise ValueError(
+                f"asset_link project_id does not resolve: {(*prefix, project_id)}"
+            )
         if row.object_type == "message":
             key = (*prefix, _identity(row.conversation_id), str(row.object_id))
             if key not in message_keys:
