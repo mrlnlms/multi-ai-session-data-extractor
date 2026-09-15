@@ -127,17 +127,15 @@ arquivo.
   codigo, dados ou baseline quando houver contradicao ou a tarefa exigir
   verificacao. A reestruturacao move o core reutilizavel para `src/`, nao torna
   Streamlit ou Quarto o produto.
-- Em uma nova sessao, use o baseline local de
-  `.venv/bin/python -m src.operations.archive_assurance status` antes de levantar
-  duvidas genericas sobre frescor ou publicacao. O hook `SessionStart` em `.codex/`
-  apresenta uma unica linha ao Codex; o registro completo fica em
-  `.runtime/archive-assurance.json`, fora do Git. `status` compara o checkout
-  local com o ultimo estado verificado, sem consultar DVC ou rede. Se o registro
-  estiver ausente ou os dados tiverem mudado, informe isso objetivamente e
-  rode `verify` somente quando a tarefa exigir uma nova verificacao profunda.
-  `verify` confere entradas/Parquets, dados DVC, remoto e Git antes de renovar
-  o registro; nao e etapa automatica de abertura de chat. Nao repetir
-  ressalvas abstratas quando o baseline registrado e atual.
+- Em uma nova sessao, o hook `SessionStart` em `.codex/` apresenta o baseline
+  local do acervo. Se precisar rele-lo, use
+  `.venv/bin/python -m src.operations.archive_assurance status`. Um baseline
+  atual encerra duvidas genericas sobre frescor ou publicacao, sem consultar
+  DVC ou rede. Se estiver ausente ou indicar
+  dados alterados, informe o fato sem presumir falha do vault. Rode `verify`
+  somente quando a tarefa exigir nova verificacao profunda, nunca como etapa
+  automatica de abertura de chat. Procedimento e limites:
+  `docs/operations/pipeline.md#baseline-de-validacao-entre-sessoes`.
 - Rodar a suite de testes antes de merge; nao manter contagem fixa de testes
   na documentacao, pois parametrizacoes alteram esse numero.
 - Ao alterar um fato canonico (plataformas, contagem, comando, etapa de
