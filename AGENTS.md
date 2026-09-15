@@ -14,10 +14,9 @@ extractor/copy -> raw -> reconciler -> merged -> parser -> processed -> unify ->
 
 Leia tambem `README.md`, `docs/README.md` e o
 `docs/extractor-engineering/platforms/<web|cli>/<source>/state.md` da fonte
-antes de alterar um extractor, reconciler ou parser. `CLAUDE.md` contem o guia
-autonomo equivalente para Claude Code. As regras compartilhadas devem ficar
-alinhadas; o estado observavel no codigo e nos dados prevalece sobre texto
-historico.
+antes de alterar um extractor, reconciler ou parser. O guia historico de Claude
+Code foi preservado em `private/CLAUDE.md`; o estado observavel no codigo e nos
+dados prevalece sobre texto historico.
 
 ## Principios de preservacao
 
@@ -122,12 +121,15 @@ arquivo.
   Streamlit e nos relatorios Quarto. O dashboard e iniciado por
   `PYTHONPATH=. .venv/bin/streamlit run dashboard/app.py`.
 - Nao declarar uma pipeline verde se o parquet for anterior ao raw/merged.
-- Para alinhar produto e roadmap, leia primeiro a linha de desenvolvimento em
-  `docs/ROADMAP.md`; aprofunde apenas a frente em pauta. A reestruturacao
-  move o core reutilizavel para `src/`, nao torna Streamlit ou Quarto o produto.
+- Para discutir prioridades ou planejar uma frente, consulte `docs/ROADMAP.md`
+  e aprofunde apenas o tema em pauta; nao e leitura obrigatoria ao iniciar toda
+  sessao. Use o status registrado ali como sinal normal de andamento e confira
+  codigo, dados ou baseline quando houver contradicao ou a tarefa exigir
+  verificacao. A reestruturacao move o core reutilizavel para `src/`, nao torna
+  Streamlit ou Quarto o produto.
 - Em uma nova sessao, use o baseline local de
-  `python -m src.operations.archive_assurance status` antes de levantar duvidas
-  genericas sobre frescor ou publicacao. O hook `SessionStart` em `.codex/`
+  `.venv/bin/python -m src.operations.archive_assurance status` antes de levantar
+  duvidas genericas sobre frescor ou publicacao. O hook `SessionStart` em `.codex/`
   apresenta uma unica linha ao Codex; o registro completo fica em
   `.runtime/archive-assurance.json`, fora do Git. `status` compara o checkout
   local com o ultimo estado verificado, sem consultar DVC ou rede. Se o registro

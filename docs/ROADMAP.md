@@ -2,10 +2,17 @@
 
 This is the operational index for outstanding work and important completed
 decisions. It intentionally links to the evidence and technical detail rather
-than duplicating it here. Shipped work belongs in `git log`; platform-specific
-behavior belongs in its own documentation.
+than duplicating it here. Completed work is marked here so its status can be
+read without searching Git history; implementation detail belongs in `git log`,
+and platform-specific behavior belongs in its own documentation.
 
 **Last reviewed:** 2026-09-15.
+
+For one-time work, use **planned**, **active**, or **completed**. Mark completion
+when closing the work, with its date and an evidence pointer when available.
+Ongoing operations and future exploration can use descriptive statuses instead.
+This index is the normal signal for planning; check observable state when it
+conflicts with the entry or the task requires a fresh verification.
 
 ## Current operational state
 
@@ -275,8 +282,10 @@ prerequisite.
 
 ### Reactivation and compatibility cycle
 
-**Status:** completed in the 2026-09-15 capture and DVC update; repeat only when
-a later snapshot is needed.
+**Status:** completed on 2026-09-15. The capture and DVC update were validated
+and published; the local archive assurance record in
+`.runtime/archive-assurance.json` holds the publication baseline. A later
+snapshot is a new operational cycle, not unfinished work from this one.
 
 For a later production snapshot, refresh each platform safely: start with
 discovery or `--dry-run`, run one source at a time, repair only extractors
