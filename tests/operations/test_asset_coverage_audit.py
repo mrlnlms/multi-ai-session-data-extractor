@@ -110,6 +110,66 @@ def test_claude_ai_memory_export_is_a_domain_record(tmp_path):
     assert item.representation_kind == "memory_export"
 
 
+def test_notebooklm_note_materialization_is_an_asset_candidate(tmp_path):
+    data = tmp_path / "data"
+    path = data / "merged" / "NotebookLM" / "account-1" / "assets/notes/notebook_note.md"
+    path.parent.mkdir(parents=True)
+    path.write_text("# Note\n\nActual note content")
+
+    [item] = inventory_preserved_session_assets(data)
+    assert item.representation_kind == "notebooklm_note_materialization"
+    assert item.binary_path == path.relative_to(data).as_posix()
+
+    [finding] = reconcile_asset_coverage(
+        [item], pd.DataFrame(), pd.DataFrame(), load_policy()
+    )
+    assert (finding.status, finding.policy_disposition) == (
+        "eligible_uncovered", None
+    )
+    assets = pd.DataFrame({"asset_path": [item.binary_path]})
+    [finding] = reconcile_asset_coverage(
+        [item], assets, pd.DataFrame(), load_policy()
+    )
+    assert finding.status == "covered"
+
+
+@pytest.mark.parametrize("body", ["", "11111111-1111-4111-8111-111111111111"])
+def test_notebooklm_legacy_note_reference_rendering_is_operational(tmp_path, body):
+    data = tmp_path / "data"
+    path = (
+        data / "merged" / "NotebookLM" / "account-1" /
+        "assets/notes/notebook_reference.md"
+    )
+    path.parent.mkdir(parents=True)
+    path.write_text(f"# Reference\n\n{body}\n")
+    [item] = inventory_preserved_session_assets(data)
+    assert item.representation_kind == "notebooklm_note_reference_materialization"
+    assert item.binary_path is None
+    [finding] = reconcile_asset_coverage(
+        [item], pd.DataFrame(), pd.DataFrame(), load_policy()
+    )
+    assert (finding.status, finding.policy_disposition) == (
+        "excluded", "operational"
+    )
+
+
+@pytest.mark.parametrize("relative", [
+    "assets/mind_maps/notebook_map.json",
+    "assets/text_artifacts/notebook_output_type2.json",
+])
+def test_notebooklm_generated_artifact_materializations_are_asset_candidates(
+    tmp_path, relative
+):
+    data = tmp_path / "data"
+    path = data / "merged" / "NotebookLM" / "account-1" / relative
+    path.parent.mkdir(parents=True)
+    path.write_text("{}")
+
+    [item] = inventory_preserved_session_assets(data)
+    assert item.representation_kind == "preserved_binary"
+    assert item.binary_path == path.relative_to(data).as_posix()
+
+
 def test_cli_materialized_artifacts_are_preserved_binary_candidates(tmp_path):
     data = tmp_path / "data"
     path = data / "raw" / "Antigravity CLI" / "_artifacts" / "conv" / "report.md"

@@ -81,6 +81,24 @@ and historical binaries link to their authoritative `output`
 with role `output`. Multi-file slide decks use deterministic child asset IDs;
 signed upstream URLs and text-only domain records are not assets.
 
+The extractor also materializes text-bearing artifacts under `assets/`: note
+Markdown, mind-map JSON trees and JSON envelopes returned by the text-artifact
+RPC. Although the local serialization is produced by the pipeline, each file
+preserves an identifiable user-facing NotebookLM object. All are indexed as
+Assets and linked to their exact `note` or `output` object.
+
+Note metadata type 1 identifies a user-created/editable note; type 2 identifies
+a chat answer saved as a note. The current archive has 13 user notes and 166
+saved-answer notes with preserved Markdown. Another 184 legacy Markdown files
+are not notes: 183 contain only a mind-map UUID reference and one has no useful
+body, produced because the old materializer did not filter those RPC shapes.
+They remain physically preserved but are explicitly operational evidence, not
+Assets or historical content. Six generated briefs from the immutable
+historical archive are assistant note-assets as well. The same preservation
+rule recovers every mind-map JSON;
+29 maps previously misclassified as type-4 quiz/flashcard rows are correctly
+disambiguated by their saved map representation.
+
 ### Key decision
 
 `guide.summary` becomes a system message (sequence=0) in notebooks that

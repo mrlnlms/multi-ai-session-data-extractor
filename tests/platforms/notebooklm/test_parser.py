@@ -135,6 +135,99 @@ def test_binary_source_pages_and_outputs_become_assets_with_exact_links(tmp_path
     ].iloc[0]
 
 
+def test_generated_text_output_and_mind_map_materializations_become_assets(tmp_path):
+    merged = _build_minimal_merged()
+    merged["notebooks"][0]["audios"][0].append(
+        ["mm-uuid-1", "Interactive map", 4, [], "ARTIFACT_STATUS_READY"]
+    )
+    account_id = "11111111-1111-4111-8111-111111111111"
+    merged["notebooks"][0]["account_id"] = account_id
+    account_dir = tmp_path / "data" / "merged" / "NotebookLM" / "account-1"
+    text_output = (
+        account_dir / "assets" / "text_artifacts" /
+        "nb-uuid-1_art-2_type2.json"
+    )
+    mind_map = (
+        account_dir / "assets" / "mind_maps" /
+        "nb-uuid-1_mm-uuid-1.json"
+    )
+    old_mind_map = (
+        account_dir / "assets" / "mind_maps" /
+        "nb-uuid-1_mm-old.json"
+    )
+    text_output.parent.mkdir(parents=True)
+    mind_map.parent.mkdir(parents=True)
+    text_output.write_text(json.dumps({"artifact_id": "art-2", "content": []}))
+    mind_map.write_text(json.dumps({"mind_map_uuid": "mm-uuid-1", "tree": {}}))
+    old_mind_map.write_text(json.dumps({
+        "mind_map_uuid": "mm-old", "tree": {"name": "older"},
+    }))
+    merged["notebooks"][0]["_account_dir"] = str(account_dir)
+
+    NotebookLMParser().parse(merged, output_dir=tmp_path / "processed")
+
+    assets = pd.read_parquet(tmp_path / "processed" / "notebooklm_assets.parquet")
+    links = pd.read_parquet(tmp_path / "processed" / "notebooklm_asset_links.parquet")
+    outputs = pd.read_parquet(tmp_path / "processed" / "notebooklm_outputs.parquet")
+    assert set(assets["asset_id"]) == {"art-2", "mm-uuid-1", "mm-old"}
+    assert set(assets["asset_origin"]) == {"assistant"}
+    assert assets["is_model_generated"].all()
+    assert set(links["object_type"]) == {"output"}
+    assert set(links["object_id"]) == {"art-2", "mm-uuid-1", "mm-old"}
+    assert set(links["role"]) == {"output"}
+    assert outputs.loc[outputs["output_id"] == "art-2", "asset_path"].iloc[0] == [
+        "merged/NotebookLM/account-1/assets/text_artifacts/nb-uuid-1_art-2_type2.json"
+    ]
+    assert outputs.loc[
+        outputs["output_id"] == "mm-uuid-1", "asset_path"
+    ].iloc[0] == [
+        "merged/NotebookLM/account-1/assets/mind_maps/nb-uuid-1_mm-uuid-1.json"
+    ]
+    current_map = outputs.loc[outputs["output_id"] == "mm-uuid-1"].iloc[0]
+    assert current_map["output_type"] == 10
+    assert current_map["status"] == "ARTIFACT_STATUS_READY"
+    old = outputs.loc[outputs["output_id"] == "mm-old"].iloc[0]
+    assert old["status"] == "preserved_missing"
+    assert old["asset_path"] == [
+        "merged/NotebookLM/account-1/assets/mind_maps/nb-uuid-1_mm-old.json"
+    ]
+
+
+def test_manual_and_saved_response_notes_keep_distinct_origins(tmp_path):
+    merged = _build_minimal_merged()
+    account_id = "11111111-1111-4111-8111-111111111111"
+    merged["notebooks"][0]["account_id"] = account_id
+    merged["notebooks"][0]["notes"] = [[
+        ["manual-note", ["manual-note", "My text", [1, "user", [1, 0]], None, "Manual"]],
+        ["saved-answer", ["saved-answer", "AI answer", [2, "user", [2, 0]], [], "Saved"]],
+    ]]
+    account_dir = tmp_path / "data" / "merged" / "NotebookLM" / "account-1"
+    note_dir = account_dir / "assets" / "notes"
+    note_dir.mkdir(parents=True)
+    (note_dir / "nb-uuid-1_manual-note.md").write_text("# Manual\n\nMy text\n")
+    (note_dir / "nb-uuid-1_saved-answer.md").write_text("# Saved\n\nAI answer\n")
+    merged["notebooks"][0]["_account_dir"] = str(account_dir)
+
+    NotebookLMParser().parse(merged, output_dir=tmp_path / "processed")
+
+    notes = pd.read_parquet(tmp_path / "processed" / "notebooklm_notes.parquet")
+    assets = pd.read_parquet(tmp_path / "processed" / "notebooklm_assets.parquet")
+    links = pd.read_parquet(tmp_path / "processed" / "notebooklm_asset_links.parquet")
+    origins = dict(zip(notes.note_id, notes.origin))
+    assert origins["manual-note"] == "user"
+    assert origins["saved-answer"] == "assistant"
+    assert dict(zip(notes.note_id, notes.is_preserved_missing)) == {
+        "manual-note": False, "saved-answer": False,
+    }
+    assert dict(zip(assets.asset_id, assets.asset_origin)) == {
+        "manual-note": "user", "saved-answer": "assistant",
+    }
+    assert set(links.object_type) == {"note"}
+    assert dict(zip(links.object_id, links.role)) == {
+        "manual-note": "context", "saved-answer": "output",
+    }
+
+
 def test_missing_binary_and_presigned_url_do_not_create_assets(tmp_path):
     merged = _build_minimal_merged()
     merged["notebooks"][0]["audios"][0][0].extend(

@@ -239,9 +239,10 @@ class NotebookLMHistoricalParser:
                         (line[2:].strip() for line in content.splitlines()[:7] if line.startswith("# ")),
                         None,
                     )
+                    note_id = asset.stem.removesuffix("_brief")
                     result.notes.append(
                         NotebookLMNote(
-                            note_id=asset.stem.removesuffix("_brief"),
+                            note_id=note_id,
                             conversation_id=conversation_id,
                             source=SOURCE,
                             account_id=self.account_id,
@@ -251,8 +252,35 @@ class NotebookLMHistoricalParser:
                             kind="brief",
                             source_refs_json=None,
                             created_at=captured_at,
+                            origin="assistant",
                         )
                     )
+                    asset_path = _data_relative(asset)
+                    result.assets.append(Asset(
+                        asset_id=note_id, source=SOURCE,
+                        account_id=self.account_id, asset_kind="artifact",
+                        asset_origin="assistant", file_name=asset.name,
+                        mime_type="text/markdown", size_bytes=asset.stat().st_size,
+                        asset_path=asset_path, is_model_generated=True,
+                        is_preserved_missing=False, is_binary_available=True,
+                        created_at=captured_at,
+                        metadata_json=json.dumps({
+                            "representation": "historical_generated_brief",
+                            "archive": self.archive_key,
+                            "note_id": note_id,
+                        }, sort_keys=True),
+                    ))
+                    result.asset_links.append(AssetLink(
+                        asset_link_id=make_asset_link_id(
+                            SOURCE, self.account_id, note_id, "note", note_id,
+                            "output", 0,
+                        ),
+                        source=SOURCE, account_id=self.account_id,
+                        asset_id=note_id, object_type="note", object_id=note_id,
+                        conversation_id=conversation_id, message_id=None,
+                        project_id=conversation_id, role="output", ordinal=0,
+                        content_block_index=None, metadata_json=None,
+                    ))
                 elif extension in _EXT_TO_OUTPUT:
                     output_type, output_name = _EXT_TO_OUTPUT[extension]
                     relative_asset = asset.relative_to(notebook_dir.parent).as_posix()

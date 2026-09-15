@@ -158,11 +158,11 @@ AUX_CONFIG = {
     "asset_links": {
         "title": "Asset Links",
         "id_col": "asset_link_id",
-        "desc": "Evidence-backed links between assets and messages, conversations, projects, sources, or outputs.",
+        "desc": "Evidence-backed links between assets and messages, conversations, projects, sources, outputs, or notes.",
         "fields": {
             "asset_link_id": "Deterministic relationship UUID",
             "asset_id": "Related canonical asset ID",
-            "object_type": "message / conversation / project / source / output",
+            "object_type": "message / conversation / project / source / output / note",
             "object_id": "Native ID of the related object",
             "conversation_id": "Conversation context when applicable",
             "message_id": "Exact message when observable",

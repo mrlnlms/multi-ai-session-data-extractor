@@ -179,13 +179,26 @@ def extract_notes(notes_raw) -> list[dict]:
             continue
         # Heuristica: se content comeca com "Com base" ou ":" eh um brief; senao note
         kind = "brief" if (content.startswith(("Com base", "Based", "**", "#"))) else "note"
+        note_type = (
+            meta[2][0]
+            if len(meta) > 2 and isinstance(meta[2], list) and meta[2]
+            and isinstance(meta[2][0], int)
+            else None
+        )
+        created_at = (
+            meta[2][2]
+            if len(meta) > 2 and isinstance(meta[2], list) and len(meta[2]) > 2
+            else None
+        )
         out.append({
             "uuid": uuid,
-            "title": None,
+            "title": meta[4] if len(meta) > 4 and isinstance(meta[4], str) else None,
             "content": content,
             "kind": kind,
             "source_refs": [],
-            "created_at": None,
+            "created_at": created_at,
+            "origin": "user" if note_type == 1 else "assistant" if note_type == 2 else None,
+            "note_type": note_type,
         })
     return out
 

@@ -153,6 +153,12 @@ These validations require a Pro Max account and remain open until someone tests:
   relationships across all three current accounts and the historical archive.
   Text-only sources and outputs remain authoritative in `sources`/`outputs`;
   missing downloads and expiring signed URLs are not represented as binaries.
+- **Legacy note materialization produced 184 non-note Markdown files.** The old
+  saver treated every non-JSON `cFji9` item as note text. In the cumulative tree,
+  183 of those files contain only an internal mind-map UUID reference and one
+  has no useful body. They remain preserved and inventoried as operational
+  evidence, but are not emitted as notes or Assets. Current type-1 user notes
+  and type-2 saved chat answers are classified from their native metadata.
 - **Real chat — not a bug, it's the state of the data.** Of the 143 current
   notebooks, 0 have chat populated upstream (the user did not have real
   chats in the notebooks). The 138 captured messages are `role=system`

@@ -316,7 +316,8 @@ class NotebookLMParser:
         ))
 
         # === Notes ===
-        for n in extract_notes(nb.get("notes")):
+        parsed_notes = extract_notes(nb.get("notes"))
+        for n in parsed_notes:
             try:
                 notes.append(NotebookLMNote(
                     note_id=n["uuid"],
@@ -329,7 +330,13 @@ class NotebookLMParser:
                     kind=n.get("kind", "note"),
                     source_refs_json=json.dumps(n.get("source_refs", [])) if n.get("source_refs") else None,
                     created_at=parse_timestamp(n.get("created_at")),
+                    origin=n.get("origin"),
                 ))
+                self._append_note_asset(
+                    nb, n["uuid"], conv_id, account_id,
+                    parse_timestamp(n.get("created_at")), n.get("origin"),
+                    n.get("note_type"), assets, asset_links,
+                )
             except ValueError:
                 # kind invalido — skip silently (pra evitar quebra em edge cases)
                 continue
@@ -368,6 +375,9 @@ class NotebookLMParser:
         mm_payload = nb.get("_mind_map_tree")
         if mm_payload:
             mm_uuid = mm_payload.get("mind_map_uuid", f"{nb_uuid}_mm")
+            mm_artifact = next(
+                (art for art in artifacts_list if art["uuid"] == mm_uuid), {}
+            )
             # Preferir 'tree' completa (asset) quando disponivel; fallback
             # pra serializacao de 'raw' (metadata do CYK0Xb).
             tree_full = mm_payload.get("tree")
@@ -375,6 +385,11 @@ class NotebookLMParser:
                 content_str = json.dumps(tree_full, ensure_ascii=False)
             else:
                 content_str = extract_mind_map_tree(mm_payload.get("raw"))
+            preserved_paths = self._append_mind_map_assets(
+                nb, mm_uuid, conv_id, account, account_id, created_at,
+                {art["uuid"]: art for art in artifacts_list},
+                outputs, assets, asset_links,
+            )
             outputs.append(NotebookLMOutput(
                 output_id=mm_uuid,
                 conversation_id=conv_id,
@@ -383,12 +398,17 @@ class NotebookLMParser:
                 account=account,
                 output_type=10,
                 output_type_name="mind_map",
-                title=None,
-                status=None,
-                asset_path=None,
+                title=mm_artifact.get("title"),
+                status=mm_artifact.get("status"),
+                asset_path=preserved_paths or None,
                 content=content_str or None,
-                source_refs_json=None,
-                created_at=created_at,
+                source_refs_json=(
+                    json.dumps(mm_artifact.get("source_refs", []))
+                    if mm_artifact.get("source_refs") else None
+                ),
+                created_at=(
+                    parse_timestamp(mm_artifact.get("created_at")) or created_at
+                ),
             ))
 
         # === Guide questions ===
@@ -488,13 +508,118 @@ class NotebookLMParser:
         for subdir in ("audio_overviews", "video_overviews"):
             matches.extend(root.joinpath(subdir).glob(f"{nb['uuid']}_{output_id}.*"))
         matches.extend(root.joinpath("slide_decks", f"{nb['uuid']}_{output_id}").glob("*"))
+        matches.extend(
+            root.joinpath("text_artifacts").glob(
+                f"{nb['uuid']}_{output_id}_type*.json"
+            )
+        )
         paths = sorted(p for p in matches if p.is_file())
+        mind_map_path = root / "mind_maps" / f"{nb['uuid']}_{output_id}.json"
+        representation_count = len(paths) + int(mind_map_path.is_file())
         for ordinal, path in enumerate(paths):
             relative = _data_relative(path)
-            asset_id = output_id if len(paths) == 1 else _child_asset_id(output_id, relative)
+            asset_id = (
+                output_id if representation_count == 1
+                else _child_asset_id(output_id, relative)
+            )
             self._append_asset(
                 path, asset_id, account_id, "output", "assistant", True, created_at,
                 {"representation": "generated_output", "output_id": output_id},
                 "output", output_id, conv_id, "output", ordinal, assets, links,
             )
         return [_data_relative(path) for path in paths]
+
+    def _append_mind_map_assets(
+        self, nb: dict, output_id: str, conv_id: str, account: str,
+        account_id: str | None, created_at, artifacts_by_id: dict,
+        outputs: list, assets: list, links: list,
+    ) -> list[str]:
+        account_dir = nb.get("_account_dir")
+        if not account_dir:
+            return []
+        paths = sorted(
+            p for p in (
+                Path(account_dir) / "assets" / "mind_maps"
+            ).glob(f"{nb['uuid']}_*.json") if p.is_file()
+        )
+        current_paths: list[str] = []
+        for ordinal, path in enumerate(paths):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            preserved_id = payload.get("mind_map_uuid")
+            if not isinstance(preserved_id, str) or not preserved_id:
+                continue
+            relative = _data_relative(path)
+            text_matches = list(
+                (Path(account_dir) / "assets" / "text_artifacts").glob(
+                    f"{nb['uuid']}_{preserved_id}_type*.json"
+                )
+            )
+            asset_id = (
+                _child_asset_id(preserved_id, relative)
+                if text_matches else preserved_id
+            )
+            self._append_asset(
+                path, asset_id, account_id, "output", "assistant", True,
+                created_at,
+                {"representation": "generated_mind_map", "output_id": preserved_id},
+                "output", preserved_id, conv_id, "output", 0, assets, links,
+            )
+            if preserved_id == output_id:
+                current_paths.extend(_data_relative(p) for p in sorted(text_matches))
+                current_paths.append(relative)
+                continue
+            artifact = artifacts_by_id.get(preserved_id, {})
+            tree = payload.get("tree")
+            outputs.append(NotebookLMOutput(
+                output_id=preserved_id,
+                conversation_id=conv_id,
+                source=SOURCE,
+                account_id=account_id,
+                account=account,
+                output_type=10,
+                output_type_name="mind_map",
+                title=artifact.get("title"),
+                status=artifact.get("status") or "preserved_missing",
+                asset_path=[
+                    *(_data_relative(p) for p in sorted(text_matches)), relative,
+                ],
+                content=json.dumps(tree, ensure_ascii=False) if tree else None,
+                source_refs_json=(
+                    json.dumps(artifact.get("source_refs", []))
+                    if artifact.get("source_refs") else None
+                ),
+                created_at=(
+                    parse_timestamp(artifact.get("created_at"))
+                    if artifact else None
+                ),
+            ))
+        return current_paths
+
+    def _append_note_asset(
+        self, nb: dict, note_id: str, conv_id: str, account_id: str | None,
+        created_at, origin: str | None, note_type: int | None,
+        assets: list, links: list,
+    ) -> bool:
+        account_dir = nb.get("_account_dir")
+        if not account_dir:
+            return False
+        path = (
+            Path(account_dir) / "assets" / "notes" /
+            f"{nb['uuid']}_{note_id}.md"
+        )
+        if not path.is_file():
+            return False
+        asset_origin = origin or "unknown"
+        generated = True if origin == "assistant" else False if origin == "user" else None
+        role = "output" if origin == "assistant" else "context" if origin == "user" else "unknown"
+        self._append_asset(
+            path, note_id, account_id, "artifact", asset_origin, generated,
+            created_at,
+            {"representation": "notebook_note", "note_id": note_id,
+             "note_type": note_type},
+            "note", note_id, conv_id, role, 0, assets, links,
+        )
+        return True

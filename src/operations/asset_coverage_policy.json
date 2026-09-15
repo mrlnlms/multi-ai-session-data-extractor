@@ -212,6 +212,12 @@
       "reason": "Download and lineage metadata describing assets, not the represented file"
     },
     {
+      "source": "NotebookLM",
+      "representation_kind": "notebooklm_note_reference_materialization",
+      "disposition": "operational",
+      "reason": "Legacy extractor rendering of an internal UUID reference or empty note payload, not user-facing note content"
+    },
+    {
       "source": "Perplexity",
       "representation_kind": "asset_manifest",
       "disposition": "operational",

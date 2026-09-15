@@ -13,7 +13,7 @@ VALID_ROLES = ("user", "assistant", "system")
 VALID_MODES = ("chat", "search", "research", "copilot", "concise", "dalle", "cli")
 VALID_ASSET_KINDS = ("attachment", "generated", "project_file", "output", "artifact", "other")
 VALID_ASSET_ORIGINS = ("user", "assistant", "platform", "imported", "unknown")
-VALID_ASSET_LINK_OBJECT_TYPES = ("message", "conversation", "project", "source", "output")
+VALID_ASSET_LINK_OBJECT_TYPES = ("message", "conversation", "project", "source", "output", "note")
 VALID_ASSET_LINK_ROLES = ("input", "output", "context", "reference", "unknown")
 ASSET_LINK_NAMESPACE = uuid.UUID("c76d54a8-9ba8-5f33-b2a3-0ae129545238")
 
@@ -405,6 +405,8 @@ class NotebookLMNote:
     source_refs_json: Optional[str]
     created_at: Optional[pd.Timestamp]
     account_id: Optional[str] = None
+    origin: Optional[str] = None
+    is_preserved_missing: bool = False
 
     def __post_init__(self):
         _validate_account_id(self.account_id)
@@ -412,6 +414,8 @@ class NotebookLMNote:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
         if self.kind not in VALID_NOTE_KINDS:
             raise ValueError(f"kind '{self.kind}' invalido. Validos: {VALID_NOTE_KINDS}")
+        if self.origin is not None and self.origin not in VALID_ASSET_ORIGINS:
+            raise ValueError(f"origin '{self.origin}' invalido. Validos: {VALID_ASSET_ORIGINS}")
 
     def to_dict(self) -> dict:
         return asdict(self)

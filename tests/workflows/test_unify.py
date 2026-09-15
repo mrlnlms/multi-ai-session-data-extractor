@@ -334,6 +334,36 @@ def test_asset_source_link_resolves_against_project_docs(tmp_path):
     unify_module._validate_asset_integrity(frames, tmp_path)
 
 
+def test_asset_note_link_resolves_against_notebooklm_notes(tmp_path):
+    account_id = "810f3e91-ae10-5cb1-931a-53b80630af16"
+    frames = {
+        "conversations": pd.DataFrame({
+            "source": ["notebooklm"], "account_id": [account_id],
+            "conversation_id": ["conversation-1"],
+        }),
+        "notes": pd.DataFrame({
+            "source": ["notebooklm"], "account_id": [account_id],
+            "conversation_id": ["conversation-1"], "note_id": ["note-1"],
+        }),
+        "assets": pd.DataFrame({
+            "asset_id": ["note-1"], "source": ["notebooklm"],
+            "account_id": [account_id], "asset_origin": ["user"],
+            "is_model_generated": [False], "asset_path": [None],
+            "is_binary_available": [False], "metadata_json": [None],
+        }),
+        "asset_links": pd.DataFrame({
+            "asset_link_id": ["link-1"], "source": ["notebooklm"],
+            "account_id": [account_id], "asset_id": ["note-1"],
+            "object_type": ["note"], "object_id": ["note-1"],
+            "conversation_id": ["conversation-1"], "message_id": [None],
+            "project_id": ["conversation-1"], "role": ["context"],
+            "ordinal": [0], "content_block_index": [None],
+            "metadata_json": [None],
+        }),
+    }
+    unify_module._validate_asset_integrity(frames, tmp_path)
+
+
 def test_asset_project_link_resolves_against_conversation_project_id(tmp_path):
     account_id = "810f3e91-ae10-5cb1-931a-53b80630af16"
     frames = {

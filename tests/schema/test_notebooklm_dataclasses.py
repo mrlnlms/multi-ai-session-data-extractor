@@ -39,6 +39,15 @@ def test_notebooklm_note_valid():
     assert n.kind == "brief"
 
 
+def test_notebooklm_note_validates_origin():
+    with pytest.raises(ValueError, match="origin"):
+        NotebookLMNote(
+            note_id="n1", conversation_id="c1", source="notebooklm",
+            account="1", title="t", content="x", kind="note",
+            source_refs_json=None, created_at=None, origin="invalid",
+        )
+
+
 def test_notebooklm_output_validates_type():
     with pytest.raises(ValueError, match="output_type"):
         NotebookLMOutput(

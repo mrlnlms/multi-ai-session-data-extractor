@@ -320,11 +320,17 @@ def _validate_asset_integrity(
         (str(row.source), _identity(row.account_id), str(row.output_id))
         for row in outputs.itertuples(index=False)
     }
+    notes = frames.get("notes", pd.DataFrame())
+    note_keys = {
+        (str(row.source), _identity(row.account_id), str(row.note_id))
+        for row in notes.itertuples(index=False)
+    }
     object_keys = {
         "conversation": conversation_keys,
         "project": project_keys,
         "source": source_keys,
         "output": output_keys,
+        "note": note_keys,
     }
     for row in links.itertuples(index=False):
         prefix = (str(row.source), _identity(row.account_id))

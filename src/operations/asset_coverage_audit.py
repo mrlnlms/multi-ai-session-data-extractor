@@ -127,6 +127,9 @@ def _kind_for_file(path: Path, source_root: Path, source: str) -> str:
         return "project_source_index"
     if source == "ChatGPT" and "canvases" in parts and "__patch_" in lower_name:
         return "canvas_patch_record"
+    if source == "NotebookLM" and "assets" in parts:
+        if "notes" in parts:
+            return "notebooklm_note_materialization"
     if lower_name in OPERATIONAL_NAMES:
         return "capture_log" if "capture" in lower_name else "operational_record"
     if lower_name.endswith("manifest.json") or lower_name in {"assets_manifest.json", "assets_log.json"}:
@@ -171,7 +174,19 @@ def _filesystem_evidence(data_root: Path) -> list[RepresentationEvidence]:
                 # Default-root traversal also sees account-* children. Assigning
                 # from the path keeps each physical file in exactly one scope.
                 kind = _kind_for_file(path, source_root, source)
-                binary = _relative_to_data(path, data_root) if kind == "preserved_binary" else None
+                if kind == "notebooklm_note_materialization":
+                    try:
+                        lines = path.read_text(encoding="utf-8").splitlines()
+                        body = "\n".join(lines[2:] if len(lines) > 1 and not lines[1] else lines).strip()
+                    except (OSError, UnicodeDecodeError):
+                        body = ""
+                    if not body or (len(body) == 36 and body.count("-") == 4):
+                        kind = "notebooklm_note_reference_materialization"
+                binary = (
+                    _relative_to_data(path, data_root)
+                    if kind in {"preserved_binary", "notebooklm_note_materialization"}
+                    else None
+                )
                 # Gemini's canonical identity is the preserved content digest.
                 # Carry it in the census so a second physical copy can be
                 # distinguished from genuinely uncovered content. Other
@@ -664,7 +679,9 @@ def reconcile_asset_coverage(
         matches = _policy_matches(item, policy)
         if len(matches) > 1:
             findings.append(CoverageFinding(item, "unresolved"))
-        elif item.representation_kind == "preserved_binary":
+        elif item.representation_kind in {
+            "preserved_binary", "notebooklm_note_materialization",
+        }:
             status = "covered" if item.binary_path in asset_paths else "eligible_uncovered"
             if status == "eligible_uncovered" and item.native_id:
                 source_key = "".join(ch for ch in item.source.lower() if ch.isalnum())

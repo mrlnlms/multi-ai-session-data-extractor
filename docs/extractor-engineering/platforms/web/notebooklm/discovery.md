@@ -221,6 +221,24 @@ campo `summary_json` em `notebooklm_sources.parquet`.
 
 ## Validação cruzada com baseline legacy
 
+## Notes and text-bearing artifacts — verified 2026-09-15
+
+The note metadata flag at `item[1][2][0]` is semantic: `1` is a note created
+and edited by the user, while `2` is an assistant chat answer saved as a note.
+The latter may also carry citation descriptors in `item[1][3]` and rich content
+in `item[1][5]`. This replaces the old content-prefix heuristic as the source
+of origin; `kind` remains a presentation classification only.
+
+The cumulative note directory also contains 184 files produced by the old
+materializer from non-note shapes: 183 bodies are only a 36-character UUID
+reference to a mind map and one body is empty. These files do not contain lost
+note content and are operational evidence rather than Assets. Mind-map JSON
+disambiguates 29 current type-4 catalog rows that would otherwise be mistaken
+for quiz/flashcards. Text-artifact JSON envelopes, mind-map trees and the 179
+actual current note Markdown files are preserved representations of user-facing
+objects and participate in the Asset graph without duplicating their content
+into Asset metadata.
+
 O baseline legacy tinha 4 Parquets v1. O v3 e estritamente superset:
 
 | Tabela | Pai (v1) | v3 |

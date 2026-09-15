@@ -17,7 +17,7 @@ paths are relative to `data/` and resolve to local files.
 | ChatGPT | 997 / 997 | user 696; assistant 208; unknown 93 | 1,002; input 559, output 213, context 137, unknown 93 | 100.0% | 927 / 70 | inline | Project indexes, Canvas patches and account-memory exports remain operational/domain evidence rather than files delivered through an interaction |
 | Claude.ai | 3,566 / 3,566 | user 2,082; assistant 1,484 | 3,617; input 1,892, output 1,484, context 241 | 100.0% | 3,292 / 274 | message | Extracted artifact versions are exact message outputs; inline text-bearing `attachments` and account-memory exports remain domain content rather than fake binaries |
 | Gemini | 364 / 364 | assistant 173; user 110; unknown 81 | 963; input 787, output 176 | 78.0% | 364 / 0 | message | 27 additional physical copies (25 images and 2 reports) are verified same-account/content duplicates; no placement is invented for manifest-only images |
-| NotebookLM | 4,712 / 4,712 | platform 4,499; assistant 213 | 4,712; context 4,499, output 213 | 100.0% | 4,712 / 0 | library | Text-only sources/outputs, missing downloads and expiring signed URLs stay in domain/raw evidence |
+| NotebookLM | 5,252 / 5,252 | platform 4,499; assistant 740; user 13 | 5,252; context 4,512, output 740 | 100.0% | 5,252 / 0 | library | 179 real note Markdown files, 105 mind-map trees and 250 text-output envelopes retain exact note/output identity; 184 legacy UUID-reference/empty Markdown materializations are operational, not notes |
 | Qwen | 367 / 367 | user 313; assistant 54 | 367; input 294, output 54, context 19 | 100.0% | 367 / 0 | inline | Rotated signed-URL manifest entries are consolidated; inline document text stays in domain tables |
 | DeepSeek | 80 / 80 | user 80 | 80; input 80 | 100.0% | 0 / 80 | message | Native upload records remain metadata-only because no current binary or manifest survived in merged |
 | Perplexity | 15 / 15 | assistant 9; user 6 | 8; input 8 | 40.0% | 9 / 6 | message | Third-party featured images are external references; deleted upstream uploads retain metadata only |
@@ -27,7 +27,7 @@ paths are relative to `data/` and resolve to local files.
 | Codex | 44 / 44 | user 44 | 44; input 44 | 100.0% | 44 / 0 | inline | User-message data URIs are materialized; image payloads inside tool/guardian envelopes are not user-facing assets |
 | Gemini CLI | 0 / 0 | — | 0 | — | 0 / 0 | library | Tool-output text spills and working-tree paths are operational evidence; no eligible session file is currently preserved |
 | Antigravity CLI | 12 / 12 | assistant 12 | 12; output 12 | 100.0% | 12 / 0 | message | Explicit `ArtifactMetadata` + preserved `CodeContent` is eligible; opaque containers and ordinary tool paths are not assets |
-| **Total** | **13,740 / 13,740** | user 6,827; assistant 2,153; platform 4,499; unknown 261 | **14,335**; input 7,107, output 2,152, context 4,896, unknown 180 | **98.9%** | **13,309 / 431** | mixed | Coverage expands only through source-specific evidence |
+| **Total** | **14,280 / 14,280** | user 6,840; assistant 2,680; platform 4,499; unknown 261 | **14,875**; input 7,107, output 2,679, context 4,909, unknown 180 | **98.9%** | **13,849 / 431** | mixed | Coverage expands only through source-specific evidence |
 
 ## Reader capability levels
 
@@ -41,6 +41,18 @@ paths are relative to `data/` and resolve to local files.
 These labels describe the strongest supported reading mode, not completeness.
 For example, Gemini also has unlinked library rows, and NotebookLM links files
 to authoritative source/output objects rather than chat messages.
+
+NotebookLM's text-bearing materializations are first-class preserved
+representations of user-facing objects even though the pipeline writes the
+local serialization. Type-1 notes are user context, type-2 saved chat answers
+are assistant outputs. All 179 actual current-tree note Markdown files, 105
+mind-map trees and 250 text-output envelopes are covered. The other 184 legacy
+files in the note directory contain only an internal UUID reference (183) or no
+useful body (1), so they are explicitly inventoried as an old materializer
+defect rather than mislabeled as historical notes. Six historical generated
+briefs are covered from the immutable external archive. The note and output
+domain tables remain authoritative; Asset metadata does not duplicate their
+content.
 
 ## Publication invariants
 
