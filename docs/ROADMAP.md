@@ -275,9 +275,10 @@ prerequisite.
 
 ### Reactivation and compatibility cycle
 
-**Status:** planned.
+**Status:** completed in the 2026-09-15 capture and DVC update; repeat only when
+a later snapshot is needed.
 
-Before a new production snapshot, refresh each platform safely: start with
+For a later production snapshot, refresh each platform safely: start with
 discovery or `--dry-run`, run one source at a time, repair only extractors
 affected by upstream changes, then parse and unify. Validate that produced
 Parquets are not older than their raw/merged inputs. New DVC pushes remain
