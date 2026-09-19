@@ -124,6 +124,17 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.login --account
 PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.sync --account account-2
 PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.parse
 ```
+## Asset vault transition
+
+`vault` is the default asset reader, using `data/assets` and `data` unless roots
+are overridden explicitly. `legacy` remains an explicit temporary rollback;
+filesystem contents never select the mode. The legacy tree remains preserved,
+while the vault reader projects the same public `Asset`, `AssetLink`, and
+`Message.asset_paths` contract. For DeepSeek, reader scope is each evidenced
+message/file use; the current metadata-only assets remain valid and no local
+path is fabricated when bytes are absent. See the [operational
+transition](../../../../operations/pipeline.md#transicao-do-asset-vault).
+
 ## Explicit login-health check
 
 A minimal `GET /api/v0/chat_session/fetch_page` listing is the established read-only check; missing or rejected `userToken` means `expired`. Profile presence alone never produces a valid status. The check is

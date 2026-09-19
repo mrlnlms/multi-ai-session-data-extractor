@@ -26,6 +26,8 @@ from src.application.profiles import (
 from dashboard.pipeline import render_last_run_summary, run_full_pipeline
 from src.workflows.execution import has_sync_script, sync_command
 
+ASSET_MODE_OPTIONS = ("vault", "legacy")
+
 
 @st.cache_data(show_spinner=False)
 def _cached_merged_stats(merged_path_str: str, mtime: float):
@@ -211,6 +213,13 @@ def _render_pipeline_button(state: PlatformState) -> None:
             f"dry-run without committing to DVC/git."
         ),
     )
+    asset_mode = opt_col.selectbox(
+        "Asset storage mode",
+        ASSET_MODE_OPTIONS,
+        key=f"platform_asset_mode_{state.name}",
+        disabled=is_running,
+        help="Vault is the canonical default; select legacy only for temporary rollback.",
+    )
 
     if is_running:
         btn_col.button(
@@ -222,7 +231,12 @@ def _render_pipeline_button(state: PlatformState) -> None:
     if btn_col.button(sync_label, key=f"pipeline-{state.name}", type="primary"):
         st.session_state["pipeline_running"] = True
         try:
-            run_full_pipeline([state], publish_after, scope=f"platform:{state.name}")
+            run_full_pipeline(
+                [state],
+                publish_after,
+                scope=f"platform:{state.name}",
+                asset_modes={state.name: asset_mode},
+            )
         finally:
             st.session_state["pipeline_running"] = False
 

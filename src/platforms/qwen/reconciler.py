@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from src.assets.reader import AssetReader
 from src.reconciliation.files import link_or_copy
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,8 @@ def run_reconciliation(
     previous_merged: Path | None = None,
     force_refetch_features: set[str] | None = None,
     full: bool = False,
+    asset_reader: AssetReader | None = None,
+    asset_account_id: str | None = None,
 ) -> QwenReconcileReport:
     if previous_merged is None:
         previous_merged = merged_output if merged_output.exists() else None
@@ -162,7 +165,8 @@ def run_reconciliation(
 
     merged_output.mkdir(parents=True, exist_ok=True)
     (merged_output / "conversations").mkdir(exist_ok=True)
-    (merged_output / "assets").mkdir(exist_ok=True)
+    if asset_reader is None:
+        (merged_output / "assets").mkdir(exist_ok=True)
 
     # ============================================================
     # CONVERSATIONS
@@ -236,12 +240,20 @@ def run_reconciliation(
     # ============================================================
     # ASSETS (cumulativos, skip-existing) + manifest
     # ============================================================
-    _merge_dir(raw_dir / "assets", merged_output / "assets")
-    if previous_merged and previous_merged != merged_output:
-        _merge_dir(previous_merged / "assets", merged_output / "assets")
-    assets_dir = merged_output / "assets"
-    if assets_dir.exists():
-        report.asset_binaries_total = sum(1 for p in assets_dir.rglob("*") if p.is_file())
+    if asset_reader is None:
+        _merge_dir(raw_dir / "assets", merged_output / "assets")
+        if previous_merged and previous_merged != merged_output:
+            _merge_dir(previous_merged / "assets", merged_output / "assets")
+        assets_dir = merged_output / "assets"
+        if assets_dir.exists():
+            report.asset_binaries_total = sum(
+                1 for path in assets_dir.rglob("*") if path.is_file()
+            )
+    else:
+        report.asset_binaries_total = sum(
+            asset.is_binary_available
+            for asset in asset_reader.projection_for("qwen", asset_account_id).assets
+        )
 
     # Manifest dos assets (gerado pelo download_assets) — copiar pro merged
     # pra parser conseguir resolver asset_paths via lookup.

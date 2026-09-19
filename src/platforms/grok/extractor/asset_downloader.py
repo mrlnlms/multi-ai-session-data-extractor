@@ -22,6 +22,12 @@ import mimetypes
 from pathlib import Path
 
 from playwright.async_api import BrowserContext
+from src.assets.incremental import (
+    AssetObservation,
+    WebAssetCaptureSession,
+    commit_web_asset_capture,
+)
+from src.assets.vault import AssetVault
 
 
 CDN_BASE = "https://assets.grok.com/"
@@ -52,10 +58,22 @@ def _ext_for_mime(mime: str) -> str:
     return guess or ".bin"
 
 
+def _representation_kind(asset: dict) -> str:
+    if asset.get("isModelGenerated") or asset.get("isRootAssetCreatedByModel"):
+        return "assistant_generated"
+    if asset.get("fileSource") == "SELF_UPLOAD_FILE_SOURCE":
+        return "user_attachment"
+    return "delivery"
+
+
 async def download_assets(
     context: BrowserContext,
     raw_dir: Path,
     skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+    complete_discovery: bool = True,
 ) -> dict:
     """Baixa todos os assets listados em raw_dir/assets.json.
 
@@ -64,11 +82,27 @@ async def download_assets(
     assets_path = raw_dir / "assets.json"
     if not assets_path.exists():
         print(f"  assets.json nao existe em {raw_dir} — nada pra baixar")
+        commit_web_asset_capture(
+            asset_vault,
+            source="grok",
+            account_id=account_id,
+            observations=(),
+            complete_discovery=complete_discovery,
+            evidence_path=assets_path,
+        )
         return {"downloaded": 0, "skipped": 0, "errors": []}
 
     assets = json.loads(assets_path.read_text(encoding="utf-8"))
     if not assets:
         print("  0 assets na listagem")
+        commit_web_asset_capture(
+            asset_vault,
+            source="grok",
+            account_id=account_id,
+            observations=(),
+            complete_discovery=complete_discovery,
+            evidence_path=assets_path,
+        )
         return {"downloaded": 0, "skipped": 0, "errors": []}
 
     out_dir = raw_dir / "assets"
@@ -87,6 +121,13 @@ async def download_assets(
             pass
 
     stats = {"downloaded": 0, "skipped": 0, "errors": []}
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="grok",
+        account_id=account_id,
+        evidence_path=assets_path,
+        capture_method="web_asset_download",
+    )
     total = len(assets)
 
     for i, a in enumerate(assets, start=1):
@@ -101,6 +142,16 @@ async def download_assets(
         dst = out_dir / f"{aid}{ext}"
 
         if skip_existing and dst.exists():
+            payload = dst.read_bytes() if asset_vault is not None else None
+            capture.observe(AssetObservation(
+                delivery_id=str(aid),
+                object_id=str(aid),
+                representation_kind=_representation_kind(a),
+                payload=payload,
+                file_name=a.get("fileName") or dst.name,
+                mime_type=mime,
+                upstream_locator=CDN_BASE + key,
+            ))
             stats["skipped"] += 1
             manifest[aid] = {
                 "url": CDN_BASE + key,
@@ -129,6 +180,15 @@ async def download_assets(
             }""", url)
             data = base64.b64decode(b64)
             dst.write_bytes(data)
+            capture.observe(AssetObservation(
+                delivery_id=str(aid),
+                object_id=str(aid),
+                representation_kind=_representation_kind(a),
+                payload=data,
+                file_name=a.get("fileName") or dst.name,
+                mime_type=mime,
+                upstream_locator=url,
+            ))
             manifest[aid] = {
                 "url": url,
                 "relpath": str(dst.relative_to(raw_dir)),
@@ -138,6 +198,15 @@ async def download_assets(
             stats["downloaded"] += 1
         except Exception as e:
             stats["errors"].append((aid, str(e)[:200]))
+            capture.observe(AssetObservation(
+                delivery_id=str(aid),
+                object_id=str(aid),
+                representation_kind=_representation_kind(a),
+                file_name=a.get("fileName"),
+                mime_type=mime,
+                upstream_locator=url,
+                failure_reason=str(e)[:200],
+            ))
 
         if i % 10 == 0:
             print(f"  [{i}/{total}] dl={stats['downloaded']} skip={stats['skipped']} err={len(stats['errors'])}")
@@ -145,4 +214,5 @@ async def download_assets(
     print(f"  [{total}/{total}] dl={stats['downloaded']} skip={stats['skipped']} err={len(stats['errors'])} (final)")
 
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    capture.finish(complete_discovery=complete_discovery)
     return stats

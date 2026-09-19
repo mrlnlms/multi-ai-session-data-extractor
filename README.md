@@ -144,6 +144,14 @@ extractor → reconciler → parser → unify
    `data/unified/` with 15 parquet tables (4 canonical + 11 auxiliaries),
    ready for cross-platform analysis.
 
+The published `Asset`/`AssetLink` schema and the physical storage of their
+bytes are separate contracts. The central content-addressed asset vault is
+materialized and verified locally and is now the default for normal runs, but
+it has not yet been staged or published through DVC. `legacy` remains an
+explicit temporary rollback, and no legacy evidence may be removed. See the
+[asset storage transition](docs/operations/pipeline.md#transicao-do-asset-vault)
+for reader selection, verification, local restore, retention, and rollback.
+
 Full schema in `src/schema/models.py`. Capture and parser terminology is in
 [the extractor engineering glossary](docs/extractor-engineering/glossary.md).
 

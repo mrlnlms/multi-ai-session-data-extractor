@@ -25,6 +25,10 @@ from typing import Optional
 
 import pandas as pd
 
+from src.assets.cli_incremental import CLIAssetCaptureSession
+from src.assets.incremental import DEFAULT_MAX_BATCH_BYTES
+from src.assets.reader import AssetReader, VaultAssetReader
+from src.assets.vault import AssetVault
 from src.parsing.base import BaseParser
 from src.schema.models import (
     Branch,
@@ -46,8 +50,27 @@ logger = logging.getLogger(__name__)
 class GeminiCLIParser(BaseParser):
     source_name = "gemini_cli"
 
-    def __init__(self, account: Optional[str] = None):
-        super().__init__(account=account)
+    def __init__(
+        self,
+        account: Optional[str] = None,
+        account_id: Optional[str] = None,
+        *,
+        asset_reader: AssetReader | None = None,
+        asset_vault: AssetVault | None = None,
+        asset_data_root: Path | None = None,
+        asset_max_batch_bytes: int = DEFAULT_MAX_BATCH_BYTES,
+    ):
+        if asset_vault is not None and asset_data_root is None:
+            raise ValueError("asset_data_root is required when asset_vault is enabled")
+        self.asset_vault = asset_vault
+        self.asset_data_root = Path(asset_data_root) if asset_data_root is not None else None
+        self.asset_max_batch_bytes = asset_max_batch_bytes
+        if asset_reader is None and asset_vault is not None:
+            assert self.asset_data_root is not None
+            asset_reader = VaultAssetReader(asset_vault, self.asset_data_root)
+        super().__init__(
+            account=account, account_id=account_id, asset_reader=asset_reader
+        )
         self.branches: list[Branch] = []
         self._conv_source_files: dict[str, set[str]] = {}
         self._input_path: Optional[Path] = None
@@ -57,6 +80,9 @@ class GeminiCLIParser(BaseParser):
         self.branches = []
         self._conv_source_files = {}
         self._input_path = None
+        self.assets = []
+        self.asset_links = []
+        self._asset_capture: CLIAssetCaptureSession | None = None
 
     def parse(self, input_path: Path) -> None:
         """Le sessoes JSON de todos os projetos em input_path.
@@ -66,6 +92,16 @@ class GeminiCLIParser(BaseParser):
         """
         input_path = Path(input_path)
         self._input_path = input_path
+        if self.asset_vault is not None:
+            assert self.asset_data_root is not None
+            self._asset_capture = CLIAssetCaptureSession(
+                self.asset_vault,
+                source=self.source_name,
+                account_id=self.account_id,
+                evidence_path=input_path,
+                data_root=self.asset_data_root,
+                max_batch_bytes=self.asset_max_batch_bytes,
+            )
         for project_dir in sorted(input_path.iterdir()):
             if not project_dir.is_dir():
                 continue
@@ -80,6 +116,9 @@ class GeminiCLIParser(BaseParser):
         self._build_branches()
         from src.capture.cli.preservation import mark_cli_preservation
         mark_cli_preservation(self)
+        if self._asset_capture is not None:
+            self._asset_capture.finish()
+        self.apply_asset_reader()
 
     def parse_files(self, files: list[Path]) -> None:
         """Processa lista especifica (uso incremental). Infere project do path."""

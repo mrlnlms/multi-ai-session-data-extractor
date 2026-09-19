@@ -27,8 +27,12 @@ import json
 import sys
 import time
 from pathlib import Path
+from typing import Mapping
 from src.accounts import capturable_account_key
 
+from src.assets.vault import AssetVault
+from src.assets.reader import AssetReader
+from src.assets.runtime import load_asset_runtime, runtime_account_id
 from src.platforms.gemini.extractor.auth import VALID_ACCOUNTS, load_context
 from src.platforms.gemini.extractor.api_client import GeminiAPIClient
 from src.platforms.gemini.extractor.batchexecute import load_session
@@ -47,10 +51,19 @@ def _section(title: str):
     print("=" * 72)
 
 
-async def _run_assets(raw_dir: Path, account: str) -> dict:
+async def _run_assets(
+    raw_dir: Path,
+    account: str,
+    *,
+    asset_vault: AssetVault | None = None,
+    asset_account_id: str | None = None,
+    complete_discovery: bool = False,
+) -> dict:
     """Extrai Deep Research offline + baixa imagens online."""
     print("Extraindo Deep Research reports...")
-    dr = extract_deep_research(raw_dir)
+    dr = extract_deep_research(
+        raw_dir, asset_vault=asset_vault, account_id=asset_account_id
+    )
     print(f"  extracted: {dr['extracted']}, skip: {dr['skipped_existing']}, err: {len(dr['errors'])}")
 
     print("Baixando imagens (lh3.googleusercontent.com)...")
@@ -58,7 +71,13 @@ async def _run_assets(raw_dir: Path, account: str) -> dict:
     try:
         session = await load_session(context)
         client = GeminiAPIClient(context, session)
-        stats = await download_assets(client, raw_dir)
+        stats = await download_assets(
+            client,
+            raw_dir,
+            asset_vault=asset_vault,
+            account_id=asset_account_id,
+            complete_discovery=complete_discovery,
+        )
     finally:
         await context.close()
 
@@ -68,7 +87,14 @@ async def _run_assets(raw_dir: Path, account: str) -> dict:
     return {"deep_research": dr, "images": stats}
 
 
-async def _sync_account(args: argparse.Namespace, account: str) -> int:
+async def _sync_account(
+    args: argparse.Namespace,
+    account: str,
+    *,
+    asset_vault: AssetVault | None = None,
+    asset_account_id: str | None = None,
+    asset_reader: AssetReader | None = None,
+) -> int:
     _section(f"ACCOUNT {account}")
     _section(f"Etapa 1/3 — Capture (account {account})")
     try:
@@ -83,7 +109,13 @@ async def _sync_account(args: argparse.Namespace, account: str) -> int:
     if not args.no_binaries:
         _section(f"Etapa 2/3 — Assets (account {account})")
         try:
-            await _run_assets(raw_dir, account=account)
+            await _run_assets(
+                raw_dir,
+                account=account,
+                asset_vault=asset_vault,
+                asset_account_id=asset_account_id,
+                complete_discovery=False,
+            )
         except Exception as e:
             print(f"\nERRO em assets account {account}: {e}")
             return 1
@@ -96,7 +128,13 @@ async def _sync_account(args: argparse.Namespace, account: str) -> int:
 
     _section(f"Etapa 3/3 — Reconcile (account {account})")
     merged_dir = MERGED_BASE / f"account-{account}"
-    report = run_reconciliation(raw_dir, merged_dir, full=args.full)
+    report = run_reconciliation(
+        raw_dir,
+        merged_dir,
+        full=args.full,
+        asset_reader=asset_reader,
+        asset_account_id=asset_account_id,
+    )
     if report.aborted:
         print(f"  ABORTED: {report.abort_reason}")
         return 2
@@ -108,8 +146,14 @@ async def _sync_account(args: argparse.Namespace, account: str) -> int:
     return 0
 
 
-async def main(args: argparse.Namespace) -> int:
+async def main(
+    args: argparse.Namespace,
+    *,
+    asset_vault: AssetVault | None = None,
+    asset_account_ids: Mapping[str, str] | None = None,
+) -> int:
     started = time.time()
+    asset_runtime = load_asset_runtime("gemini")
 
     if args.dry_run:
         _section("DRY RUN")
@@ -124,9 +168,26 @@ async def main(args: argparse.Namespace) -> int:
         return 0
 
     accounts = [args.account] if args.account else list(VALID_ACCOUNTS)
+    if asset_vault is None:
+        asset_vault = asset_runtime.vault
+        asset_account_ids = {
+            acc: runtime_account_id(
+                asset_runtime,
+                "Gemini",
+                f"account-{acc}",
+                explicit=(asset_account_ids or {}).get(acc),
+            )
+            for acc in accounts
+        }
     overall = 0
     for acc in accounts:
-        rc = await _sync_account(args, acc)
+        rc = await _sync_account(
+            args,
+            acc,
+            asset_vault=asset_vault,
+            asset_account_id=(asset_account_ids or {}).get(acc),
+            asset_reader=asset_runtime.reader if asset_vault is asset_runtime.vault else None,
+        )
         if rc != 0:
             overall = rc
 

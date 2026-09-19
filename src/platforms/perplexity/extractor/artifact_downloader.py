@@ -20,6 +20,8 @@ import json
 import re
 from pathlib import Path
 from playwright.async_api import BrowserContext
+from src.assets.incremental import AssetObservation, WebAssetCaptureSession
+from src.assets.vault import AssetVault
 
 
 def _ext_from_url_or_type(url: str, asset_type: str | None) -> str:
@@ -41,6 +43,10 @@ async def download_artifacts(
     context: BrowserContext,
     artifacts: list[dict],
     output_dir: Path,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+    complete_discovery: bool = False,
 ) -> dict:
     """Baixa binarios dos artifacts via APIRequestContext (cookies-aware)."""
     files_dir = output_dir / "assets" / "files"
@@ -50,6 +56,13 @@ async def download_artifacts(
     ok = 0
     skipped = 0
     failed = 0
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="perplexity",
+        account_id=account_id,
+        evidence_path=output_dir / "assets" / "_index.json",
+        capture_method="web_asset_download:artifacts",
+    )
 
     for art in artifacts:
         location = art.get("location")
@@ -58,12 +71,30 @@ async def download_artifacts(
 
         if not location or not slug:
             manifest.append({"slug": slug or "unknown", "status": "skipped_no_url"})
+            if slug:
+                delivery_id = str(art.get("asset_id") or slug)
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=delivery_id,
+                    representation_kind="assistant_generated",
+                    failure_reason="skipped_no_url",
+                ))
             continue
 
         ext = _ext_from_url_or_type(location, asset_type)
         out_path = files_dir / f"{slug}{ext}"
 
         if out_path.exists():
+            delivery_id = str(art.get("asset_id") or slug)
+            capture.observe(AssetObservation(
+                delivery_id=delivery_id,
+                object_id=delivery_id,
+                representation_kind="assistant_generated",
+                payload=(out_path.read_bytes() if asset_vault is not None else None),
+                file_name=out_path.name,
+                mime_type=art.get("media_type"),
+                upstream_locator=location,
+            ))
             skipped += 1
             manifest.append({
                 "slug": slug,
@@ -77,6 +108,16 @@ async def download_artifacts(
         try:
             response = await context.request.get(location, timeout=60000)
             if not response.ok:
+                delivery_id = str(art.get("asset_id") or slug)
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=delivery_id,
+                    representation_kind="assistant_generated",
+                    file_name=out_path.name,
+                    mime_type=art.get("media_type"),
+                    upstream_locator=location,
+                    failure_reason=f"HTTP {response.status}",
+                ))
                 failed += 1
                 manifest.append({
                     "slug": slug,
@@ -87,6 +128,16 @@ async def download_artifacts(
                 continue
             body = await response.body()
             out_path.write_bytes(body)
+            delivery_id = str(art.get("asset_id") or slug)
+            capture.observe(AssetObservation(
+                delivery_id=delivery_id,
+                object_id=delivery_id,
+                representation_kind="assistant_generated",
+                payload=body,
+                file_name=out_path.name,
+                mime_type=art.get("media_type"),
+                upstream_locator=location,
+            ))
             ok += 1
             manifest.append({
                 "slug": slug,
@@ -97,6 +148,16 @@ async def download_artifacts(
                 "caption": art.get("caption"),
             })
         except Exception as e:
+            delivery_id = str(art.get("asset_id") or slug)
+            capture.observe(AssetObservation(
+                delivery_id=delivery_id,
+                object_id=delivery_id,
+                representation_kind="assistant_generated",
+                file_name=out_path.name,
+                mime_type=art.get("media_type"),
+                upstream_locator=location,
+                failure_reason=str(e)[:200],
+            ))
             failed += 1
             manifest.append({
                 "slug": slug,
@@ -107,6 +168,8 @@ async def download_artifacts(
 
     with open(files_dir / "_manifest.json", "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
+
+    capture.finish(complete_discovery=complete_discovery)
 
     return {
         "downloaded": ok,

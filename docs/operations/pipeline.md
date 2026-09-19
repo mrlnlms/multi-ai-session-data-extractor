@@ -16,6 +16,91 @@ Os reconcilers tratam assets binarios como imutaveis: ao preserva-los em
 uma copia normal como fallback quando o filesystem nao suporta links. JSON,
 manifestos e outros arquivos que podem ser anotados continuam independentes.
 
+## Transicao do asset vault
+
+O contrato publicado em `assets.parquet`, `asset_links.parquet` e
+`Message.asset_paths` nao determina onde os bytes ficam armazenados. O asset
+vault central, content-addressed por SHA-256, esta materializado e validado em
+`data/assets`; ele e o default operacional, mas **ainda nao foi staged nem
+publicado pelo DVC**. Ate a publicacao e uma coleta incremental real, as arvores
+legacy em `raw`, `merged` e `external` permanecem preservadas como rollback e
+nao podem ser removidas.
+
+### Selecao explicita de leitura e escrita
+
+Cada fonte usa um modo explicito, nunca inferido pela presenca de diretorios:
+
+- `vault` e o default e usa o log duravel e os blobs em `data/assets`, com
+  `data/` como raiz de dados; ambas as raizes podem ser sobrescritas
+  explicitamente;
+- `legacy` continua lendo/escrevendo os caminhos antigos e deve ser selecionado
+  explicitamente somente para rollback temporario.
+
+No dashboard, selecione `legacy` ou `vault` antes da execucao. No modo
+headless, a selecao e por fonte; fontes omitidas usam `vault`:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.workflows.headless --no-publish
+
+# rollback temporario por fonte
+PYTHONPATH=. .venv/bin/python -m src.workflows.headless --no-publish \
+  --asset-mode Gemini=legacy
+```
+
+O modo `vault` escreve primeiro o blob imutavel e o registro de captura
+append-only; `state.json`, as tabelas e os paths compativeis sao projecoes
+reconstruiveis. O reader valida o blob antes de expor um path. Writers usam
+lock exclusivo por fonte/conta, commits idempotentes e `fsync`; um append
+interrompido e recuperado ate o ultimo commit completo.
+
+### Migracao, verificacao e restore local
+
+A migracao excepcional e preview-first. Gere um plano fora de `data/`, revise
+o JSON e execute-o em uma raiz temporaria. `run` valida o checksum e o drift
+dos inputs, e recusa `data/assets` sem `--apply-canonical`:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.operations.migrate_asset_vault plan \
+  --data-root data --output /tmp/asset-vault-plan.json
+PYTHONPATH=. .venv/bin/python -m src.operations.migrate_asset_vault run \
+  /tmp/asset-vault-plan.json --vault-root /tmp/asset-vault/assets
+PYTHONPATH=. .venv/bin/python -m src.operations.verify_asset_vault verify \
+  --vault-root /tmp/asset-vault/assets
+```
+
+O restore local aceita somente um destino vazio, copia apenas o estado duravel
+(`schema.json`, blobs e logs) e reconstrui os `state.json` antes de verificar:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.operations.verify_asset_vault restore \
+  --vault-root /tmp/asset-vault/assets \
+  --destination /tmp/asset-vault-restored/assets
+```
+
+Esse comando prova reconstrução local; restore via Git/DVC/remoto continua um
+gate separado e ainda nao foi validado. Nenhum desses comandos apaga evidencia
+legacy.
+
+### Retencao e rollback
+
+Durante a transicao, retenha juntos os blobs, `schema.json` e todos os
+`scopes/*/*/records.jsonl`; os logs commitados sao a fonte duravel do estado do
+vault. `state.json`, paths compativeis e Parquets podem ser reconstruidos. Nao
+existe coleta de lixo autorizada para o vault e blobs nao devem ser removidos
+isoladamente.
+
+`processed` e `unified` continuam no DVC durante esta transicao. Um restore frio
+do remoto e diagnostico opcional para divergencia ou incidente de recuperacao,
+nao gate automatico de publicacao; os gates normais sao push bem-sucedido,
+status local/remoto limpos e um novo recibo de archive assurance.
+
+O rollback operacional e selecionar novamente `legacy` para a fonte e
+reprocessar a partir das arvores preservadas. Como a migracao e os writers nao
+removem essas arvores, o rollback nao depende de converter o vault de volta.
+O default `vault` nao autoriza remover a evidencia legacy. Mantenha o rollback
+ate a publicacao verificada e uma coleta incremental real; limpeza e `dvc gc`
+ficam fora desta transicao e exigem aprovacao separada.
+
 Use `PYTHONPATH=. .venv/bin/python` para executar scripts sem depender do
 Python global.
 

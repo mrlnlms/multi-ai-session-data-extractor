@@ -32,6 +32,10 @@ from typing import Optional
 
 import pandas as pd
 
+from src.assets.cli_incremental import CLIAssetCaptureSession, CLIAssetObservation
+from src.assets.incremental import DEFAULT_MAX_BATCH_BYTES
+from src.assets.reader import AssetReader, VaultAssetReader
+from src.assets.vault import AssetVault
 from src.parsing.agent_memory import parse_memories_for_source
 from src.parsing.base import BaseParser
 
@@ -83,8 +87,27 @@ def make_embedded_image_asset_id(
 class ClaudeCodeParser(BaseParser):
     source_name = "claude_code"
 
-    def __init__(self, account: Optional[str] = None):
-        super().__init__(account=account)
+    def __init__(
+        self,
+        account: Optional[str] = None,
+        account_id: Optional[str] = None,
+        *,
+        asset_reader: AssetReader | None = None,
+        asset_vault: AssetVault | None = None,
+        asset_data_root: Path | None = None,
+        asset_max_batch_bytes: int = DEFAULT_MAX_BATCH_BYTES,
+    ):
+        if asset_vault is not None and asset_data_root is None:
+            raise ValueError("asset_data_root is required when asset_vault is enabled")
+        self.asset_vault = asset_vault
+        self.asset_data_root = Path(asset_data_root) if asset_data_root is not None else None
+        self.asset_max_batch_bytes = asset_max_batch_bytes
+        if asset_reader is None and asset_vault is not None:
+            assert self.asset_data_root is not None
+            asset_reader = VaultAssetReader(asset_vault, self.asset_data_root)
+        super().__init__(
+            account=account, account_id=account_id, asset_reader=asset_reader
+        )
         self.branches: list[Branch] = []
         self._chain_links: dict[str, str] = {}
         self._conv_source_files: dict[str, set[str]] = {}
@@ -100,6 +123,7 @@ class ClaudeCodeParser(BaseParser):
         self.agent_memories = []
         self.assets: list[Asset] = []
         self.asset_links: list[AssetLink] = []
+        self._asset_capture: CLIAssetCaptureSession | None = None
 
     def parse(self, input_path: Path, home_memory_files: Optional[set[str]] = None) -> None:
         """Le sessoes JSONL de todos os projetos em input_path.
@@ -129,6 +153,16 @@ class ClaudeCodeParser(BaseParser):
         """
         input_path = Path(input_path)
         self._input_path = input_path
+        if self.asset_vault is not None:
+            assert self.asset_data_root is not None
+            self._asset_capture = CLIAssetCaptureSession(
+                self.asset_vault,
+                source=self.source_name,
+                account_id=self.account_id,
+                evidence_path=input_path,
+                data_root=self.asset_data_root,
+                max_batch_bytes=self.asset_max_batch_bytes,
+            )
 
         # FASE 1: descobrir cadeias de compactacao globalmente
         self._chain_links = self._build_chain_links(input_path)
@@ -199,6 +233,9 @@ class ClaudeCodeParser(BaseParser):
         # Agent memory ingestion (Slice C — Task C4)
         mem_files = home_memory_files if home_memory_files is not None else set()
         self.agent_memories = parse_memories_for_source(input_path, "claude_code", mem_files)
+        if self._asset_capture is not None:
+            self._asset_capture.finish()
+        self.apply_asset_reader()
 
     def _build_chain_links(self, input_path: Path) -> dict[str, str]:
         """Identifica cadeias de compactacao varrendo o primeiro sessionId de
@@ -377,7 +414,7 @@ class ClaudeCodeParser(BaseParser):
         session_id: str,
         msg_seq: int,
         block_idx: int,
-    ) -> Optional[tuple[str, str, int, str]]:
+    ) -> Optional[tuple[str, str, int, str | None, bytes]]:
         # Imagens user-attached em sessoes Claude Code chegam inline base64.
         # Decodifica e salva em <raw_root>/_images/<session_id>/seq_idx.<ext>;
         # retorna path, hash, tamanho e MIME para o catalogo canonico.
@@ -391,7 +428,6 @@ class ClaudeCodeParser(BaseParser):
             return None
         raw_root = getattr(self, "_input_path", None) or session_file.parent.parent
         out_dir = Path(raw_root) / "_images" / session_id
-        out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / f"{msg_seq}_{block_idx}{ext}"
         try:
             decoded = base64.b64decode(data, validate=True)
@@ -399,16 +435,18 @@ class ClaudeCodeParser(BaseParser):
             logger.warning(f"  {session_file}: falha decode imagem msg={msg_seq}: {e}")
             return None
         digest = hashlib.sha256(decoded).hexdigest()
-        if out_path.exists():
-            existing_digest = hashlib.sha256(out_path.read_bytes()).hexdigest()
-            if existing_digest != digest:
-                raise ValueError(
-                    f"preserved Claude Code image hash mismatch: {out_path}"
-                )
-        else:
-            out_path.write_bytes(decoded)
+        if self._asset_capture is None:
+            out_dir.mkdir(parents=True, exist_ok=True)
+            if out_path.exists():
+                existing_digest = hashlib.sha256(out_path.read_bytes()).hexdigest()
+                if existing_digest != digest:
+                    raise ValueError(
+                        f"preserved Claude Code image hash mismatch: {out_path}"
+                    )
+            else:
+                out_path.write_bytes(decoded)
         rel_path = f"raw/Claude Code/_images/{session_id}/{out_path.name}"
-        return rel_path, digest, len(decoded), media_type or None
+        return rel_path, digest, len(decoded), media_type or None, decoded
 
     def _parse_session(
         self,
@@ -521,14 +559,14 @@ class ClaudeCodeParser(BaseParser):
                         block, session_file, session_id, seq, image_ordinal
                     )
                     if saved:
-                        asset_path, digest, size_bytes, media_type = saved
+                        asset_path, digest, size_bytes, media_type, payload = saved
                         attachment_names.append(asset_path.removeprefix("raw/Claude Code/"))
                         asset_paths.append(asset_path)
                         ct_set.add("image")
                         asset_id = make_embedded_image_asset_id(
                             session_id, message_id, content_idx, digest
                         )
-                        self.assets.append(Asset(
+                        asset = Asset(
                             asset_id=asset_id,
                             source=self.source_name,
                             account_id=self.account_id,
@@ -545,9 +583,10 @@ class ClaudeCodeParser(BaseParser):
                             metadata_json=json.dumps(
                                 {"content_sha256": digest}, sort_keys=True
                             ),
-                        ))
+                        )
+                        self.assets.append(asset)
                         relationship_conv_id = override_conv_id or session_id
-                        self.asset_links.append(AssetLink(
+                        link = AssetLink(
                             asset_link_id=make_asset_link_id(
                                 self.source_name,
                                 self.account_id,
@@ -570,7 +609,15 @@ class ClaudeCodeParser(BaseParser):
                             ordinal=image_ordinal,
                             content_block_index=content_idx,
                             metadata_json=None,
-                        ))
+                        )
+                        self.asset_links.append(link)
+                        if self._asset_capture is not None:
+                            self._asset_capture.observe(CLIAssetObservation(
+                                asset=asset,
+                                link=link,
+                                payload=payload,
+                                representation_kind="user_attachment",
+                            ))
 
                 messages.append(Message(
                     message_id=message_id,

@@ -2,6 +2,7 @@
 """Schema unificado para dados de interacao com AI."""
 
 from dataclasses import dataclass, fields, asdict
+from pathlib import PurePosixPath
 from typing import Optional
 import uuid
 
@@ -30,6 +31,22 @@ def _validate_account_id(account_id: Optional[str]) -> None:
         raise ValueError("account_id must be a canonical UUID string or None") from exc
     if str(parsed) != account_id:
         raise ValueError("account_id must be a canonical UUID string or None")
+
+
+def normalize_data_relative_path(value: str) -> str:
+    """Return one canonical path relative to ``data/``.
+
+    Historical message projections may already include the leading ``data/``
+    component, while asset paths are relative to it. Keep one public
+    convention at the DataFrame boundary without changing parser internals.
+    """
+    if not isinstance(value, str) or not value:
+        raise ValueError("data-relative path must be a non-empty string")
+    normalized = value.removeprefix("data/")
+    path = PurePosixPath(normalized)
+    if not normalized or normalized == "." or path.is_absolute() or ".." in path.parts:
+        raise ValueError(f"path must be relative to data/: {value}")
+    return normalized
 
 
 @dataclass
@@ -517,7 +534,16 @@ def conversations_to_df(convs: list[Conversation]) -> pd.DataFrame:
 
 def messages_to_df(msgs: list[Message]) -> pd.DataFrame:
     cols = [f.name for f in fields(Message)]
-    return _models_to_df(msgs, cols)
+    frame = _models_to_df(msgs, cols)
+    if frame.empty:
+        return frame
+    frame["asset_paths"] = frame["asset_paths"].map(
+        lambda paths: (
+            [normalize_data_relative_path(path) for path in paths]
+            if paths is not None else None
+        )
+    )
+    return frame
 
 
 def tool_events_to_df(events: list[ToolEvent]) -> pd.DataFrame:

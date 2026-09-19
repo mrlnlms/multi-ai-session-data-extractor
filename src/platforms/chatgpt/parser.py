@@ -24,6 +24,7 @@ from typing import Optional
 
 import pandas as pd
 
+from src.assets.reader import AssetReader
 from src.parsing.base import BaseParser
 from src.platforms.chatgpt._parser_helpers import (
     classify_event_type,
@@ -60,8 +61,9 @@ class ChatGPTParser(BaseParser):
     source_name = "chatgpt"
 
     def __init__(self, account: Optional[str] = None, raw_root: Optional[Path] = None,
-                 account_id: Optional[str] = None):
-        super().__init__(account, account_id)
+                 account_id: Optional[str] = None, *,
+                 asset_reader: AssetReader | None = None):
+        super().__init__(account, account_id, asset_reader=asset_reader)
         self.raw_root = Path(raw_root) if raw_root else Path("data/raw/ChatGPT")
 
     def reset(self):
@@ -92,6 +94,7 @@ class ChatGPTParser(BaseParser):
         for conv_id, conv_data in convs.items():
             self._extract_conv(conv_id, conv_data, last_run_date)
         self._record_preserved_file_assets()
+        self.apply_asset_reader()
 
     @staticmethod
     def _compute_last_run_date(convs: dict) -> Optional[str]:

@@ -18,6 +18,7 @@ from src.schema.models import (
     assets_to_df,
     asset_links_to_df,
     make_asset_link_id,
+    normalize_data_relative_path,
 )
 
 
@@ -253,6 +254,37 @@ def test_messages_to_df():
     df = messages_to_df(msgs)
     assert len(df) == 2
     assert df["sequence"].tolist() == [1, 2]
+
+
+def test_messages_to_df_normalizes_asset_paths_relative_to_data():
+    message = Message(
+        message_id="msg_1",
+        conversation_id="conv_1",
+        source="gemini",
+        sequence=1,
+        role="assistant",
+        content="",
+        model=None,
+        created_at=pd.Timestamp("2026-01-01"),
+        asset_paths=[
+            "data/merged/Gemini/account-1/assets/image.png",
+            "raw/Gemini/account-1/assets/input.png",
+        ],
+    )
+
+    frame = messages_to_df([message])
+
+    assert frame.iloc[0]["asset_paths"] == [
+        "merged/Gemini/account-1/assets/image.png",
+        "raw/Gemini/account-1/assets/input.png",
+    ]
+    assert message.asset_paths[0].startswith("data/")
+
+
+@pytest.mark.parametrize("path", ["/absolute/file.png", "data/../secret", "raw/../secret"])
+def test_normalize_data_relative_path_rejects_paths_outside_data(path):
+    with pytest.raises(ValueError, match="relative to data"):
+        normalize_data_relative_path(path)
 
 
 def test_tool_events_to_df():

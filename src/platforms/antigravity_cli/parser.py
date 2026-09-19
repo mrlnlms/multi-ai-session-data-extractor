@@ -22,6 +22,10 @@ from typing import Any, Optional
 
 import pandas as pd
 
+from src.assets.cli_incremental import CLIAssetCaptureSession, CLIAssetObservation
+from src.assets.incremental import DEFAULT_MAX_BATCH_BYTES
+from src.assets.reader import AssetReader, VaultAssetReader
+from src.assets.vault import AssetVault
 from src.parsing.base import BaseParser
 from src.schema.models import (
     Branch,
@@ -58,8 +62,27 @@ class AntigravityCLIParser(BaseParser):
 
     source_name = "antigravity_cli"
 
-    def __init__(self, account: Optional[str] = None):
-        super().__init__(account=account)
+    def __init__(
+        self,
+        account: Optional[str] = None,
+        account_id: Optional[str] = None,
+        *,
+        asset_reader: AssetReader | None = None,
+        asset_vault: AssetVault | None = None,
+        asset_data_root: Path | None = None,
+        asset_max_batch_bytes: int = DEFAULT_MAX_BATCH_BYTES,
+    ):
+        if asset_vault is not None and asset_data_root is None:
+            raise ValueError("asset_data_root is required when asset_vault is enabled")
+        self.asset_vault = asset_vault
+        self.asset_data_root = Path(asset_data_root) if asset_data_root is not None else None
+        self.asset_max_batch_bytes = asset_max_batch_bytes
+        if asset_reader is None and asset_vault is not None:
+            assert self.asset_data_root is not None
+            asset_reader = VaultAssetReader(asset_vault, self.asset_data_root)
+        super().__init__(
+            account=account, account_id=account_id, asset_reader=asset_reader
+        )
         self.branches: list[Branch] = []
         self._conv_source_files: dict[str, set[str]] = {}
         self._input_path: Optional[Path] = None
@@ -77,6 +100,7 @@ class AntigravityCLIParser(BaseParser):
         self._summaries = {}
         self.assets: list[Asset] = []
         self.asset_links: list[AssetLink] = []
+        self._asset_capture: CLIAssetCaptureSession | None = None
 
     @staticmethod
     def _decoded_string(value: Any) -> Optional[str]:
@@ -126,12 +150,13 @@ class AntigravityCLIParser(BaseParser):
             self._input_path / "_artifacts" / conversation_id
             / f"{message_id.rsplit('_', 1)[-1]}_{tool_index}{suffix}"
         )
-        out.parent.mkdir(parents=True, exist_ok=True)
-        if out.exists():
-            if hashlib.sha256(out.read_bytes()).hexdigest() != digest:
-                raise ValueError(f"preserved Antigravity artifact hash mismatch: {out}")
-        else:
-            out.write_bytes(encoded)
+        if self._asset_capture is None:
+            out.parent.mkdir(parents=True, exist_ok=True)
+            if out.exists():
+                if hashlib.sha256(out.read_bytes()).hexdigest() != digest:
+                    raise ValueError(f"preserved Antigravity artifact hash mismatch: {out}")
+            else:
+                out.write_bytes(encoded)
         asset_path = f"raw/Antigravity CLI/_artifacts/{conversation_id}/{out.name}"
         asset_id = make_artifact_asset_id(
             conversation_id, message_id, tool_index, digest
@@ -141,7 +166,7 @@ class AntigravityCLIParser(BaseParser):
             for key in ("ArtifactType", "RequestFeedback", "UserFacing")
             if key in metadata
         }
-        self.assets.append(Asset(
+        asset = Asset(
             asset_id=asset_id, source=self.source_name, account_id=self.account_id,
             asset_kind="artifact", asset_origin="assistant",
             file_name=Path(target).name, mime_type=mimetypes.guess_type(target)[0],
@@ -151,8 +176,9 @@ class AntigravityCLIParser(BaseParser):
             metadata_json=json.dumps(
                 {"content_sha256": digest, **public_metadata}, sort_keys=True
             ),
-        ))
-        self.asset_links.append(AssetLink(
+        )
+        self.assets.append(asset)
+        link = AssetLink(
             asset_link_id=make_asset_link_id(
                 self.source_name, self.account_id, asset_id, "message", message_id,
                 "output", tool_index,
@@ -162,13 +188,31 @@ class AntigravityCLIParser(BaseParser):
             conversation_id=conversation_id, message_id=message_id,
             project_id=None, role="output", ordinal=tool_index,
             content_block_index=None, metadata_json=None,
-        ))
+        )
+        self.asset_links.append(link)
+        if self._asset_capture is not None:
+            self._asset_capture.observe(CLIAssetObservation(
+                asset=asset,
+                link=link,
+                payload=encoded,
+                representation_kind="assistant_artifact",
+            ))
         return asset_path
 
     def parse(self, input_path: Path) -> None:
         """Parse all readable trajectories and retain opaque containers as stubs."""
         input_path = Path(input_path)
         self._input_path = input_path
+        if self.asset_vault is not None:
+            assert self.asset_data_root is not None
+            self._asset_capture = CLIAssetCaptureSession(
+                self.asset_vault,
+                source=self.source_name,
+                account_id=self.account_id,
+                evidence_path=input_path,
+                data_root=self.asset_data_root,
+                max_batch_bytes=self.asset_max_batch_bytes,
+            )
         self._history = self._load_history(input_path / "history.jsonl")
         self._metadata = self._load_metadata(input_path / "cache" / "conversation_metadata.json")
         self._summaries = self._load_sqlite_summaries(input_path / "conversation_summaries.db")
@@ -191,6 +235,9 @@ class AntigravityCLIParser(BaseParser):
         self._build_branches()
         from src.capture.cli.preservation import mark_cli_preservation
         mark_cli_preservation(self)
+        if self._asset_capture is not None:
+            self._asset_capture.finish()
+        self.apply_asset_reader()
 
     def _relative_path(self, path: Path) -> Optional[str]:
         if self._input_path is None:

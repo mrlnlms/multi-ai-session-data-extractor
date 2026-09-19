@@ -58,6 +58,25 @@ Dois caminhos para o mesmo arquivo fisico. E usado quando capturas distintas
 referenciam o mesmo binario; nao duplica espaco. O arquivo so desaparece ao
 remover seu ultimo link.
 
+### Asset vault
+
+Armazenamento central append-only para assets, com blobs imutaveis enderecados
+por SHA-256 e logs duraveis por fonte/conta. `state.json`, paths compativeis e
+tabelas publicadas sao projecoes reconstruiveis desses logs e blobs. O vault
+esta materializado em `data/assets` e e o default operacional, mas ainda nao foi
+staged ou publicado pelo DVC; `legacy` permanece como rollback explicito e suas
+arvores devem ser preservadas. O
+[procedimento operacional](../operations/pipeline.md#transicao-do-asset-vault)
+documenta selecao, restore, retencao e rollback.
+
+### Modo de asset (`legacy` / `vault`)
+
+Selecao explicita da fronteira de armazenamento usada por uma fonte.
+`legacy` le e grava as arvores atuais; `vault` usa por default `data/assets` e
+`data`, aceita overrides explícitos e opera sobre os logs/blobs centrais. O modo
+nunca deve ser inferido pela existencia de arquivos. Essa escolha altera o
+armazenamento e o reader, nao o schema publicado de `Asset` e `AssetLink`.
+
 ### Voice pass
 
 Etapa opcional que abre uma conversa no DOM para procurar a transcricao de
@@ -117,6 +136,9 @@ conversa, projeto, fonte ou output. `role` descreve o uso contextual
 (`input`, `output`, `context`, `reference` ou `unknown`), enquanto
 `content_block_index` permite posicionamento inline quando a fonte oferece essa
 evidencia. Um mesmo asset pode ter varios vinculos sem duplicar seus metadados.
+`Message.asset_paths`, quando materializado para compatibilidade, segue a mesma
+convencao de `Asset.asset_path`: cada entrada e relativa a `data/` e nao inclui
+o prefixo `data/`.
 
 ### Custom GPT e Project
 

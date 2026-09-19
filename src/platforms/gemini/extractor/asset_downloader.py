@@ -10,6 +10,12 @@ import json
 import mimetypes
 from pathlib import Path
 
+from src.assets.incremental import (
+    AssetObservation,
+    WebAssetCaptureSession,
+    commit_web_asset_capture,
+)
+from src.assets.vault import AssetVault
 from src.platforms.gemini.extractor.api_client import GeminiAPIClient, extract_image_urls
 
 
@@ -25,10 +31,22 @@ async def download_assets(
     raw_dir: Path,
     concurrency: int = 5,
     skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+    complete_discovery: bool = True,
 ) -> dict:
     """Varre conversations/*.json, extrai URLs, baixa binarios."""
     conv_dir = raw_dir / "conversations"
     if not conv_dir.exists():
+        commit_web_asset_capture(
+            asset_vault,
+            source="gemini",
+            account_id=account_id,
+            observations=(),
+            complete_discovery=complete_discovery,
+            evidence_path=conv_dir,
+        )
         return {"downloaded": 0, "skipped": 0, "errors": []}
 
     # Coleta URLs unicos (conv_id, url)
@@ -63,6 +81,13 @@ async def download_assets(
     stats = {"downloaded": 0, "skipped": 0, "errors": []}
     done = 0
     total = len(all_urls)
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="gemini",
+        account_id=account_id,
+        evidence_path=raw_dir,
+        capture_method="web_asset_download",
+    )
 
     async def _one(url: str, conv_id: str):
         nonlocal done
@@ -72,6 +97,18 @@ async def download_assets(
             if skip_existing and h in manifest:
                 existing = assets_dir / manifest[h].get("filename", "")
                 if existing.exists():
+                    info = manifest[h]
+                    payload = existing.read_bytes() if asset_vault is not None else None
+                    delivery_id = hashlib.sha256(payload).hexdigest() if payload is not None else h
+                    capture.observe(AssetObservation(
+                        delivery_id=delivery_id,
+                        object_id=delivery_id,
+                        representation_kind="delivery",
+                        payload=payload,
+                        file_name=existing.name,
+                        mime_type=info.get("content_type"),
+                        upstream_locator=url,
+                    ))
                     stats["skipped"] += 1
                     done += 1
                     return
@@ -79,12 +116,30 @@ async def download_assets(
                 resp = await client.context.request.get(url)
                 if not resp.ok:
                     stats["errors"].append((url[:80], f"HTTP {resp.status}"))
+                    delivery_id = "manifest:" + hashlib.sha256(url.encode()).hexdigest()
+                    capture.observe(AssetObservation(
+                        delivery_id=delivery_id,
+                        object_id=delivery_id,
+                        representation_kind="delivery",
+                        upstream_locator=url,
+                        failure_reason=f"HTTP {resp.status}",
+                    ))
                     done += 1
                     return
                 blob = await resp.body()
                 ct = resp.headers.get("content-type", "application/octet-stream")
                 filename = _filename_from_url(url, ct)
                 (assets_dir / filename).write_bytes(blob)
+                delivery_id = hashlib.sha256(blob).hexdigest()
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=delivery_id,
+                    representation_kind="delivery",
+                    payload=blob,
+                    file_name=filename,
+                    mime_type=ct,
+                    upstream_locator=url,
+                ))
                 manifest[h] = {
                     "url": url,
                     "conv_id": conv_id,
@@ -95,6 +150,14 @@ async def download_assets(
                 stats["downloaded"] += 1
             except Exception as e:
                 stats["errors"].append((url[:80], str(e)[:150]))
+                delivery_id = "manifest:" + hashlib.sha256(url.encode()).hexdigest()
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=delivery_id,
+                    representation_kind="delivery",
+                    upstream_locator=url,
+                    failure_reason=str(e)[:150],
+                ))
             done += 1
             if done % 20 == 0:
                 print(
@@ -106,6 +169,7 @@ async def download_assets(
 
     # Salva manifest
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
+    capture.finish(complete_discovery=complete_discovery)
     print(
         f"  [{done}/{total}] dl={stats['downloaded']} "
         f"skip={stats['skipped']} err={len(stats['errors'])} (final)"
@@ -137,7 +201,13 @@ def _is_markdown_report(s: str) -> bool:
     return bool(re.search(r'\n##?\s+\w', head))
 
 
-def extract_deep_research(raw_dir: Path, skip_existing: bool = True) -> dict:
+def extract_deep_research(
+    raw_dir: Path,
+    skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+) -> dict:
     """Extrai relatorios Deep Research de conversations/*.json.
 
     Heuristica: strings >=2500 chars no raw aninhado que parecam markdown
@@ -153,6 +223,13 @@ def extract_deep_research(raw_dir: Path, skip_existing: bool = True) -> dict:
     out_root.mkdir(parents=True, exist_ok=True)
 
     stats = {"extracted": 0, "skipped_existing": 0, "errors": []}
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="gemini",
+        account_id=account_id,
+        evidence_path=conv_dir,
+        capture_method="web_asset_download:deep_research",
+    )
 
     for jp in sorted(conv_dir.glob("*.json")):
         try:
@@ -183,11 +260,31 @@ def extract_deep_research(raw_dir: Path, skip_existing: bool = True) -> dict:
             h = hashlib.sha1(content.encode()).hexdigest()[:10]
             fname = f"report_{idx:02d}_{h}.md"
             out_path = out_conv / fname
+            payload = content.encode()
+            delivery_id = hashlib.sha256(payload).hexdigest()
             if skip_existing and out_path.exists():
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=delivery_id,
+                    representation_kind="assistant_output",
+                    payload=(out_path.read_bytes() if asset_vault is not None else None),
+                    file_name=out_path.name,
+                    mime_type="text/markdown",
+                    upstream_locator=f"{cid}:{path}",
+                ))
                 stats["skipped_existing"] += 1
                 continue
             try:
                 out_path.write_text(content, encoding="utf-8")
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=delivery_id,
+                    representation_kind="assistant_output",
+                    payload=payload,
+                    file_name=out_path.name,
+                    mime_type="text/markdown",
+                    upstream_locator=f"{cid}:{path}",
+                ))
                 stats["extracted"] += 1
                 meta_path = out_path.with_suffix(".md.meta.json")
                 # Tenta extrair titulo da primeira linha
@@ -201,4 +298,5 @@ def extract_deep_research(raw_dir: Path, skip_existing: bool = True) -> dict:
             except Exception as e:
                 stats["errors"].append((fname, str(e)[:100]))
 
+    capture.finish(complete_discovery=False)
     return stats

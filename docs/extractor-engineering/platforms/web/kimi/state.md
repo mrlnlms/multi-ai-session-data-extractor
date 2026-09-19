@@ -146,6 +146,17 @@ Cursor pagination via `nextPageToken`. Bearer token obrigatorio em
 
 O comportamento da migracao de origem e outros fatos upstream ficam em
 [server-behavior.md](server-behavior.md).
+## Asset vault transition
+
+`vault` is the default asset reader, using `data/assets` and `data` unless roots
+are overridden explicitly. `legacy` remains an explicit temporary rollback;
+filesystem contents never select the mode. The legacy tree remains preserved,
+while the vault reader projects the same public `Asset`, `AssetLink`, and
+`Message.asset_paths` contract. For Kimi, reader scope preserves the observable
+conversation/file association; unknown author or message placement remains
+unknown rather than being inferred. See the [operational
+transition](../../../../operations/pipeline.md#transicao-do-asset-vault).
+
 ## Explicit login-health check
 
 A one-row `ListChats` request is the established read-only check; cookies plus the existing `access_token` are required. Profile presence alone never produces a valid status. The check is

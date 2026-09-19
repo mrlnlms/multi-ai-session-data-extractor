@@ -52,6 +52,16 @@ class PipelineRequest:
     platforms: tuple[str, ...]
     publish_after: bool
     scope: str = "all"
+    asset_modes: tuple[tuple[str, str], ...] = ()
+    asset_vault_root: Path | None = Path("data/assets")
+    asset_data_root: Path | None = Path("data")
+
+    def asset_mode_for(self, platform: str) -> str:
+        modes = dict(self.asset_modes)
+        unknown = set(modes).difference(self.platforms)
+        if unknown:
+            raise ValueError(f"asset modes configured for unselected platforms: {sorted(unknown)}")
+        return modes.get(platform, "vault")
 
 
 @dataclass(frozen=True)
@@ -121,7 +131,16 @@ def run_pipeline(
         )
 
     def finish() -> PipelineResult:
-        persist_run(statuses, results, request.publish_after, request.scope)
+        persist_run(
+            statuses,
+            results,
+            request.publish_after,
+            request.scope,
+            asset_modes={
+                platform: request.asset_mode_for(platform)
+                for platform in request.platforms
+            },
+        )
         outcome = PipelineResult(tuple(statuses), tuple(results))
         notify(PipelineEvent("finished"))
         return outcome
@@ -145,7 +164,13 @@ def run_pipeline(
                 )
 
             try:
-                rc, tail = run_sync(platform, on_line=on_sync_line)
+                rc, tail = run_sync(
+                    platform,
+                    on_line=on_sync_line,
+                    asset_mode=request.asset_mode_for(platform),
+                    vault_root=request.asset_vault_root,
+                    data_root=request.asset_data_root,
+                )
             except Exception as exc:  # noqa: BLE001
                 rc, tail = -1, f"exception: {exc}"
             ok = rc == 0
@@ -168,14 +193,19 @@ def run_pipeline(
                 )
             )
 
-        if not any_sync_ok:
+        if any_sync_fail:
             set_stage(0, "failed")
             for index, step in ((1, "abort"), (2, "quarto-render")):
                 set_stage(index, "aborted")
-                add_result(index, step, "aborted", "all stage 1 platforms failed")
+                detail = (
+                    "stage 1 requires every selected platform to succeed"
+                    if any_sync_ok
+                    else "all stage 1 platforms failed"
+                )
+                add_result(index, step, "aborted", detail)
             if request.publish_after:
                 set_stage(3, "aborted")
-                add_result(3, "abort", "aborted", "all stage 1 platforms failed")
+                add_result(3, "abort", "aborted", detail)
             return finish()
         set_stage(0, "failed" if any_sync_fail else "done")
 
@@ -258,6 +288,7 @@ def persist_run(
     results: list[dict],
     publish_after: bool,
     scope: str,
+    asset_modes: dict[str, str] | None = None,
 ) -> None:
     """Append pipeline metadata without retaining potentially large tails."""
     entry = {
@@ -265,6 +296,7 @@ def persist_run(
         "scope": scope,
         "stage_status": list(stage_status),
         "publish": publish_after,
+        "asset_modes": dict(asset_modes or {}),
         "results": [{key: value for key, value in row.items() if key != "tail"} for row in results],
     }
     try:

@@ -83,10 +83,8 @@ def setup_unified_views(
         sources_filter: lista de sources (ex: ['chatgpt','claude_ai']) ou None
             pra todas. Aplicado via WHERE source IN (...) na criacao da view.
 
-    Tabelas esperadas em unified_dir:
-    - 4 canonicas: conversations, messages, tool_events, branches
-    - 7 auxiliares: sources, notes, outputs, guide_questions, source_guides,
-      project_metadata, project_docs
+    Carrega todas as tabelas publicadas que existirem em ``unified_dir``,
+    inclusive o grafo de assets usado pelo overview.
 
     Returns: {table: row_count} de cada view criada.
     """
@@ -94,6 +92,7 @@ def setup_unified_views(
         "conversations", "messages", "tool_events", "branches",
         "sources", "notes", "outputs", "guide_questions", "source_guides",
         "project_metadata", "project_docs",
+        "conversation_projects", "agent_memories", "assets", "asset_links",
     ]
     counts: dict[str, int] = {}
     for table in TABLES:

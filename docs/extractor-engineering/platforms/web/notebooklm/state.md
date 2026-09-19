@@ -298,6 +298,17 @@ for f in notebooklm notebooklm-acc-1 notebooklm-acc-2; do
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd
 done
 ```
+## Asset vault transition
+
+`vault` is the default asset reader, using `data/assets` and `data` unless roots
+are overridden explicitly. `legacy` remains an explicit temporary rollback;
+filesystem contents never select the mode. The legacy tree remains preserved,
+while the vault reader projects the same public `Asset`, `AssetLink`, and
+`Message.asset_paths` contract. NotebookLM is library-scoped: preserved files
+retain their evidenced source, note, or output-object links, including
+multi-file outputs, without treating text-only domain records as assets. See
+the [operational transition](../../../../operations/pipeline.md#transicao-do-asset-vault).
+
 ## Explicit login-health check
 
 A single `wXbhsf` notebook listing is the established read-only check; a successful parsed response is the only path to `valid`. Profile presence alone never produces a valid status. The check is

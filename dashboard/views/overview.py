@@ -23,6 +23,8 @@ from dashboard.pipeline import (
 )
 from src.workflows.execution import sync_command
 
+ASSET_MODE_OPTIONS = ("vault", "legacy")
+
 
 @st.cache_data(show_spinner=False)
 def _cached_merged_stats(merged_path_str: str, mtime: float):
@@ -191,11 +193,18 @@ def render(states: list[PlatformState]) -> None:
              "git push). Stage 4 publishes the data consumed by AI Interaction Analysis. "
              "Uncheck if you want to dry-run sync without pushing.",
     )
+    asset_mode = opt_col.selectbox(
+        "Asset storage mode for selected sources",
+        ASSET_MODE_OPTIONS,
+        key="update_all_asset_mode",
+        disabled=is_running,
+        help="Vault is the canonical default; select legacy only for temporary rollback.",
+    )
     if is_running:
         btn_col.button("🔄 Running…", disabled=True, type="primary", key="update_all_running_btn")
     elif btn_col.button("🔄 Update all", disabled=sync_disabled, type="primary"):
         st.session_state["pipeline_running"] = True
-        _run_update_all(states, publish_after=publish_after)
+        _run_update_all(states, publish_after=publish_after, asset_mode=asset_mode)
 
     st.divider()
 
@@ -288,13 +297,22 @@ def _render_overview_qmds_section() -> None:
                     st.error(f"❌ {label}: {err}")
 
 
-def _run_update_all(states: list[PlatformState], publish_after: bool = True) -> None:
+def _run_update_all(
+    states: list[PlatformState],
+    publish_after: bool = True,
+    asset_mode: str = "vault",
+) -> None:
     targets = [s for s in states if sync_command(s.name)]
     if not targets:
         st.error("No sync available.")
         st.session_state["pipeline_running"] = False
         return
     try:
-        run_full_pipeline(targets, publish_after, scope="all")
+        run_full_pipeline(
+            targets,
+            publish_after,
+            scope="all",
+            asset_modes={state.name: asset_mode for state in targets},
+        )
     finally:
         st.session_state["pipeline_running"] = False

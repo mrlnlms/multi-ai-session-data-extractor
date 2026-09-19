@@ -53,6 +53,17 @@ same way — sessions are JSONL files in the user's filesystem.
   checkout DVC. Entradas de arquivos ausentes permanecem no sidecar junto do
   conteudo preservado.
 
+## Asset vault transition
+
+`vault` is the default asset reader, using `data/assets` and `data` unless roots
+are overridden explicitly. `legacy` remains an explicit temporary rollback;
+filesystem contents never select the mode. The legacy tree remains preserved,
+while the vault reader projects the same public `Asset`, `AssetLink`, and
+`Message.asset_paths` contract. For Claude Code, reader scope is the inline
+image block and its exact user-message position; deferred external path
+enrichment is not inferred as an asset. See the [operational
+transition](../../../../operations/pipeline.md#transicao-do-asset-vault).
+
 ## Where the real info lives
 
 - **Parser:** `src/platforms/claude_code/parser.py`

@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from src.assets.reader import AssetReader
 from src.reconciliation.files import link_or_copy
 
 logger = logging.getLogger(__name__)
@@ -147,6 +148,8 @@ def run_reconciliation(
     previous_merged: Path | None = None,
     force_refetch_features: set[str] | None = None,
     full: bool = False,
+    asset_reader: AssetReader | None = None,
+    asset_account_id: str | None = None,
 ) -> KimiReconcileReport:
     if previous_merged is None:
         previous_merged = merged_output if merged_output.exists() else None
@@ -218,13 +221,16 @@ def run_reconciliation(
     report.skills_installed = len(skills.get("installed") or [])
 
     # Asset binarios — espelha raw_dir/assets/ pra merged
-    raw_assets = raw_dir / "assets"
-    merged_assets = merged_output / "assets"
-    preserve_asset_tree(raw_assets, merged_assets)
+    if asset_reader is None:
+        raw_assets = raw_dir / "assets"
+        merged_assets = merged_output / "assets"
+        preserve_asset_tree(raw_assets, merged_assets)
 
-    if previous_merged and previous_merged != merged_output:
-        prev_bin = previous_merged / "assets"
-        preserve_asset_tree(prev_bin, merged_assets)
+        if previous_merged and previous_merged != merged_output:
+            prev_bin = previous_merged / "assets"
+            preserve_asset_tree(prev_bin, merged_assets)
+    else:
+        asset_reader.projection_for("kimi", asset_account_id)
 
     raw_manifest = raw_dir / "assets_manifest.json"
     if raw_manifest.exists():

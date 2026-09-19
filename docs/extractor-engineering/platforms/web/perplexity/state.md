@@ -111,6 +111,17 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.login --accou
 PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.sync --account account-2
 PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.parse
 ```
+## Asset vault transition
+
+`vault` is the default asset reader, using `data/assets` and `data` unless roots
+are overridden explicitly. `legacy` remains an explicit temporary rollback;
+filesystem contents never select the mode. The legacy tree remains preserved,
+while the vault reader projects the same public `Asset`, `AssetLink`, and
+`Message.asset_paths` contract. For Perplexity, reader scope preserves exact
+message links for evidenced generated artifacts and retains older uploads as
+metadata-only assets when no binary or position is available. See the
+[operational transition](../../../../operations/pipeline.md#transicao-do-asset-vault).
+
 ## Explicit login-health check
 
 A one-row `list_ask_threads` request is the established read-only check. It is user-triggered and may require a visible Cloudflare-safe browser. Profile presence alone never produces a valid status. The check is

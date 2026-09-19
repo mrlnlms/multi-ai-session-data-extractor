@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
+from src.assets.runtime import asset_subprocess_env
 from src.runtime.project import find_project_root
 from src.platforms.registry import (
     KNOWN_PLATFORMS,
@@ -148,6 +149,10 @@ def run_sync_streaming(
     on_line,
     tail_size: int = 30,
     timeout: Optional[float] = 3600.0,
+    *,
+    asset_mode: str = "legacy",
+    vault_root: Path | None = None,
+    data_root: Path | None = None,
 ) -> tuple[int, str]:
     """Run sync and the mandatory web parser with streaming output.
 
@@ -159,7 +164,16 @@ def run_sync_streaming(
     cmd = sync_command(platform)
     if cmd is None:
         raise RuntimeError(f"No sync or export script found for {platform}")
-    rc, sync_tail = _stream(cmd, on_line, tail_size=tail_size, timeout=timeout)
+    asset_env = asset_subprocess_env(
+        asset_mode, vault_root=vault_root, data_root=data_root
+    )
+    rc, sync_tail = _stream(
+        cmd,
+        on_line,
+        tail_size=tail_size,
+        timeout=timeout,
+        extra_env=asset_env,
+    )
     if rc != 0:
         return rc, sync_tail
     parser_cmd = parse_command(platform)
@@ -171,6 +185,7 @@ def run_sync_streaming(
         on_line,
         tail_size=tail_size,
         timeout=timeout,
+        extra_env=asset_env,
     )
     combined = "\n".join(part for part in (sync_tail, parse_tail) if part)
     return rc, "\n".join(combined.splitlines()[-tail_size:])

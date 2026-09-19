@@ -1,7 +1,7 @@
 # Known limitations
 
 Honest list of what **does not work** or **has not been validated**. Updated
-on 2026-09-14.
+on 2026-09-19.
 
 Limitations fall into 3 categories:
 
@@ -231,6 +231,16 @@ These validations require a Pro Max account and remain open until someone tests:
   decodable artifact visible without fabricating content.
 
 ## Cross-platform assets
+
+- **The central asset vault is not published yet.** Its append-only log,
+  content-addressed blobs, explicit `legacy|vault` reader selection, full-corpus
+  migration retry and clean local restore have been validated, and the verified
+  canonical vault is materialized in `data/assets`. Runtime operation now
+  defaults to `vault`, but the DVC pointer and remote objects have not been
+  staged or published. `legacy` remains an explicit temporary rollback, and no
+  legacy raw/merged/external evidence may be removed. The operational boundary
+  and rollback are documented in the
+  [pipeline guide](../operations/pipeline.md#transicao-do-asset-vault).
 
 - **The published web scope is `preserved_web_files`.** The exact counts,
   relationship rates, reader capability and approved exclusions are maintained

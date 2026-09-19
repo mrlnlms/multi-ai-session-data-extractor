@@ -16,6 +16,8 @@ import re
 from pathlib import Path
 
 from playwright.async_api import BrowserContext, Page
+from src.assets.incremental import AssetObservation, WebAssetCaptureSession
+from src.assets.vault import AssetVault
 
 
 API_BASE = "https://chat.deepseek.com/api/v0"
@@ -93,6 +95,10 @@ async def download_assets(
     raw_dir: Path,
     concurrency: int = 3,
     skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+    complete_discovery: bool = True,
 ) -> dict:
     entries = _collect_files(raw_dir)
     print(f"Encontrados {len(entries)} file references")
@@ -111,6 +117,13 @@ async def download_assets(
     stats = {"downloaded": 0, "skipped": 0, "errors": []}
     done = 0
     total = len(entries)
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="deepseek",
+        account_id=account_id,
+        evidence_path=raw_dir / "conversations",
+        capture_method="web_asset_download",
+    )
 
     async def _one(e: dict):
         nonlocal done
@@ -118,6 +131,15 @@ async def download_assets(
         if skip_existing and fid in manifest:
             existing = assets_dir / manifest[fid].get("relpath", "")
             if existing.exists():
+                info = manifest[fid]
+                capture.observe(AssetObservation(
+                    delivery_id=str(fid),
+                    object_id=str(fid),
+                    representation_kind="user_attachment",
+                    payload=existing.read_bytes() if asset_vault is not None else None,
+                    file_name=e["file_name"],
+                    mime_type=info.get("content_type"),
+                ))
                 stats["skipped"] += 1
                 done += 1
                 return
@@ -127,10 +149,24 @@ async def download_assets(
                 url = await _get_presigned_url(page, token, fid, e["conv_id"], e["message_id"])
             except Exception as ex:
                 stats["errors"].append((fid, f"preview: {str(ex)[:150]}"))
+                capture.observe(AssetObservation(
+                    delivery_id=str(fid),
+                    object_id=str(fid),
+                    representation_kind="user_attachment",
+                    file_name=e["file_name"],
+                    failure_reason=f"preview: {str(ex)[:150]}",
+                ))
                 done += 1
                 return
             if not url:
                 stats["errors"].append((fid, "no presigned url (maybe file expired/deleted upstream)"))
+                capture.observe(AssetObservation(
+                    delivery_id=str(fid),
+                    object_id=str(fid),
+                    representation_kind="user_attachment",
+                    file_name=e["file_name"],
+                    failure_reason="no presigned url",
+                ))
                 done += 1
                 return
             # 2) Download direto do OBS
@@ -138,6 +174,14 @@ async def download_assets(
                 resp = await context.request.get(url, timeout=60000)
                 if not resp.ok:
                     stats["errors"].append((fid, f"HTTP {resp.status}"))
+                    capture.observe(AssetObservation(
+                        delivery_id=str(fid),
+                        object_id=str(fid),
+                        representation_kind="user_attachment",
+                        file_name=e["file_name"],
+                        upstream_locator=url,
+                        failure_reason=f"HTTP {resp.status}",
+                    ))
                     done += 1
                     return
                 blob = await resp.body()
@@ -146,6 +190,15 @@ async def download_assets(
                 folder.mkdir(parents=True, exist_ok=True)
                 target = folder / _safe(e["file_name"])
                 target.write_bytes(blob)
+                capture.observe(AssetObservation(
+                    delivery_id=str(fid),
+                    object_id=str(fid),
+                    representation_kind="user_attachment",
+                    payload=blob,
+                    file_name=e["file_name"],
+                    mime_type=ct,
+                    upstream_locator=url,
+                ))
                 relpath = target.relative_to(assets_dir).as_posix()
                 manifest[fid] = {
                     "file_id": fid,
@@ -159,6 +212,14 @@ async def download_assets(
                 stats["downloaded"] += 1
             except Exception as ex:
                 stats["errors"].append((fid, f"download: {str(ex)[:150]}"))
+                capture.observe(AssetObservation(
+                    delivery_id=str(fid),
+                    object_id=str(fid),
+                    representation_kind="user_attachment",
+                    file_name=e["file_name"],
+                    upstream_locator=url,
+                    failure_reason=f"download: {str(ex)[:150]}",
+                ))
             done += 1
             if done % 10 == 0:
                 print(f"  [{done}/{total}] dl={stats['downloaded']} "
@@ -166,6 +227,7 @@ async def download_assets(
 
     await asyncio.gather(*(_one(e) for e in entries))
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
+    capture.finish(complete_discovery=complete_discovery)
     print(f"  [{done}/{total}] dl={stats['downloaded']} "
           f"skip={stats['skipped']} err={len(stats['errors'])} (final)")
     return stats

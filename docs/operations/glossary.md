@@ -18,6 +18,22 @@ Google Drive; ele guarda a base canonica atual recuperavel.
 A materializacao local dos objetos DVC em `data/`. Pode ser removida para
 liberar espaco e reconstruida com `dvc pull`.
 
+## Estado duravel e projecao do asset vault
+
+No asset vault, `schema.json`, os blobs content-addressed e os
+`records.jsonl` commitados formam o estado duravel. `state.json`, hardlinks de
+compatibilidade e Parquets sao projecoes reconstruiveis. Esse contrato foi
+validado localmente, mas o vault ainda nao foi publicado como fonte canonica;
+restore remoto permanece pendente. Veja a
+[transicao operacional](pipeline.md#transicao-do-asset-vault).
+
+## Rollback de asset
+
+Retorno explicito de uma fonte ao modo `legacy`. Durante a transicao, nenhuma
+migracao ou escrita em `vault` remove as arvores legacy, portanto o rollback
+reprocessa essa evidencia preservada em vez de tentar inverter os logs do
+vault.
+
 ## Cache DVC
 
 Objetos locais em `.dvc/cache/`, usados pelo DVC para evitar transferencias e

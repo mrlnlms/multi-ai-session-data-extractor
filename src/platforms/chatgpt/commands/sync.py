@@ -32,6 +32,8 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright
 
+from src.assets.vault import AssetVault
+from src.assets.runtime import load_asset_runtime, runtime_account_id
 from src.platforms.chatgpt.extractor.api_client import ChatGPTAPIClient
 from src.platforms.chatgpt.extractor.asset_downloader import (
     extract_canvases,
@@ -51,7 +53,13 @@ def _account_dir(base: Path, account: str) -> Path:
     return account_data_dir(base, account)
 
 
-async def _download_project_sources_for(raw_dir: Path, account: str) -> dict:
+async def _download_project_sources_for(
+    raw_dir: Path,
+    account: str,
+    *,
+    asset_vault: AssetVault | None = None,
+    asset_account_id: str | None = None,
+) -> dict:
     """Wrapper async que abre Playwright e baixa project_sources delta."""
     import json
     raw_path = raw_dir / "chatgpt_raw.json"
@@ -77,12 +85,22 @@ async def _download_project_sources_for(raw_dir: Path, account: str) -> dict:
             args=["--disable-blink-features=AutomationControlled"],
         )
         client = ChatGPTAPIClient(context.request)
-        report = await download_project_sources(client, pids, raw_dir)
+        report = await download_project_sources(
+            client,
+            pids,
+            raw_dir,
+            asset_vault=asset_vault,
+            account_id=asset_account_id,
+        )
         await context.close()
     return {"project_ids": len(pids), **report}
 
 
-def main():
+def main(
+    *,
+    asset_vault: AssetVault | None = None,
+    asset_account_id: str | None = None,
+):
     parser = argparse.ArgumentParser(
         description="Captura + binarios + reconcile ChatGPT em uma rodada"
     )
@@ -100,6 +118,15 @@ def main():
                        help="Pula etapa 4 (reconciliacao)")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
+    asset_runtime = load_asset_runtime("chatgpt")
+    if asset_vault is None:
+        asset_vault = asset_runtime.vault
+        asset_account_id = runtime_account_id(
+            asset_runtime,
+            "ChatGPT",
+            args.account,
+            explicit=asset_account_id,
+        )
 
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(message)s")
@@ -130,23 +157,46 @@ def main():
         print("\n" + "=" * 60)
         print("ETAPA 2/4: Download assets (delta)")
         print("=" * 60)
-        c = extract_canvases(actual_raw_dir)
+        c = extract_canvases(
+            actual_raw_dir,
+            asset_vault=asset_vault,
+            account_id=asset_account_id,
+        )
         print(
             f"Canvas: extracted={c['extracted']}, skip={c['skipped_existing']}, "
             f"failed_upstream={c['failed_upstream']}, "
             f"unreconstructable={c['unreconstructable']}, "
             f"ambiguous={c['ambiguous']}, err={len(c['errors'])}"
         )
-        r = extract_deep_research(actual_raw_dir)
+        r = extract_deep_research(
+            actual_raw_dir,
+            asset_vault=asset_vault,
+            account_id=asset_account_id,
+        )
         print(f"Deep Research: extracted={r['extracted']}, skip={r['skipped_existing']}, err={len(r['errors'])}")
-        asset_report = asyncio.run(run_asset_download(actual_raw_dir, profile_name=args.account))
+        asset_report = asyncio.run(
+            run_asset_download(
+                actual_raw_dir,
+                profile_name=args.account,
+                asset_vault=asset_vault,
+                account_id=asset_account_id,
+                complete_discovery=False,
+            )
+        )
         print(asset_report.summary())
 
         # ETAPA 3: Download project_sources delta
         print("\n" + "=" * 60)
         print("ETAPA 3/4: Download project sources (delta)")
         print("=" * 60)
-        ps_report = asyncio.run(_download_project_sources_for(actual_raw_dir, args.account))
+        ps_report = asyncio.run(
+            _download_project_sources_for(
+                actual_raw_dir,
+                args.account,
+                asset_vault=asset_vault,
+                asset_account_id=asset_account_id,
+            )
+        )
         print(f"Projects scaneados: {ps_report.get('projects_scanned', 0)} "
               f"({ps_report.get('projects_with_files', 0)} com files)")
         print(f"Files: total={ps_report.get('total_files', 0)}, "

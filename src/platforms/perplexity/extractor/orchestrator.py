@@ -10,6 +10,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.assets.vault import AssetVault
 from src.platforms.perplexity.extractor.auth import load_context
 from src.platforms.perplexity.extractor.api_client import PerplexityAPIClient
 from src.platforms.perplexity.extractor.discovery import discover, persist_discovery
@@ -89,6 +90,8 @@ async def run_export(
     account: str = "default",
     headless: bool = False,
     output_dir: Path | None = None,
+    asset_vault: AssetVault | None = None,
+    asset_account_id: str | None = None,
 ) -> Path:
     started_at = datetime.now(timezone.utc)
     output_dir = output_dir or account_data_dir(BASE_DIR, account)
@@ -249,7 +252,14 @@ async def run_export(
         # Download binarios artifacts
         if assets_all:
             print("Baixando binarios dos artifacts...")
-            dl_stats = await download_artifacts(context, assets_all, output_dir)
+            dl_stats = await download_artifacts(
+                context,
+                assets_all,
+                output_dir,
+                asset_vault=asset_vault,
+                account_id=asset_account_id,
+                complete_discovery=False,
+            )
             print(f"  downloaded={dl_stats['downloaded']} skipped_existing={dl_stats['skipped_existing']} failed={dl_stats['failed']}")
         else:
             dl_stats = {"downloaded": 0, "skipped_existing": 0, "failed": 0, "total": 0}
@@ -257,7 +267,13 @@ async def run_export(
         # Thread attachments
         print("Baixando thread attachments + featured images...")
         try:
-            att_stats = await download_thread_attachments(context, output_dir)
+            att_stats = await download_thread_attachments(
+                context,
+                output_dir,
+                asset_vault=asset_vault,
+                account_id=asset_account_id,
+                complete_discovery=False,
+            )
             print(f"  downloaded={att_stats['downloaded']} skipped={att_stats['skipped']} errors={len(att_stats['errors'])}")
         except Exception as e:
             print(f"  ERRO: {str(e)[:200]}")

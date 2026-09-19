@@ -49,6 +49,17 @@ amarela no dashboard mesmo que o Parquet tenha sido escrito depois do raw;
 isso evita declarar a pipeline saudavel quando um formato novo for descartado
 silenciosamente.
 
+## Asset vault transition
+
+`vault` is the default asset reader, using `data/assets` and `data` unless roots
+are overridden explicitly. `legacy` remains an explicit temporary rollback;
+filesystem contents never select the mode. The legacy tree remains preserved,
+while the vault reader projects the same public `Asset`, `AssetLink`, and
+`Message.asset_paths` contract. For Codex, reader scope is the inline input
+image and its evidenced message position; unrelated filesystem paths are not
+promoted to assets. See the [operational
+transition](../../../../operations/pipeline.md#transicao-do-asset-vault).
+
 ## Where the real info lives
 
 - **Parser:** `src/platforms/codex/parser.py`

@@ -161,6 +161,17 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.login --account acc
 PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.sync --account account-2
 PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.parse
 ```
+## Asset vault transition
+
+`vault` is the default asset reader, using `data/assets` and `data` unless roots
+are overridden explicitly. `legacy` remains an explicit temporary rollback;
+filesystem contents never select the mode. The legacy tree remains preserved,
+while the vault reader projects the same public `Asset`, `AssetLink`, and
+`Message.asset_paths` contract. Grok's current reader scope is the global asset
+catalog: without evidence of conversation/message use, it preserves assets but
+does not fabricate `AssetLink` rows. See the [operational
+transition](../../../../operations/pipeline.md#transicao-do-asset-vault).
+
 ## Explicit login-health check
 
 A one-row `GET /rest/app-chat/conversations` listing is the established cookies-only read check. Profile presence alone never produces a valid status. The check is

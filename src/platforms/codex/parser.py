@@ -28,6 +28,10 @@ from typing import Optional
 
 import pandas as pd
 
+from src.assets.cli_incremental import CLIAssetCaptureSession, CLIAssetObservation
+from src.assets.incremental import DEFAULT_MAX_BATCH_BYTES
+from src.assets.reader import AssetReader, VaultAssetReader
+from src.assets.vault import AssetVault
 from src.parsing.agent_memory import parse_memories_for_source
 from src.parsing.base import BaseParser
 from src.schema.models import (
@@ -65,8 +69,27 @@ def make_input_image_asset_id(
 class CodexParser(BaseParser):
     source_name = "codex"
 
-    def __init__(self, account: Optional[str] = None):
-        super().__init__(account=account)
+    def __init__(
+        self,
+        account: Optional[str] = None,
+        account_id: Optional[str] = None,
+        *,
+        asset_reader: AssetReader | None = None,
+        asset_vault: AssetVault | None = None,
+        asset_data_root: Path | None = None,
+        asset_max_batch_bytes: int = DEFAULT_MAX_BATCH_BYTES,
+    ):
+        if asset_vault is not None and asset_data_root is None:
+            raise ValueError("asset_data_root is required when asset_vault is enabled")
+        self.asset_vault = asset_vault
+        self.asset_data_root = Path(asset_data_root) if asset_data_root is not None else None
+        self.asset_max_batch_bytes = asset_max_batch_bytes
+        if asset_reader is None and asset_vault is not None:
+            assert self.asset_data_root is not None
+            asset_reader = VaultAssetReader(asset_vault, self.asset_data_root)
+        super().__init__(
+            account=account, account_id=account_id, asset_reader=asset_reader
+        )
         self.branches: list[Branch] = []
         self.agent_memories: list[AgentMemory] = []
         self._conv_source_files: dict[str, set[str]] = {}
@@ -83,6 +106,7 @@ class CodexParser(BaseParser):
         self.files_skipped = 0
         self.assets: list[Asset] = []
         self.asset_links: list[AssetLink] = []
+        self._asset_capture: CLIAssetCaptureSession | None = None
 
     def _materialize_input_image(
         self,
@@ -107,25 +131,27 @@ class CodexParser(BaseParser):
         if self._input_path is None:
             raise ValueError("Codex input root is required to materialize images")
         out = self._input_path / "_images" / session_id / f"{sequence}_{image_ordinal}{extension}"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        if out.exists():
-            if hashlib.sha256(out.read_bytes()).hexdigest() != digest:
-                raise ValueError(f"preserved Codex image hash mismatch: {out}")
-        else:
-            out.write_bytes(decoded)
+        if self._asset_capture is None:
+            out.parent.mkdir(parents=True, exist_ok=True)
+            if out.exists():
+                if hashlib.sha256(out.read_bytes()).hexdigest() != digest:
+                    raise ValueError(f"preserved Codex image hash mismatch: {out}")
+            else:
+                out.write_bytes(decoded)
         asset_path = f"raw/Codex/_images/{session_id}/{out.name}"
         asset_id = make_input_image_asset_id(
             session_id, message_id, content_block_index, digest
         )
-        self.assets.append(Asset(
+        asset = Asset(
             asset_id=asset_id, source=self.source_name, account_id=self.account_id,
             asset_kind="attachment", asset_origin="user", file_name=out.name,
             mime_type=mime_type, size_bytes=len(decoded), asset_path=asset_path,
             is_model_generated=False, is_preserved_missing=False,
             is_binary_available=True, created_at=created_at,
             metadata_json=json.dumps({"content_sha256": digest}, sort_keys=True),
-        ))
-        self.asset_links.append(AssetLink(
+        )
+        self.assets.append(asset)
+        link = AssetLink(
             asset_link_id=make_asset_link_id(
                 self.source_name, self.account_id, asset_id, "message", message_id,
                 "input", image_ordinal, content_block_index,
@@ -135,7 +161,15 @@ class CodexParser(BaseParser):
             conversation_id=session_id, message_id=message_id, project_id=None,
             role="input", ordinal=image_ordinal,
             content_block_index=content_block_index, metadata_json=None,
-        ))
+        )
+        self.asset_links.append(link)
+        if self._asset_capture is not None:
+            self._asset_capture.observe(CLIAssetObservation(
+                asset=asset,
+                link=link,
+                payload=decoded,
+                representation_kind="user_attachment",
+            ))
         return asset_path
 
     def parse(self, input_path: Path, home_memory_files: Optional[set[str]] = None) -> None:
@@ -149,6 +183,16 @@ class CodexParser(BaseParser):
         """
         input_path = Path(input_path)
         self._input_path = input_path
+        if self.asset_vault is not None:
+            assert self.asset_data_root is not None
+            self._asset_capture = CLIAssetCaptureSession(
+                self.asset_vault,
+                source=self.source_name,
+                account_id=self.account_id,
+                evidence_path=input_path,
+                data_root=self.asset_data_root,
+                max_batch_bytes=self.asset_max_batch_bytes,
+            )
         for session_file in sorted(input_path.rglob("rollout-*.jsonl")):
             self.files_seen += 1
             if self._parse_session(session_file):
@@ -162,6 +206,9 @@ class CodexParser(BaseParser):
         # Agent memory ingestion (Slice D — Task D1)
         mem_files = home_memory_files if home_memory_files is not None else set()
         self.agent_memories = parse_memories_for_source(input_path, "codex", mem_files)
+        if self._asset_capture is not None:
+            self._asset_capture.finish()
+        self.apply_asset_reader()
 
     def parse_files(self, files: list[Path]) -> None:
         """Processa apenas a lista de arquivos especificada (uso incremental)."""

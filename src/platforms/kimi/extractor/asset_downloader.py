@@ -18,6 +18,12 @@ import mimetypes
 from pathlib import Path
 
 from playwright.async_api import BrowserContext
+from src.assets.incremental import (
+    AssetObservation,
+    WebAssetCaptureSession,
+    commit_web_asset_capture,
+)
+from src.assets.vault import AssetVault
 
 
 HOME_URL = "https://kimi.ai/"
@@ -53,10 +59,22 @@ async def download_assets(
     context: BrowserContext,
     raw_dir: Path,
     skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+    complete_discovery: bool = True,
 ) -> dict:
     """Baixa todos os files inline em chat.files[]. Manifesta em assets_manifest.json."""
     conv_dir = raw_dir / "conversations"
     if not conv_dir.exists():
+        commit_web_asset_capture(
+            asset_vault,
+            source="kimi",
+            account_id=account_id,
+            observations=(),
+            complete_discovery=complete_discovery,
+            evidence_path=conv_dir,
+        )
         return {"downloaded": 0, "skipped": 0, "errors": []}
 
     out_dir = raw_dir / "assets"
@@ -74,6 +92,13 @@ async def download_assets(
     await page.wait_for_timeout(1500)
 
     stats = {"downloaded": 0, "skipped": 0, "errors": []}
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="kimi",
+        account_id=account_id,
+        evidence_path=conv_dir,
+        capture_method="web_asset_download",
+    )
     pairs: list[tuple[str, str, dict]] = []  # (chat_id, file_id, file_obj)
     for fp in sorted(conv_dir.glob("*.json")):
         try:
@@ -102,6 +127,16 @@ async def download_assets(
         dst = chat_subdir / f"{fid}{ext}"
 
         if skip_existing and dst.exists():
+            payload = dst.read_bytes() if asset_vault is not None else None
+            capture.observe(AssetObservation(
+                delivery_id=str(fid),
+                object_id=str(fid),
+                representation_kind="unattributed_attachment",
+                payload=payload,
+                file_name=meta.get("name") or dst.name,
+                mime_type=mime,
+                upstream_locator=(fobj.get("blob") or {}).get("signUrl"),
+            ))
             stats["skipped"] += 1
             manifest[fid] = {
                 "chat_id": cid,
@@ -118,6 +153,14 @@ async def download_assets(
         url = (fobj.get("blob") or {}).get("signUrl")
         if not url:
             stats["errors"].append((fid, "no signUrl"))
+            capture.observe(AssetObservation(
+                delivery_id=str(fid),
+                object_id=str(fid),
+                representation_kind="unattributed_attachment",
+                file_name=meta.get("name"),
+                mime_type=mime,
+                failure_reason="no signUrl",
+            ))
             continue
         try:
             b64 = await page.evaluate("""async (url) => {
@@ -133,6 +176,15 @@ async def download_assets(
             }""", url)
             data = base64.b64decode(b64)
             dst.write_bytes(data)
+            capture.observe(AssetObservation(
+                delivery_id=str(fid),
+                object_id=str(fid),
+                representation_kind="unattributed_attachment",
+                payload=data,
+                file_name=meta.get("name") or dst.name,
+                mime_type=mime,
+                upstream_locator=url,
+            ))
             manifest[fid] = {
                 "chat_id": cid,
                 "url": url,
@@ -144,10 +196,20 @@ async def download_assets(
             stats["downloaded"] += 1
         except Exception as e:
             stats["errors"].append((fid, str(e)[:200]))
+            capture.observe(AssetObservation(
+                delivery_id=str(fid),
+                object_id=str(fid),
+                representation_kind="unattributed_attachment",
+                file_name=meta.get("name"),
+                mime_type=mime,
+                upstream_locator=url,
+                failure_reason=str(e)[:200],
+            ))
 
         if i % 5 == 0:
             print(f"  [{i}/{total}] dl={stats['downloaded']} skip={stats['skipped']} err={len(stats['errors'])}")
 
     print(f"  [{total}/{total}] dl={stats['downloaded']} skip={stats['skipped']} err={len(stats['errors'])} (final)")
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    capture.finish(complete_discovery=complete_discovery)
     return stats

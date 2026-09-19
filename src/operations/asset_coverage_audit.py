@@ -18,6 +18,7 @@ from typing import Iterable, Iterator, Mapping, Sequence
 
 import pandas as pd
 
+from src.account_catalog import load_account_catalog
 from src.platforms.registry import KNOWN_PLATFORMS, WEB_PLATFORMS
 from src.platforms.claude_code.parser import make_embedded_image_asset_id
 from src.platforms.codex.parser import make_input_image_asset_id
@@ -817,16 +818,51 @@ def _asset_path_matches_account(path: str, source: str, account_scope: str) -> b
     return child == account_scope if account_scope.startswith("account-") else not child.startswith("account-")
 
 
+def _vault_blob_digest(path: str) -> str | None:
+    parts = PurePosixPath(path).parts
+    if len(parts) != 5 or parts[:3] != ("assets", "blobs", "sha256"):
+        return None
+    digest = parts[4]
+    if parts[3] != digest[:2] or len(digest) != 64:
+        return None
+    try:
+        int(digest, 16)
+    except ValueError:
+        return None
+    return digest
+
+
+def _evidence_digest(
+    item: RepresentationEvidence,
+    data_root: Path | None,
+    cache: dict[str, str | None],
+) -> str | None:
+    if item.binary_path is None or data_root is None:
+        return None
+    if item.binary_path in cache:
+        return cache[item.binary_path]
+    path = Path(data_root) / item.binary_path
+    if not path.is_file():
+        cache[item.binary_path] = None
+        return None
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    cache[item.binary_path] = digest
+    return digest
+
+
 def reconcile_asset_coverage(
     evidence: Iterable[RepresentationEvidence],
     assets: pd.DataFrame,
     links: pd.DataFrame,
     policy: Sequence[Mapping[str, str]] = (),
+    *,
+    data_root: Path | None = None,
 ) -> list[CoverageFinding]:
     del links  # Relationship reconciliation is added once evidence identities are source-complete.
     asset_paths = set(assets.get("asset_path", pd.Series(dtype="string")).dropna().astype(str))
     asset_identity_paths: dict[tuple[str, str], set[str]] = {}
     asset_identity_counts: dict[tuple[str, str], int] = {}
+    asset_digests: set[tuple[str, str]] = set()
     if not assets.empty and {"source", "asset_id"}.issubset(assets.columns):
         for source, asset_id in assets[["source", "asset_id"]].dropna().astype(str).itertuples(index=False, name=None):
             key = ("".join(ch for ch in source.lower() if ch.isalnum()), asset_id)
@@ -836,17 +872,27 @@ def reconcile_asset_coverage(
         ].dropna().astype(str).itertuples(index=False, name=None):
             key = ("".join(ch for ch in source.lower() if ch.isalnum()), asset_id)
             asset_identity_paths.setdefault(key, set()).add(asset_path)
+            digest = _vault_blob_digest(asset_path)
+            if digest is not None:
+                asset_digests.add((key[0], digest))
     findings: list[CoverageFinding] = []
+    digest_cache: dict[str, str | None] = {}
     for item in evidence:
         matches = _policy_matches(item, policy)
+        source_key = "".join(ch for ch in item.source.lower() if ch.isalnum())
+        digest = _evidence_digest(item, data_root, digest_cache)
+        binary_is_covered = (
+            item.binary_path is None
+            or item.binary_path in asset_paths
+            or (digest is not None and (source_key, digest) in asset_digests)
+        )
         if len(matches) > 1:
             findings.append(CoverageFinding(item, "unresolved"))
         elif item.representation_kind in {
             "preserved_binary", "notebooklm_note_materialization",
         }:
-            status = "covered" if item.binary_path in asset_paths else "eligible_uncovered"
+            status = "covered" if binary_is_covered else "eligible_uncovered"
             if status == "eligible_uncovered" and item.native_id:
-                source_key = "".join(ch for ch in item.source.lower() if ch.isalnum())
                 identity_paths = asset_identity_paths.get((source_key, item.native_id), set())
                 if any(
                     _asset_path_matches_account(path, item.source, item.account_scope)
@@ -855,23 +901,19 @@ def reconcile_asset_coverage(
                     status = "duplicate_representation"
             findings.append(CoverageFinding(item, status))
         elif item.representation_kind == "embedded_attachment":
-            source_key = "".join(ch for ch in item.source.lower() if ch.isalnum())
             identity_count = asset_identity_counts.get((source_key, item.native_id or ""), 0)
-            path_is_covered = item.binary_path is None or item.binary_path in asset_paths
             findings.append(CoverageFinding(
                 item,
-                "covered" if identity_count == 1 and path_is_covered else
-                "eligible_uncovered" if identity_count == 0 or not path_is_covered else
+                "covered" if identity_count == 1 and binary_is_covered else
+                "eligible_uncovered" if identity_count == 0 or not binary_is_covered else
                 "unresolved",
             ))
         elif item.representation_kind in {"native_file_record", "generated_artifact_record"} and item.native_id:
-            source_key = "".join(ch for ch in item.source.lower() if ch.isalnum())
             count = asset_identity_counts.get((source_key, item.native_id), 0)
-            path_is_covered = item.binary_path is None or item.binary_path in asset_paths
             findings.append(CoverageFinding(
                 item,
-                "covered" if count == 1 and path_is_covered else
-                "eligible_uncovered" if count == 0 or not path_is_covered else
+                "covered" if count == 1 and binary_is_covered else
+                "eligible_uncovered" if count == 0 or not binary_is_covered else
                 "unresolved",
             ))
         elif item.representation_kind == "verified_duplicate_representation":
@@ -903,11 +945,23 @@ def build_coverage_report(
 ) -> CoverageReport:
     """Build the invariant report without weakening source-specific policy."""
     evidence_rows = list(evidence)
-    findings = tuple(reconcile_asset_coverage(evidence_rows, assets, links, policy))
+    account_ids: dict[tuple[str, str], str] = {}
+    if data_root is not None:
+        catalog = load_account_catalog(Path(data_root) / "accounts" / "catalog.json")
+        account_ids = {
+            (record.platform, record.technical_key): record.account_id
+            for record in catalog.records
+        }
+    findings = tuple(
+        reconcile_asset_coverage(
+            evidence_rows, assets, links, policy, data_root=data_root
+        )
+    )
     ambiguous = sum(len(_policy_matches(item, policy)) > 1 for item in evidence_rows)
 
     asset_rows_by_path: dict[str, set[tuple[str, str | None, str]]] = {}
     asset_keys: set[tuple[str, str | None, str]] = set()
+    asset_keys_by_digest: dict[tuple[str, str], set[tuple[str, str | None, str]]] = {}
     integrity_by_scope = {
         "web": {"ambiguous_policy_matches": 0, "available_path_failures": 0,
                 "unresolved_asset_links": 0, "eligible_identity_failures": 0},
@@ -926,6 +980,9 @@ def build_coverage_report(
         path_value = None if pd.isna(row.asset_path) else str(row.asset_path)
         if path_value:
             asset_rows_by_path.setdefault(path_value, set()).add(key)
+            digest = _vault_blob_digest(path_value)
+            if digest is not None:
+                asset_keys_by_digest.setdefault((key[0], digest), set()).add(key)
         if bool(row.is_binary_available):
             if not path_value or data_root is None or not (Path(data_root) / path_value).is_file():
                 available_path_failures += 1
@@ -934,6 +991,7 @@ def build_coverage_report(
 
     eligible_identity_failures = 0
     ambiguous_evidence_ids: set[int] = set()
+    digest_cache: dict[str, str | None] = {}
     eligible_kinds = {
         "preserved_binary", "notebooklm_note_materialization",
         "embedded_attachment", "native_file_record", "generated_artifact_record",
@@ -941,13 +999,26 @@ def build_coverage_report(
     for item in evidence_rows:
         if item.representation_kind not in eligible_kinds:
             continue
+        resolved_by_digest = False
         identities = set(asset_rows_by_path.get(item.binary_path or "", set()))
         if not identities and item.native_id:
             identities = {
                 key for key in asset_keys
                 if key[0] == _source_key(item.source) and key[2] == item.native_id
             }
-        if len(identities) != 1:
+        if not identities:
+            digest = _evidence_digest(item, data_root, digest_cache)
+            if digest is not None:
+                identities = set(
+                    asset_keys_by_digest.get((_source_key(item.source), digest), set())
+                )
+                resolved_by_digest = bool(identities)
+        technical_key = item.account_scope.removeprefix("account-")
+        expected_account_id = account_ids.get((item.source, technical_key))
+        if expected_account_id is not None and len(identities) > 1:
+            identities = {key for key in identities if key[1] == expected_account_id}
+            resolved_by_digest = resolved_by_digest and bool(identities)
+        if len(identities) != 1 and not resolved_by_digest:
             eligible_identity_failures += 1
             scope = "web" if item.source in WEB_PLATFORMS else "cli"
             integrity_by_scope[scope]["eligible_identity_failures"] += 1

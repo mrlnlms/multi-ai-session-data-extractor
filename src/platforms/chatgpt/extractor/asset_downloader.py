@@ -24,6 +24,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from src.assets.incremental import AssetObservation, WebAssetCaptureSession
+from src.assets.vault import AssetVault
 from src.platforms.chatgpt.extractor.api_client import BASE_URL
 from src.platforms.chatgpt.extractor.canvas_materializer import (
     parse_canvas_payload,
@@ -253,7 +255,13 @@ def _legacy_canvas_payloads(raw_dir: Path) -> dict[tuple[str, float], dict[str, 
     return recovered
 
 
-def extract_canvases(raw_dir: Path, skip_existing: bool = True) -> dict:
+def extract_canvases(
+    raw_dir: Path,
+    skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+) -> dict:
     """Replay Canvas operations and materialize every reconstructable state."""
     raw_path = raw_dir / "chatgpt_raw.json"
     if not raw_path.exists():
@@ -275,6 +283,13 @@ def extract_canvases(raw_dir: Path, skip_existing: bool = True) -> dict:
         "by_type": {}, "errors": [], "failed_upstream": 0,
         "unreconstructable": 0, "ambiguous": 0,
     }
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="chatgpt",
+        account_id=account_id,
+        evidence_path=raw_path,
+        capture_method="web_asset_download:canvas",
+    )
 
     for cid, conv in data.get("conversations", {}).items():
         fallbacks: dict[str, dict[str, Any]] = {}
@@ -327,6 +342,16 @@ def extract_canvases(raw_dir: Path, skip_existing: bool = True) -> dict:
                     and meta_path.read_text(encoding="utf-8") == expected_meta
                 ))
                 if content_matches and metadata_matches and out_path.exists() and meta_path.exists():
+                    delivery_id = str(metadata["asset_id"])
+                    capture.observe(AssetObservation(
+                        delivery_id=delivery_id,
+                        object_id=str(snapshot.document_id),
+                        representation_kind="assistant_artifact",
+                        payload=(out_path.read_bytes() if asset_vault is not None else None),
+                        file_name=out_path.name,
+                        mime_type="text/markdown" if ext == "md" else "text/plain",
+                        upstream_locator=str(snapshot.native_textdoc_id or snapshot.document_id),
+                    ))
                     stats["skipped_existing"] += 1
                     continue
                 if not content_matches or not metadata_matches:
@@ -338,6 +363,16 @@ def extract_canvases(raw_dir: Path, skip_existing: bool = True) -> dict:
                     out_path.write_text(snapshot.content, encoding="utf-8")
                 if not meta_path.exists():
                     meta_path.write_text(expected_meta, encoding="utf-8")
+                delivery_id = str(metadata["asset_id"])
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=str(snapshot.document_id),
+                    representation_kind="assistant_artifact",
+                    payload=snapshot.content.encode(),
+                    file_name=out_path.name,
+                    mime_type="text/markdown" if ext == "md" else "text/plain",
+                    upstream_locator=str(snapshot.native_textdoc_id or snapshot.document_id),
+                ))
                 stats["extracted"] += 1
                 stats["by_type"][snapshot.textdoc_type] = (
                     stats["by_type"].get(snapshot.textdoc_type, 0) + 1
@@ -345,10 +380,17 @@ def extract_canvases(raw_dir: Path, skip_existing: bool = True) -> dict:
             except Exception as e:
                 stats["errors"].append((fname, str(e)[:100]))
 
+    capture.finish(complete_discovery=False)
     return stats
 
 
-def extract_deep_research(raw_dir: Path, skip_existing: bool = True) -> dict:
+def extract_deep_research(
+    raw_dir: Path,
+    skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+) -> dict:
     """Extrai relatorios de Deep Research do raw ChatGPT.
 
     Varre msgs do assistant com metadata.is_async_task_result_message=True.
@@ -367,6 +409,13 @@ def extract_deep_research(raw_dir: Path, skip_existing: bool = True) -> dict:
     out_root.mkdir(parents=True, exist_ok=True)
 
     stats = {"extracted": 0, "skipped_existing": 0, "errors": []}
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="chatgpt",
+        account_id=account_id,
+        evidence_path=raw_path,
+        capture_method="web_asset_download:deep_research",
+    )
 
     for cid, conv in data.get("conversations", {}).items():
         for nid, n in (conv.get("mapping") or {}).items():
@@ -389,11 +438,30 @@ def extract_deep_research(raw_dir: Path, skip_existing: bool = True) -> dict:
             out_conv.mkdir(parents=True, exist_ok=True)
             fname = f"{_slug(task_id, 30)}_{_slug(title, 60)}.md"
             out_path = out_conv / fname
+            delivery_id = f"deep-research:{task_id}"
             if skip_existing and out_path.exists():
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=str(task_id),
+                    representation_kind="assistant_output",
+                    payload=(out_path.read_bytes() if asset_vault is not None else None),
+                    file_name=out_path.name,
+                    mime_type="text/markdown",
+                    upstream_locator=str(task_id),
+                ))
                 stats["skipped_existing"] += 1
                 continue
             try:
                 out_path.write_text(content, encoding="utf-8")
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=str(task_id),
+                    representation_kind="assistant_output",
+                    payload=content.encode(),
+                    file_name=out_path.name,
+                    mime_type="text/markdown",
+                    upstream_locator=str(task_id),
+                ))
                 stats["extracted"] += 1
                 meta_path = out_path.with_suffix(".md.meta.json")
                 meta_path.write_text(json.dumps({
@@ -410,6 +478,7 @@ def extract_deep_research(raw_dir: Path, skip_existing: bool = True) -> dict:
             except Exception as e:
                 stats["errors"].append((fname, str(e)[:100]))
 
+    capture.finish(complete_discovery=False)
     return stats
 
 
@@ -417,6 +486,10 @@ async def run_asset_download(
     raw_dir: Path,
     only_conv_ids: list[str] | None = None,
     profile_name: str = "default",
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+    complete_discovery: bool = False,
 ) -> AssetReport:
     """Orquestrador: itera raw, baixa todos os image_asset_pointer via API."""
     from playwright.async_api import async_playwright
@@ -440,6 +513,13 @@ async def run_asset_download(
     report = AssetReport(
         total_expected=sum(len(v) for v in conv_images.values()),
         convs_with_assets=len(conv_images),
+    )
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="chatgpt",
+        account_id=account_id,
+        evidence_path=raw_path,
+        capture_method="web_asset_download:images",
     )
 
     async with async_playwright() as p:
@@ -465,10 +545,36 @@ async def run_asset_download(
                 st = result["status"]
                 if st == "downloaded":
                     report.total_downloaded += 1
+                    path = Path(result["path"])
+                    capture.observe(AssetObservation(
+                        delivery_id=fid,
+                        object_id=fid,
+                        representation_kind="delivery",
+                        payload=path.read_bytes(),
+                        file_name=result.get("filename") or path.name,
+                        mime_type=result.get("content_type"),
+                        upstream_locator=fid,
+                    ))
                 elif st == "skipped":
                     report.total_skipped_existing += 1
+                    path = Path(result["path"])
+                    capture.observe(AssetObservation(
+                        delivery_id=fid,
+                        object_id=fid,
+                        representation_kind="delivery",
+                        payload=(path.read_bytes() if asset_vault is not None else None),
+                        file_name=path.name.split("__", 1)[-1],
+                        upstream_locator=fid,
+                    ))
                 elif st == "failed":
                     report.total_failed += 1
+                    capture.observe(AssetObservation(
+                        delivery_id=fid,
+                        object_id=fid,
+                        representation_kind="delivery",
+                        upstream_locator=fid,
+                        failure_reason=str(result.get("reason") or "download failed"),
+                    ))
                     if len(report.failures) < 50:
                         report.failures.append({
                             "conv_id": conv_id,
@@ -497,5 +603,7 @@ async def run_asset_download(
         "convs_with_assets": report.convs_with_assets,
         "failures": report.failures,
     }, indent=2, ensure_ascii=False))
+
+    capture.finish(complete_discovery=complete_discovery)
 
     return report

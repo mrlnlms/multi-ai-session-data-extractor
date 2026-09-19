@@ -8,6 +8,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.assets.vault import AssetVault
+from src.assets.runtime import load_asset_runtime
 from src.runtime.project import find_project_root
 
 from src.capture.cli.copy import copy_source as _copy_source
@@ -19,7 +21,16 @@ RAW_DIR = PROJECT_ROOT / "data" / "raw" / "Antigravity CLI"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed" / "Antigravity CLI"
 
 
-def main() -> int:
+def main(
+    *,
+    asset_vault: AssetVault | None = None,
+    asset_data_root: Path | None = None,
+) -> int:
+    runtime = load_asset_runtime("antigravity_cli")
+    if asset_vault is None:
+        asset_vault = runtime.vault
+        if runtime.reader is not None:
+            asset_data_root = runtime.reader.data_root
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--full", action="store_true", help="Forca re-parse sem descartar o raw preservado")
     ap.add_argument("--no-binaries", action="store_true", help="(no-op: containers locais sao preservados no raw)")
@@ -49,7 +60,10 @@ def main() -> int:
     print("=" * 60)
     print("  Etapa 2/2 — Parse trajectories → data/processed/Antigravity CLI/")
     print("=" * 60)
-    parser = AntigravityCLIParser()
+    parser = AntigravityCLIParser(
+        asset_vault=asset_vault,
+        asset_data_root=(asset_data_root or RAW_DIR.parents[1]) if asset_vault else None,
+    )
     parser.parse(RAW_DIR)
     stats = parser.write_parquets(PROCESSED_DIR)
 

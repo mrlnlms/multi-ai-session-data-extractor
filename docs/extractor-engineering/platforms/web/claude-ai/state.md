@@ -135,6 +135,17 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.refetch_known
 PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.parse
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/claude-ai.qmd
 ```
+## Asset vault transition
+
+`vault` is the default asset reader, using `data/assets` and `data` unless roots
+are overridden explicitly. `legacy` remains an explicit temporary rollback;
+filesystem contents never select the mode. The legacy tree remains preserved,
+while the vault reader projects the same public `Asset`, `AssetLink`, and
+`Message.asset_paths` contract. For Claude.ai, reader scope is the evidenced
+message/file or generated-output relationship; text-only inline attachments
+remain message content rather than binary assets. See the [operational
+transition](../../../../operations/pipeline.md#transicao-do-asset-vault).
+
 ## Explicit login-health check
 
 A one-row `chat_conversations_v2` listing is the established read-only check; HTTP 401/403 or `account_session_invalid` means `expired`. Profile presence alone never produces a valid status. The check is

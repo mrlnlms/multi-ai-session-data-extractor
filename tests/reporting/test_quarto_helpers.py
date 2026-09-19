@@ -32,6 +32,7 @@ from src.reporting.quarto_helpers import (
     table_count,
     setup_views_with_manual,
     setup_notebook,
+    setup_unified_views,
 )
 
 
@@ -260,6 +261,32 @@ class TestSetupViewsWithManual:
         )
         assert detected["tool_events"] == {"extractor": False, "manual": False}
         assert has_view(con, "tool_events") is False
+
+
+class TestSetupUnifiedViews:
+    def test_asset_graph_is_available_to_overview_and_source_filter(self, tmp_path):
+        unified = tmp_path / "unified"
+        unified.mkdir()
+        pd.DataFrame({
+            "source": ["chatgpt", "claude_ai"],
+            "account_id": [None, None],
+            "asset_id": ["asset-1", "asset-2"],
+            "is_binary_available": [True, False],
+        }).to_parquet(unified / "assets.parquet")
+        pd.DataFrame({
+            "source": ["chatgpt", "claude_ai"],
+            "account_id": [None, None],
+            "asset_link_id": ["link-1", "link-2"],
+            "asset_id": ["asset-1", "asset-2"],
+        }).to_parquet(unified / "asset_links.parquet")
+
+        con = duckdb.connect()
+        counts = setup_unified_views(con, unified, sources_filter=["chatgpt"])
+
+        assert counts["assets"] == 1
+        assert counts["asset_links"] == 1
+        assert table_count(con, "assets") == 1
+        assert table_count(con, "asset_links") == 1
 
 
 class TestSetupNotebook:

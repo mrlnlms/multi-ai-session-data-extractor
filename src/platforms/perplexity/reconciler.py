@@ -52,6 +52,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.assets.reader import AssetReader
 from src.reconciliation.files import link_or_copy
 
 logger = logging.getLogger(__name__)
@@ -165,6 +166,8 @@ def run_reconciliation(
     raw_dir: Path,
     merged_output: Path,
     previous_merged: Path | None = None,
+    asset_reader: AssetReader | None = None,
+    asset_account_id: str | None = None,
 ) -> PerplexityReconcileReport:
     """Executa reconciliacao: produz pasta merged unica cumulativa."""
     if previous_merged is None:
@@ -192,7 +195,8 @@ def run_reconciliation(
     (merged_output / "threads").mkdir(exist_ok=True)
     (merged_output / "spaces").mkdir(exist_ok=True)
     (merged_output / "assets").mkdir(exist_ok=True)
-    (merged_output / "assets" / "files").mkdir(exist_ok=True)
+    if asset_reader is None:
+        (merged_output / "assets" / "files").mkdir(exist_ok=True)
 
     # ============================================================
     # 1. THREADS
@@ -382,23 +386,29 @@ def run_reconciliation(
     report.assets_total = len(cumulative_assets_index)
 
     # Binarios — cumulativo, copia novos sem sobrescrever existentes
-    curr_files = curr_assets_dir / "files"
-    if curr_files.exists():
-        for item in curr_files.iterdir():
-            if not item.is_file():
-                continue
-            target = merged_output / "assets" / "files" / item.name
-            link_or_copy(item, target)
-    if prev_assets_dir and (prev_assets_dir / "files").exists():
-        for item in (prev_assets_dir / "files").iterdir():
-            if not item.is_file():
-                continue
-            target = merged_output / "assets" / "files" / item.name
-            link_or_copy(item, target)
-    report.asset_binaries_total = len([
-        f for f in (merged_output / "assets" / "files").iterdir()
-        if f.is_file() and f.name != "_manifest.json"
-    ])
+    if asset_reader is None:
+        curr_files = curr_assets_dir / "files"
+        if curr_files.exists():
+            for item in curr_files.iterdir():
+                if not item.is_file():
+                    continue
+                target = merged_output / "assets" / "files" / item.name
+                link_or_copy(item, target)
+        if prev_assets_dir and (prev_assets_dir / "files").exists():
+            for item in (prev_assets_dir / "files").iterdir():
+                if not item.is_file():
+                    continue
+                target = merged_output / "assets" / "files" / item.name
+                link_or_copy(item, target)
+        report.asset_binaries_total = len([
+            path for path in (merged_output / "assets" / "files").iterdir()
+            if path.is_file() and path.name != "_manifest.json"
+        ])
+    else:
+        report.asset_binaries_total = sum(
+            asset.is_binary_available
+            for asset in asset_reader.projection_for("perplexity", asset_account_id).assets
+        )
 
     # ============================================================
     # 4. SUMMARY + LOG

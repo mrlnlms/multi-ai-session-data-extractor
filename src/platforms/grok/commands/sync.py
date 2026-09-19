@@ -25,6 +25,8 @@ import sys
 import time
 from pathlib import Path
 
+from src.assets.vault import AssetVault
+from src.assets.runtime import load_asset_runtime, runtime_account_id
 from src.platforms.grok.extractor.asset_downloader import download_assets
 from src.platforms.grok.extractor.auth import load_context
 from src.platforms.grok.extractor.orchestrator import BASE_DIR as RAW_DIR, run_export
@@ -46,8 +48,19 @@ def _section(title: str):
     print("=" * 72)
 
 
-async def main(args: argparse.Namespace) -> int:
+async def main(
+    args: argparse.Namespace,
+    *,
+    asset_vault: AssetVault | None = None,
+    asset_account_id: str | None = None,
+) -> int:
     started = time.time()
+    asset_runtime = load_asset_runtime("grok")
+    if asset_vault is None:
+        asset_vault = asset_runtime.vault
+        asset_account_id = runtime_account_id(
+            asset_runtime, "Grok", args.account, explicit=asset_account_id
+        )
 
     if args.dry_run:
         _section("DRY RUN")
@@ -79,7 +92,13 @@ async def main(args: argparse.Namespace) -> int:
         try:
             context = await load_context(account=args.account, headless=not args.headed)
             try:
-                stats = await download_assets(context, raw_dir)
+                stats = await download_assets(
+                    context,
+                    raw_dir,
+                    asset_vault=asset_vault,
+                    account_id=asset_account_id,
+                    complete_discovery=args.smoke is None,
+                )
             finally:
                 await context.close()
             (raw_dir / "assets_log.json").write_text(
@@ -101,7 +120,13 @@ async def main(args: argparse.Namespace) -> int:
 
     _section("Etapa 3/3 — Reconcile")
     merged_dir = _account_dir(MERGED_DIR, args.account)
-    report = run_reconciliation(raw_dir, merged_dir, full=args.full)
+    report = run_reconciliation(
+        raw_dir,
+        merged_dir,
+        full=args.full,
+        asset_reader=asset_runtime.reader if asset_vault is asset_runtime.vault else None,
+        asset_account_id=asset_account_id,
+    )
     print(report.summary())
     if report.aborted:
         print(f"  ABORTED: {report.abort_reason}")

@@ -29,6 +29,7 @@ from typing import Optional
 
 import pandas as pd
 
+from src.assets.reader import AssetReader
 from src.platforms.qwen._parser_helpers import (
     CHAT_TYPE_TO_MODE,
     CHAT_TYPE_TO_TOOL_CATEGORY,
@@ -94,8 +95,10 @@ class QwenParser(BaseParser):
         account: Optional[str] = None,
         merged_root: Optional[Path] = None,
         account_id: Optional[str] = None,
+        *,
+        asset_reader: AssetReader | None = None,
     ):
-        super().__init__(account, account_id)
+        super().__init__(account, account_id, asset_reader=asset_reader)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Qwen")
         self.projects: list[dict] = []
         self.project_docs: list[ProjectDoc] = []
@@ -127,6 +130,7 @@ class QwenParser(BaseParser):
             self._parse_conv(data, last_run_date=envelope.get("_last_seen_in_server"))
         else:
             raise FileNotFoundError(f"Input nao existe: {input_path}")
+        self.apply_asset_reader()
 
     def _parse_merged_dir(self, merged_root: Path) -> None:
         self.merged_root = merged_root
@@ -349,6 +353,8 @@ class QwenParser(BaseParser):
         raise ValueError(f"asset path is not under a data directory: {path}")
 
     def assets_df(self) -> pd.DataFrame:
+        if self.asset_projection is not None:
+            return assets_to_df(list(self.asset_projection.assets))
         grouped: dict[tuple[str | None, str], list[dict]] = {}
         for entry in self._asset_entries:
             grouped.setdefault((entry.get("account_id"), self._asset_id(entry)), []).append(entry)
@@ -378,6 +384,8 @@ class QwenParser(BaseParser):
         return assets_to_df(rows)
 
     def asset_links_df(self) -> pd.DataFrame:
+        if self.asset_projection is not None:
+            return asset_links_to_df(list(self.asset_projection.links))
         rows: list[AssetLink] = []
         seen: set[str] = set()
         for use in self._asset_uses:

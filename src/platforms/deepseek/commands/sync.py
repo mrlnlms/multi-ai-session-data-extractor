@@ -11,10 +11,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import sys
 import time
 from pathlib import Path
 
+from src.assets.vault import AssetVault
+from src.assets.runtime import load_asset_runtime, runtime_account_id
+from src.platforms.deepseek.extractor.asset_downloader import download_assets
+from src.platforms.deepseek.extractor.auth import HOME_URL, load_context
 from src.platforms.deepseek.extractor.orchestrator import BASE_DIR as RAW_DIR, run_export
 from src.platforms.deepseek.reconciler import run_reconciliation
 from src.accounts import account_data_dir
@@ -34,8 +39,49 @@ def _section(title: str):
     print("=" * 72)
 
 
-async def main(args: argparse.Namespace) -> int:
+async def _run_assets(
+    raw_dir: Path,
+    account: str,
+    *,
+    asset_vault: AssetVault,
+    asset_account_id: str | None,
+    complete_discovery: bool,
+) -> dict:
+    context = await load_context(account=account, headless=True)
+    try:
+        page = await context.new_page()
+        await page.goto(HOME_URL, wait_until="domcontentloaded", timeout=60000)
+        await page.wait_for_timeout(3000)
+        raw_token = await page.evaluate("() => localStorage.getItem('userToken')")
+        if not raw_token:
+            raise RuntimeError("localStorage.userToken is empty")
+        token = json.loads(raw_token)["value"]
+        return await download_assets(
+            context,
+            page,
+            token,
+            raw_dir,
+            asset_vault=asset_vault,
+            account_id=asset_account_id,
+            complete_discovery=complete_discovery,
+        )
+    finally:
+        await context.close()
+
+
+async def main(
+    args: argparse.Namespace,
+    *,
+    asset_vault: AssetVault | None = None,
+    asset_account_id: str | None = None,
+) -> int:
     started = time.time()
+    asset_runtime = load_asset_runtime("deepseek")
+    if asset_vault is None:
+        asset_vault = asset_runtime.vault
+        asset_account_id = runtime_account_id(
+            asset_runtime, "DeepSeek", args.account, explicit=asset_account_id
+        )
 
     if args.dry_run:
         _section("DRY RUN")
@@ -58,13 +104,33 @@ async def main(args: argparse.Namespace) -> int:
         return 1
     print(f"\nCapture OK em: {raw_dir}")
 
+    if asset_vault is not None and not args.no_binaries:
+        _section("Vault asset capture (temporary rollout)")
+        try:
+            await _run_assets(
+                raw_dir,
+                args.account,
+                asset_vault=asset_vault,
+                asset_account_id=asset_account_id,
+                complete_discovery=args.smoke is None,
+            )
+        except Exception as e:
+            print(f"\nERRO em assets: {e}")
+            return 1
+
     if args.no_reconcile:
         print("\n--no-reconcile setado, pulando etapa 2.")
         return 0
 
     _section("Etapa 2/2 — Reconcile")
     merged_dir = _account_dir(MERGED_DIR, args.account)
-    report = run_reconciliation(raw_dir, merged_dir, full=args.full)
+    report = run_reconciliation(
+        raw_dir,
+        merged_dir,
+        full=args.full,
+        asset_reader=asset_runtime.reader if asset_vault is asset_runtime.vault else None,
+        asset_account_id=asset_account_id,
+    )
     print(report.summary())
     if report.aborted:
         print(f"  ABORTED: {report.abort_reason}")

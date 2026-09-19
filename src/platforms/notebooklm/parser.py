@@ -24,6 +24,11 @@ from typing import Optional, TYPE_CHECKING
 
 import pandas as pd
 
+from src.assets.reader import (
+    AssetReader,
+    apply_asset_projection,
+    combine_asset_projections,
+)
 from src.schema.models import (
     Conversation, Message, ToolEvent, Branch, ProjectDoc, Asset, AssetLink,
     NotebookLMNote, NotebookLMOutput, NotebookLMGuideQuestion, NotebookLMSourceGuide,
@@ -76,6 +81,13 @@ class NotebookLMParser:
     """Parser for current merged data plus optional historical rows."""
 
     source_name = SOURCE
+
+    def __init__(self, *, asset_reader: AssetReader | None = None) -> None:
+        if asset_reader is None:
+            from src.assets.runtime import load_asset_runtime
+
+            asset_reader = load_asset_runtime(self.source_name).reader
+        self.asset_reader = asset_reader
 
     def parse(
         self,
@@ -144,6 +156,16 @@ class NotebookLMParser:
             questions.extend(historical.guide_questions)
             assets.extend(historical.assets)
             asset_links.extend(historical.asset_links)
+
+        if self.asset_reader is not None:
+            projection = combine_asset_projections(
+                self.asset_reader,
+                self.source_name,
+                (asset.account_id for asset in assets),
+            )
+            assets = list(projection.assets)
+            asset_links = list(projection.links)
+            apply_asset_projection(msgs, projection)
 
         # Enforce the published output PK at the parser boundary. NotebookLM's
         # artifact RPC can repeat an artifact row; keep the last representation,

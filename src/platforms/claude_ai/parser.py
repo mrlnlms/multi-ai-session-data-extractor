@@ -34,6 +34,7 @@ from typing import Optional
 
 import pandas as pd
 
+from src.assets.reader import AssetReader
 from src.platforms.claude_ai._parser_helpers import (
     block_time_bounds_iso,
     build_branches,
@@ -80,8 +81,10 @@ class ClaudeAIParser(BaseParser):
         account: Optional[str] = None,
         merged_root: Optional[Path] = None,
         account_id: Optional[str] = None,
+        *,
+        asset_reader: AssetReader | None = None,
     ):
-        super().__init__(account, account_id)
+        super().__init__(account, account_id, asset_reader=asset_reader)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Claude.ai")
         self.projects: list[dict] = []  # raw project dicts (para tabela separada)
 
@@ -128,6 +131,7 @@ class ClaudeAIParser(BaseParser):
             self._parse_conv(conv, last_run_date=conv.get("_last_seen_in_server"))
         else:
             raise FileNotFoundError(f"Input nao existe: {input_path}")
+        self.apply_asset_reader()
 
     def _parse_merged_dir(self, merged_root: Path) -> None:
         """Varre conversations/ e projects/ na pasta merged."""

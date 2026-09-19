@@ -32,7 +32,7 @@ SOURCE_COLOR   = "#7C3AED"
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Antigravity CLI"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
-AUX_TABLES     = []
+AUX_TABLES     = ["assets", "asset_links"]
 ACCOUNT_FILTER = None
 
 con = duckdb.connect()
@@ -45,3 +45,5 @@ _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_
 > raw; opaque legacy containers appear as zero-message conversations.
 
 {{< include _template.qmd >}}
+
+{{< include _template_aux.qmd >}}

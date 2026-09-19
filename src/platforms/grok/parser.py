@@ -28,6 +28,7 @@ from typing import Optional
 
 import pandas as pd
 
+from src.assets.reader import AssetReader
 from src.parsing.base import BaseParser
 from src.schema.models import (
     Asset,
@@ -70,8 +71,10 @@ class GrokParser(BaseParser):
         account: Optional[str] = None,
         merged_root: Optional[Path] = None,
         account_id: Optional[str] = None,
+        *,
+        asset_reader: AssetReader | None = None,
     ):
-        super().__init__(account, account_id)
+        super().__init__(account, account_id, asset_reader=asset_reader)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Grok")
         self.workspaces: list[dict] = []
         self.assets: list[dict] = []
@@ -101,6 +104,7 @@ class GrokParser(BaseParser):
             self._parse_envelope(envelope)
         else:
             raise FileNotFoundError(f"Input nao existe: {input_path}")
+        self.apply_asset_reader()
 
     def _parse_merged_dir(self, merged_root: Path) -> None:
         self.merged_root = merged_root
@@ -343,6 +347,8 @@ class GrokParser(BaseParser):
         return conversation_projects_to_df(self.conversation_projects)
 
     def assets_df(self) -> pd.DataFrame:
+        if self.asset_projection is not None:
+            return assets_to_df(list(self.asset_projection.assets))
         if not self.assets:
             return assets_to_df([])
         # Index binaries em merged/Grok/assets/ por asset_id (sem extensao)
@@ -399,6 +405,8 @@ class GrokParser(BaseParser):
         return assets_to_df(rows)
 
     def asset_links_df(self) -> pd.DataFrame:
+        if self.asset_projection is not None:
+            return asset_links_to_df(list(self.asset_projection.links))
         # /rest/assets is a global Files catalog. It exposes no trustworthy
         # conversation/message/project use relation, so do not invent one.
         return asset_links_to_df([])

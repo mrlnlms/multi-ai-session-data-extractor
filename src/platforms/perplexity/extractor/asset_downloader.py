@@ -26,6 +26,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from playwright.async_api import BrowserContext
+from src.assets.incremental import AssetObservation, WebAssetCaptureSession
+from src.assets.vault import AssetVault
 
 
 # Domains que consideramos "assets nativos da conversa"
@@ -156,6 +158,10 @@ async def download_assets(
     raw_dir: Path,
     concurrency: int = 5,
     skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+    complete_discovery: bool = False,
 ) -> dict:
     # Warmup + pagina pra poder chamar /rest/file-repository/*
     page = await context.new_page()
@@ -185,6 +191,18 @@ async def download_assets(
     stats = {"downloaded": 0, "skipped": 0, "errors": []}
     done = 0
     total = len(urls_info)
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="perplexity",
+        account_id=account_id,
+        evidence_path=raw_dir,
+        capture_method="web_asset_download:thread_attachments",
+    )
+
+    def _delivery_id(url: str) -> str:
+        parts = urlparse(url)
+        stable = f"{parts.scheme.lower()}://{parts.netloc.lower()}{parts.path}"
+        return "url:" + hashlib.sha256(stable.encode()).hexdigest()
 
     async def _try_download(url: str) -> tuple[bytes | None, str, str]:
         """Tenta baixar 1 URL. Retorna (bytes, content_type, error_str)."""
@@ -209,11 +227,36 @@ async def download_assets(
                 # Skip se ja baixado E arquivo existe
                 relpath = manifest[h].get("relpath")
                 if relpath and (assets_dir / relpath).exists():
+                    path = assets_dir / relpath
+                    delivery_id = _delivery_id(stale_url)
+                    capture.observe(AssetObservation(
+                        delivery_id=delivery_id,
+                        object_id=delivery_id,
+                        representation_kind=(
+                            "user_attachment" if info["source_type"] == "user_upload"
+                            else "delivery"
+                        ),
+                        payload=(path.read_bytes() if asset_vault is not None else None),
+                        file_name=path.name,
+                        mime_type=manifest[h].get("content_type"),
+                        upstream_locator=stale_url,
+                    ))
                     stats["skipped"] += 1
                     done += 1
                     return
                 # Skip se ja tentou e falhou por upstream deletion (idempotencia)
                 if manifest[h].get("status") == "failed_upstream_deleted":
+                    delivery_id = _delivery_id(stale_url)
+                    capture.observe(AssetObservation(
+                        delivery_id=delivery_id,
+                        object_id=delivery_id,
+                        representation_kind=(
+                            "user_attachment" if info["source_type"] == "user_upload"
+                            else "delivery"
+                        ),
+                        upstream_locator=stale_url,
+                        failure_reason=str(manifest[h].get("error") or "failed_upstream_deleted"),
+                    ))
                     stats["skipped"] += 1
                     done += 1
                     return
@@ -244,12 +287,36 @@ async def download_assets(
                     "error": err[:200],
                 }
                 stats["errors"].append((stale_url[:100], err))
+                delivery_id = _delivery_id(stale_url)
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=delivery_id,
+                    representation_kind=(
+                        "user_attachment" if info["source_type"] == "user_upload"
+                        else "delivery"
+                    ),
+                    upstream_locator=stale_url,
+                    failure_reason=err[:200],
+                ))
                 done += 1
                 return
 
             try:
                 target = _target_path(assets_dir, stale_url, info, ct)
                 target.write_bytes(blob)
+                delivery_id = _delivery_id(stale_url)
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=delivery_id,
+                    representation_kind=(
+                        "user_attachment" if info["source_type"] == "user_upload"
+                        else "delivery"
+                    ),
+                    payload=blob,
+                    file_name=target.name,
+                    mime_type=ct,
+                    upstream_locator=stale_url,
+                ))
                 relpath = target.relative_to(assets_dir).as_posix()
                 manifest[h] = {
                     "url_stale": stale_url,
@@ -263,6 +330,17 @@ async def download_assets(
                 stats["downloaded"] += 1
             except Exception as e:
                 stats["errors"].append((stale_url[:100], f"write failed: {str(e)[:200]}"))
+                delivery_id = _delivery_id(stale_url)
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=delivery_id,
+                    representation_kind=(
+                        "user_attachment" if info["source_type"] == "user_upload"
+                        else "delivery"
+                    ),
+                    upstream_locator=stale_url,
+                    failure_reason=f"write failed: {str(e)[:200]}",
+                ))
             done += 1
             if done % 20 == 0:
                 print(f"  [{done}/{total}] dl={stats['downloaded']} "
@@ -272,6 +350,7 @@ async def download_assets(
     await page.close()
 
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
+    capture.finish(complete_discovery=complete_discovery)
     print(f"  [{done}/{total}] dl={stats['downloaded']} "
           f"skip={stats['skipped']} err={len(stats['errors'])} (final)")
     return stats

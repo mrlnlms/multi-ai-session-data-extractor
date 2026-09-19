@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from src.workflows.pipeline import PipelineRequest, run_pipeline
 
 
@@ -7,7 +9,7 @@ def _fake_dependencies(**overrides):
     deps = {
         "acquire_lock": lambda: None,
         "release_lock": lambda: None,
-        "run_sync": lambda platform, on_line: (0, f"{platform} ok"),
+        "run_sync": lambda platform, on_line, **kwargs: (0, f"{platform} ok"),
         "run_unify": lambda on_line: (0, "unify ok"),
         "has_quarto": lambda: True,
         "run_quarto": lambda on_line, platforms_filter=None: (0, "quarto ok"),
@@ -50,7 +52,7 @@ def test_run_pipeline_aborts_after_all_syncs_fail(monkeypatch):
     from src.workflows import pipeline
 
     for name, value in _fake_dependencies(
-        run_sync=lambda platform, on_line: (1, "capture failed"),
+        run_sync=lambda platform, on_line, **kwargs: (1, "capture failed"),
     ).items():
         monkeypatch.setattr(pipeline, name, value)
 
@@ -60,10 +62,10 @@ def test_run_pipeline_aborts_after_all_syncs_fail(monkeypatch):
     assert all(row["status"] == "failed" for row in result.results[:2])
 
 
-def test_run_pipeline_continues_after_partial_sync_failure(monkeypatch):
+def test_run_pipeline_preserves_published_tables_after_partial_sync_failure(monkeypatch):
     from src.workflows import pipeline
 
-    def sync(platform, on_line):
+    def sync(platform, on_line, **kwargs):
         return (1, "failed") if platform == "ChatGPT" else (0, "ok")
 
     for name, value in _fake_dependencies(run_sync=sync).items():
@@ -71,7 +73,143 @@ def test_run_pipeline_continues_after_partial_sync_failure(monkeypatch):
 
     result = run_pipeline(PipelineRequest(("ChatGPT", "Claude.ai"), False, "all"))
 
-    assert result.stage_status == ("failed", "done", "done", "skipped")
+    assert result.stage_status == ("failed", "aborted", "aborted", "skipped")
+
+
+def test_vault_pipeline_passes_explicit_mode_per_source(monkeypatch, tmp_path):
+    from src.workflows import pipeline
+
+    calls = []
+
+    def sync(platform, on_line, *, asset_mode, vault_root, data_root):
+        calls.append((platform, asset_mode, vault_root, data_root))
+        return 0, "ok"
+
+    for name, value in _fake_dependencies(run_sync=sync).items():
+        monkeypatch.setattr(pipeline, name, value)
+
+    data_root = tmp_path / "data"
+    result = run_pipeline(
+        PipelineRequest(
+            ("ChatGPT", "Codex"),
+            False,
+            "all",
+            asset_modes=(("ChatGPT", "vault"), ("Codex", "legacy")),
+            asset_vault_root=data_root / "assets",
+            asset_data_root=data_root,
+        )
+    )
+
+    assert result.stage_status == ("done", "done", "done", "skipped")
+    assert calls == [
+        ("ChatGPT", "vault", data_root / "assets", data_root),
+        ("Codex", "legacy", data_root / "assets", data_root),
+    ]
+
+
+def test_vault_pipeline_aborts_before_unify_on_partial_source_failure(
+    monkeypatch, tmp_path
+):
+    from src.workflows import pipeline
+
+    def sync(platform, on_line, **kwargs):
+        return (1, "failed") if platform == "ChatGPT" else (0, "ok")
+
+    def fail_unify(*args, **kwargs):
+        raise AssertionError("unify must preserve the previously published parquets")
+
+    for name, value in _fake_dependencies(
+        run_sync=sync,
+        run_unify=fail_unify,
+    ).items():
+        monkeypatch.setattr(pipeline, name, value)
+
+    result = run_pipeline(
+        PipelineRequest(
+            ("ChatGPT", "Claude.ai"),
+            False,
+            "all",
+            asset_modes=(("ChatGPT", "vault"), ("Claude.ai", "vault")),
+            asset_vault_root=tmp_path / "data" / "assets",
+            asset_data_root=tmp_path / "data",
+        )
+    )
+
+    assert result.stage_status == ("failed", "aborted", "aborted", "skipped")
+
+
+def test_vault_mode_is_the_default_with_canonical_roots(monkeypatch):
+    from src.workflows import pipeline
+
+    calls = []
+
+    def sync(platform, on_line, **kwargs):
+        calls.append(kwargs)
+        return 0, "ok"
+
+    for name, value in _fake_dependencies(run_sync=sync).items():
+        monkeypatch.setattr(pipeline, name, value)
+
+    run_pipeline(PipelineRequest(("Codex",), False, "platform:Codex"))
+
+    assert calls == [{
+        "asset_mode": "vault",
+        "vault_root": Path("data/assets"),
+        "data_root": Path("data"),
+    }]
+
+
+def test_explicit_legacy_mode_remains_available_for_rollback(monkeypatch):
+    from src.workflows import pipeline
+
+    calls = []
+
+    def sync(platform, on_line, **kwargs):
+        calls.append(kwargs)
+        return 0, "ok"
+
+    for name, value in _fake_dependencies(run_sync=sync).items():
+        monkeypatch.setattr(pipeline, name, value)
+
+    run_pipeline(
+        PipelineRequest(
+            ("Codex",),
+            False,
+            "platform:Codex",
+            asset_modes=(("Codex", "legacy"),),
+        )
+    )
+
+    assert calls == [{
+        "asset_mode": "legacy",
+        "vault_root": Path("data/assets"),
+        "data_root": Path("data"),
+    }]
+
+
+def test_pipeline_persists_the_explicit_per_source_modes(monkeypatch, tmp_path):
+    from src.workflows import pipeline
+
+    captured = []
+    for name, value in _fake_dependencies().items():
+        monkeypatch.setattr(pipeline, name, value)
+    monkeypatch.setattr(
+        pipeline,
+        "persist_run",
+        lambda *args, **kwargs: captured.append(kwargs["asset_modes"]),
+    )
+
+    run_pipeline(
+        PipelineRequest(
+            ("ChatGPT", "Codex"),
+            False,
+            asset_modes=(("ChatGPT", "vault"), ("Codex", "legacy")),
+            asset_vault_root=tmp_path / "data/assets",
+            asset_data_root=tmp_path / "data",
+        )
+    )
+
+    assert captured == [{"ChatGPT": "vault", "Codex": "legacy"}]
 
 
 def test_run_pipeline_aborts_quarto_and_publish_after_unify_failure(monkeypatch):

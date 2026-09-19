@@ -3,12 +3,43 @@ lockfile JSON com child cleanup)."""
 from __future__ import annotations
 
 import json
+import inspect
 import os
 import signal
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
+
+def test_dashboard_pipeline_defaults_to_vault_with_canonical_roots(monkeypatch):
+    from dashboard import pipeline
+    from src.application.platforms import PlatformState
+    from src.workflows.pipeline import PipelineResult
+
+    captured = []
+    monkeypatch.setattr(
+        pipeline,
+        "run_pipeline",
+        lambda request, emit: (captured.append(request) or PipelineResult(("done",) * 4, ())),
+    )
+    state = object.__new__(PlatformState)
+    object.__setattr__(state, "name", "Codex")
+
+    pipeline.run_full_pipeline([state], False)
+
+    request = captured[0]
+    assert request.asset_modes == (("Codex", "vault"),)
+    assert request.asset_vault_root == Path("data/assets")
+    assert request.asset_data_root == Path("data")
+
+
+def test_dashboard_views_offer_vault_first_and_keep_legacy_rollback():
+    from dashboard.views import overview, platform
+
+    assert inspect.signature(overview._run_update_all).parameters["asset_mode"].default == "vault"
+    assert overview.ASSET_MODE_OPTIONS == ("vault", "legacy")
+    assert platform.ASSET_MODE_OPTIONS == ("vault", "legacy")
 
 
 # ===================== Stage 3 incremental =====================

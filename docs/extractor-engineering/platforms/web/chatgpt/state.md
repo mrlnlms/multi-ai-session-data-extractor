@@ -110,6 +110,17 @@ missing deps (duckdb, plotly, itables).
 ## Related documents
 
 - `docs/extractor-engineering/platforms/web/chatgpt/server-behavior.md` — upstream behavior.
+## Asset vault transition
+
+`vault` is the default asset reader, using `data/assets` and `data` unless roots
+are overridden explicitly. `legacy` remains an explicit temporary rollback;
+filesystem contents never select the mode. The legacy tree remains preserved,
+while the vault reader projects the same public `Asset`, `AssetLink`, and
+`Message.asset_paths` contract. For ChatGPT, reader scope preserves evidenced
+inline/message placements and metadata-only rows; Canvas actions are not
+promoted unless they materialize an eligible reconstructable output. See the
+[operational transition](../../../../operations/pipeline.md#transicao-do-asset-vault).
+
 ## Explicit login-health check
 
 `GET /backend-api/conversations` is documented, but the current Cloudflare-safe transport requires a visible page. This delivery therefore returns `unknown` instead of opening a browser implicitly. Profile presence alone never produces a valid status. The check is

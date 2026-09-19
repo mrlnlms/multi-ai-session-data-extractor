@@ -37,6 +37,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from src.assets.reader import AssetReader
 from src.reconciliation.files import link_or_copy
 
 logger = logging.getLogger(__name__)
@@ -200,6 +201,8 @@ def run_reconciliation(
     previous_merged: Path | None = None,
     force_refetch_features: set[str] | None = None,
     full: bool = False,
+    asset_reader: AssetReader | None = None,
+    asset_account_id: str | None = None,
 ) -> ClaudeReconcileReport:
     """Executa reconciliacao em pasta unica.
 
@@ -242,7 +245,8 @@ def run_reconciliation(
     merged_output.mkdir(parents=True, exist_ok=True)
     (merged_output / "conversations").mkdir(exist_ok=True)
     (merged_output / "projects").mkdir(exist_ok=True)
-    (merged_output / "assets").mkdir(exist_ok=True)
+    if asset_reader is None:
+        (merged_output / "assets").mkdir(exist_ok=True)
 
     # ============================================================
     # 1. CONVERSATIONS
@@ -281,9 +285,15 @@ def run_reconciliation(
     # ============================================================
     # 3. ASSETS (cumulativos, skip-existing)
     # ============================================================
-    _merge_assets(raw_dir, previous_merged, merged_output)
+    if asset_reader is None:
+        _merge_assets(raw_dir, previous_merged, merged_output)
+    else:
+        report.asset_binaries_total = sum(
+            asset.is_binary_available
+            for asset in asset_reader.projection_for("claude_ai", asset_account_id).assets
+        )
     assets_dir = merged_output / "assets"
-    if assets_dir.exists():
+    if asset_reader is None and assets_dir.exists():
         # binarios = arquivos diretos em assets/ (excluindo subpasta artifacts/)
         report.asset_binaries_total = sum(
             1 for p in assets_dir.glob("*") if p.is_file()

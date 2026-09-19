@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.assets.reader import AssetReader
 from src.reconciliation.files import link_or_copy
 
 logger = logging.getLogger(__name__)
@@ -321,6 +322,8 @@ def run_reconciliation(
     previous_merged: Path | None = None,
     force_refetch_features: set[str] | None = None,
     full: bool = False,
+    asset_reader: AssetReader | None = None,
+    asset_account_id: str | None = None,
 ) -> ReconcileReport:
     """Executa reconciliacao in-place na pasta unica per-account.
 
@@ -338,7 +341,8 @@ def run_reconciliation(
     output_dir = merged_output_base
     (output_dir / "notebooks").mkdir(exist_ok=True)
     (output_dir / "sources").mkdir(exist_ok=True)
-    (output_dir / "assets").mkdir(exist_ok=True)
+    if asset_reader is None:
+        (output_dir / "assets").mkdir(exist_ok=True)
 
     # Pasta unica: previous = merged_output_base mesmo (a menos que override)
     if previous_merged is None:
@@ -405,7 +409,10 @@ def run_reconciliation(
                 shutil.copy2(src_nb, dst_nb)
 
     # Assets do raw atual
-    _merge_assets(raw_dir, output_dir)
+    if asset_reader is None:
+        _merge_assets(raw_dir, output_dir)
+    else:
+        asset_reader.projection_for("notebooklm", asset_account_id)
 
     # Discovery do merged: discovery atual + tag preserved_missing pros deletados
     merged_disc = list(current_disc.values())

@@ -33,6 +33,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import pandas as pd
 
+from src.assets.reader import AssetReader
 from src.parsing.base import BaseParser
 from src.schema.models import (
     Asset,
@@ -139,8 +140,10 @@ class PerplexityParser(BaseParser):
         merged_root: Optional[Path] = None,
         raw_root: Optional[Path] = None,
         account_id: Optional[str] = None,
+        *,
+        asset_reader: AssetReader | None = None,
     ):
-        super().__init__(account, account_id)
+        super().__init__(account, account_id, asset_reader=asset_reader)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Perplexity")
         self.raw_root = Path(raw_root) if raw_root else Path("data/raw/Perplexity")
 
@@ -231,6 +234,7 @@ class PerplexityParser(BaseParser):
                     self._parse_asset(a)
             except Exception as e:
                 logger.warning(f"assets: {e}")
+        self.apply_asset_reader()
 
     def _parse_thread_file(
         self,

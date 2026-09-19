@@ -24,6 +24,8 @@ import sys
 import time
 from pathlib import Path
 
+from src.assets.vault import AssetVault
+from src.assets.runtime import load_asset_runtime, runtime_account_id
 from src.platforms.perplexity.extractor.orchestrator import run_export, BASE_DIR as RAW_DIR
 from src.platforms.perplexity.reconciler import run_reconciliation
 from src.accounts import account_data_dir
@@ -43,8 +45,19 @@ def _section(title: str):
     print("=" * 72)
 
 
-async def main(args: argparse.Namespace) -> int:
+async def main(
+    args: argparse.Namespace,
+    *,
+    asset_vault: AssetVault | None = None,
+    asset_account_id: str | None = None,
+) -> int:
     started = time.time()
+    asset_runtime = load_asset_runtime("perplexity")
+    if asset_vault is None:
+        asset_vault = asset_runtime.vault
+        asset_account_id = runtime_account_id(
+            asset_runtime, "Perplexity", args.account, explicit=asset_account_id
+        )
 
     if args.dry_run:
         _section("DRY RUN (sem efeitos)")
@@ -65,6 +78,8 @@ async def main(args: argparse.Namespace) -> int:
             full=args.full,
             account=args.account,
             output_dir=_account_dir(RAW_DIR, args.account),
+            asset_vault=asset_vault,
+            asset_account_id=asset_account_id,
         )
     except Exception as e:
         print(f"\nERRO na captura: {e}")
@@ -80,7 +95,12 @@ async def main(args: argparse.Namespace) -> int:
     # ============================================================
     _section("Etapa 2/2 — Reconcile")
     merged_dir = _account_dir(MERGED_DIR, args.account)
-    report = run_reconciliation(raw_dir, merged_dir)
+    report = run_reconciliation(
+        raw_dir,
+        merged_dir,
+        asset_reader=asset_runtime.reader if asset_vault is asset_runtime.vault else None,
+        asset_account_id=asset_account_id,
+    )
     print(report.summary())
     if report.aborted:
         print(f"  ABORTED: {report.abort_reason}")

@@ -15,6 +15,8 @@ import json
 import re
 from pathlib import Path
 
+from src.assets.incremental import AssetObservation, WebAssetCaptureSession
+from src.assets.vault import AssetVault
 from src.platforms.notebooklm.extractor.api_client import NotebookLMClient
 
 
@@ -256,6 +258,10 @@ async def download_assets(
     raw_dir: Path,
     concurrency: int = 8,
     skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+    complete_discovery: bool = False,
 ) -> dict:
     """Varre notebooks/*.json + sources/*.json, baixa todos os artifacts de midia:
     audio overviews, video overviews (mp4), slide decks (PDF+PPTX), page images.
@@ -340,11 +346,30 @@ async def download_assets(
 
     progress = {"done": 0, "errors_logged": 0}
     total = len(targets)
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="notebooklm",
+        account_id=account_id,
+        evidence_path=raw_dir,
+        capture_method="web_asset_download:media",
+    )
+
+    def _identity(fname: Path) -> str:
+        return f"media:{fname.relative_to(assets_dir).as_posix()}"
 
     async def _one(url: str, fname: Path, kind: str):
         fname.parent.mkdir(parents=True, exist_ok=True)
         dl_key, skip_key = KIND_STAT[kind]
         if skip_existing and fname.exists() and fname.stat().st_size > 0:
+            delivery_id = _identity(fname)
+            capture.observe(AssetObservation(
+                delivery_id=delivery_id,
+                object_id=delivery_id,
+                representation_kind=("platform_artifact" if kind == "page" else "assistant_output"),
+                payload=(fname.read_bytes() if asset_vault is not None else None),
+                file_name=fname.name,
+                upstream_locator=url,
+            ))
             stats[skip_key] += 1
         else:
             async with sem:
@@ -356,9 +381,27 @@ async def download_assets(
                         stats["errors"].append((str(fname.name), msg))
                         if progress["errors_logged"] < 5:
                             print(f"  ERR {fname.name}: {msg}", flush=True)
-                            progress["errors_logged"] += 1
+                        progress["errors_logged"] += 1
+                        delivery_id = _identity(fname)
+                        capture.observe(AssetObservation(
+                            delivery_id=delivery_id,
+                            object_id=delivery_id,
+                            representation_kind=("platform_artifact" if kind == "page" else "assistant_output"),
+                            file_name=fname.name,
+                            upstream_locator=url,
+                            failure_reason=msg,
+                        ))
                     else:
                         fname.write_bytes(blob)
+                        delivery_id = _identity(fname)
+                        capture.observe(AssetObservation(
+                            delivery_id=delivery_id,
+                            object_id=delivery_id,
+                            representation_kind=("platform_artifact" if kind == "page" else "assistant_output"),
+                            payload=blob,
+                            file_name=fname.name,
+                            upstream_locator=url,
+                        ))
                         stats[dl_key] += 1
                 except Exception as e:
                     msg = f"{kind}: {str(e)[:120]}"
@@ -366,6 +409,15 @@ async def download_assets(
                     if progress["errors_logged"] < 5:
                         print(f"  ERR {fname.name}: {msg}", flush=True)
                         progress["errors_logged"] += 1
+                    delivery_id = _identity(fname)
+                    capture.observe(AssetObservation(
+                        delivery_id=delivery_id,
+                        object_id=delivery_id,
+                        representation_kind=("platform_artifact" if kind == "page" else "assistant_output"),
+                        file_name=fname.name,
+                        upstream_locator=url,
+                        failure_reason=msg,
+                    ))
         progress["done"] += 1
         # Throttle baixo (a cada 10) pra dashboard ver progresso vivo;
         # runs pequenos (poucos audios) nunca atingiriam 200 antes do final.
@@ -380,10 +432,17 @@ async def download_assets(
             )
 
     await asyncio.gather(*(_one(u, f, k) for u, f, k in targets))
+    capture.finish(complete_discovery=complete_discovery)
     return stats
 
 
-def save_notes_and_mindmaps(raw_dir: Path, skip_existing: bool = True) -> dict:
+def save_notes_and_mindmaps(
+    raw_dir: Path,
+    skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+) -> dict:
     """Extrai notes+briefs+mind maps do cFji9 ja capturado (offline, sem rede).
 
     Salva:
@@ -399,6 +458,13 @@ def save_notes_and_mindmaps(raw_dir: Path, skip_existing: bool = True) -> dict:
     nb_dir = raw_dir / "notebooks"
     if not nb_dir.exists():
         return stats
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="notebooklm",
+        account_id=account_id,
+        evidence_path=nb_dir,
+        capture_method="web_asset_download:notes_mindmaps",
+    )
 
     for jp in nb_dir.glob("*.json"):
         try:
@@ -413,11 +479,29 @@ def save_notes_and_mindmaps(raw_dir: Path, skip_existing: bool = True) -> dict:
             out = assets_dir / "notes" / f"{nb_uuid}_{n['uuid']}.md"
             out.parent.mkdir(parents=True, exist_ok=True)
             if skip_existing and out.exists() and out.stat().st_size > 0:
+                capture.observe(AssetObservation(
+                    delivery_id=str(n["uuid"]),
+                    object_id=str(n["uuid"]),
+                    representation_kind="user_artifact",
+                    payload=(out.read_bytes() if asset_vault is not None else None),
+                    file_name=out.name,
+                    mime_type="text/markdown",
+                    upstream_locator=str(n["uuid"]),
+                ))
                 stats["notes_skipped"] += 1
                 continue
             try:
                 md = f"# {n.get('title') or 'Untitled note'}\n\n{n['content']}\n"
                 out.write_text(md, encoding="utf-8")
+                capture.observe(AssetObservation(
+                    delivery_id=str(n["uuid"]),
+                    object_id=str(n["uuid"]),
+                    representation_kind="user_artifact",
+                    payload=md.encode(),
+                    file_name=out.name,
+                    mime_type="text/markdown",
+                    upstream_locator=str(n["uuid"]),
+                ))
                 stats["notes_saved"] += 1
             except Exception as e:
                 stats["errors"].append((out.name, str(e)[:100]))
@@ -426,6 +510,15 @@ def save_notes_and_mindmaps(raw_dir: Path, skip_existing: bool = True) -> dict:
             out = assets_dir / "mind_maps" / f"{nb_uuid}_{mm['uuid']}.json"
             out.parent.mkdir(parents=True, exist_ok=True)
             if skip_existing and out.exists() and out.stat().st_size > 0:
+                capture.observe(AssetObservation(
+                    delivery_id=str(mm["uuid"]),
+                    object_id=str(mm["uuid"]),
+                    representation_kind="assistant_output",
+                    payload=(out.read_bytes() if asset_vault is not None else None),
+                    file_name=out.name,
+                    mime_type="application/json",
+                    upstream_locator=str(mm["uuid"]),
+                ))
                 stats["mind_maps_skipped"] += 1
                 continue
             try:
@@ -434,9 +527,19 @@ def save_notes_and_mindmaps(raw_dir: Path, skip_existing: bool = True) -> dict:
                                 "tree": mm["tree"]}, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
+                capture.observe(AssetObservation(
+                    delivery_id=str(mm["uuid"]),
+                    object_id=str(mm["uuid"]),
+                    representation_kind="assistant_output",
+                    payload=out.read_bytes(),
+                    file_name=out.name,
+                    mime_type="application/json",
+                    upstream_locator=str(mm["uuid"]),
+                ))
                 stats["mind_maps_saved"] += 1
             except Exception as e:
                 stats["errors"].append((out.name, str(e)[:100]))
+    capture.finish(complete_discovery=False)
     return stats
 
 
@@ -445,6 +548,9 @@ async def fetch_text_artifacts(
     raw_dir: Path,
     concurrency: int = 5,
     skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
 ) -> dict:
     """Fetch text artifacts (types 2/4/7/9) via v9rmvd.
 
@@ -471,10 +577,27 @@ async def fetch_text_artifacts(
             targets.append((nb_uuid, t["id"], t["type"], out))
 
     sem = asyncio.Semaphore(concurrency)
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="notebooklm",
+        account_id=account_id,
+        evidence_path=nb_dir,
+        capture_method="web_asset_download:text_artifacts",
+    )
 
     async def _one(nb_uuid: str, art_id: str, art_type: int, out: Path):
         out.parent.mkdir(parents=True, exist_ok=True)
         if skip_existing and out.exists() and out.stat().st_size > 0:
+            delivery_id = f"text-artifact:{art_id}"
+            capture.observe(AssetObservation(
+                delivery_id=delivery_id,
+                object_id=art_id,
+                representation_kind="text_artifact_envelope",
+                payload=(out.read_bytes() if asset_vault is not None else None),
+                file_name=out.name,
+                mime_type="application/json",
+                upstream_locator=art_id,
+            ))
             stats["text_artifacts_skipped"] += 1
             return
         async with sem:
@@ -482,6 +605,15 @@ async def fetch_text_artifacts(
                 data = await client.fetch_artifact(nb_uuid, art_id)
                 if data is None:
                     stats["errors"].append((out.name, "fetch_artifact None"))
+                    delivery_id = f"text-artifact:{art_id}"
+                    capture.observe(AssetObservation(
+                        delivery_id=delivery_id,
+                        object_id=art_id,
+                        representation_kind="text_artifact_envelope",
+                        file_name=out.name,
+                        upstream_locator=art_id,
+                        failure_reason="fetch_artifact None",
+                    ))
                     return
                 out.write_text(
                     json.dumps({"type": art_type, "artifact_id": art_id,
@@ -489,11 +621,29 @@ async def fetch_text_artifacts(
                                ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
+                delivery_id = f"text-artifact:{art_id}"
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=art_id,
+                    representation_kind="text_artifact_envelope",
+                    payload=out.read_bytes(),
+                    file_name=out.name,
+                    mime_type="application/json",
+                    upstream_locator=art_id,
+                ))
                 stats["text_artifacts_fetched"] += 1
             except Exception as e:
                 stats["errors"].append((out.name, str(e)[:150]))
+                delivery_id = f"text-artifact:{art_id}"
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=art_id,
+                    representation_kind="text_artifact_envelope",
+                    file_name=out.name,
+                    upstream_locator=art_id,
+                    failure_reason=str(e)[:150],
+                ))
 
     await asyncio.gather(*(_one(n, a, t, o) for n, a, t, o in targets))
+    capture.finish(complete_discovery=False)
     return stats
-
-

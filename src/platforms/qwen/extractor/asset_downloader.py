@@ -24,6 +24,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from playwright.async_api import BrowserContext
+from src.assets.incremental import AssetObservation, WebAssetCaptureSession
+from src.assets.vault import AssetVault
 
 
 CDN_UPLOAD_RE = re.compile(r'^https://cdn\.qwenlm\.ai/[0-9a-f\-]{36}/[0-9a-f\-]{36}_')
@@ -161,6 +163,10 @@ async def download_assets(
     raw_dir: Path,
     concurrency: int = 5,
     skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+    complete_discovery: bool = True,
 ) -> dict:
     # Abre uma page pra ter acesso ao endpoint /api/v1/files/{id}/content
     # como fallback quando a URL direta do CDN retorna 404.
@@ -187,6 +193,28 @@ async def download_assets(
     stats = {"downloaded": 0, "skipped": 0, "errors": []}
     done = 0
     total = len(urls_info)
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="qwen",
+        account_id=account_id,
+        evidence_path=raw_dir,
+        capture_method="web_asset_download",
+    )
+
+    def _delivery_id(info: dict, url: str, payload: bytes | None) -> str:
+        native_id = info.get("file_id")
+        if native_id:
+            return str(native_id)
+        if payload is not None:
+            return hashlib.sha256(payload).hexdigest()
+        return "reference:" + hashlib.sha256(url.encode()).hexdigest()
+
+    def _representation(info: dict) -> str:
+        if info["source_type"] == "project_file":
+            return "user_project_file"
+        if info["source_type"] == "user_upload":
+            return "user_attachment"
+        return "assistant_generated"
 
     async def _try_api_content_fallback(file_id: str) -> tuple[bytes, str] | None:
         """Fallback: GET /api/v1/files/{id}/content via page.evaluate.
@@ -229,6 +257,17 @@ async def download_assets(
                     str(manifest[h].get("content_type") or "application/octet-stream"),
                 )
                 if existing.is_file() and existing == expected:
+                    payload = existing.read_bytes() if asset_vault is not None else None
+                    delivery_id = _delivery_id(info, url, payload)
+                    capture.observe(AssetObservation(
+                        delivery_id=delivery_id,
+                        object_id=delivery_id,
+                        representation_kind=_representation(info),
+                        payload=payload,
+                        file_name=info.get("file_name") or existing.name,
+                        mime_type=manifest[h].get("content_type"),
+                        upstream_locator=url,
+                    ))
                     stats["skipped"] += 1
                     done += 1
                     return
@@ -249,10 +288,28 @@ async def download_assets(
                             blob, ct = fb
                     if blob is None:
                         stats["errors"].append((url[:100], f"HTTP {resp.status} (fallback api/v1 also failed)"))
+                        delivery_id = _delivery_id(info, url, None)
+                        capture.observe(AssetObservation(
+                            delivery_id=delivery_id,
+                            object_id=delivery_id,
+                            representation_kind=_representation(info),
+                            file_name=info.get("file_name"),
+                            upstream_locator=url,
+                            failure_reason=f"HTTP {resp.status}",
+                        ))
                         done += 1
                         return
             except Exception as e:
                 stats["errors"].append((url[:100], str(e)[:200]))
+                delivery_id = _delivery_id(info, url, None)
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=delivery_id,
+                    representation_kind=_representation(info),
+                    file_name=info.get("file_name"),
+                    upstream_locator=url,
+                    failure_reason=str(e)[:200],
+                ))
                 done += 1
                 return
 
@@ -266,6 +323,17 @@ async def download_assets(
                 else:
                     target.write_bytes(blob)
                     stats["downloaded"] += 1
+                payload = target.read_bytes() if asset_vault is not None else blob
+                delivery_id = _delivery_id(info, url, payload)
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=delivery_id,
+                    representation_kind=_representation(info),
+                    payload=payload,
+                    file_name=info.get("file_name") or target.name,
+                    mime_type=ct,
+                    upstream_locator=url,
+                ))
                 relpath = target.relative_to(assets_dir).as_posix()
                 record = {
                     "url": url,
@@ -290,6 +358,15 @@ async def download_assets(
                 manifest[h] = record
             except Exception as e:
                 stats["errors"].append((url[:100], f"write: {str(e)[:150]}"))
+                delivery_id = _delivery_id(info, url, None)
+                capture.observe(AssetObservation(
+                    delivery_id=delivery_id,
+                    object_id=delivery_id,
+                    representation_kind=_representation(info),
+                    file_name=info.get("file_name"),
+                    upstream_locator=url,
+                    failure_reason=f"write: {str(e)[:150]}",
+                ))
             done += 1
             if done % 20 == 0:
                 print(f"  [{done}/{total}] dl={stats['downloaded']} "
@@ -299,6 +376,7 @@ async def download_assets(
     await page.close()
 
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
+    capture.finish(complete_discovery=complete_discovery)
     print(f"  [{done}/{total}] dl={stats['downloaded']} "
           f"skip={stats['skipped']} err={len(stats['errors'])} (final)")
     return stats

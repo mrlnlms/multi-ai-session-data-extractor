@@ -7,6 +7,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.assets.reader import (
+    AssetReader,
+    apply_asset_projection,
+    combine_asset_projections,
+)
+from src.assets.runtime import load_asset_runtime
+
 logger = logging.getLogger(__name__)
 
 from src.schema.models import (
@@ -28,15 +35,43 @@ class BaseParser(ABC):
 
     source_name: str = ""
 
-    def __init__(self, account: str | None = None, account_id: str | None = None):
+    def __init__(
+        self,
+        account: str | None = None,
+        account_id: str | None = None,
+        *,
+        asset_reader: AssetReader | None = None,
+    ):
+        if asset_reader is None and self.source_name:
+            asset_reader = load_asset_runtime(self.source_name).reader
         self.account = account
         self.account_id = account_id
+        self.asset_reader = asset_reader
+        self.asset_projection = None
         self.reset()
 
     def reset(self):
         self.conversations: list[Conversation] = []
         self.messages: list[Message] = []
         self.events: list[ToolEvent] = []
+        self.asset_projection = None
+
+    def apply_asset_reader(self, account_ids=None):
+        """Apply the explicitly injected reader after source parsing completes."""
+        if self.asset_reader is None:
+            return None
+        if account_ids is None:
+            account_ids = (self.account_id,)
+        projection = combine_asset_projections(
+            self.asset_reader, self.source_name, account_ids
+        )
+        apply_asset_projection(self.messages, projection)
+        self.asset_projection = projection
+        if hasattr(self, "assets"):
+            self.assets = list(projection.assets)
+        if hasattr(self, "asset_links"):
+            self.asset_links = list(projection.links)
+        return projection
 
     @abstractmethod
     def parse(self, input_path: Path) -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import webbrowser
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
@@ -223,7 +224,11 @@ class _StreamlitPipelineView:
 
 
 def run_full_pipeline(
-    targets: list[PlatformState], publish_after: bool, scope: str = "all"
+    targets: list[PlatformState],
+    publish_after: bool,
+    scope: str = "all",
+    *,
+    asset_modes: dict[str, str] | None = None,
 ) -> None:
     headed = [
         state.name for state in targets if state.name in ("ChatGPT", "Perplexity")
@@ -237,7 +242,14 @@ def run_full_pipeline(
     if not publish_after:
         statuses[3] = "skipped"
     result = run_pipeline(
-        PipelineRequest(tuple(state.name for state in targets), publish_after, scope),
+        PipelineRequest(
+            tuple(state.name for state in targets),
+            publish_after,
+            scope,
+            asset_modes=tuple((state.name, (asset_modes or {}).get(state.name, "vault")) for state in targets),
+            asset_vault_root=Path("data/assets"),
+            asset_data_root=Path("data"),
+        ),
         emit=_StreamlitPipelineView(statuses, scope),
     )
     if result.lock_error is None:

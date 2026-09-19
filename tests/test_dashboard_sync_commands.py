@@ -29,7 +29,7 @@ def test_parse_command_is_none_for_cli_platforms():
 def test_streaming_web_sync_runs_parser_after_success(monkeypatch):
     calls = []
 
-    def fake_stream(command, on_line, tail_size, timeout):
+    def fake_stream(command, on_line, tail_size, timeout, **kwargs):
         calls.append(command)
         return 0, command[-1]
 
@@ -60,7 +60,7 @@ def test_migrated_cli_sync_command_uses_platform_module():
 def test_streaming_failed_sync_does_not_parse(monkeypatch):
     calls = []
 
-    def fake_stream(command, on_line, tail_size, timeout):
+    def fake_stream(command, on_line, tail_size, timeout, **kwargs):
         calls.append(command)
         return 1, "failed"
 
@@ -74,7 +74,7 @@ def test_streaming_failed_sync_does_not_parse(monkeypatch):
 def test_streaming_cli_sync_does_not_double_parse(monkeypatch):
     calls = []
 
-    def fake_stream(command, on_line, tail_size, timeout):
+    def fake_stream(command, on_line, tail_size, timeout, **kwargs):
         calls.append(command)
         return 0, "ok"
 
@@ -83,3 +83,30 @@ def test_streaming_cli_sync_does_not_double_parse(monkeypatch):
 
     assert rc == 0
     assert len(calls) == 1
+
+
+def test_streaming_vault_mode_propagates_validated_environment(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_stream(command, on_line, tail_size, timeout, extra_env=None):
+        calls.append((command, extra_env))
+        return 0, "ok"
+
+    monkeypatch.setattr(sync, "_stream", fake_stream)
+    data_root = tmp_path / "data"
+    rc, _tail = sync.run_sync_streaming(
+        "Claude.ai",
+        lambda _line: None,
+        asset_mode="vault",
+        vault_root=data_root / "assets",
+        data_root=data_root,
+    )
+
+    assert rc == 0
+    assert len(calls) == 2
+    for _command, env in calls:
+        assert env == {
+            "AI_ARCHIVE_ASSET_MODE": "vault",
+            "AI_ARCHIVE_ASSET_VAULT_ROOT": str(data_root / "assets"),
+            "AI_ARCHIVE_ASSET_DATA_ROOT": str(data_root),
+        }

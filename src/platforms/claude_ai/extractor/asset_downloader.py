@@ -8,9 +8,12 @@ como arquivos separados em assets/artifacts/.
 """
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 
+from src.assets.incremental import AssetObservation, WebAssetCaptureSession
+from src.assets.vault import AssetVault
 from src.platforms.claude_ai.extractor.api_client import ClaudeAPIClient
 
 
@@ -97,6 +100,10 @@ async def download_assets(
     concurrency: int = 5,
     include_thumbnail: bool = False,
     skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+    complete_discovery: bool = False,
 ) -> dict:
     """Download em batch. Retorna dict com estatisticas por kind + errors.
 
@@ -124,6 +131,13 @@ async def download_assets(
     }
     done = 0
     total = len(file_entries)
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="claude_ai",
+        account_id=account_id,
+        evidence_path=raw_dir,
+        capture_method="web_asset_download:files",
+    )
 
     async def _one(file_uuid: str, file_kind: str, file_name: str):
         nonlocal done
@@ -135,21 +149,62 @@ async def download_assets(
             # Blob ou kind desconhecido sem endpoint
             async with sem:
                 stats["not_downloadable_blob"] += 1
+                capture.observe(AssetObservation(
+                    delivery_id=file_uuid,
+                    object_id=file_uuid,
+                    representation_kind="delivery",
+                    file_name=file_name or None,
+                    failure_reason="native file has no downloadable binary variant",
+                ))
                 done += 1
                 return
 
         async with sem:
+            selected = False
+            last_failure: str | None = None
             for variant in variants:
                 out_path = assets_dir / f"{file_uuid}_{variant}.webp"
                 if skip_existing and out_path.exists():
+                    if not selected:
+                        capture.observe(AssetObservation(
+                            delivery_id=file_uuid,
+                            object_id=file_uuid,
+                            representation_kind="delivery",
+                            payload=(out_path.read_bytes() if asset_vault is not None else None),
+                            file_name=file_name or out_path.name,
+                            mime_type="image/webp",
+                            upstream_locator=f"file:{file_uuid}:{variant}",
+                        ))
+                        selected = True
                     stats["skipped_existing"] += 1
                     continue
                 try:
                     blob = await client.download_file(file_uuid, variant)
                     out_path.write_bytes(blob)
+                    if not selected:
+                        capture.observe(AssetObservation(
+                            delivery_id=file_uuid,
+                            object_id=file_uuid,
+                            representation_kind="delivery",
+                            payload=blob,
+                            file_name=file_name or out_path.name,
+                            mime_type="image/webp",
+                            upstream_locator=f"file:{file_uuid}:{variant}",
+                        ))
+                        selected = True
                     stats["downloaded"] += 1
                 except Exception as e:
-                    stats["errors"].append((file_uuid, f"{file_kind}/{variant}: {str(e)[:150]}"))
+                    last_failure = f"{file_kind}/{variant}: {str(e)[:150]}"
+                    stats["errors"].append((file_uuid, last_failure))
+            if not selected and last_failure is not None:
+                capture.observe(AssetObservation(
+                    delivery_id=file_uuid,
+                    object_id=file_uuid,
+                    representation_kind="delivery",
+                    file_name=file_name or None,
+                    upstream_locator=f"file:{file_uuid}",
+                    failure_reason=last_failure,
+                ))
             done += 1
             if done % 50 == 0:
                 print(
@@ -164,6 +219,7 @@ async def download_assets(
         f"skip={stats['skipped_existing']} err={len(stats['errors'])} "
         f"blob={stats['not_downloadable_blob']} (final)"
     )
+    capture.finish(complete_discovery=complete_discovery)
     return stats
 
 
@@ -176,7 +232,14 @@ def _artifact_ext(art_type: str, language: str | None) -> str:
     return "txt"
 
 
-def extract_artifacts(raw_dir: Path, skip_existing: bool = True) -> dict:
+def extract_artifacts(
+    raw_dir: Path,
+    skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
+    complete_discovery: bool = False,
+) -> dict:
     """Extrai artifacts de tool_use blocks como arquivos separados.
 
     Cada versao (command create/update/rewrite) vira um arquivo. Preserva historico
@@ -194,6 +257,13 @@ def extract_artifacts(raw_dir: Path, skip_existing: bool = True) -> dict:
     stats = {"extracted": 0, "skipped_existing": 0, "by_type": {}, "errors": []}
     # Conta versoes por (conv, artifact_id) pra nomear v1/v2/...
     version_counter: dict[tuple[str, str], int] = {}
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="claude_ai",
+        account_id=account_id,
+        evidence_path=conv_dir,
+        capture_method="web_asset_download:artifacts",
+    )
 
     for jp in sorted(conv_dir.glob("*.json")):
         try:
@@ -240,13 +310,39 @@ def extract_artifacts(raw_dir: Path, skip_existing: bool = True) -> dict:
                 art_id_safe = art_id.replace("/", "_").replace("\\", "_")
                 fname = f"{art_id_safe}_v{v_num}_{vuuid_short}.{ext}"
                 out_path = out_conv_dir / fname
+                if version_uuid:
+                    delivery_id = f"artifact-version:{version_uuid}"
+                else:
+                    locator = "\x1f".join(
+                        str(value or "")
+                        for value in (conv_uuid, m.get("uuid"), art_id, v_num)
+                    )
+                    delivery_id = "artifact-version:" + hashlib.sha256(locator.encode()).hexdigest()
 
                 if skip_existing and out_path.exists():
+                    capture.observe(AssetObservation(
+                        delivery_id=delivery_id,
+                        object_id=str(art_id),
+                        representation_kind="assistant_artifact",
+                        payload=(out_path.read_bytes() if asset_vault is not None else None),
+                        file_name=out_path.name,
+                        mime_type=art_type,
+                        upstream_locator=str(version_uuid or art_id),
+                    ))
                     stats["skipped_existing"] += 1
                     continue
 
                 try:
                     out_path.write_text(str(content), encoding="utf-8")
+                    capture.observe(AssetObservation(
+                        delivery_id=delivery_id,
+                        object_id=str(art_id),
+                        representation_kind="assistant_artifact",
+                        payload=str(content).encode(),
+                        file_name=out_path.name,
+                        mime_type=art_type,
+                        upstream_locator=str(version_uuid or art_id),
+                    ))
                     stats["extracted"] += 1
                     type_key = f"{art_type}|{language or '-'}"
                     stats["by_type"][type_key] = stats["by_type"].get(type_key, 0) + 1
@@ -270,4 +366,5 @@ def extract_artifacts(raw_dir: Path, skip_existing: bool = True) -> dict:
                 except Exception as e:
                     stats["errors"].append((fname, str(e)[:150]))
 
+    capture.finish(complete_discovery=complete_discovery)
     return stats

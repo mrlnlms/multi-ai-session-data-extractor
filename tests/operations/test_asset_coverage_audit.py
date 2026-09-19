@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -213,6 +214,32 @@ def test_malformed_session_evidence_is_never_silently_ignored(tmp_path):
     path.write_text("not-json\n")
     evidence = inventory_preserved_session_assets(data)
     assert any(item.representation_kind == "malformed_evidence" for item in evidence)
+
+
+def test_vault_blob_digest_covers_preserved_legacy_binary(tmp_path):
+    data = tmp_path / "data"
+    legacy = data / "raw" / "ChatGPT" / "assets" / "one.bin"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_bytes(b"same payload")
+    digest = hashlib.sha256(b"same payload").hexdigest()
+    blob = data / "assets" / "blobs" / "sha256" / digest[:2] / digest
+    blob.parent.mkdir(parents=True)
+    blob.write_bytes(b"same payload")
+    item = RepresentationEvidence(
+        "ChatGPT", "default", "preserved_binary", "raw/ChatGPT/index.json",
+        None, "raw/ChatGPT/assets/one.bin", None, None, None, None,
+    )
+    assets = pd.DataFrame([{
+        "source": "chatgpt", "account_id": None, "asset_id": "asset-1",
+        "asset_path": f"assets/blobs/sha256/{digest[:2]}/{digest}",
+        "is_binary_available": True,
+    }])
+
+    [finding] = reconcile_asset_coverage(
+        [item], assets, pd.DataFrame(), data_root=data
+    )
+
+    assert finding.status == "covered"
 
 
 def test_claude_code_jsonl_keeps_unicode_line_separator_inside_json_string(tmp_path):

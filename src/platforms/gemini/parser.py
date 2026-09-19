@@ -39,6 +39,7 @@ from typing import Mapping, Optional
 
 import pandas as pd
 
+from src.assets.reader import AssetReader
 from src.platforms.gemini._parser_helpers import (
     conv_last_timestamp,
     conv_turns,
@@ -130,8 +131,10 @@ class GeminiParser(BaseParser):
         merged_root: Optional[Path] = None,
         account_labels: Mapping[str, str] | None = None,
         account_ids: Mapping[str, str] | None = None,
+        *,
+        asset_reader: AssetReader | None = None,
     ):
-        super().__init__(account)
+        super().__init__(account, asset_reader=asset_reader)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Gemini")
         self.account_labels = dict(account_labels or {})
         self.account_ids = dict(account_ids or {})
@@ -156,6 +159,7 @@ class GeminiParser(BaseParser):
                 continue
         for acc, acc_dir in sorted(account_dirs):
             self._parse_account(acc_dir, acc)
+        self.apply_asset_reader(asset.account_id for asset in self.assets)
 
     def _parse_account(self, account_dir: Path, account: int) -> None:
         manifest = _load_assets_manifest(self.merged_root, account)

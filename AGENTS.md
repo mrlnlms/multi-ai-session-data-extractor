@@ -45,6 +45,66 @@ salva-los. Quando o usuario exigir revisao ou aprovacao antes de alterar codigo,
 esse gate se aplica a implementacao versionada e nao ao registro do plano no
 workbench privado.
 
+### Regra obrigatoria para frentes com plano/tracker
+
+Se uma frente tem plano ou tracker de acompanhamento, **nao encerrar nenhuma
+rodada nem recomendar compactacao sem atualizar o documento principal**. Isto
+vale tambem para probe negativo, desvio corrigido, mudanca de prioridade e
+rodada sem alteracao de codigo. Antes da resposta final:
+
+1. confrontar o proximo passo anteriormente combinado com o que foi realmente
+   feito e com os resultados ja registrados; nao transformar decisao aberta em
+   tarefa ainda nao executada;
+2. atualizar checkboxes apenas no escopo exato demonstrado, registrar evidencia,
+   limites e decisoes pendentes, e corrigir afirmacoes/handoffs obsoletos;
+3. atualizar `Estado atual` e uma unica proxima entrega verificavel no `Handoff`;
+4. conferir que a copia privada e eventual espelho local coincidem, validar
+   links locais e executar `git diff --check`; e
+5. na resposta final, indicar o plano atualizado e o proximo passo que ele
+   registra.
+
+Se a atualizacao do plano falhar, informar a falha explicitamente e nao
+apresentar a rodada como encerrada ou pronta para compactar. Checkpoints antigos
+sao registro historico, nao substituem o tracker corrente.
+
+### Registro determinado da frente de refactor de assets
+
+Esta frente tem **um unico documento corrente**:
+`private/docs/discussions/asset-pipeline-refactor-master-tracker-2026-09-15.md`.
+Ele reune contrato acordado, decisoes abertas/aprovadas, checklist, estado,
+um handoff e links para diarios de evidencia datados. `docs/local/` e ignorado
+pelo Git e nao deve conter copia, espelho ou link desta frente. Nao criar outro
+tracker, handoff ou documento corrente concorrente. Cada rodada relevante pode
+ter um diario imutavel em `private/docs/discussions/` com pergunta, escopo,
+metodo, artefatos, resultado, limites e implicacao; o tracker recebe somente
+um resumo curto e o link. Microdecisoes sem evidencia nao exigem diario.
+Especificacao/plano de migracao formais so nascem no marco 2, com
+escopo/finalidade escritos antes no tracker; nao viram outro acompanhamento.
+Esta regra prevalece para esta frente sobre a convencao geral de criar planos
+no workbench.
+
+Antes de cada rodada, ler `Situação agora`, checkbox alvo, `Estado atual`,
+`Handoff` e a entrada E pertinente; executar a unica proxima entrega registrada,
+salvo nova instrucao explicita do usuario. Mudanca de prioridade entra no
+tracker antes de outro probe. Depois, registrar evidencia nova no diario da
+rodada e promover ao tracker somente um resumo, links, escopo demonstrado,
+decisoes, estado e proxima entrega; nao repetir tabelas/narrativas. Fatos
+duraveis do sistema atual pertencem a documentacao versionada da fonte
+conforme as regras canonicas abaixo; diarios guardam metodo/proveniencia
+datados. Memoria do chat nao redefine o handoff.
+
+Para esta frente de refactor de assets, ao retomar apos compactacao ou em nova
+sessao, reler primeiro
+`private/docs/discussions/asset-pipeline-refactor-master-tracker-2026-09-15.md`,
+em especial `Situação agora`, `Próxima entrega`, `Handoff` e E pertinente.
+Executar a entrega ali escrita
+antes de propor novo plano, probe ou fonte. O marco de 10.976 pares identicos
+(~4,06 GB logicos, dominados por NotebookLM) ja foi medido; a classificacao
+NotebookLM e a contagem estatica de ramos ja foram examinadas. Nao refazer
+essas tarefas porque uma decisao de desenho segue aberta. Se o tracker e o
+checkout divergirem, corrigir o tracker com evidencia antes de escolher outra
+entrega; nunca interpretar a compactacao como reinicio do checklist.
+
 ### Edicao segura atraves do symlink `private/`
 
 O destino de `private/` fica fora da raiz gravavel do checkout. Ferramentas de

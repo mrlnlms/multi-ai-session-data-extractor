@@ -17,8 +17,7 @@ Uso:
         --plats=ChatGPT,Claude.ai
 
 Exit codes:
-    0  pipeline OK (talvez com falhas parciais de plats em stage 1, mas
-       stages 2-4 OK)
+    0  pipeline OK (todas as fontes selecionadas e stages 2-4 OK)
     1  pipeline falhou em algum stage critico (2/3/4) ou todas plats falharam
     2  erro de invocacao (sem plats sincronizaveis, lockfile ocupado)
 """
@@ -27,6 +26,7 @@ from __future__ import annotations
 import argparse
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 from src.workflows.execution import KNOWN_PLATFORMS
 from src.workflows.pipeline import STAGE_KEYS, commit_msg_for_scope, persist_run
@@ -68,6 +68,15 @@ def main() -> int:
         ),
     )
     p.add_argument("--no-publish", action="store_true", help="Pula Stage 4 (DVC + git push).")
+    p.add_argument(
+        "--asset-mode",
+        action="append",
+        default=[],
+        metavar="PLATFORM=legacy|vault",
+        help="Explicit per-source asset mode; unspecified sources use vault.",
+    )
+    p.add_argument("--asset-vault-root", type=Path, default=Path("data/assets"))
+    p.add_argument("--asset-data-root", type=Path, default=Path("data"))
     args = p.parse_args()
 
     plat_names = [p.strip() for p in args.plats.split(",") if p.strip()]
@@ -82,6 +91,12 @@ def main() -> int:
         _log(f"warning: skipping {skipped} (no sync/export script)")
 
     publish_after = not args.no_publish
+    asset_modes: dict[str, str] = {}
+    for item in args.asset_mode:
+        platform, separator, mode = item.partition("=")
+        if not separator or platform not in targets or mode not in {"legacy", "vault"}:
+            p.error(f"invalid --asset-mode {item!r}; expected selected PLATFORM=legacy|vault")
+        asset_modes[platform] = mode
     _log(f"=== Pipeline starting: {len(targets)} plats, publish={publish_after} ===")
     _log(f"plats: {targets}")
 
@@ -91,19 +106,41 @@ def main() -> int:
         return 2
 
     try:
-        return _run(targets, publish_after)
+        return _run(
+            targets,
+            publish_after,
+            asset_modes=asset_modes,
+            asset_vault_root=args.asset_vault_root,
+            asset_data_root=args.asset_data_root,
+        )
     finally:
         release_pipeline_lock()
 
 
-def _run(targets: list[str], publish_after: bool) -> int:
+def _run(
+    targets: list[str],
+    publish_after: bool,
+    *,
+    asset_modes: dict[str, str] | None = None,
+    asset_vault_root: Path | None = None,
+    asset_data_root: Path | None = None,
+) -> int:
     stage_status = ["pending"] * 4
     if not publish_after:
         stage_status[3] = "skipped"
     results: list[dict] = []
 
     def _persist():
-        persist_run(stage_status, results, publish_after, scope="cli:headless")
+        persist_run(
+            stage_status,
+            results,
+            publish_after,
+            scope="cli:headless",
+            asset_modes={
+                platform: (asset_modes or {}).get(platform, "vault")
+                for platform in targets
+            },
+        )
 
     # =================== Stage 1/4 — Sync + parse ===================
     _log(f"=== Stage 1/4 — Sync + parse ({len(targets)} plats) ===")
@@ -113,7 +150,13 @@ def _run(targets: list[str], publish_after: bool) -> int:
     for i, plat in enumerate(targets, 1):
         _log(f"--- [{i}/{len(targets)}] {plat} ---")
         try:
-            rc, tail = run_sync_streaming(plat, on_line=_log)
+            rc, tail = run_sync_streaming(
+                plat,
+                on_line=_log,
+                asset_mode=(asset_modes or {}).get(plat, "vault"),
+                vault_root=asset_vault_root,
+                data_root=asset_data_root,
+            )
         except Exception as e:  # noqa: BLE001
             rc, tail = -1, f"exception: {e}"
         status = "ok" if rc == 0 else "failed"
@@ -128,13 +171,14 @@ def _run(targets: list[str], publish_after: bool) -> int:
             any_fail = True
             _log(f"  FAIL: {plat} (rc={rc})")
 
-    if not any_ok:
+    if any_fail:
         stage_status[0] = "failed"
         for idx in (1, 2):
             stage_status[idx] = "aborted"
         if publish_after:
             stage_status[3] = "aborted"
-        _log("=== ALL plats failed in Stage 1 — aborting ===")
+        reason = "a selected source failed" if any_ok else "all platforms failed"
+        _log(f"=== Stage 1 incomplete ({reason}) — aborting before unify ===")
         _persist()
         return 1
 

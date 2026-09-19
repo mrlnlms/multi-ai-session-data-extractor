@@ -8,6 +8,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.assets.vault import AssetVault
+from src.assets.runtime import load_asset_runtime
 from src.runtime.project import find_project_root
 
 from src.capture.cli.copy import copy_source as _copy_source, current_source_files
@@ -18,7 +20,16 @@ RAW_DIR = PROJECT_ROOT / "data" / "raw" / "Codex"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed" / "Codex"
 
 
-def main() -> int:
+def main(
+    *,
+    asset_vault: AssetVault | None = None,
+    asset_data_root: Path | None = None,
+) -> int:
+    runtime = load_asset_runtime("codex")
+    if asset_vault is None:
+        asset_vault = runtime.vault
+        if runtime.reader is not None:
+            asset_data_root = runtime.reader.data_root
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--full", action="store_true",
                     help="Forca re-parse mesmo sem arquivos novos (CLIs nao re-copiam — sem servidor pra refetch)")
@@ -56,7 +67,10 @@ def main() -> int:
     print("=" * 60)
     print("  Etapa 2/2 — Parse → data/processed/Codex/")
     print("=" * 60)
-    parser = CodexParser()
+    parser = CodexParser(
+        asset_vault=asset_vault,
+        asset_data_root=(asset_data_root or RAW_DIR.parents[1]) if asset_vault else None,
+    )
     parser.parse(RAW_DIR, home_memory_files=current_source_files("codex"))
     stats = parser.write_parquets(PROCESSED_DIR)
 

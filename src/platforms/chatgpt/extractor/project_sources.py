@@ -18,6 +18,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from src.assets.incremental import AssetObservation, WebAssetCaptureSession
+from src.assets.vault import AssetVault
 from src.platforms.chatgpt.extractor.api_client import ChatGPTAPIClient
 
 
@@ -123,6 +125,9 @@ async def download_project_sources(
     output_dir: Path,
     concurrency: int = 3,
     skip_existing: bool = True,
+    *,
+    asset_vault: AssetVault | None = None,
+    account_id: str | None = None,
 ) -> dict:
     """Pra cada project_id, pega lista de files e baixa binarios.
 
@@ -145,6 +150,13 @@ async def download_project_sources(
         "projects_deleted_marked": 0,  # projects locais que sumiram do servidor
         "errors": [],
     }
+    capture = WebAssetCaptureSession(
+        asset_vault,
+        source="chatgpt",
+        account_id=account_id,
+        evidence_path=root,
+        capture_method="web_asset_download:project_sources",
+    )
 
     async def _process_project(pid: str):
         async with sem:
@@ -176,21 +188,61 @@ async def download_project_sources(
             safe_name = _safe_filename(name)
             out_path = pdir / safe_name
             if skip_existing and out_path.exists() and out_path.stat().st_size > 0:
+                capture.observe(AssetObservation(
+                    delivery_id=str(fid),
+                    object_id=str(fid),
+                    representation_kind="user_project_file",
+                    payload=(out_path.read_bytes() if asset_vault is not None else None),
+                    file_name=safe_name,
+                    upstream_locator=str(fid),
+                ))
                 stats["skipped_existing"] += 1
                 continue
             try:
                 url = await client.get_project_file_download_url(fid, pid)
                 if not url:
                     stats["errors"].append((fid, f"{pid}: permission_error"))
+                    capture.observe(AssetObservation(
+                        delivery_id=str(fid),
+                        object_id=str(fid),
+                        representation_kind="user_project_file",
+                        file_name=safe_name,
+                        upstream_locator=str(fid),
+                        failure_reason=f"{pid}: permission_error",
+                    ))
                     continue
                 blob = await client.download_binary(url)
                 if blob is None:
                     stats["errors"].append((fid, f"{pid}: download failed"))
+                    capture.observe(AssetObservation(
+                        delivery_id=str(fid),
+                        object_id=str(fid),
+                        representation_kind="user_project_file",
+                        file_name=safe_name,
+                        upstream_locator=str(fid),
+                        failure_reason=f"{pid}: download failed",
+                    ))
                     continue
                 out_path.write_bytes(blob)
+                capture.observe(AssetObservation(
+                    delivery_id=str(fid),
+                    object_id=str(fid),
+                    representation_kind="user_project_file",
+                    payload=blob,
+                    file_name=safe_name,
+                    upstream_locator=str(fid),
+                ))
                 stats["downloaded"] += 1
             except Exception as e:
                 stats["errors"].append((fid, f"{pid}: {str(e)[:150]}"))
+                capture.observe(AssetObservation(
+                    delivery_id=str(fid),
+                    object_id=str(fid),
+                    representation_kind="user_project_file",
+                    file_name=safe_name,
+                    upstream_locator=str(fid),
+                    failure_reason=f"{pid}: {str(e)[:150]}",
+                ))
 
     print(f"Scaneando {len(project_ids)} projects pra files...")
     await asyncio.gather(*(_process_project(pid) for pid in project_ids))
@@ -221,4 +273,5 @@ async def download_project_sources(
             f"Projects deletados no servidor (sources marcadas preserved): "
             f"{stats['projects_deleted_marked']}"
         )
+    capture.finish(complete_discovery=False)
     return stats

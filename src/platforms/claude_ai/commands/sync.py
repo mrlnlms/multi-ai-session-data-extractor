@@ -27,6 +27,8 @@ import sys
 import time
 from pathlib import Path
 
+from src.assets.vault import AssetVault
+from src.assets.runtime import load_asset_runtime, runtime_account_id
 from src.platforms.claude_ai.extractor.api_client import ClaudeAPIClient
 from src.platforms.claude_ai.extractor.asset_downloader import download_assets, extract_artifacts
 from src.platforms.claude_ai.extractor.auth import load_context
@@ -53,10 +55,17 @@ async def _run_assets(
     raw_dir: Path,
     profile: str,
     include_thumbnail: bool,
+    *,
+    asset_vault: AssetVault | None = None,
+    asset_account_id: str | None = None,
 ) -> dict:
     """Etapa 2: extract artifacts (offline) + download binarios (API)."""
     print("Extraindo artifacts (code/markdown/html/react/...)...")
-    art_stats = extract_artifacts(raw_dir)
+    art_stats = extract_artifacts(
+        raw_dir,
+        asset_vault=asset_vault,
+        account_id=asset_account_id,
+    )
     print(f"  artifacts extraidos: {art_stats['extracted']}")
     print(f"  ja existentes:      {art_stats['skipped_existing']}")
     if art_stats["errors"]:
@@ -67,7 +76,11 @@ async def _run_assets(
     client = ClaudeAPIClient(context, org_id)
     try:
         stats = await download_assets(
-            client, raw_dir, include_thumbnail=include_thumbnail
+            client,
+            raw_dir,
+            include_thumbnail=include_thumbnail,
+            asset_vault=asset_vault,
+            account_id=asset_account_id,
         )
     finally:
         await context.close()
@@ -81,8 +94,19 @@ async def _run_assets(
     return {"artifacts": art_stats, "binaries": stats}
 
 
-async def main(args: argparse.Namespace) -> int:
+async def main(
+    args: argparse.Namespace,
+    *,
+    asset_vault: AssetVault | None = None,
+    asset_account_id: str | None = None,
+) -> int:
     started = time.time()
+    asset_runtime = load_asset_runtime("claude_ai")
+    if asset_vault is None:
+        asset_vault = asset_runtime.vault
+        asset_account_id = runtime_account_id(
+            asset_runtime, "Claude.ai", args.profile, explicit=asset_account_id
+        )
 
     if args.dry_run:
         _section("DRY RUN (sem efeitos)")
@@ -122,6 +146,8 @@ async def main(args: argparse.Namespace) -> int:
                 raw_dir,
                 profile=args.profile,
                 include_thumbnail=args.thumbnail,
+                asset_vault=asset_vault,
+                asset_account_id=asset_account_id,
             )
         except Exception as e:
             print(f"\nERRO em assets: {e}")
@@ -135,7 +161,13 @@ async def main(args: argparse.Namespace) -> int:
     if not args.no_reconcile:
         _section("Etapa 3/3 — Reconcile")
         merged_dir = _account_dir(MERGED_DIR, args.profile)
-        report = run_reconciliation(raw_dir, merged_dir, full=args.full)
+        report = run_reconciliation(
+            raw_dir,
+            merged_dir,
+            full=args.full,
+            asset_reader=asset_runtime.reader if asset_vault is asset_runtime.vault else None,
+            asset_account_id=asset_account_id,
+        )
         print(report.summary())
         if report.aborted:
             print(f"  ABORTED: {report.abort_reason}")
