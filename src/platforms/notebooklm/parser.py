@@ -29,6 +29,7 @@ from src.assets.reader import (
     apply_asset_projection,
     combine_asset_projections,
 )
+from src.assets.appearances import commit_web_parser_appearances
 from src.schema.models import (
     Conversation, Message, ToolEvent, Branch, ProjectDoc, Asset, AssetLink,
     NotebookLMNote, NotebookLMOutput, NotebookLMGuideQuestion, NotebookLMSourceGuide,
@@ -83,10 +84,13 @@ class NotebookLMParser:
     source_name = SOURCE
 
     def __init__(self, *, asset_reader: AssetReader | None = None) -> None:
+        self.web_asset_vault = None
         if asset_reader is None:
             from src.assets.runtime import load_asset_runtime
 
-            asset_reader = load_asset_runtime(self.source_name).reader
+            runtime = load_asset_runtime(self.source_name)
+            asset_reader = runtime.reader
+            self.web_asset_vault = runtime.vault
         self.asset_reader = asset_reader
 
     def parse(
@@ -158,6 +162,15 @@ class NotebookLMParser:
             asset_links.extend(historical.asset_links)
 
         if self.asset_reader is not None:
+            if self.web_asset_vault is not None:
+                commit_web_parser_appearances(
+                    self.web_asset_vault,
+                    source=self.source_name,
+                    assets=assets,
+                    links=asset_links,
+                    messages=msgs,
+                    evidence_path=output_dir,
+                )
             projection = combine_asset_projections(
                 self.asset_reader,
                 self.source_name,

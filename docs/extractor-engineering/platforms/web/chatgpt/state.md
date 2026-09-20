@@ -28,8 +28,8 @@
 
 ## Reference volume
 
-- 1249 cumulative conversations: 1207 in the legacy default account and 42 in
-  `account-2` (discovered 2026-09-12).
+- 1276 cumulative conversations: 1208 in the legacy default account and 68 in
+  `account-2` (validated 2026-09-20).
 - `LAST_RECONCILE.md` and `reconcile_log.jsonl` updated on every run.
 
 ## Canonical parser
@@ -65,9 +65,14 @@ branches, assets and asset_links Parquets.
   two successful regex patches cannot be applied to the preceding preserved
   state. These exceptions remain visible as protocol limitations, not invented
   files.
-- **Availability** is explicit: the current two-account base produces 1,117
-  assets and 1,122 links, with 1,047 local binaries and 70 metadata-only assets.
-  All links and available paths resolve, and no upstream pointer URL is published.
+- **Availability** is explicit: the current two-account base produces 1,194
+  assets and 1,232 links, with 1,119 local binaries and 75 metadata-only assets.
+  All published links and available paths resolve, and no upstream pointer URL
+  is published. The parser boundary now commits an authoritative semantic
+  appearance snapshot after every web capture. The append-only vault retains
+  historical relationships, while the public projection selects the newest
+  authoritative snapshot so changed positions do not create stale duplicate
+  links.
 - Project `_files.json` indexes and Canvas operation records remain preserved
   outside the Asset domain; their reconstructable successful Canvas states are
   Assets. Account memory exports remain preserved for the separately planned
@@ -76,10 +81,31 @@ branches, assets and asset_links Parquets.
 - **Custom GPT vs project** distinguished.
 - **Preservation** via `is_preserved_missing` + `last_seen_in_server`.
 
-### Typical volume
+### Current validated volume
 
-1255 convs / 22,039 msgs / 4,279 tool_events. Byte-for-byte idempotent after
+1276 convs / 24,478 msgs / 5,507 tool_events. Byte-for-byte idempotent after
 the source's volatile server fields are normalized by the pipeline.
+
+### Last validated incremental run — 2026-09-20
+
+Both configured accounts completed headed capture and reconciliation without
+discovery errors. The legacy default account discovered 1,205 active
+conversations, fetched none, and preserved 3 server-missing records. `account-2`
+discovered 66 active conversations, fetched 22, added 21, updated 1, and
+preserved 2 server-missing records. Asset capture downloaded 62 conversation
+files and 10 project files for `account-2`; 88 conversation-file attempts
+remained unavailable upstream and are retained as explicit metadata/evidence.
+The run initially exposed 110 missing semantic links under `account-2`: the
+incremental writer had preserved delivery, observation and blob records but no
+appearance records. The shared web parser boundary now appends those semantic
+relationships without rewriting prior evidence. A direct legacy/vault
+comparison passes exactly for all 1,194 asset IDs and 1,232 link IDs (961 in
+the default account and 271 in `account-2`); the 682 messages with asset paths
+also preserve the same ordered payload sequence. Repeated parser output is
+byte-for-byte idempotent, the unified base now has 15,109 asset links and
+592,066 total rows, all six affected Quarto reports render, the complete test
+suite passes, and both coverage and vault integrity verification are green. No
+publication was performed in this validation round.
 
 ## Descriptive Quarto
 

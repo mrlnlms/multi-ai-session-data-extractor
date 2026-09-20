@@ -123,3 +123,17 @@ def test_combined_scopes_do_not_repeat_the_same_message_path():
     )
 
     assert projection.message_paths == {"message-1": ("assets/shared.bin",)}
+
+
+def test_combined_projection_preserves_repeated_positions_within_one_scope():
+    class Reader:
+        def projection_for(self, source, account_id):
+            return AssetProjection(
+                (), (), {"message-1": ("assets/shared.bin", "assets/shared.bin")}
+            )
+
+    projection = combine_asset_projections(Reader(), "chatgpt", (ACCOUNT_ID,))
+
+    assert projection.message_paths == {
+        "message-1": ("assets/shared.bin", "assets/shared.bin")
+    }

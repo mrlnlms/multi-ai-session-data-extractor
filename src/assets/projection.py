@@ -326,7 +326,24 @@ def project_assets(state: AssetState, data_root: Path) -> AssetProjection:
         raise TypeError("state must be an AssetState")
     data_root = Path(data_root)
     deliveries = _unique_records(state.records, "delivery", "delivery_id")
-    appearances = _unique_records(state.records, "appearance", "appearance_id")
+    authoritative_capture_id = next((
+        record.capture_id
+        for record in reversed(state.records)
+        if record.record_type == "capture"
+        and record.payload.get("appearances_authoritative") is True
+    ), None)
+    appearance_records = (
+        tuple(
+            record for record in state.records
+            if record.record_type != "appearance"
+            or record.capture_id == authoritative_capture_id
+        )
+        if authoritative_capture_id is not None
+        else state.records
+    )
+    appearances = _unique_records(
+        appearance_records, "appearance", "appearance_id"
+    )
     observations = _latest_observations(state)
     blob_sizes = _blob_sizes(state)
     assets = tuple(

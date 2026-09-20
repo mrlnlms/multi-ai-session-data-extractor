@@ -4,18 +4,19 @@ from __future__ import annotations
 
 import hashlib
 import json
-import uuid
 from pathlib import Path
 
 import pandas as pd
 
 from src.assets.contracts import AssetEvidenceContext
+from src.assets.appearances import (
+    link_appearance_payload,
+    message_path_appearance_payload,
+)
 from src.assets.models import AssetScope, CaptureBatch, RecordEnvelope
 from src.assets.state import canonical_json
 from src.schema.models import Asset, normalize_data_relative_path
 
-
-_APPEARANCE_NAMESPACE = uuid.UUID("a0f32d0c-ffcf-5865-a514-8d2119cbbd3a")
 
 _REPRESENTATION_BY_PUBLIC_CLASS = {
     ("other", "unknown", None): "delivery",
@@ -137,61 +138,16 @@ class ProjectionEvidenceAdapter:
         for link in context.links:
             if link.asset_id not in asset_ids:
                 raise ValueError(f"link has no delivery in batch: {link.asset_id}")
-            appearances.append(
-                {
-                    "appearance_id": link.asset_link_id,
-                    "asset_link_id": link.asset_link_id,
-                    "delivery_id": link.asset_id,
-                    "object_type": link.object_type,
-                    "object_id": link.object_id,
-                    "conversation_id": link.conversation_id,
-                    "message_id": link.message_id,
-                    "project_id": link.project_id,
-                    "role": link.role,
-                    "ordinal": link.ordinal,
-                    "content_block_index": link.content_block_index,
-                    "position_confidence": "exact",
-                    "projection_kind": "asset_link",
-                    "projection_order": context.link_order[link.asset_link_id],
-                    "metadata_json": link.metadata_json,
-                }
-            )
+            appearances.append(link_appearance_payload(
+                link, projection_order=context.link_order[link.asset_link_id]
+            ))
 
         for item in context.message_paths:
             if item.asset_id not in asset_ids:
                 raise ValueError(f"message path has no delivery in batch: {item.asset_id}")
-            appearance_id = str(
-                uuid.uuid5(
-                    _APPEARANCE_NAMESPACE,
-                    "\x1f".join(
-                        (
-                            self.source,
-                            context.account_id or "",
-                            item.asset_id,
-                            item.conversation_id,
-                            item.message_id,
-                            str(item.ordinal),
-                        )
-                    ),
-                )
-            )
-            appearances.append(
-                {
-                    "appearance_id": appearance_id,
-                    "delivery_id": item.asset_id,
-                    "object_type": "message",
-                    "object_id": item.message_id,
-                    "conversation_id": item.conversation_id,
-                    "message_id": item.message_id,
-                    "project_id": None,
-                    "role": "unknown",
-                    "ordinal": item.ordinal,
-                    "content_block_index": None,
-                    "position_confidence": "exact",
-                    "projection_kind": "message_path",
-                    "metadata_json": None,
-                }
-            )
+            appearances.append(message_path_appearance_payload(
+                self.source, context.account_id, item
+            ))
 
         capture_payload: dict[str, object] = {
             "source": self.source,

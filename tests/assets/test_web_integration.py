@@ -10,6 +10,9 @@ import pytest
 from src.assets.models import AssetScope
 from src.assets.incremental import AssetObservation, WebAssetCaptureSession
 from src.assets.vault import AssetVault
+from src.assets.reader import VaultAssetReader
+from src.parsing.base import BaseParser
+from src.schema.models import Asset, AssetLink, Message, make_asset_link_id
 from src.platforms.grok.extractor.asset_downloader import download_assets
 
 
@@ -136,3 +139,60 @@ async def test_grok_captured_response_writes_legacy_and_committed_vault(tmp_path
     assert state.by_type["delivery"][0].payload["delivery_id"] == "asset-native-1"
     assert state.by_type["observation"][0].payload["status"] == "available"
     assert vault.verify(state.scope).blob_count == 1
+
+
+def test_web_parser_boundary_enriches_new_delivery_before_vault_projection(
+    tmp_path,
+):
+    vault = AssetVault(tmp_path / "assets", runtime_root=tmp_path / "runtime")
+    account_id = "11111111-1111-4111-8111-111111111111"
+    commit = importlib.import_module("src.assets.incremental").commit_web_asset_capture
+    commit(
+        vault,
+        source="chatgpt",
+        account_id=account_id,
+        observations=(AssetObservation(
+            "asset-1", "asset-1", "user_attachment", payload=b"image"
+        ),),
+        complete_discovery=True,
+        evidence_path=tmp_path / "raw",
+    )
+
+    class Parser(BaseParser):
+        source_name = "chatgpt"
+
+        def parse(self, input_path):
+            return None
+
+    parser = Parser(
+        account_id=account_id,
+        asset_reader=VaultAssetReader(vault, tmp_path),
+    )
+    parser.web_asset_vault = vault
+    asset_path = "raw/ChatGPT/assets/asset-1.png"
+    parser.assets = [Asset(
+        asset_id="asset-1", source="chatgpt", account_id=account_id,
+        asset_kind="attachment", asset_origin="user", file_name="asset-1.png",
+        mime_type="image/png", size_bytes=5, asset_path=asset_path,
+        is_model_generated=False, is_preserved_missing=False,
+        is_binary_available=True, created_at=None, metadata_json=None,
+    )]
+    link_id = make_asset_link_id(
+        "chatgpt", account_id, "asset-1", "message", "message-1", "input", 0, 0
+    )
+    parser.asset_links = [AssetLink(
+        asset_link_id=link_id, source="chatgpt", account_id=account_id,
+        asset_id="asset-1", object_type="message", object_id="message-1",
+        conversation_id="conversation-1", message_id="message-1", project_id=None,
+        role="input", ordinal=0, content_block_index=0, metadata_json=None,
+    )]
+    parser.messages = [Message(
+        message_id="message-1", conversation_id="conversation-1",
+        source="chatgpt", account_id=account_id, role="user", content="upload",
+        sequence=0, model=None, created_at=None, asset_paths=[asset_path],
+    )]
+
+    projection = parser.apply_asset_reader()
+
+    assert [link.asset_link_id for link in projection.links] == [link_id]
+    assert parser.messages[0].asset_paths == [projection.assets[0].asset_path]

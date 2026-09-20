@@ -12,9 +12,15 @@ from src.assets.reader import (
     apply_asset_projection,
     combine_asset_projections,
 )
+from src.assets.appearances import commit_web_parser_appearances
 from src.assets.runtime import load_asset_runtime
 
 logger = logging.getLogger(__name__)
+
+WEB_ASSET_SOURCES = frozenset({
+    "chatgpt", "claude_ai", "gemini", "notebooklm", "qwen",
+    "deepseek", "perplexity", "grok", "kimi",
+})
 
 from src.schema.models import (
     Conversation,
@@ -42,8 +48,11 @@ class BaseParser(ABC):
         *,
         asset_reader: AssetReader | None = None,
     ):
+        self.web_asset_vault = None
         if asset_reader is None and self.source_name:
-            asset_reader = load_asset_runtime(self.source_name).reader
+            runtime = load_asset_runtime(self.source_name)
+            asset_reader = runtime.reader
+            self.web_asset_vault = runtime.vault
         self.account = account
         self.account_id = account_id
         self.asset_reader = asset_reader
@@ -60,6 +69,20 @@ class BaseParser(ABC):
         """Apply the explicitly injected reader after source parsing completes."""
         if self.asset_reader is None:
             return None
+        if (
+            self.web_asset_vault is not None
+            and self.source_name in WEB_ASSET_SOURCES
+            and hasattr(self, "assets")
+            and hasattr(self, "asset_links")
+        ):
+            commit_web_parser_appearances(
+                self.web_asset_vault,
+                source=self.source_name,
+                assets=tuple(self.assets),
+                links=tuple(self.asset_links),
+                messages=tuple(self.messages),
+                evidence_path=Path(getattr(self, "raw_root", ".")),
+            )
         if account_ids is None:
             account_ids = (self.account_id,)
         projection = combine_asset_projections(

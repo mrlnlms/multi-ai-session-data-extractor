@@ -61,7 +61,10 @@ def combine_asset_projections(
         assets.extend(projection.assets)
         links.extend(projection.links)
         for message_id, paths in projection.message_paths.items():
-            destination = message_paths.setdefault(message_id, [])
+            if message_id not in message_paths:
+                message_paths[message_id] = list(paths)
+                continue
+            destination = message_paths[message_id]
             for path in paths:
                 if path not in destination:
                     destination.append(path)

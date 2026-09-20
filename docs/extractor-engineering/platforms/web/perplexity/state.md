@@ -31,14 +31,17 @@ Output in `data/merged/Perplexity/perplexity_merged_summary.json` +
 - 2436 tool_events.
 - 90 branches.
 
-### Last validated incremental run — 2026-08-30
+### Last validated incremental run — 2026-09-20
 
-Headed capture completed with 82 threads discovered, 3 fetched and 79 reused;
-the three spaces were also fetched. Reconciliation added 3 threads, updated
-none, and preserved one server-missing space. The parser then completed before
-the unified parquets were regenerated. This is a healthy green state: dashboard
-status must additionally require a fresh processed parquet, not merely a
-recent capture timestamp.
+Headed capture completed with 82 threads discovered, none fetched and all 82
+reused; the three spaces were fetched without errors. All 9 artifact binaries
+and 6 thread attachments were already preserved. Reconciliation copied all 82
+threads, kept one server-missing space and one orphan marker, and the parser
+reproduced the reference volume before the unified parquets and six affected
+Quarto reports were regenerated. The asset coverage audit and vault integrity
+verification passed. This is a healthy green state: dashboard status must
+additionally require a fresh processed parquet, not merely a recent capture
+timestamp.
 
 ## Canonical parser
 
