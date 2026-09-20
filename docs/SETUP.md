@@ -108,6 +108,13 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.login --accou
 4. O perfil e preservado e os syncs seguintes nao pedem login ate a sessao
    expirar.
 
+Ao criar cada perfil persistente, mantenha tambem o navegador visivelmente
+vinculado a identidade correspondente sempre que o provedor oferecer esse
+recurso. Esse vinculo nao substitui o login na plataforma: antes de fechar a
+janela, confira a conta exibida pelo proprio servico. A combinacao reduz
+confusao entre perfis durante operacoes multi-conta e deve permanecer alinhada
+ao mesmo nome tecnico usado nos comandos de login e sync.
+
 **CLIs (Claude Code, Codex, Gemini CLI e Antigravity CLI):** o coletor nao
 faz login. Ele copia dados dos diretorios locais da ferramenta, como
 `~/.claude/projects/`, `~/.codex/sessions/` e `~/.gemini/tmp/`.

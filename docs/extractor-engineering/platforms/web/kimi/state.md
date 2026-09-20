@@ -35,6 +35,28 @@
 - The combined parser produced 56 conversations, 1,389 messages, 249 tool
   events, 56 branches, and 5 installed skills.
 
+### Latest validated collection — 2026-09-20
+
+- Both observable profiles were validated explicitly. The default profile
+  rediscovered and reused all 53 chats; `account-2` grew from 5 to 6 chats,
+  fetched the new body without error, and downloaded 3 new binary files.
+  Repeated runs then reused all 53 and 6 chats respectively.
+- The combined parser produced 59 conversations, 1,514 messages, 249 tool
+  events, 59 branches, 2 installed skills, and 90 assets. Eighty-nine assets
+  are locally available; the remaining signed URL is the previously known
+  unavailable upstream object.
+- The run exposed the same preservation boundary previously observed in Qwen:
+  vault mode refreshed the manifest but skipped copying new raw binaries into
+  the cumulative merged tree. Kimi reconciliation now preserves raw binaries
+  in merged in both reader modes, with a regression test. The archive-wide
+  coverage audit returned to zero gaps; vault verification, unify, all 6
+  selected Quarto reports, and the complete test suite pass.
+- The collector requires an authenticated `kimi.ai` session and access token.
+  During this run, the `account-2` token expired again shortly after two
+  successful incremental reads, so a freshly completed login is not proof of
+  durable future authentication. General browser-profile identity guidance is
+  documented in `docs/SETUP.md` rather than as a Kimi-specific requirement.
+
 ## Commands
 
 ```bash

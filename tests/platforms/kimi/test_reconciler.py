@@ -3,6 +3,16 @@ import json
 from src.platforms.kimi.reconciler import run_reconciliation
 
 
+class _EmptyProjection:
+    assets = ()
+
+
+class _VaultReaderStub:
+    def projection_for(self, source, account_id):
+        assert source == "kimi"
+        return _EmptyProjection()
+
+
 def _write_discovery(root, ids):
     root.mkdir(parents=True, exist_ok=True)
     (root / "discovery_ids.json").write_text(
@@ -35,3 +45,16 @@ def test_reconcile_preserves_nested_current_and_previous_assets(tmp_path):
     expected = {**current_files, "chat-old/file-3.txt": b"previous-only"}
     for relative, content in expected.items():
         assert (merged / "assets" / relative).read_bytes() == content
+
+
+def test_vault_reader_still_preserves_raw_assets_in_merged(tmp_path):
+    raw = tmp_path / "raw"
+    merged = tmp_path / "merged"
+    _write_discovery(raw, [])
+    binary = raw / "assets" / "chat-a" / "attachment.bin"
+    binary.parent.mkdir(parents=True)
+    binary.write_bytes(b"preserved")
+
+    run_reconciliation(raw, merged, asset_reader=_VaultReaderStub())
+
+    assert (merged / "assets" / "chat-a" / "attachment.bin").read_bytes() == b"preserved"

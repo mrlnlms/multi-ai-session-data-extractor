@@ -220,16 +220,16 @@ def run_reconciliation(
     report.skills_official = len(skills.get("official") or [])
     report.skills_installed = len(skills.get("installed") or [])
 
-    # Asset binarios — espelha raw_dir/assets/ pra merged
-    if asset_reader is None:
-        raw_assets = raw_dir / "assets"
-        merged_assets = merged_output / "assets"
-        preserve_asset_tree(raw_assets, merged_assets)
-
-        if previous_merged and previous_merged != merged_output:
-            prev_bin = previous_merged / "assets"
-            preserve_asset_tree(prev_bin, merged_assets)
-    else:
+    # The vault is the authoritative reader, but the cumulative merged tree is
+    # still preservation evidence and the manifest below points into it. Keep
+    # copying new raw binaries in both reader modes; otherwise a refreshed
+    # manifest can reference paths that exist only in raw.
+    raw_assets = raw_dir / "assets"
+    merged_assets = merged_output / "assets"
+    preserve_asset_tree(raw_assets, merged_assets)
+    if previous_merged and previous_merged != merged_output:
+        preserve_asset_tree(previous_merged / "assets", merged_assets)
+    if asset_reader is not None:
         asset_reader.projection_for("kimi", asset_account_id)
 
     raw_manifest = raw_dir / "assets_manifest.json"
