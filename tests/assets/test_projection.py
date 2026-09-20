@@ -314,6 +314,47 @@ def test_complete_and_partial_discovery_statuses_project_without_losing_preserve
     assert by_id["reference"].asset_path is None
 
 
+def test_later_available_observation_enriches_reference_only_delivery(tmp_path):
+    data_root = tmp_path / "data"
+    vault = AssetVault(data_root / "assets", runtime_root=tmp_path / "runtime")
+    scope = AssetScope("notebooklm", ACCOUNT_ID)
+    payload = b"recovered later"
+    digest = hashlib.sha256(payload).hexdigest()
+    first = (
+        _record("capture", "capture-reference"),
+        _record("delivery", "capture-reference", **_delivery("audio", payload=None)),
+        _record(
+            "observation",
+            "capture-reference",
+            observation_id="reference",
+            delivery_id="audio",
+            status="reference_only",
+        ),
+    )
+    vault.commit(CaptureBatch(scope, "capture-reference", first, {}))
+    recovered = (
+        _record("capture", "capture-available"),
+        _record("blob", "capture-available", sha256=digest, size_bytes=len(payload)),
+        _record(
+            "observation",
+            "capture-available",
+            observation_id="available",
+            delivery_id="audio",
+            status="available",
+            sha256=digest,
+            size_bytes=len(payload),
+        ),
+    )
+    state = vault.commit(CaptureBatch(
+        scope, "capture-available", recovered, {digest: payload}
+    ))
+
+    asset = project_assets(state, data_root).assets[0]
+    assert asset.is_binary_available is True
+    assert asset.size_bytes == len(payload)
+    assert asset.asset_path == f"assets/blobs/sha256/{digest[:2]}/{digest}"
+
+
 @pytest.mark.parametrize("damage", ["corrupt", "missing"])
 def test_projection_rejects_corrupt_or_missing_available_blob(tmp_path, damage):
     payload = b"verified payload"

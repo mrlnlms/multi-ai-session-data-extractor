@@ -61,9 +61,23 @@ def _extract_audio_overviews(artifacts_raw) -> list[dict]:
         if not ao_id:
             continue
         title = ao[1] if isinstance(ao[1], str) else ""
-        serialized = json.dumps(ao, default=str)
-        urls = NBLM_URL_RE.findall(serialized)
-        url = _clean_url(urls[0]) if urls else None
+        url = None
+        # Prefer the mapped schema position. Current media URLs can end in a
+        # comma-bearing transform suffix such as ``=mm,140``; the historical
+        # regex fallback intentionally stops at commas and would truncate that
+        # valid URL into a server-side HTTP 400.
+        if (
+            len(ao) > 6
+            and isinstance(ao[6], list)
+            and len(ao[6]) > 2
+            and isinstance(ao[6][2], str)
+            and "googleusercontent.com/notebooklm" in ao[6][2]
+        ):
+            url = _clean_url(ao[6][2])
+        if not url:
+            serialized = json.dumps(ao, default=str)
+            urls = NBLM_URL_RE.findall(serialized)
+            url = _clean_url(urls[0]) if urls else None
         out.append({"id": ao_id, "title": title, "type": TYPE_AUDIO, "url": url})
     return out
 

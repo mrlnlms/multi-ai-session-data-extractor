@@ -111,8 +111,11 @@ def _unique_records(
     return tuple(ordered.values())
 
 
-def _latest_observations(state: AssetState) -> dict[str, str]:
+def _observation_state(
+    state: AssetState,
+) -> tuple[dict[str, str], dict[str, tuple[str, int]]]:
     latest: dict[str, str] = {}
+    available_material: dict[str, tuple[str, int]] = {}
     for record in state.records:
         if record.record_type != "observation":
             continue
@@ -121,7 +124,20 @@ def _latest_observations(state: AssetState) -> dict[str, str]:
         if status not in _OBSERVATION_STATUSES:
             raise ValueError(f"unsupported observation status: {status!r}")
         latest[delivery_id] = status
-    return latest
+        digest_value = record.payload.get("sha256")
+        size_value = record.payload.get("size_bytes")
+        if digest_value is None and size_value is None:
+            continue
+        if status != "available":
+            raise ValueError("non-available observation cannot reference bytes")
+        digest = validate_digest(_required_string(record.payload, "sha256"))
+        if not isinstance(size_value, int) or isinstance(size_value, bool) or size_value < 0:
+            raise IntegrityError(f"available observation has invalid size: {delivery_id}")
+        previous = available_material.get(delivery_id)
+        if previous is not None and previous != (digest, size_value):
+            raise IntegrityError(f"delivery observation changed immutable bytes: {delivery_id}")
+        available_material[delivery_id] = (digest, size_value)
+    return latest, available_material
 
 
 def _blob_sizes(state: AssetState) -> dict[str, int]:
@@ -169,6 +185,7 @@ def _project_asset(
     data_root: Path,
     blob_sizes: dict[str, int],
     observations: dict[str, str],
+    observed_material: dict[str, tuple[str, int]],
 ) -> Asset:
     payload = record.payload
     delivery_id = _required_string(payload, "delivery_id")
@@ -185,15 +202,20 @@ def _project_asset(
     if availability not in {"available", "reference_only"}:
         raise ValueError(f"unsupported delivery availability: {availability!r}")
     digest_value = payload.get("sha256")
+    size_value = payload.get("size_bytes")
+    material = observed_material.get(delivery_id)
+    if digest_value is None and material is not None:
+        digest_value, size_value = material
     asset_path: str | None = None
-    if availability == "available":
+    effective_available = availability == "available" or material is not None
+    if effective_available:
         if not isinstance(digest_value, str):
             raise IntegrityError(f"available delivery has no sha256: {delivery_id}")
         digest = validate_digest(digest_value)
         if digest not in blob_sizes:
             raise IntegrityError(f"available delivery has no blob record: {digest}")
         asset_path = _verified_blob_path(
-            data_root, digest, blob_sizes[digest], payload.get("size_bytes")
+            data_root, digest, blob_sizes[digest], size_value
         )
     elif digest_value is not None:
         raise ValueError(f"reference-only delivery has sha256: {delivery_id}")
@@ -220,7 +242,6 @@ def _project_asset(
     preserved_value = payload.get("is_preserved_missing", False)
     if preserved_value is not None and not isinstance(preserved_value, bool):
         raise ValueError("is_preserved_missing must be a boolean or None")
-    size_value = payload.get("size_bytes")
     if size_value is not None and (
         not isinstance(size_value, int) or isinstance(size_value, bool) or size_value < 0
     ):
@@ -344,10 +365,12 @@ def project_assets(state: AssetState, data_root: Path) -> AssetProjection:
     appearances = _unique_records(
         appearance_records, "appearance", "appearance_id"
     )
-    observations = _latest_observations(state)
+    observations, observed_material = _observation_state(state)
     blob_sizes = _blob_sizes(state)
     assets = tuple(
-        _project_asset(state, record, data_root, blob_sizes, observations)
+        _project_asset(
+            state, record, data_root, blob_sizes, observations, observed_material
+        )
         for record in deliveries
     )
     asset_ids = {asset.asset_id for asset in assets}

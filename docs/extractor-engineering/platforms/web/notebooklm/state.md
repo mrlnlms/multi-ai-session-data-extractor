@@ -280,6 +280,32 @@ also without removal or overwrite. The NotebookLM parser then completed with
 185 conversations, 156 messages, 1,706 sources, 174 notes, 648 outputs, and
 468 guide questions across the two live accounts.
 
+## Operational validation — 2026-09-20
+
+The three-account headless pipeline completed capture, reconciliation, parse,
+unify, and all 9 selected Quarto renders without publication. The first pass
+found one new notebook in account-3 and produced 200 conversations, 193
+messages, 1,973 sources, 609 outputs, 513 guide questions, and 1,745 source
+guides across the three active accounts plus the historical archive.
+
+The run exposed two incremental asset defects. Current audio URLs can carry a
+comma-bearing media transform suffix such as `=mm,140`; the regex fallback
+truncated that suffix and caused HTTP 400. Audio extraction now prefers the
+mapped `gArtLc` position and retains the complete URL. The resulting successful
+download also exercised recovery from an earlier `reference_only` delivery:
+the vault projection now uses the immutable digest and size from a later
+available observation, without rewriting the original delivery record.
+
+The repair recovered the new account-3 audio and one account-1 audio. A clean
+repeat classified all 186 currently discovered notebooks as unchanged
+(`129 + 53 + 4` copies), reconciled with zero warnings, and retained historical
+upstream failures without deleting evidence: 63 in account-1, 5 in account-2,
+and 2 in account-3. The final parser materialized 10,445 NotebookLM assets and
+5,252 asset links; unified data contains 19,674 assets. Vault verification
+covered all 21 scopes and 11,748 physical blobs, and the complete repository
+suite passed. This validation was intentionally run with no DVC or Git
+publication.
+
 ## Related documents
 
 - `incident-lite-fetch-regression-2026-08-30.md` — diagnosis, narrow fix, validation,
