@@ -67,44 +67,6 @@ Se a atualizacao do plano falhar, informar a falha explicitamente e nao
 apresentar a rodada como encerrada ou pronta para compactar. Checkpoints antigos
 sao registro historico, nao substituem o tracker corrente.
 
-### Registro determinado da frente de refactor de assets
-
-Esta frente tem **um unico documento corrente**:
-`private/docs/discussions/asset-pipeline-refactor-master-tracker-2026-09-15.md`.
-Ele reune contrato acordado, decisoes abertas/aprovadas, checklist, estado,
-um handoff e links para diarios de evidencia datados. `docs/local/` e ignorado
-pelo Git e nao deve conter copia, espelho ou link desta frente. Nao criar outro
-tracker, handoff ou documento corrente concorrente. Cada rodada relevante pode
-ter um diario imutavel em `private/docs/discussions/` com pergunta, escopo,
-metodo, artefatos, resultado, limites e implicacao; o tracker recebe somente
-um resumo curto e o link. Microdecisoes sem evidencia nao exigem diario.
-Especificacao/plano de migracao formais so nascem no marco 2, com
-escopo/finalidade escritos antes no tracker; nao viram outro acompanhamento.
-Esta regra prevalece para esta frente sobre a convencao geral de criar planos
-no workbench.
-
-Antes de cada rodada, ler `Situação agora`, checkbox alvo, `Estado atual`,
-`Handoff` e a entrada E pertinente; executar a unica proxima entrega registrada,
-salvo nova instrucao explicita do usuario. Mudanca de prioridade entra no
-tracker antes de outro probe. Depois, registrar evidencia nova no diario da
-rodada e promover ao tracker somente um resumo, links, escopo demonstrado,
-decisoes, estado e proxima entrega; nao repetir tabelas/narrativas. Fatos
-duraveis do sistema atual pertencem a documentacao versionada da fonte
-conforme as regras canonicas abaixo; diarios guardam metodo/proveniencia
-datados. Memoria do chat nao redefine o handoff.
-
-Para esta frente de refactor de assets, ao retomar apos compactacao ou em nova
-sessao, reler primeiro
-`private/docs/discussions/asset-pipeline-refactor-master-tracker-2026-09-15.md`,
-em especial `Situação agora`, `Próxima entrega`, `Handoff` e E pertinente.
-Executar a entrega ali escrita
-antes de propor novo plano, probe ou fonte. O marco de 10.976 pares identicos
-(~4,06 GB logicos, dominados por NotebookLM) ja foi medido; a classificacao
-NotebookLM e a contagem estatica de ramos ja foram examinadas. Nao refazer
-essas tarefas porque uma decisao de desenho segue aberta. Se o tracker e o
-checkout divergirem, corrigir o tracker com evidencia antes de escolher outra
-entrega; nunca interpretar a compactacao como reinicio do checklist.
-
 ### Edicao segura atraves do symlink `private/`
 
 O destino de `private/` fica fora da raiz gravavel do checkout. Ferramentas de
