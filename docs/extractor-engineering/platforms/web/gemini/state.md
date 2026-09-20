@@ -82,6 +82,27 @@ copy fallback; mutable conversation JSON remains independent.
   five processed Gemini tables. All 364 available paths and all asset/message/
   conversation relationships resolve.
 
+### Operational validation — 2026-09-20
+
+The three-account headless pipeline completed capture, reconciliation, parse,
+unify, and all 9 selected Quarto renders without publication. Discovery found
+the same `50 + 34 + 1` current conversations, reused all 85 bodies, and had no
+conversation fetch errors. Reconciliation retained 18 and 2 conversations no
+longer present in the account-1 and account-2 listings. The 73 expired
+account-1 image URLs still return HTTP 403 and remain preserved as unavailable
+upstream evidence; accounts 2 and 3 had no asset download errors.
+
+The first vault-mode parse exposed a representation-path mismatch: Gemini
+content-deduplicates identical image bytes into one canonical `Asset`, while a
+message could still carry the filename of another preserved representation.
+The parser now resolves each image message path through the representation's
+content identity and replaces it with the canonical asset path, without
+removing either physical representation. A regression test covers two
+filenames with identical bytes. The clean repeat produced 105 conversations,
+770 messages, 1,746 tool events, 733 vault assets (660 available and 73
+reference-only), and the same 963 exact asset links. Vault verification covered
+22 scopes and 11,748 physical blobs, and the complete repository suite passed.
+
 ## Canonical parser
 
 Each account tree resolves its immutable catalog UUID into `account_id`; the

@@ -206,6 +206,35 @@ class GeminiParser(BaseParser):
                 titles, created_at_secs, pinned_set, manifest
             )
         self._append_manifest_catalog(account, account_id, manifest)
+        self._canonicalize_image_message_paths(account, account_id)
+
+    def _canonicalize_image_message_paths(
+        self, account: int, account_id: str | None
+    ) -> None:
+        """Point message paths at the content-deduplicated image representation."""
+        image_assets = {
+            asset.asset_id: asset
+            for asset in self.assets
+            if asset.account_id == account_id
+            and asset.asset_path is not None
+            and asset.metadata_json == '{"representation": "hosted_image"}'
+        }
+        for message in self.messages:
+            if message.account_id != account_id or not message.asset_paths:
+                continue
+            canonical_paths: list[str] = []
+            for path_value in message.asset_paths:
+                representation = (
+                    self.merged_root / f"account-{account}" / "assets" /
+                    Path(path_value).name
+                )
+                asset = image_assets.get(self._asset_id(representation, str(path_value)))
+                canonical_paths.append(
+                    asset.asset_path
+                    if asset is not None and asset.asset_path is not None
+                    else path_value
+                )
+            message.asset_paths = canonical_paths
 
     def _parse_conv(
         self,

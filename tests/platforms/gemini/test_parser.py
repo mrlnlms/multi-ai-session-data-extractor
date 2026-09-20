@@ -302,6 +302,51 @@ def test_gemini_parser_emits_deduplicated_assets_and_distinct_message_uses(tmp_p
     assert link.ordinal == 0
 
 
+def test_gemini_parser_canonicalizes_message_path_for_duplicate_representation(
+    tmp_path: Path,
+):
+    merged = tmp_path / "merged" / "Gemini"
+    raw_root = tmp_path / "raw" / "Gemini"
+    conv_dir = merged / "account-1" / "conversations"
+    asset_dir = merged / "account-1" / "assets"
+    manifest_dir = raw_root / "account-1"
+    conv_dir.mkdir(parents=True)
+    asset_dir.mkdir(parents=True)
+    manifest_dir.mkdir(parents=True)
+    image_bytes = b"same preserved image"
+    first_url = "https://lh3.googleusercontent.com/first"
+    duplicate_url = "https://lh3.googleusercontent.com/duplicate"
+    (asset_dir / "first.png").write_bytes(image_bytes)
+    (asset_dir / "duplicate.png").write_bytes(image_bytes)
+    (manifest_dir / "assets_manifest.json").write_text(json.dumps({
+        "first": {
+            "url": first_url, "conv_id": "c_first", "content_type": "image/png",
+            "size": len(image_bytes), "filename": "first.png",
+        },
+        "duplicate": {
+            "url": duplicate_url, "conv_id": "c_second", "content_type": "image/png",
+            "size": len(image_bytes), "filename": "duplicate.png",
+        },
+    }))
+    for conv_id, url in (("c_first", first_url), ("c_second", duplicate_url)):
+        turn = _make_turn("draw", "done", 1762000000, images=[url])
+        (conv_dir / f"{conv_id}.json").write_text(json.dumps({
+            "uuid": conv_id, "raw": [[turn], None, None, []],
+        }))
+
+    parser = GeminiParser(merged_root=merged)
+    parser.parse(merged)
+
+    assert len(parser.assets) == 1
+    assert len(parser.asset_links) == 2
+    expected_path = parser.assets[0].asset_path
+    image_messages = [message for message in parser.messages if message.asset_paths]
+    assert len(image_messages) == 2
+    assert {tuple(message.asset_paths or ()) for message in image_messages} == {
+        (expected_path,)
+    }
+
+
 def test_gemini_parser_classifies_user_image_and_repeated_reference(tmp_path: Path):
     merged = tmp_path / "merged" / "Gemini"
     conv_dir = merged / "account-1" / "conversations"
