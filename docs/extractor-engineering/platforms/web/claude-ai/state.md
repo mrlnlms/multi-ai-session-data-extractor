@@ -29,7 +29,22 @@ Reconciler v3 (FEATURES_VERSION=2): full preservation (convs +
 projects), idempotent. Output: `data/merged/Claude.ai/conversations/<uuid>.json`
 + `projects/<uuid>.json` + `assets/`.
 
-### Latest validated collection — 2026-09-12
+### Latest validated collection — 2026-09-20
+
+- The default profile discovered the same 918 conversations and 5 live
+  projects, reused every body without fetch errors, and retained 2 conversations
+  plus 79 projects that are no longer listed upstream.
+- The explicit `account-2` pass discovered 4 new conversations and 1 new
+  project, fetched all five records without errors, and downloaded 1 new binary
+  while reusing 7. The combined parser now produces 938 conversations, 26,388
+  messages, 17,870 tool events, 1,274 branches, 88 projects, 557 project docs,
+  3,567 assets, and 3,618 exact asset links.
+- Unify and all 6 selected Quarto reports completed successfully. Vault
+  verification covered 22 scopes and 11,749 physical blobs. The general
+  headless orchestrator still invokes only the default profile, so additional
+  profiles must be run explicitly until account enumeration is implemented.
+
+### Prior validated collection — 2026-09-12
 
 - A second isolated profile, `account-2`, captured 14 conversations, 3
   projects, and 7 binary files with zero fetch or asset errors. Its canonical
