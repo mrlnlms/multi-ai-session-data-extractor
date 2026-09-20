@@ -207,6 +207,21 @@ def test_cli_materialized_artifacts_are_preserved_binary_candidates(tmp_path):
     assert item.representation_kind == "preserved_binary"
 
 
+def test_preserved_macos_finder_metadata_is_operational(tmp_path):
+    data = tmp_path / "data"
+    path = data / "raw" / "Gemini CLI" / ".DS_Store"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"finder metadata")
+
+    [item] = inventory_preserved_session_assets(data)
+    [finding] = reconcile_asset_coverage(
+        [item], pd.DataFrame(), pd.DataFrame(), load_policy()
+    )
+
+    assert item.representation_kind == "operational_record"
+    assert finding.status == "infrastructure"
+
+
 def test_malformed_session_evidence_is_never_silently_ignored(tmp_path):
     data = tmp_path / "data"
     path = data / "raw" / "Codex" / "broken.jsonl"

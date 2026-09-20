@@ -73,6 +73,27 @@ def _optional_index(payload: dict[str, object], name: str) -> int | None:
     return value
 
 
+def _record_payloads_match(
+    record_type: str,
+    left: dict[str, object],
+    right: dict[str, object],
+) -> bool:
+    if left == right:
+        return True
+    if record_type != "appearance":
+        return False
+    # Backfills persisted the public link order, while the incremental CLI
+    # writer deliberately omitted it. Ordering is projection metadata rather
+    # than appearance identity; every semantic field must still match.
+    left_semantic = {
+        key: value for key, value in left.items() if key != "projection_order"
+    }
+    right_semantic = {
+        key: value for key, value in right.items() if key != "projection_order"
+    }
+    return left_semantic == right_semantic
+
+
 def _unique_records(
     records: tuple[RecordEnvelope, ...], record_type: str, key_name: str
 ) -> tuple[RecordEnvelope, ...]:
@@ -82,7 +103,9 @@ def _unique_records(
             continue
         key = _required_string(record.payload, key_name)
         previous = ordered.get(key)
-        if previous is not None and previous.payload != record.payload:
+        if previous is not None and not _record_payloads_match(
+            record_type, previous.payload, record.payload
+        ):
             raise ValueError(f"conflicting {record_type} record: {key}")
         ordered.setdefault(key, record)
     return tuple(ordered.values())

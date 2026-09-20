@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 RAW = PROJECT_ROOT / "data" / "raw"
+IGNORED_SOURCE_FILENAMES = frozenset({".DS_Store"})
 
 
 SOURCES = {
@@ -58,7 +59,7 @@ def _sync_tree(src: Path, dst: Path, glob_pattern: str = "**/*") -> dict[str, li
     updated_files: list[Path] = []
     dst.mkdir(parents=True, exist_ok=True)
     for src_file in src.glob(glob_pattern):
-        if not src_file.is_file():
+        if not src_file.is_file() or src_file.name in IGNORED_SOURCE_FILENAMES:
             continue
         rel = src_file.relative_to(src)
         dst_file = dst / rel

@@ -6,7 +6,7 @@ than duplicating it here. Completed work is marked here so its status can be
 read without searching Git history; implementation detail belongs in `git log`,
 and platform-specific behavior belongs in its own documentation.
 
-**Last reviewed:** 2026-09-15.
+**Last reviewed:** 2026-09-20.
 
 For one-time work, use **planned**, **active**, or **completed**. Mark completion
 when closing the work, with its date and an evidence pointer when available.
@@ -62,19 +62,18 @@ not features inside Streamlit or static Quarto reports. Read this section first
 for product alignment; open a detailed document only for the active question.
 
 The near-term data-layer fronts are the preserved ChatGPT/Claude.ai
-account-memory/configuration domain, a derived account dimension in unified
-data, and a central physical home for preserved asset binaries. The account
+account-memory/configuration domain and a derived account dimension in unified
+data. The account
 dimension continues the already-published `account_id` work: it would expose
 the durable catalog as queryable, read-only data without making Parquet the
-account registry or inferring CLI/manual identities. The asset front continues
-the published per-source identity and relationship work: the Parquets already
-follow clear pipeline stages, while binaries remain distributed across source
-trees in `raw` and `merged`. A central store and preservation manifest should
-replace that fragmented physical layout and its source-specific path handling,
-not add another parallel layer. `assets`/`asset_links` remain published outputs
-whose fields and IDs may be reviewed as the capture-to-analysis contract is
-designed; source provenance must remain explicit. These fronts are concurrent
-planning priorities, not a fixed
+account registry or inferring CLI/manual identities. The asset front has since
+materialized that central physical home: `data/assets` and its preservation
+index are the published DVC-backed source for bytes, while `assets` and
+`asset_links` remain the analytical outputs with explicit source provenance.
+The legacy source trees remain available as rollback until the first natural
+incremental collection confirms the default `vault` flow; that observation is
+post-publication follow-up, not unfinished design or migration. The memory and
+account-dimension fronts are concurrent planning priorities, not a fixed
 implementation order; schema changes and data publication retain their normal
 review and validation gates.
 
@@ -162,7 +161,7 @@ canonical operational remote.
 |---|---|---|
 | Evaluate a single DVC object remote | Future research, not near-term | Remove DVC objects from personal Google Drive without reducing the archive merely to fit an arbitrary free tier. |
 | Oracle Object Storage proof of concept | Candidate, not approved | Test a private S3-compatible Oracle bucket. Its published Always Free allocation is 20 GB and 50,000 Object Storage API calls/month; DVC's real request count must be measured before choosing it. |
-| [Central asset vault and manifest](../private/docs/discussions/central-asset-vault-alignment-2026-09-15.md) | Near-term data-layer design and validation | Replace distributed binary copies and per-source path handling with one physical home and a preservation manifest; review how the published asset Parquets derive from it, then validate local space, incremental capture and clean restore. |
+| [Central asset vault and manifest](../private/docs/discussions/asset-pipeline-refactor-master-tracker-2026-09-15.md) | Published; operational confirmation pending | The DVC-backed central home and preservation index are implemented, migrated and published. Observe the first natural incremental collection before retiring the explicit legacy rollback; cold restore remains diagnostic rather than a publication gate. |
 | Retention audit for `data/external/` | Planned | Classify each set as active input, unique recovery evidence, or verified duplicate before any storage-policy change. |
 
 References: [Oracle Always Free Object Storage](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm),

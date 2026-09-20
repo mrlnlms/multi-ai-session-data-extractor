@@ -40,7 +40,7 @@ FINDING_STATUSES = frozenset({
 })
 OPERATIONAL_NAMES = frozenset({
     "capture_log.json", "capture_log.jsonl", "discovery_ids.json",
-    "reconcile_report.json", "last_capture.md", "last_reconcile.md",
+    "reconcile_report.json", "last_capture.md", "last_reconcile.md", ".ds_store",
 })
 CONTAINER_SUFFIXES = (".db", ".db-wal", ".db-shm", ".pb")
 

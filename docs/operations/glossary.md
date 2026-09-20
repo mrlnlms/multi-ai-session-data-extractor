@@ -23,8 +23,9 @@ liberar espaco e reconstruida com `dvc pull`.
 No asset vault, `schema.json`, os blobs content-addressed e os
 `records.jsonl` commitados formam o estado duravel. `state.json`, hardlinks de
 compatibilidade e Parquets sao projecoes reconstruiveis. Esse contrato foi
-validado localmente, mas o vault ainda nao foi publicado como fonte canonica;
-restore remoto permanece pendente. Veja a
+validado, publicado no DVC e verificado contra o remoto como fonte canonica. Um
+novo restore frio fica reservado como diagnostico de recuperacao; a confirmacao
+operacional ainda pendente e a primeira coleta incremental real. Veja a
 [transicao operacional](pipeline.md#transicao-do-asset-vault).
 
 ## Rollback de asset

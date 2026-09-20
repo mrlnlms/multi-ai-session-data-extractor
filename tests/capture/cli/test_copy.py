@@ -3,6 +3,7 @@ import pytest
 import sqlite3
 from pathlib import Path
 from src.capture.cli.copy import (
+    _sync_tree,
     copy_antigravity_cli,
     copy_codex_memories,
     copy_claude_code,
@@ -10,6 +11,19 @@ from src.capture.cli.copy import (
     SOURCES,
     RAW,
 )
+
+
+def test_sync_tree_skips_macos_finder_metadata(tmp_path):
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    source.mkdir()
+    (source / ".DS_Store").write_bytes(b"finder metadata")
+    (source / "session.json").write_text("{}")
+
+    result = _sync_tree(source, destination)
+
+    assert [path.name for path in result["new"]] == ["session.json"]
+    assert not (destination / ".DS_Store").exists()
 
 
 def test_copy_codex_memories_no_op_when_src_missing(tmp_path, monkeypatch):

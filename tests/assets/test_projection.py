@@ -231,6 +231,60 @@ def test_projection_order_restores_public_link_order_across_capture_batches(tmp_
     ]
 
 
+def test_duplicate_appearance_accepts_legacy_projection_order_difference(tmp_path):
+    payload = b"ordered"
+    appearance = _message_appearance(
+        "appearance-1", "asset-1", "message-1", ordinal=0
+    )
+    data_root, vault, _ = _commit(
+        tmp_path,
+        deliveries=(_delivery("asset-1", payload=payload),),
+        appearances=({**appearance, "projection_order": 7},),
+        payloads=(payload,),
+    )
+
+    state = vault.commit(CaptureBatch(
+        AssetScope("gemini", ACCOUNT_ID),
+        "capture-2",
+        (
+            _record("capture", "capture-2", captured_at="2026-09-20T12:00:00Z"),
+            _record("appearance", "capture-2", **appearance),
+        ),
+        {},
+    ))
+
+    projection = project_assets(state, data_root)
+
+    assert len(projection.links) == 1
+    assert projection.links[0].message_id == "message-1"
+
+
+def test_duplicate_appearance_still_rejects_semantic_conflict(tmp_path):
+    payload = b"ordered"
+    appearance = _message_appearance(
+        "appearance-1", "asset-1", "message-1", ordinal=0
+    )
+    data_root, vault, _ = _commit(
+        tmp_path,
+        deliveries=(_delivery("asset-1", payload=payload),),
+        appearances=({**appearance, "projection_order": 7},),
+        payloads=(payload,),
+    )
+    conflicting = {**appearance, "message_id": "message-2"}
+    state = vault.commit(CaptureBatch(
+        AssetScope("gemini", ACCOUNT_ID),
+        "capture-2",
+        (
+            _record("capture", "capture-2", captured_at="2026-09-20T12:00:00Z"),
+            _record("appearance", "capture-2", **conflicting),
+        ),
+        {},
+    ))
+
+    with pytest.raises(ValueError, match="conflicting appearance record"):
+        project_assets(state, data_root)
+
+
 def test_complete_and_partial_discovery_statuses_project_without_losing_preserved_bytes(tmp_path):
     payloads = (b"still preserved", b"currently visible",)
     deliveries = (

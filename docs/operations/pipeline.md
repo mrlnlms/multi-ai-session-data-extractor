@@ -21,10 +21,11 @@ manifestos e outros arquivos que podem ser anotados continuam independentes.
 O contrato publicado em `assets.parquet`, `asset_links.parquet` e
 `Message.asset_paths` nao determina onde os bytes ficam armazenados. O asset
 vault central, content-addressed por SHA-256, esta materializado e validado em
-`data/assets`; ele e o default operacional, mas **ainda nao foi staged nem
-publicado pelo DVC**. Ate a publicacao e uma coleta incremental real, as arvores
-legacy em `raw`, `merged` e `external` permanecem preservadas como rollback e
-nao podem ser removidas.
+`data/assets`; ele e o default operacional e foi publicado pelo DVC no commit
+`7b180b2`, com cache local e remoto verificados em sincronia. Ate uma coleta
+incremental real confirmar o fluxo operacional, as arvores legacy em `raw`,
+`merged` e `external` permanecem preservadas como rollback e nao podem ser
+removidas.
 
 ### Selecao explicita de leitura e escrita
 
@@ -51,7 +52,10 @@ O modo `vault` escreve primeiro o blob imutavel e o registro de captura
 append-only; `state.json`, as tabelas e os paths compativeis sao projecoes
 reconstruiveis. O reader valida o blob antes de expor um path. Writers usam
 lock exclusivo por fonte/conta, commits idempotentes e `fsync`; um append
-interrompido e recuperado ate o ultimo commit completo.
+interrompido e recuperado ate o ultimo commit completo. Aparicoes repetidas
+precisam coincidir em todos os campos semanticos; `projection_order` e metadado
+da materializacao e pode estar presente no backfill e ausente em capturas
+incrementais sem criar uma segunda aparicao.
 
 ### Migracao, verificacao e restore local
 
@@ -77,9 +81,10 @@ PYTHONPATH=. .venv/bin/python -m src.operations.verify_asset_vault restore \
   --destination /tmp/asset-vault-restored/assets
 ```
 
-Esse comando prova reconstrução local; restore via Git/DVC/remoto continua um
-gate separado e ainda nao foi validado. Nenhum desses comandos apaga evidencia
-legacy.
+Esse comando prova reconstrução local. O vault publicado teve ponteiro, push e
+sincronia do remoto verificados; um novo restore frio via Git/DVC fica reservado
+como diagnostico de recuperacao, nao como gate automatico da publicacao.
+Nenhum desses comandos apaga evidencia legacy.
 
 ### Retencao e rollback
 

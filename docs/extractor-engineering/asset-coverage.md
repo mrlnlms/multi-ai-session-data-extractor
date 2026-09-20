@@ -84,6 +84,9 @@ It prints independent web and CLI blocks and exits nonzero for uncovered or
 unresolved evidence, ambiguous policy matches, available paths that do not
 resolve, dangling AssetLinks, non-unique eligible identities or incomplete
 accounting. Both the nine-source web block and four-source CLI block are green.
+Filesystem metadata such as a previously preserved `.DS_Store` is inventoried
+as operational evidence rather than silently removed or promoted to an Asset;
+new CLI copies ignore that replaceable metadata.
 These independent gates are the publication evidence for
 `preserved_web_files` and `preserved_cli_session_assets`, respectively.
 

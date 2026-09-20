@@ -3,6 +3,10 @@
 Source: `gemini_cli`. Mode: `cli`. Local data — incremental copy from
 `~/.gemini/tmp/`.
 
+The copy ignores new macOS `.DS_Store` metadata because it is neither session
+content nor CLI state. A copy preserved before that exclusion remains in raw
+as operational filesystem metadata and is not promoted to an Asset.
+
 ## Schema specifics
 
 - **JSON schema** (not JSONL like Claude Code/Codex): `session-<timestamp>-<sid>.json`
