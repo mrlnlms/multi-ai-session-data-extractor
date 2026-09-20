@@ -16,7 +16,28 @@
 Chats + projects + project files captured. Reconciler v3
 (FEATURES_VERSION=2): full preservation for convs + projects.
 
-### Latest validated collection — 2026-08-30
+### Latest validated collection — 2026-09-20
+
+- The default profile rediscovered the same 144 current chats, 6 projects,
+  and 15 project files. It reused all conversation bodies without fetch
+  errors, retained 1 preserved-missing chat, downloaded 16 asset
+  representations, reused 354, and preserved the 5 URLs still unavailable
+  upstream.
+- The explicit `account-2` pass grew from 3 to 5 current chats and from 1 to
+  2 projects with 7 project files. Both new conversation bodies and all 9
+  requested asset representations were captured without errors.
+- The round exposed a vault-mode reconciliation bug: Qwen updated the merged
+  manifest but skipped copying new raw binaries into the cumulative merged
+  tree whenever an asset reader was active. Reconciliation now preserves raw
+  binaries in both reader modes; the parser consequently resolves all 372
+  canonical assets locally and the archive-wide coverage gate reports zero
+  eligible-uncovered, unresolved, or broken-link findings.
+- The combined parser produces 150 conversations, 2,194 messages, 9 tool
+  events, 181 branches, 8 projects, 22 project docs, 372 assets, and 372 exact
+  asset links. Unify, all 6 selected Quarto reports, vault verification across
+  22 scopes and 11,752 physical blobs, and the complete test suite pass.
+
+### Prior validated collection — 2026-08-30
 
 - The previous token was expired; after interactive login, a one-page API read
   confirmed the renewed authorization before capture.
@@ -82,11 +103,11 @@ uploads and project sources; generated files without an upstream ID use their
 preserved SHA-256 content identity. Rotated signed URLs therefore do not create
 duplicate assets and are never copied into processed metadata.
 
-The current archive materializes 367 distinct assets: 294 user uploads, 54
-assistant-generated outputs, and 19 project sources. Each has one evidenced
+The current archive materializes 372 distinct assets: 294 user uploads, 56
+assistant-generated outputs, and 22 project sources. Each has one evidenced
 link: uploads and generated outputs resolve to their exact input/output message,
 while project files resolve to the matching `ProjectDoc` with `role=context`.
-All 367 Asset rows carry a locally resolving path, subject to the collision
+All 372 Asset rows carry a locally resolving path, subject to the collision
 qualification below. Seven additional PNG paths are verified
 same-account, byte-identical physical copies of generated outputs whose canonical
 identity is already their SHA-256 content digest; the coverage audit reports

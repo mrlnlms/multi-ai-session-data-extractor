@@ -12,6 +12,16 @@ from pathlib import Path
 from src.platforms.qwen.reconciler import build_plan, run_reconciliation
 
 
+class _EmptyProjection:
+    assets = ()
+
+
+class _VaultReaderStub:
+    def projection_for(self, source, account_id):
+        assert source == "qwen"
+        return _EmptyProjection()
+
+
 def _make_raw_dir(base: Path, convs: list[dict]) -> Path:
     raw = base / "raw_Qwen"
     raw.mkdir(parents=True, exist_ok=True)
@@ -124,3 +134,16 @@ class TestRunReconciliationQwen:
         run_reconciliation(raw, merged, previous_merged=merged)
         assert (merged / "conversations" / "a.json").read_bytes() == snap_a
         assert (merged / "discovery_ids.json").read_bytes() == snap_d
+
+    def test_vault_reader_still_preserves_raw_assets_in_merged(self, tmp_path):
+        raw = _make_raw_dir(tmp_path, [
+            {"id": "a", "updated_at": 1000.0, "title": "X"},
+        ])
+        binary = raw / "assets" / "conversation-a" / "attachment.bin"
+        binary.parent.mkdir(parents=True)
+        binary.write_bytes(b"preserved")
+
+        merged = tmp_path / "merged"
+        run_reconciliation(raw, merged, asset_reader=_VaultReaderStub())
+
+        assert (merged / "assets" / "conversation-a" / "attachment.bin").read_bytes() == b"preserved"

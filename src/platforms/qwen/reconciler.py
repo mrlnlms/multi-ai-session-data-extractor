@@ -165,8 +165,7 @@ def run_reconciliation(
 
     merged_output.mkdir(parents=True, exist_ok=True)
     (merged_output / "conversations").mkdir(exist_ok=True)
-    if asset_reader is None:
-        (merged_output / "assets").mkdir(exist_ok=True)
+    (merged_output / "assets").mkdir(exist_ok=True)
 
     # ============================================================
     # CONVERSATIONS
@@ -240,19 +239,22 @@ def run_reconciliation(
     # ============================================================
     # ASSETS (cumulativos, skip-existing) + manifest
     # ============================================================
-    if asset_reader is None:
-        _merge_dir(raw_dir / "assets", merged_output / "assets")
-        if previous_merged and previous_merged != merged_output:
-            _merge_dir(previous_merged / "assets", merged_output / "assets")
-        assets_dir = merged_output / "assets"
-        if assets_dir.exists():
-            report.asset_binaries_total = sum(
-                1 for path in assets_dir.rglob("*") if path.is_file()
-            )
-    else:
+    # The vault is the authoritative reader, but the cumulative merged tree is
+    # still preservation evidence and the manifest below points into it. Keep
+    # copying new raw binaries in both reader modes; otherwise a refreshed
+    # manifest can reference paths that exist only in raw.
+    _merge_dir(raw_dir / "assets", merged_output / "assets")
+    if previous_merged and previous_merged != merged_output:
+        _merge_dir(previous_merged / "assets", merged_output / "assets")
+    if asset_reader is not None:
         report.asset_binaries_total = sum(
             asset.is_binary_available
             for asset in asset_reader.projection_for("qwen", asset_account_id).assets
+        )
+    else:
+        assets_dir = merged_output / "assets"
+        report.asset_binaries_total = sum(
+            1 for path in assets_dir.rglob("*") if path.is_file()
         )
 
     # Manifest dos assets (gerado pelo download_assets) — copiar pro merged
