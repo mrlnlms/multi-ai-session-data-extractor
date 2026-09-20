@@ -298,6 +298,19 @@ def test_technical_evidence_is_accounted_for_but_not_an_asset(kind):
     assert finding.status == "excluded"
 
 
+def test_deepseek_asset_manifest_is_operational_evidence():
+    item = RepresentationEvidence(
+        "DeepSeek", "default", "asset_manifest",
+        "raw/DeepSeek/assets_manifest.json", None, None,
+        None, None, None, None,
+    )
+    [finding] = reconcile_asset_coverage(
+        [item], pd.DataFrame(), pd.DataFrame(), load_policy()
+    )
+    assert finding.status == "excluded"
+    assert finding.policy_disposition == "operational"
+
+
 def test_json_output_is_asset_but_companion_metadata_is_not(tmp_path):
     data = tmp_path / "data"
     root = data / "raw" / "Claude.ai" / "assets" / "artifacts" / "conversation"

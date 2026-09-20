@@ -23,7 +23,7 @@ records each exact message use as an `input` AssetLink. Missing local binaries
 remain metadata-only assets rather than being dropped or assigned fabricated
 paths.
 
-### Canonical asset validation — 2026-09-14
+### Prior canonical asset validation — 2026-09-14
 
 - The two-account archive produces 80 native assets and 80 exact message links.
 - No current DeepSeek binary or asset manifest is present in merged, so all 80
@@ -33,7 +33,28 @@ paths.
 - Two independent temporary parses produced byte-identical six-table outputs,
   and canonical asset metadata contains no signed URL material.
 
-### Latest validated collection — 2026-08-30
+### Latest validated collection — 2026-09-20
+
+- Both configured profiles authenticated successfully. The default profile
+  rediscovered and reused all 82 current sessions without fetch errors; the
+  second profile rediscovered and reused its single current session.
+- Reconciliation retains 83 default-profile sessions, including 1 historical
+  `preserved_missing` session, plus the second profile's current session.
+- All 80 previously metadata-only file references became downloadable in this
+  round. The vault preserved every delivery, and the parser now publishes all
+  80 assets with locally resolving paths and 80 exact input links. Content
+  deduplication accounts for 74 distinct canonical paths without losing any
+  native asset identity or message relationship.
+- The archive-wide coverage audit initially exposed two new DeepSeek asset
+  manifests without an explicit policy. They are now classified as operational
+  download/lineage metadata, matching the other web adapters; all eligible,
+  unresolved, broken-path, and dangling-link counts are zero.
+- The combined parser remains at 84 conversations, 734 messages, 20 tool
+  events, and 276 branches. Unify, all 6 selected Quarto reports, vault
+  verification across 23 scopes and 11,798 physical blobs, and the complete
+  test suite pass.
+
+### Prior validated collection — 2026-08-30
 
 - The profile's stored token had expired and was renewed by interactive login;
   a minimal API list request then confirmed authorization before capture.

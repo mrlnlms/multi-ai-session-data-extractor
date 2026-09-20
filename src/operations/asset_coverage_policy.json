@@ -194,6 +194,12 @@
       "reason": "Download and lineage metadata describing assets, not the represented file"
     },
     {
+      "source": "DeepSeek",
+      "representation_kind": "asset_manifest",
+      "disposition": "operational",
+      "reason": "Download and lineage metadata describing assets, not the represented file"
+    },
+    {
       "source": "Grok",
       "representation_kind": "asset_manifest",
       "disposition": "operational",
