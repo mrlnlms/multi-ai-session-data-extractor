@@ -77,7 +77,7 @@ class GrokParser(BaseParser):
         super().__init__(account, account_id, asset_reader=asset_reader)
         self.merged_root = Path(merged_root) if merged_root else Path("data/merged/Grok")
         self.workspaces: list[dict] = []
-        self.assets: list[dict] = []
+        self.assets: list[dict | Asset] = []
         self.asset_path_overrides: dict[str, str] = {}
         self.scheduled_tasks: dict = {}
         self.conversation_projects: list[ConversationProject] = []
@@ -351,6 +351,8 @@ class GrokParser(BaseParser):
             return assets_to_df(list(self.asset_projection.assets))
         if not self.assets:
             return assets_to_df([])
+        if all(isinstance(asset, Asset) for asset in self.assets):
+            return assets_to_df(list(self.assets))
         # Index binaries em merged/Grok/assets/ por asset_id (sem extensao)
         bin_index: dict[str, str] = {}
         bin_dir = self.merged_root / "assets"

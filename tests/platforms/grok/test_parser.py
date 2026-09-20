@@ -2,6 +2,7 @@ import json
 import pandas as pd
 
 from src.platforms.grok.parser import GrokParser
+from src.schema.models import Asset
 
 
 ACCOUNT_ID = "810f3e91-ae10-5cb1-931a-53b80630af16"
@@ -50,6 +51,33 @@ def test_assets_are_deterministic(tmp_path):
     parser = GrokParser(account_id=ACCOUNT_ID, merged_root=merged)
     parser.assets = [{"assetId": "a", "fileSource": "UNKNOWN"}]
     assert parser.assets_df().to_json(date_format="iso") == parser.assets_df().to_json(date_format="iso")
+
+
+def test_assets_df_accepts_combined_vault_assets(tmp_path):
+    parser = GrokParser(account_id=ACCOUNT_ID, merged_root=tmp_path)
+    parser.assets = [
+        Asset(
+            asset_id="vault-asset",
+            source="grok",
+            account_id=ACCOUNT_ID,
+            asset_kind="attachment",
+            asset_origin="user",
+            file_name="file.bin",
+            mime_type="application/octet-stream",
+            size_bytes=1,
+            asset_path="assets/blobs/sha256/ab/cd",
+            is_model_generated=False,
+            is_preserved_missing=False,
+            is_binary_available=True,
+            created_at=None,
+            metadata_json=None,
+        )
+    ]
+
+    frame = parser.assets_df()
+
+    assert frame["asset_id"].tolist() == ["vault-asset"]
+    assert frame["account_id"].tolist() == [ACCOUNT_ID]
 
 
 def test_global_catalog_emits_empty_exact_schema_asset_links(tmp_path):

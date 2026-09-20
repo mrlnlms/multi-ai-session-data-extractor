@@ -17,6 +17,25 @@ Conversations + workspaces (projects) + workspace conv cross-ref.
 Reconciler V1 (FEATURES_VERSION=1): full preservation for convs +
 workspaces.
 
+### Latest validated collection — 2026-09-20
+
+- The single observable profile authenticated successfully, rediscovered all
+  43 conversations and reused every body without fetch errors. Its 1 workspace,
+  1 conversation-to-workspace relationship, 53 global assets, and empty active
+  and inactive task lists reconciled without preservation warnings.
+- The vault reader exposed a refactor integration gap: the combined parser
+  received canonical `Asset` objects but the Grok fallback still assumed raw
+  dictionaries. The parser now accepts both representations, with a regression
+  test covering the combined-vault path.
+- The canonical output contains 43 conversations, 639 messages, 217 tool
+  events, 1 workspace relationship, and 53 locally available assets projected
+  onto 40 content-deduplicated paths. The global catalog still emits zero
+  `AssetLink` rows because it provides no trustworthy message-use evidence.
+- Unify and all 6 selected Quarto reports pass. The archive-wide coverage audit
+  is zero across all failure categories for 9 web and 4 CLI sources, vault
+  verification passes across 23 scopes and 11,798 physical blobs, and the
+  complete test suite passes.
+
 ### Reference volume (smoke 2026-05-09)
 
 - 6 convs / 1 workspace / 1 conv-in-workspace.
