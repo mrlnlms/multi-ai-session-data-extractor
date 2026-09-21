@@ -202,11 +202,12 @@ Isso materializa os Parquets unificados em `data/unified/`.
 
 ## 5. Multiplas contas (Gemini, NotebookLM)
 
-Gemini e NotebookLM tem tres contas interativas suportadas (`1`, `2` e `3`).
-O NotebookLM tambem possui um arquivo corporativo historico, separado das
-contas de login atuais. O `parse.py` oficial inclui esse snapshot quando ele
-esta restaurado pelo DVC e falha com seguranca quando o diretorio esperado esta
-ausente; `--without-historical` e uma exclusao deliberada, nao o padrao.
+Gemini e NotebookLM suportam contas isoladas por chave tecnica; `1`, `2` e `3`
+abaixo sao exemplos das contas configuradas no acervo atual, nao um limite do
+modelo. O NotebookLM tambem possui um arquivo corporativo historico, separado
+das contas de login atuais. O `parse.py` oficial inclui esse snapshot quando
+ele esta restaurado pelo DVC e falha com seguranca quando o diretorio esperado
+esta ausente; `--without-historical` e uma exclusao deliberada, nao o padrao.
 
 Para Gemini:
 
@@ -223,8 +224,7 @@ PYTHONPATH=. .venv/bin/python -m src.workflows.headless --plats=Gemini --no-publ
 PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync --account 1
 ```
 
-Para NotebookLM, use o mesmo padrao com `--account 1`, `--account 2` ou
-`--account 3`.
+Para NotebookLM, use o mesmo padrao com a chave tecnica correspondente.
 
 ## 6. Problemas comuns
 

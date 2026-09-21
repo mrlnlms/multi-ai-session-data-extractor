@@ -8,7 +8,9 @@ use [web-collection.md](web-collection.md). Regras de DVC e publicacao ficam
 em [dvc-runbook.md](dvc-runbook.md).
 
 ```text
-sync/copy -> raw -> reconcile -> parse -> processed -> unify -> unified
+web: sync -> raw -> reconcile -> merged -> parse ┐
+CLI: copy cumulativo -> raw -> parse              ├-> processed -> unify -> unified
+assets imutaveis -> data/assets (vault) <---------┘
 ```
 
 Assets binarios imutaveis sao gravados no vault content-addressed. `raw` e
@@ -282,9 +284,11 @@ cat data/merged/ChatGPT/LAST_RECONCILE.md
 PYTHONPATH=. .venv/bin/pytest
 ```
 
-Nao considere uma fonte verde se o Parquet estiver anterior ao raw ou merged.
-Discovery parcial, token expirado ou falha de asset exigem a acao definida no
-`state.md`; nao apague dados para fazer os contadores parecerem consistentes.
+Nao considere uma fonte verde se o Parquet estiver anterior aos inputs
+canonicos aplicaveis, como raw, merged, catalogo de contas ou estado duravel do
+vault. Discovery parcial, token expirado ou falha de asset exigem a acao
+definida no `state.md`; nao apague dados para fazer os contadores parecerem
+consistentes.
 
 ## Relatorios Quarto
 

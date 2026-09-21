@@ -56,7 +56,10 @@ publica comum.
 Depois de uma coleta validada, o fluxo da fonte e:
 
 ```text
-sync/copy -> reconcile -> parse -> unify -> dvc add -> commit -> dvc push -> git push
+web: sync -> raw -> reconcile -> merged -> parse ┐
+CLI: copy cumulativo -> raw -> parse              ├-> processed -> unify
+assets imutaveis -> data/assets (vault) <---------┘
+unify -> dvc add -> commit -> dvc push -> git push
 ```
 
 As fontes web executadas diretamente precisam de parse explicito; os syncs

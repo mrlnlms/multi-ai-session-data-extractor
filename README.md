@@ -54,8 +54,8 @@ canonical parsing, and descriptive visualization (Quarto):
 | **Perplexity** | web | threads + pages + spaces + 9 artifact types |
 | **Qwen** | web | 8 chat types (search, research, dalle, etc.), projects |
 | **DeepSeek** | web | R1 reasoning (thinking in ~31% of msgs), token usage |
-| **Gemini** | web | multi-account (3 Google accounts), 8 models |
-| **NotebookLM** | web | 3 active accounts plus a legacy archive; 9 output types and exact source/output asset links |
+| **Gemini** | web | multi-account, reasoning/tool events, generated assets |
+| **NotebookLM** | web | multi-account, historical archives, sources and generated outputs |
 | **Grok** | web | conversations, workspaces, tool events, assets, scheduled tasks |
 | **Kimi** | web | chats, installed skills, tool events, signed asset downloads |
 | **Claude Code** | CLI | local sessions (`~/.claude/projects/`), subagents |
@@ -114,32 +114,30 @@ retention policy.
 
 ## How it works
 
-```
-extractor → reconciler → parser → unify
-   raw    →  merged    → processed (per-source) → unified (cross-source)
+```text
+web: extractor → raw → reconciler → merged → parser ┐
+CLI: cumulative copy → raw → parser                  ├→ processed → unify → unified
+immutable assets → central content-addressed vault ←─┘
 ```
 
-1. **Extractor** downloads via the platform's internal API (authenticated
-   with your cookie).
-2. **Reconciler** consolidates what you just captured with what you
-   already had — preserving records that disappeared from the server.
-3. **Parser** converts the raw JSON into parquet with a unified schema:
+1. **Web extractors** download through each platform's internal API, using
+   your authenticated local profile. The **reconciler** combines the new
+   capture with previous state and preserves records that disappeared from the
+   server.
+2. **CLI collectors** cumulatively copy local session files into raw storage;
+   they do not delete older raw material when its origin disappears.
+3. **Parsers** convert the preserved source records into parquet with a unified schema:
    `Conversation`, `Message`, `ToolEvent`, `Branch` (and auxiliaries such as
-   `Asset`, `AssetLink`, `ProjectDoc`, and `NotebookLMOutput`). The unified asset
-   index covers all nine web sources: Grok, Kimi, Qwen, Gemini, ChatGPT,
-   Claude.ai, DeepSeek, Perplexity, and NotebookLM. Its published web scope is
-   `preserved_web_files`: every eligible file representation preserved in
-   raw/merged is either represented by a canonical Asset or matched by an
-   approved, auditable exclusion rule. The
+   `Asset`, `AssetLink`, `ProjectDoc`, and `NotebookLMOutput`). Asset coverage
+   is published under explicit web and CLI preservation scopes; the
    [source-by-source matrix](docs/extractor-engineering/asset-coverage.md)
    records relationship precision, local availability, and deliberate gaps.
-   CLI session-file scope is independently published as
-   `preserved_cli_session_assets`: Claude Code and Codex
-   publish embedded user images, Antigravity publishes explicit generated
-   artifacts, and the current Gemini CLI archive has no eligible session file.
    Web rows carry the immutable catalog UUID in `account_id`; the legacy
-   display `account` remains available. CLI and manual rows keep
-   `account_id` null until a durable identity is observable.
+   display `account` remains available. The maintained
+   [account architecture](docs/product/account-architecture.md) documents
+   identity, lifecycle, local bindings, authentication observations, and
+   selective sync. CLI and manual rows keep `account_id` null until a durable
+   identity is observable.
 4. **Unify** consolidates the parquets from the 13 sources into a single
    `data/unified/` with 15 parquet tables (4 canonical + 11 auxiliaries),
    ready for cross-platform analysis.
@@ -197,15 +195,15 @@ exceptional commands, including manual-save ingestion and DVC maintenance.
 
 ## Dashboard
 
-Local Streamlit visualization — cross-platform totals, per-platform
-status, links to the descriptive documents:
+Local Streamlit interface for cross-platform totals, per-platform status,
+account operations, pipeline execution, and links to the descriptive documents:
 
 ```bash
 PYTHONPATH=. .venv/bin/streamlit run dashboard/app.py
 ```
 
-Opens at <http://localhost:8501>. Read-only over what sync produced —
-does not write or edit.
+Opens at <http://localhost:8501>. Opening and browsing it is read-only. Account
+changes, syncs, and publication are explicit, preview-first operator actions.
 
 Details in [docs/operations/dashboard.md](docs/operations/dashboard.md).
 
@@ -248,6 +246,7 @@ PYTHONPATH=. .venv/bin/pytest tests/parsers/     # parsers only
   (canonical-current data vault and local recovery)
 - [docs/extractor-engineering/known-limitations.md](docs/extractor-engineering/known-limitations.md) — known extractor gaps and limitations
 - [docs/operations/pipeline.md](docs/operations/pipeline.md) — common commands per platform
+- [docs/product/account-architecture.md](docs/product/account-architecture.md) — account identity, lifecycle, local authentication state, and selective sync
 - [docs/extractor-engineering/glossary.md](docs/extractor-engineering/glossary.md) — capture and parser terms
 - [platform engineering records](docs/extractor-engineering/platforms/README.md) — empirical behavior per platform
 - [docs/SECURITY.md](docs/SECURITY.md) — credentials and ToS policy
@@ -255,8 +254,9 @@ PYTHONPATH=. .venv/bin/pytest tests/parsers/     # parsers only
 
 ## Principles
 
-1. **Capture once, never downgrade.** Once something is captured, it
-   stays local. Reruns only fetch new items.
+1. **Capture once, never downgrade.** Material already proven to be preserved
+   is not deleted or replaced by a worse representation. Deliberate recapture
+   and safe fallback may refetch known items when validation requires it.
 2. **Preservation above all.** Conversations/files deleted on the
    server remain local with the `is_preserved_missing=True` flag.
    Losing or retiring an upstream account also does not remove its captured
