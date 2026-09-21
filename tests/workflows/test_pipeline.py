@@ -5,6 +5,18 @@ from pathlib import Path
 from src.workflows.pipeline import PipelineRequest, run_pipeline
 
 
+def test_publish_tracks_every_canonical_pipeline_tree():
+    from src.workflows.execution import DVC_PATHS
+
+    assert {
+        "data/raw",
+        "data/merged",
+        "data/processed",
+        "data/unified",
+        "data/assets",
+    }.issubset(DVC_PATHS)
+
+
 def _fake_dependencies(**overrides):
     deps = {
         "acquire_lock": lambda: None,

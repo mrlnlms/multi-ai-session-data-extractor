@@ -53,6 +53,7 @@ DVC_PATHS: list[str] = [
     "data/merged",
     "data/processed",
     "data/unified",
+    "data/assets",
     "data/accounts",
     "data/external/manual-saves",
     "data/external/deep-research-md",
