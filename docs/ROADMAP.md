@@ -20,7 +20,7 @@ conflicts with the entry or the task requires a fresh verification.
 |---|---|---|---|
 | DVC Google Drive remote | Active operational remote | [DVC runbook](operations/dvc-runbook.md) | Use it to publish and recover the canonical current dataset. |
 | Capture and processing | Unblocked | [AGENTS.md](../AGENTS.md) | Run the normal sync → parse → unify pipeline when updating a source. |
-| DVC garbage collection | Deliberate storage maintenance | [DVC runbook](operations/dvc-runbook.md) | Simulate, review and explicitly authorize it after a validated publication. |
+| DVC garbage collection | **Completed for checkpoint `4b314afc` (2026-09-21)** | [DVC runbook](operations/dvc-runbook.md) | Repeat only after a future validated publication accumulates unused objects; simulate, review and explicitly authorize it again. |
 | Prevent asset-copy rematerialization | **Completed and published** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the retention audit as a diagnostic after future capture changes. |
 | Canonical account identity and analytical dimension | **Completed and published** | [Account architecture](product/account-architecture.md) | Preserve the UUID-only contract; treat memory/configuration as a separate front. |
 

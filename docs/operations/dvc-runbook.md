@@ -144,8 +144,19 @@ Antes de uma limpeza:
 .venv/bin/dvc gc --workspace --cloud --dry
 ```
 
-Para aplicar a decisao, prefira a ferramenta do projeto em vez de executar o
-GC nativo sem `--dry`. Ela funciona com o remoto padrao configurado em
+O dry-run combinado mostra duas listas independentes: objetos coletaveis do
+cache local e objetos historicos coletaveis do remoto. Limpar somente o cache
+local libera espaco no Mac sem retirar do Drive a possibilidade de restaurar
+revisoes antigas. Depois da revisao e de autorizacao explicita:
+
+```bash
+# Limpa somente o cache local; data/ e o remoto nao sao alterados.
+.venv/bin/dvc gc --workspace --force
+```
+
+Para aplicar tambem a decisao de retencao no Drive, prefira a ferramenta do
+projeto em vez de executar o GC remoto nativo sem `--dry`. Ela funciona com o
+remoto padrao configurado em
 `core.remote`, ou com outro remoto indicado por `--remote`. O Google Drive e o
 padrao desta instalacao e pode demorar ou deixar uma requisicao HTTP presa;
 por isso a ferramenta cria um plano persistente, apaga sequencialmente em lotes
@@ -170,12 +181,21 @@ O estado e o log ficam ignorados em `.runtime/dvc-gc/`. Uma requisicao que
 estoura o limite fica marcada como `timeout_unknown`: nao e repetida cegamente,
 pois o Drive pode ter aceitado a exclusao sem responder. Ao final, uma nova
 simulacao DVC diz se sobrou algo; so entao se cria um novo plano, se necessario.
-Nunca use `--force` por conveniencia.
+O plano separa os candidatos locais exibidos pelo DVC e registra sua contagem e
+tamanho, mas essa ferramenta apaga somente objetos remotos. Nunca use `--force`
+para a limpeza remota ou por conveniencia; ele aparece acima apenas no comando
+local, depois da revisao, para evitar o prompt interativo do DVC.
 
 **Impacto assumido:** depois disso, `git checkout <commit-antigo>` pode
 continuar mostrando o codigo e os ponteiros antigos, mas `dvc pull` daquele
 estado pode falhar porque seus blobs foram descartados. A base atual e os
 consumidores que leem a revisao publicada continuam preservados.
+
+No checkpoint publicado `4b314afc`, em 2026-09-21, a manutencao removeu 8.465
+objetos do cache local (7.892.779.093 bytes) e 8.444 objetos historicos do
+remoto (7.690.920.925 bytes). O dry-run final encontrou zero candidatos locais
+e remotos, e o estado atual permaneceu sincronizado. Uma futura coleta e
+publicacao pode acumular novos objetos historicos; isso nao reautoriza outro GC.
 
 ## Problemas comuns
 

@@ -92,6 +92,28 @@ def candidates_from_dvc_output(output: str) -> list[str]:
     ]
 
 
+def split_gc_candidates(
+    candidates: list[str], *, local_prefix: str, remote_prefix: str
+) -> tuple[list[str], list[str]]:
+    """Separate DVC's combined local/remote dry-run without hiding surprises."""
+    local: list[str] = []
+    remote: list[str] = []
+    unexpected: list[str] = []
+    for path in candidates:
+        if path.startswith(local_prefix):
+            local.append(path)
+        elif path.startswith(remote_prefix):
+            remote.append(path)
+        else:
+            unexpected.append(path)
+    if unexpected:
+        raise ValueError(
+            "DVC dry-run emitted path(s) outside the configured local and remote "
+            "MD5 object roots: " + ", ".join(unexpected[:3])
+        )
+    return local, remote
+
+
 def clean_status(output: str) -> bool:
     """Return whether DVC says there is no local or cloud divergence."""
     normalized = output.lower()
@@ -142,6 +164,14 @@ def expected_prefix(root: str) -> str:
     return f"{root.rstrip('/')}/files/md5/"
 
 
+def local_object_prefix() -> str:
+    output = run_dvc(["cache", "dir"])
+    cache_dir = next((line.strip() for line in output.splitlines() if line.strip()), "")
+    if not cache_dir:
+        raise RuntimeError("DVC did not report a local cache directory.")
+    return str(Path(cache_dir).resolve() / "files" / "md5") + os.sep
+
+
 def validate_candidates(candidates: list[str], prefix: str) -> None:
     outside = [path for path in candidates if not path.startswith(prefix)]
     if outside:
@@ -174,8 +204,13 @@ def create_plan(remote: str, run_directory: Path | None = None) -> Path:
     _fs, root = configured_remote(remote)
     prefix = expected_prefix(root)
     dry_output = run_dvc(["gc", "--workspace", "--cloud", "--dry", "--remote", remote])
-    candidates = candidates_from_dvc_output(dry_output)
+    local_candidates, candidates = split_gc_candidates(
+        candidates_from_dvc_output(dry_output),
+        local_prefix=local_object_prefix(),
+        remote_prefix=prefix,
+    )
     validate_candidates(candidates, prefix)
+    local_bytes = sum(Path(path).stat().st_size for path in local_candidates)
 
     directory = run_directory or new_run_directory()
     directory.mkdir(parents=True, exist_ok=False)
@@ -186,6 +221,8 @@ def create_plan(remote: str, run_directory: Path | None = None) -> Path:
         "remote": remote,
         "object_prefix": prefix,
         "candidates": candidates,
+        "local_cache_candidate_count": len(local_candidates),
+        "local_cache_candidate_bytes": local_bytes,
         "dvc_dry_output": dry_output,
     }
     progress = {
@@ -197,7 +234,11 @@ def create_plan(remote: str, run_directory: Path | None = None) -> Path:
     atomic_json_write(directory / "plan.json", plan)
     atomic_json_write(directory / "progress.json", progress)
     print(f"Plan created: {directory}")
-    print(f"Candidates: {len(candidates)}")
+    print(f"Remote candidates: {len(candidates)}")
+    print(
+        "Local cache candidates (reported only, not deleted by this tool): "
+        f"{len(local_candidates)} ({local_bytes} bytes)"
+    )
     return directory
 
 
@@ -232,16 +273,26 @@ def run_final_audit(directory: Path, plan: dict[str, Any], progress: dict[str, A
     output = run_dvc(
         ["gc", "--workspace", "--cloud", "--dry", "--remote", plan["remote"]]
     )
-    remaining = candidates_from_dvc_output(output)
+    local_remaining, remaining = split_gc_candidates(
+        candidates_from_dvc_output(output),
+        local_prefix=local_object_prefix(),
+        remote_prefix=plan["object_prefix"],
+    )
     validate_candidates(remaining, plan["object_prefix"])
     progress["final_audit"] = {
         "at": utc_now(),
         "remaining_candidates": len(remaining),
+        "local_cache_candidates": len(local_remaining),
         "dvc_dry_output": output,
     }
     progress["updated_at"] = utc_now()
     atomic_json_write(directory / "progress.json", progress)
-    print(f"Final DVC dry-run: {len(remaining)} candidate(s) still present.")
+    print(f"Final DVC dry-run: {len(remaining)} remote candidate(s) still present.")
+    if local_remaining:
+        print(
+            f"Local cache still has {len(local_remaining)} candidate(s); "
+            "clean it separately if local disk space should be reclaimed."
+        )
     if not remaining:
         cloud_status = run_dvc(["status", "--cloud", "--remote", plan["remote"]])
         if not clean_status(cloud_status):

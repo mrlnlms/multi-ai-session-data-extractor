@@ -24,6 +24,36 @@ def test_candidate_validation_rejects_non_object_paths():
         raise AssertionError("non-MD5 path must be rejected")
 
 
+def test_split_gc_candidates_handles_combined_local_and_remote_output():
+    local_prefix = "/repo/.dvc/cache/files/md5/"
+    remote_prefix = "drive-root/files/md5/"
+    candidates = [
+        local_prefix + "ab/cdef",
+        remote_prefix + "01/2345",
+        local_prefix + "67/89ab.dir",
+    ]
+
+    assert gc.split_gc_candidates(
+        candidates, local_prefix=local_prefix, remote_prefix=remote_prefix
+    ) == (
+        [local_prefix + "ab/cdef", local_prefix + "67/89ab.dir"],
+        [remote_prefix + "01/2345"],
+    )
+
+
+def test_split_gc_candidates_rejects_unexpected_path():
+    try:
+        gc.split_gc_candidates(
+            ["other-root/files/md5/ab/cdef"],
+            local_prefix="/repo/.dvc/cache/files/md5/",
+            remote_prefix="drive-root/files/md5/",
+        )
+    except ValueError as error:
+        assert "outside" in str(error)
+    else:
+        raise AssertionError("unexpected GC path must be rejected")
+
+
 def test_unfinished_does_not_retry_unknown_timeout():
     plan = {"candidates": ["one", "two", "three"]}
     progress = {"outcomes": {"one": {"status": "deleted"}, "two": {"status": "timeout_unknown"}}}
