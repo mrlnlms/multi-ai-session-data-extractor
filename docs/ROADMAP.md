@@ -6,7 +6,7 @@ than duplicating it here. Completed work is marked here so its status can be
 read without searching Git history; implementation detail belongs in `git log`,
 and platform-specific behavior belongs in its own documentation.
 
-**Last reviewed:** 2026-09-20.
+**Last reviewed:** 2026-09-21.
 
 For one-time work, use **planned**, **active**, or **completed**. Mark completion
 when closing the work, with its date and an evidence pointer when available.
@@ -128,7 +128,7 @@ behavior remains in each platform's own documentation.
 | What product is this becoming, and what remains deliberately open? | [product/product-vision.md](product/product-vision.md) | Product vision; not a spec. |
 | What is the current priority and what work is operationally pending? | This roadmap | Ordering and status. |
 | How should IDs, references and non-message events be interpreted? | [product/reader-and-identity-contract.md](product/reader-and-identity-contract.md) | Technical record for the reader and future curation. |
-| How might account instances, application packaging and local authentication fit together? | [product/account-architecture.md](product/account-architecture.md) | Paused architectural exploration with explicit open decisions; not an implementation spec. |
+| What is the current account backend contract, and which application/distribution decisions remain open? | [product/account-architecture.md](product/account-architecture.md) | Maintained account contract plus an explicit boundary around future product decisions. |
 | What is the canonical capture and processing contract? | [AGENTS.md](../AGENTS.md) and [`src/schema/models.py`](../src/schema/models.py) | Agent instructions and observable schema. |
 | What does a particular source currently capture or miss? | [platform engineering records](extractor-engineering/platforms/README.md) and [known limitations](extractor-engineering/known-limitations.md) | Per-source evidence and known gaps. |
 | How is the existing dashboard operated? | [operations/dashboard.md](operations/dashboard.md) | Current operational UI. |

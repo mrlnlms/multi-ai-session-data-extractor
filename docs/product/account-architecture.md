@@ -1,10 +1,12 @@
 # Instancias de conta e arquitetura da aplicacao
 
-**Status:** identidade/lifecycle, bindings locais, verificacao explicita de
-autenticacao, sync seletivo e propagacao do UUID ao schema publicado foram
-implementados.
+**Status:** contrato mantido do backend de contas. Identidade/lifecycle,
+bindings locais, verificacao explicita de autenticacao, sync seletivo e
+propagacao do UUID ao schema publicado estao implementados. Empacotamento da
+aplicacao e uma eventual dimensao analitica derivada permanecem frentes
+separadas.
 
-**Data:** 2026-08-31
+**Origem:** 2026-08-31. **Revisto contra codigo e dados:** 2026-09-21.
 
 Documentos relacionados:
 
@@ -34,10 +36,10 @@ proxima plataforma. A conversa tambem mostrou que a decisao se relaciona com:
 - a migracao dos dados atuais; e
 - a fronteira com o unico consumidor, `AI Interaction Analysis`.
 
-Este documento preserva o que foi entendido, registra direcoes preferidas e
-mantem as decisoes ainda abertas visiveis. Ele existe para que o trabalho possa
-ser retomado sem transformar uma exploracao incompleta em implementacao
-prematura.
+Este documento preserva a origem da decisao, descreve o contrato que foi
+implementado e separa dele as decisoes ainda abertas da futura aplicacao. O
+estado observavel no codigo e nos dados prevalece sobre as hipoteses historicas
+mantidas aqui.
 
 ## 2. Evidencia no estado atual
 
@@ -113,7 +115,7 @@ como `Unclassified`. O UUIDv5 deterministico dessas contas legadas preserva a
 identidade entre previews. Profile ausente, logout ou token perdido nunca
 alteram lifecycle automaticamente.
 
-### 2.4 Sessao da plataforma versus identidade do navegador
+### 2.5 Sessao da plataforma versus identidade do navegador
 
 Um profile persistente do extrator e apenas um diretorio isolado de estado do
 navegador. A autenticacao relevante e a sessao criada pelo servico upstream
@@ -145,7 +147,7 @@ locais e nao presume a causa da perda de acesso.
 
 ## 3. Distincao central
 
-O modelo futuro deve separar dois conceitos:
+O modelo atual separa dois conceitos:
 
 ```text
 Plataforma/conector
@@ -169,85 +171,89 @@ ChatGPT
 A quantidade de contas nao deve ser codificada em listas fixas nem exigir
 alteracao de parser, dashboard ou relatorio a cada adicao.
 
-## 4. Acordos alcancados
+## 4. Contratos implementados
 
-Os pontos abaixo representam o entendimento atual, nao uma autorizacao para
-implementacao:
+Os pontos abaixo descrevem o comportamento canonico atual:
 
-1. A arquitetura deve possuir um nucleo comum de contas e adaptadores por
-   plataforma, em vez de reproduzir regras independentes em cada script.
-2. ChatGPT seria o primeiro novo adotante; Gemini e NotebookLM deveriam ser
-   normalizados para remover limites fixos de contas.
-3. CLI e interface grafica devem chamar o mesmo servico de dominio. Regras de
-   conta nao devem morar em `argparse`, Streamlit, Electron ou Tauri.
-4. O nome mostrado ao usuario e livre, editavel e pode repetir. Ele nunca e
-   chave, path ou identidade.
-5. A identidade interna da conta e imutavel e atribuida pelo sistema. UUID e a
-   direcao atualmente preferida, mesmo que exija migracao do desenho numerico
-   existente.
-6. Um identificador estavel fornecido pela plataforma, quando disponivel, e um
-   dado separado. Ele serve para detectar login na conta errada, nao para
-   substituir automaticamente a identidade interna.
+1. A arquitetura possui um nucleo comum de contas e capacidades declaradas no
+   registro de plataformas, em vez de reproduzir regras de identidade em cada
+   script.
+2. As nove plataformas web usam o contrato comum. Gemini e NotebookLM mantem
+   suas chaves default por compatibilidade, mas contas selecionadas
+   explicitamente nao dependem de uma quantidade fixa.
+3. CLI e dashboard chamam os mesmos servicos UI-neutral. Regras de conta nao
+   moram em `argparse` ou Streamlit.
+4. O label privado atual e apenas apresentacao e nunca funciona como chave,
+   path ou identidade. Um display name livre e editavel continua fora do
+   catalogo arquivavel.
+5. A identidade interna da conta e um UUID imutavel. Contas anteriores ao
+   catalogo receberam UUIDv5 deterministico; novas contas recebem UUID proprio.
+6. Um futuro identificador estavel fornecido pela plataforma sera dado
+   separado. Ele podera detectar login na conta errada, sem substituir
+   automaticamente a identidade interna.
 7. Ciclo de vida e autenticacao sao estados independentes. Uma conta pode estar
    ativa com login ausente ou expirado; ausencia de cookies nao a transforma em
    conta historica.
-8. Depois de restaurar Git + DVC em outra maquina, o usuario deve poder escolher
-   a mesma identidade de conta, autenticar novamente e continuar reconciliando
-   com as conversas preservadas.
+8. Depois de restaurar Git + DVC em outra maquina, o catalogo preserva a mesma
+   identidade. O profile e o binding local precisam ser recriados antes de uma
+   nova captura.
 9. Credenciais nunca entram em Git, DVC, Parquet ou logs. Profiles continuam
    sendo estado local descartavel e recriavel por login.
 10. A abertura da interface de contas e somente leitura; cadastro, lifecycle,
     binding, verificacao de login e sync seletivo sao acoes explicitas e
     preview-first da entrega operacional.
-11. Antes de mudar IDs ou schema, deve existir uma baseline validada dos
-    Parquets atualmente consumidos pelo `AI Interaction Analysis`.
-12. Nenhum DVC push, commit ou publicacao faz parte desta exploracao.
+11. `account_id` ja foi publicado nos Parquets sem substituir o campo legado
+    `account`; o consumidor continua recebendo `processed` e `unified` por DVC
+    import.
+12. A dimensao analitica de contas, se aprovada, sera derivada do catalogo e
+    nao o substituira como fonte autoritativa.
 
-## 5. Modelo de dominio candidato
+## 5. Modelo de dominio atual
 
-Este modelo expressa responsabilidades. Nomes de campos, banco e formato ainda
-nao estao decididos.
+O dominio atual separa identidade arquivavel, binding local e observacao de
+autenticacao. Campos futuros nao sao presumidos pelo contrato existente.
 
 ### 5.1 Identidade arquivavel da conta
 
 ```text
 Account
   account_id             UUID imutavel gerado pelo sistema
-  platform_id            chave estavel do conector
-  display_name           nome livre, mutavel e nao unico
-  upstream_subject       identificador upstream opcional
+  platform               nome canonico da plataforma
+  technical_key          chave operacional estavel nessa plataforma
   lifecycle_status       active | disabled | historical
   created_at
   updated_at
 ```
 
-Regras candidatas:
+Regras atuais:
 
-- renomear nao muda `account_id`, paths, relacoes ou dados;
-- nomes iguais sao validos;
 - `account_id` nunca e reutilizado;
-- `upstream_subject` nao deve conter credencial e pode exigir tratamento como
-  dado pessoal;
 - `historical` e uma decisao explicita de preservacao sem novas capturas;
-- `disabled` interrompe operacao sem apagar dados ou identidade.
+- `disabled` interrompe operacao sem apagar dados ou identidade;
+- profile ausente ou autenticacao expirada nao altera lifecycle; e
+- `upstream_subject` e display name editavel continuam fora do catalogo ate
+  existir requisito e evidencia suficientes.
 
 ### 5.2 Vinculo local de autenticacao
 
 ```text
 AccountBinding
   account_id
-  profile_locator
-  auth_status            valid | expired | missing | unknown
-  last_validated_at
+  profile_key
+  updated_at
+
+AuthObservation
+  account_id
+  status                 valid | expired | missing | unknown | error
+  checked_at
   evidence_method        probe | operator | sync
-  observed_subject       opcional
+  detail                 diagnostico curto e redigido
 ```
 
 O vinculo e especifico da maquina. Depois de uma restauracao limpa, a conta
-continua existindo, mas `auth_status=missing`. Um novo login deve vincular o
-profile recriado ao `account_id` existente. Quando a plataforma expuser um
-subject estavel, um subject diferente bloqueia o vinculo e evita mistura de
-historicos.
+continua existindo, mas a autenticacao fica ausente ate um novo binding e
+login. Uma futura verificacao por subject upstream exigira evidencia estavel
+da plataforma e nao faz parte do contrato atual.
 
 Presenca de profile nunca produz `valid` por inferencia. Uma observacao valida
 declara como foi obtida: leitura minima automatizada (`probe`), confirmacao
@@ -255,34 +261,25 @@ explicita em navegador visivel (`operator`) ou sync seletivo e parse concluídos
 com sucesso (`sync`). A confirmacao do operador nao tenta contornar protecoes
 anti-bot e permanece estado local.
 
-### 5.3 Catalogo de plataformas
+### 5.3 Registro de plataformas
 
-Um adaptador de plataforma poderia declarar, sem acoplar a interface ao
-extractor:
-
-```text
-PlatformAdapter
-  platform_id e capacidades
-  registrar/abrir login
-  validar autenticacao
-  resolver paths da instancia
-  capturar e baixar assets
-  reconciliar
-  expor status operacional
-```
+`src/platforms/registry.py` declara metadados e capacidades de selecao das nove
+fontes web sem acoplar a interface aos extractors. Os modulos de login, probe,
+sync e parse permanecem junto de cada plataforma; nao existe hoje uma classe
+monolitica `PlatformAdapter`.
 
 O parser continua sendo uma fronteira de dados. Ele consome todas as instancias
 validas de uma plataforma e produz os Parquets da plataforma, com procedencia
 de conta preservada.
 
-## 6. Fluxo alvo candidato
+## 6. Fluxo implementado
 
 ```text
-AccountService
-  ├── catalogo de plataformas
-  ├── identidades de conta
-  ├── bindings locais de autenticacao
-  └── execucoes por instancia
+servicos UI-neutral em src/
+  ├── catalogo e inventario de contas
+  ├── bindings e auth health locais
+  ├── capacidades no registro de plataformas
+  └── planejamento/execucao por account_id
              │
              ▼
 platform/account -> raw/account -> reconcile -> merged/account
@@ -295,7 +292,7 @@ platform/account -> raw/account -> reconcile -> merged/account
                                               │
                          ┌────────────────────┴───────────────────┐
                          ▼                                        ▼
-                 dashboard/relatorios                 snapshot para consumidor
+                 dashboard/relatorios                 DVC import no consumidor
 ```
 
 Falhas, discovery baseline, logs e freshness devem ser avaliados por instancia
@@ -303,7 +300,7 @@ antes de serem agregados por plataforma. Uma falha em uma conta nao pode marcar
 outra como removida. O pipeline nao deve declarar estado verde se `processed`
 ou `unified` forem anteriores aos inputs modificados.
 
-## 7. Interface operacional futura
+## 7. Interface operacional atual e evolucao futura
 
 A visao de produto ja preve cadastro de fontes e contas, login/relogin, estados
 ativo/desativado/historico, sync seletivo, erros e freshness. A conversa atual
@@ -315,20 +312,21 @@ A pagina **Accounts** oferece controles preview-first sobre os servicos
 canonicos. Ela nao executa rede na abertura, nao automatiza login e exige
 confirmacao para mutacoes; lifecycle nunca exclui identidade ou dados.
 
-Fluxo candidato:
+O fluxo operacional disponivel hoje permite:
 
 1. Selecionar uma plataforma suportada.
-2. Adicionar uma conta e escolher um nome livre.
+2. Adicionar uma conta com uma chave tecnica segura.
 3. O sistema gera a identidade imutavel.
 4. Abrir o fluxo de login; senha e MFA continuam sendo fornecidos diretamente
    pelo usuario a plataforma.
-5. Validar uma chamada minima e, quando possivel, o subject upstream.
+5. Validar uma chamada minima ou registrar confirmacao explicita do operador.
 6. Vincular o profile local.
-7. Oferecer a primeira captura e acompanhar seu progresso.
-8. Exibir autenticacao, ultima captura, freshness, erros e relatorios.
+7. Executar sync e parse seletivos para a conta ativa.
+8. Exibir lifecycle, evidencias locais e autenticacao observada.
 
-Esse fluxo pode ser exposto primeiro por CLI e depois por uma aplicacao. A
-tecnologia da aplicacao permanece deliberadamente aberta.
+CLI e dashboard chamam os mesmos servicos de dominio. Nome livre, progresso
+detalhado, fila, retry e uma experiencia integrada de login permanecem temas da
+futura aplicacao. Sua tecnologia continua deliberadamente aberta.
 
 ## 8. Web local, Electron, Tauri ou hibrido
 
@@ -412,15 +410,11 @@ Referencia oficial:
 
 ## 9. Fronteira com `AI Interaction Analysis`
 
-Antes de qualquer migracao de identidade ou schema, o consumidor deve receber
-uma copia baseline da base atual:
-
-1. localizar o projeto consumidor;
-2. identificar exatamente quais Parquets ele usa;
-3. copiar esses arquivos sem substituir inputs existentes sem validacao;
-4. registrar hashes SHA-256, schemas, contagens, timestamp e revisao de origem;
-5. executar o smoke test atual; e
-6. manter o resultado como referencia de antes da mudanca.
+O consumidor existe no checkout irmao `AI Interaction Analysis`. Ele importa
+`data/processed/` e `data/unified/` deste projeto por `dvc import` congelado e
+registra seu contrato em `docs/unified-schema.md`, com smoke test proprio apos
+atualizacoes deliberadas. A publicacao de `account_id` preservou o campo legado
+`account`; nao foi necessario substituir o mecanismo de consumo.
 
 Uma evolucao candidata e substituir o `dvc import` direto por um snapshot
 analitico exportado atomicamente:
@@ -433,37 +427,26 @@ input local e reproduzivel do consumidor
 ```
 
 O produtor continua sendo o cofre canonico de `raw`, `merged`, `processed` e
-`unified`. O consumidor recebe apenas os Parquets necessarios e um manifesto de
-proveniencia. A copia pode ser ignorada pelo Git e regenerada; o formato, o
-destino e a politica de versoes ainda precisam ser definidos.
+`unified`. Um snapshot analitico com manifesto permanece apenas uma possivel
+evolucao futura; nao e migracao em andamento nem bloqueio para a dimensao de
+contas.
 
-O projeto consumidor nao foi localizado automaticamente nos caminhos
-inspecionados durante esta conversa. Seu caminho deve ser confirmado antes da
-baseline.
+## 10. Fundacao concluida e proximas fronteiras
 
-## 10. Sequencia candidata quando o trabalho for retomado
+A fundacao reutilizavel de contas esta implementada nas nove plataformas web:
+catalogo, inventario lossless, lifecycle, bindings, auth health, sync seletivo,
+isolamento de paths e `account_id` publicado. A proxima decisao da camada de
+dados e o contrato de uma dimensao analitica derivada do catalogo, conforme o
+roadmap. Ela nao depende da escolha do shell futuro.
 
-1. Localizar o `AI Interaction Analysis` e produzir a baseline sem alterar sua
-   logica analitica.
-2. Definir o threat model local e os requisitos de instalacao/distribuicao.
-3. Fazer spikes pequenos para web local, Electron e Tauri, incluindo login
-   headed, Playwright, Keychain e subprocessos Python.
-4. Escolher a arquitetura da aplicacao e da camada operacional mutavel.
-5. Fechar a identidade de conta e sua persistencia.
-6. Fechar a identidade canonica de conversas e a migracao de referencias.
-7. Especificar `AccountService` e `PlatformAdapter`.
-8. Implementar e validar o nucleo sem interface grafica.
-9. Migrar ChatGPT; normalizar Gemini e NotebookLM.
-10. Validar parser, unified, dashboard e Quarto, sem publicar.
-11. Comparar um snapshot novo com a baseline no consumidor.
-12. Implementar a interface operacional como entrega separada.
-13. Adotar o contrato nas demais plataformas web de forma gradual.
+Memoria/configuracao preservada, leitor, fila operacional, empacotamento e
+distribuicao sao frentes separadas. Implementa-las nao deve reabrir a identidade
+arquivavel ja publicada sem nova evidencia ou requisito incompatível.
 
-Essa ordem e apenas uma hipotese. Em particular, o spike de shell pode mostrar
-que o backend Python atual deve permanecer como processo separado ou servico
-local, em vez de ser incorporado ao binario desktop.
+## 11. Decisoes fechadas e abertas
 
-## 11. Decisoes em aberto
+A numeracao abaixo preserva os identificadores da lista original para manter
+referencias historicas legiveis.
 
 ### Identidade e schema — decisões fechadas em 2026-09-14
 
@@ -478,15 +461,16 @@ local, em vez de ser incorporado ao binario desktop.
 6. Web e NotebookLM histórico recebem UUID; CLI/manual permanecem nulos.
 7. `upstream_subject` continua fora do contrato até existir evidência estável.
 
-### Estado e persistencia
+### Estado e persistencia — contrato atual
 
-8. Qual tecnologia armazena estado operacional mutavel: SQLite, outro banco ou
-   arquivos estruturados?
-9. O que pertence ao cofre DVC e o que pertence apenas ao estado local?
-10. Como fazer backup da identidade de contas sem incluir credenciais?
-11. Quais transicoes existem entre active, disabled e historical?
-12. O que significa excluir uma conta na interface, considerando o principio de
-    preservacao?
+8. O catalogo arquivavel vive em `data/accounts/catalog.json`, sob DVC.
+9. Bindings, profiles e auth health permanecem em `.storage/`, fora de Git,
+   DVC e Parquet.
+10. Lifecycle e autenticacao sao independentes; as transicoes de lifecycle sao
+    explicitas, rejeitam no-op e nunca apagam identidade ou dados.
+11. Uma acao futura chamada "excluir conta" deve retirar capacidade operacional
+    e preservar catalogo e acervo; a experiencia e o nome final dessa acao ainda
+    pertencem ao desenho da aplicacao.
 
 ### Aplicacao e distribuicao
 
@@ -511,38 +495,28 @@ local, em vez de ser incorporado ao binario desktop.
 
 ### Pipeline e produto
 
-25. Como registrar contas sem quantidade fixa e como descobrir capacidades de
-    cada plataforma?
-26. Uma falha em uma conta permite parse parcial ou bloqueia toda a plataforma?
-27. Como gerar relatorios consolidados e individuais sem arquivos manuais por
-    conta?
-28. Como representar contas historicas sem profiles e sem poluir alertas de
-    freshness?
-29. Como a futura interface coordena filas, locks, browser headed e retry?
-30. Ate onde a primeira implementacao deve normalizar plataformas existentes?
+25. Registro dinamico, capacidades e selecao por conta estao implementados para
+    as nove plataformas web.
+26. Contas historicas permanecem visiveis no inventario sem exigir profile nem
+    participar dos alvos de sync.
+27. Geracao dinamica de relatorios consolidados/individuais, filas, retry e
+    coordenacao de browser headed permanecem decisoes da futura experiencia.
 
 ### Consumidor
 
-31. Onde esta o checkout atual do `AI Interaction Analysis`?
-32. Quais Parquets e revisoes ele realmente consome?
-33. O snapshot substitui DVC import ou e primeiro uma camada de compatibilidade?
-34. Onde o manifesto vive e qual e sua politica de versoes?
-35. Como comparar a baseline com dados que mudam legitimamente por nova captura?
+31. O consumidor usa `processed` e `unified` por DVC import congelado.
+32. Se um snapshot substituir esse contrato no futuro, onde vivem manifesto,
+    politica de versoes e comparacao de mudancas legitimas?
 
-## 12. Criterios antes de implementar
+## 12. Criterios para evolucoes futuras
 
-O trabalho nao deve entrar em implementacao ate que exista uma especificacao
-aprovada cobrindo pelo menos:
+Mudancas no backend existente devem preservar UUIDs, isolamento de paths,
+catalogo lossless, separacao entre lifecycle e autenticacao, ausencia de
+credenciais em superficies publicadas e compatibilidade deliberada com o
+consumidor. Mudancas de schema seguem os gates normais de revisao, teste e
+publicacao do projeto.
 
-- identidade e persistencia de conta;
-- chaves canonicas e migracao;
-- fronteiras entre core, adaptadores e interfaces;
-- threat model e tratamento de profiles;
-- estrategia de aplicacao/distribuicao, ainda que em primeira fase;
-- baseline e contrato com o consumidor;
-- plano de rollback dos dados; e
-- testes de isolamento, idempotencia, freshness e restauracao.
-
-Enquanto essas decisoes permanecerem abertas, o comportamento atual continua
-canonico. Nao se deve cadastrar uma segunda conta em paths compartilhados nem
-publicar mudanca de schema como solucao provisoria.
+Empacotamento ou substituicao da interface exigem, adicionalmente, threat model,
+tratamento de profiles, estrategia de distribuicao e rollback. Essas decisoes
+nao bloqueiam manutencao do backend atual nem a discussao independente da
+dimensao analitica de contas.
