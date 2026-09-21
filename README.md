@@ -86,11 +86,10 @@ Login (once per platform — opens a browser, you log in manually, close):
 PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.login
 ```
 
-Sync web data (capture + consolidation), then parse it:
+Sync every runnable ChatGPT account, then parse the combined result once:
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync
-PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.parse
+PYTHONPATH=. .venv/bin/python -m src.workflows.headless --plats=ChatGPT --no-publish
 ```
 
 Result:
@@ -175,12 +174,13 @@ Each web platform keeps its operational commands together in one directory:
 
 ```bash
 PYTHONPATH=. .venv/bin/python -m src.platforms.<source_id>.commands.login
-PYTHONPATH=. .venv/bin/python -m src.platforms.<source_id>.commands.sync
+PYTHONPATH=. .venv/bin/python -m src.platforms.<source_id>.commands.sync --account <key>
 PYTHONPATH=. .venv/bin/python -m src.platforms.<source_id>.commands.parse
 ```
 
 Common web-sync flags (availability varies by source):
 
+- `--account KEY` — required account selected by the shared orchestrator
 - `--full` — force full recapture (skips the incremental path)
 - `--no-binaries` — skip asset downloads (images, slide decks, etc.)
 - `--no-reconcile` — skip consolidation (capture only)

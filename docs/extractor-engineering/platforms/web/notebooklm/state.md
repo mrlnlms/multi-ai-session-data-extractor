@@ -315,9 +315,9 @@ publication.
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.sync             # all active accounts
-PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.sync --account 1 # only account 1
-PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.sync --account 3 # only account 3
+PYTHONPATH=. .venv/bin/python -m src.workflows.headless --plats=NotebookLM --no-publish # all runnable accounts, then one parse
+PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.sync --account 1     # direct account sync, no parse
+PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.sync --account 3     # direct account sync, no parse
 PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.parse
 PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.parse --without-historical  # explicit current-only rebuild
 for f in notebooklm notebooklm-acc-1 notebooklm-acc-2; do

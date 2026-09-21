@@ -12,6 +12,9 @@
   (generated via `python -m src.platforms.kimi.commands.login`). Cookies + Bearer token from
   `localStorage.access_token` (~563 chars JWT-like). Cookies-only = 401.
   Token loaded via `page.evaluate(localStorage.getItem)` em cada captura.
+  If the first API call returns 401, the client reloads the already logged-in
+  site session, reloads the token, and retries once; a persistent 401 remains
+  a hard failure. Chrome provider login is not required.
   Since 2026-08-30, the login and runtime origin is `https://kimi.ai/`
   (Google SSO remains supported).
 
@@ -124,8 +127,6 @@ legacy `account` label and all existing native IDs remain unchanged.
   observarmos forks empiricamente.
 - **Scenario mapping:** so `SCENARIO_K2D5` na conta atual. Adicionar
   mapping pra outros scenarios (research/search/etc) quando aparecerem.
-- **Refresh do token:** se `access_token` expirar, captura quebra.
-  Implementar refresh via `refresh_token` em V2.
 - **Kimi Claw bots:** `ListBots` retornou vazio. Schema desconhecido
   ate user criar bots.
 - **`IMService/ListRooms`:** 400 com body vazio — payload obrigatorio TBD.

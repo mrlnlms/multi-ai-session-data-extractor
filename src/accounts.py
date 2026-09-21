@@ -90,6 +90,29 @@ def default_sync_accounts(platform: str) -> tuple[str, ...]:
     return account_keys(platform)
 
 
+def runnable_account_keys(platform: str) -> tuple[str, ...]:
+    """Return capture targets in inventory order, excluding retained accounts."""
+    return tuple(
+        _observed_execution_key(state)
+        for state in discover_accounts(platform)
+        if state.lifecycle_status in {None, LifecycleStatus.ACTIVE}
+        and not state.key.startswith("archive:")
+    )
+
+
+def _observed_execution_key(state: AccountState) -> str:
+    """Preserve the exact profile/data suffix expected by legacy sync CLIs."""
+    metadata = PLATFORM_ACCOUNT_METADATA[state.platform]
+    if state.evidence.profile_path is not None:
+        name = state.evidence.profile_path.name
+        if name.startswith(metadata.profile_prefix):
+            return name[len(metadata.profile_prefix):]
+    for path in (state.evidence.raw_path, state.evidence.merged_path):
+        if path is not None and path.name.startswith("account-"):
+            return path.name
+    return state.key
+
+
 def account_command_argument(platform: str, technical_key: str) -> tuple[str, str]:
     """Resolve an immutable catalog identity to the platform's existing sync flag."""
     capability = PLATFORM_ACCOUNT_CAPABILITIES.get(platform)

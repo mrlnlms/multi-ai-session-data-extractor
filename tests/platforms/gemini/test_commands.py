@@ -18,17 +18,14 @@ def test_login_defaults_to_account_one_with_current_choices():
         login_command.build_parser().parse_args(["--account", "../work"])
 
 
-def test_sync_without_account_selects_all_three_accounts(capsys):
+def test_sync_requires_explicit_account_even_for_programmatic_calls():
     args = argparse.Namespace(
         account=None, dry_run=True, full=False, no_binaries=False,
         no_reconcile=False, smoke=None,
     )
 
-    assert asyncio.run(sync.main(args)) == 0
-    output = capsys.readouterr().out
-    assert [line.strip() for line in output.splitlines() if line.strip().startswith("Account ")] == [
-        "Account 1:", "Account 2:", "Account 3:"
-    ]
+    with pytest.raises(ValueError, match="explicit account"):
+        asyncio.run(sync.main(args))
 
 
 def test_gemini_profile_and_data_paths_are_unchanged():
@@ -36,7 +33,7 @@ def test_gemini_profile_and_data_paths_are_unchanged():
     assert (sync.MERGED_BASE / "account-2").as_posix() == "data/merged/Gemini/account-2"
 
 
-def test_sync_accepts_dynamic_account_without_changing_default_order(capsys):
+def test_sync_accepts_dynamic_explicit_account(capsys):
     args = argparse.Namespace(account="work", dry_run=True, full=False, no_binaries=False,
                               no_reconcile=False, smoke=None)
     assert asyncio.run(sync.main(args)) == 0

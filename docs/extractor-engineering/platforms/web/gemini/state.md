@@ -167,8 +167,8 @@ discovered via probe (`src/platforms/gemini/probes/schema.py`):
 ## Commands
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync             # all accounts
-PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync --account 1 # account 1 only
+PYTHONPATH=. .venv/bin/python -m src.workflows.headless --plats=Gemini --no-publish # all runnable accounts, then one parse
+PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync --account 1     # direct account sync, no parse
 PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.parse
 for f in gemini gemini-acc-1 gemini-acc-2 gemini-acc-3; do
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd

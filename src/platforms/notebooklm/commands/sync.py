@@ -1,22 +1,19 @@
-"""Sync NotebookLM — captura + assets + reconcile, multi-conta.
+"""Sync NotebookLM — captura + assets + reconcile para uma conta explicita.
 
 Etapas (por conta):
     1. Capture     -> data/raw/NotebookLM/account-{N}/ (cumulativo)
     2. Assets      -> binarios (audio MP4, video MP4, slide PDF+PPTX, source PDFs)
     3. Reconcile   -> data/merged/NotebookLM/account-{N}/
 
-Multi-conta: por default roda todas as contas ativas (1, 2 e 3). Use
---account N pra rodar so uma.
-
 Flags:
-    --account KEY roda so a conta indicada (default: 1, 2 e 3)
+    --account KEY conta indicada pelo orquestrador compartilhado
     --no-binaries     pula etapa 2 (assets)
     --no-reconcile    pula etapa 3
     --full            forca refetch full (propagado pro reconcile — bug preventivo #3)
     --smoke N         smoke: N notebooks por conta
     --dry-run
 
-Uso: PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.sync
+Uso: PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.sync --account 1
 """
 
 from __future__ import annotations
@@ -33,7 +30,7 @@ from src.accounts import capturable_account_key
 from src.assets.vault import AssetVault
 from src.assets.reader import AssetReader
 from src.assets.runtime import load_asset_runtime, runtime_account_id
-from src.platforms.notebooklm.extractor.auth import ACCOUNT_LANG, VALID_ACCOUNTS, load_context
+from src.platforms.notebooklm.extractor.auth import ACCOUNT_LANG, load_context
 from src.platforms.notebooklm.extractor.api_client import NotebookLMClient
 from src.platforms.notebooklm.extractor.batchexecute import load_session
 from src.platforms.notebooklm.extractor.asset_downloader import (
@@ -170,10 +167,12 @@ async def main(
 ) -> int:
     started = time.time()
     asset_runtime = load_asset_runtime("notebooklm")
+    if args.account is None:
+        raise ValueError("NotebookLM sync requires an explicit account")
 
     if args.dry_run:
         _section("DRY RUN")
-        accounts = [args.account] if args.account else list(VALID_ACCOUNTS)
+        accounts = [args.account]
         for acc in accounts:
             print(f"  Account {acc}:")
             print(f"    Capture:   data/raw/NotebookLM/account-{acc}/")
@@ -183,7 +182,7 @@ async def main(
         print(f"  Etapa 3:     {'skipped' if args.no_reconcile else 'run'}")
         return 0
 
-    accounts = [args.account] if args.account else list(VALID_ACCOUNTS)
+    accounts = [args.account]
     if asset_vault is None:
         asset_vault = asset_runtime.vault
         asset_account_ids = {
@@ -214,8 +213,8 @@ async def main(
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--account", type=capturable_account_key, default=None,
-                    help="Roda so a conta indicada (default: todas)")
+    ap.add_argument("--account", type=capturable_account_key, required=True,
+                    help="Conta explicita a capturar")
     ap.add_argument("--no-binaries", action="store_true", help="Pula etapa 2 (assets)")
     ap.add_argument("--no-reconcile", action="store_true")
     ap.add_argument("--full", action="store_true")

@@ -15,6 +15,7 @@ from src.accounts import (
     default_sync_accounts,
     discover_accounts,
     load_account_registry,
+    runnable_account_keys,
 )
 from src.account_catalog import LifecycleStatus, legacy_account_id
 from src.auth_health import AuthEvidenceMethod, AuthHealth, AuthObservation, AuthStatus, write_auth_health_atomic
@@ -63,6 +64,9 @@ def test_canonical_account_fallbacks_preserve_current_command_contracts():
     assert account_command_argument("Gemini", "work") == ("--account", "work")
     assert account_command_argument("ChatGPT", "work") == ("--account", "work")
     assert account_command_argument("Claude.ai", "work") == ("--profile", "work")
+    assert account_command_argument("Kimi", "account-2") == ("--account", "account-2")
+    assert account_command_argument("ChatGPT", "account-2") == ("--account", "account-2")
+    assert account_command_argument("Gemini", "2") == ("--account", "2")
 
 
 def test_discovery_unions_registry_profile_and_data_evidence(tmp_path):
@@ -288,6 +292,37 @@ def test_account_models_are_immutable():
     state = AccountState("ChatGPT", "default", None, evidence, "not_configured")
     with pytest.raises((AttributeError, TypeError)):
         state.key = "other"
+
+
+def test_runnable_accounts_keep_order_and_exclude_inactive_or_archived(monkeypatch):
+    states = (
+        AccountState("NotebookLM", "1", None, AccountEvidence(), "unknown", lifecycle_status=LifecycleStatus.ACTIVE),
+        AccountState("NotebookLM", "uncatalogued", None, AccountEvidence(), "unknown"),
+        AccountState("NotebookLM", "2", None, AccountEvidence(), "unknown", lifecycle_status=LifecycleStatus.DISABLED),
+        AccountState("NotebookLM", "archive:more-design-2026-03-30", None, AccountEvidence(), "not_configured", lifecycle_status=LifecycleStatus.HISTORICAL),
+        AccountState("NotebookLM", "3", None, AccountEvidence(), "unknown", lifecycle_status=LifecycleStatus.ACTIVE),
+    )
+    monkeypatch.setattr("src.accounts.discover_accounts", lambda _platform: states)
+
+    assert runnable_account_keys("NotebookLM") == ("1", "uncatalogued", "3")
+
+
+def test_runnable_account_uses_exact_observed_profile_suffix(tmp_path, monkeypatch):
+    profile = tmp_path / ".storage" / "kimi-profile-account-2"
+    profile.mkdir(parents=True)
+
+    states = discover_accounts(
+        "Kimi",
+        storage_root=tmp_path / ".storage",
+        raw_root=tmp_path / "raw",
+        merged_root=tmp_path / "merged",
+        catalog_path=tmp_path / "catalog.json",
+        registry_path=tmp_path / "registry.json",
+    )
+    state = next(item for item in states if item.key == "2")
+    monkeypatch.setattr("src.accounts.discover_accounts", lambda _platform: (state,))
+
+    assert runnable_account_keys("Kimi") == ("account-2",)
 
 
 @pytest.mark.parametrize("content", ["[]", '{"chatgpt": []}', '{"chatgpt": {"default": ""}}'])

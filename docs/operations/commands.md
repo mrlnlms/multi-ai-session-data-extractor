@@ -18,7 +18,7 @@ CLIs ja copia e parseia.
 
 ```bash
 python -m src.platforms.chatgpt.commands.login
-python -m src.platforms.chatgpt.commands.sync
+python -m src.platforms.chatgpt.commands.sync --account default
 python -m src.platforms.chatgpt.commands.parse
 python -m src.platforms.codex.commands.sync
 ```
@@ -28,9 +28,10 @@ As flags, requisitos de browser e particularidades de cada fonte ficam em
 
 O inventario tecnico de contas e lido por `src/accounts.py` a partir dos
 defaults compativeis, do registro privado, dos profiles e das arvores
-raw/merged preservadas. Essas evidencias nao validam autenticacao e nao mudam
-quais contas cada comando seleciona: Gemini e NotebookLM continuam executando
-suas tres contas por default; os demais comandos preservam seus defaults.
+raw/merged preservadas. Essas evidencias nao validam autenticacao. O workflow
+compartilhado seleciona, em ordem, contas ativas ou ainda nao catalogadas,
+exclui `disabled`, `historical` e archives, executa cada sync web com a conta
+explicita e roda o parser consolidado uma vez ao final.
 
 ## Workflows transversais
 
@@ -61,6 +62,9 @@ python -m src.operations.accounts auth-confirm ACCOUNT_ID --apply
 
 O primeiro comando e apenas preview. O segundo registra status `valid`, horario
 e metodo `operator`; nao executa login, sync, DVC ou Git.
+Essa confirmacao se refere a conta exibida pela plataforma, nunca a uma conta
+vinculada ao Chrome. Login/sincronizacao do provedor do navegador e opcional e
+nao entra no inventario nem na avaliacao de autenticacao.
 Um sync seletivo concluido com sucesso tambem atualiza a observacao local para
 `valid` com metodo `sync`.
 

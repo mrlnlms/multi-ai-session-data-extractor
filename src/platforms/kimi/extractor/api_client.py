@@ -43,6 +43,25 @@ class KimiAPIClient:
         if self.token is None:
             await self._load_token()
         body = body or {}
+        result = await self._request(path, body)
+        if result["status"] == 401:
+            # The site can refresh a still-valid logged-in session only after
+            # its application has finished booting. Reload that session and
+            # retry once with the newly persisted token.
+            await self.page.reload(wait_until="networkidle", timeout=60000)
+            await self.page.wait_for_timeout(2000)
+            await self._load_token()
+            result = await self._request(path, body)
+        if result["status"] != 200:
+            raise RuntimeError(
+                f"HTTP {result['status']} on POST {path}: {result['body'][:300]}"
+            )
+        try:
+            return json.loads(result["body"])
+        except Exception as e:
+            raise RuntimeError(f"Bad JSON from {path}: {e}: {result['body'][:200]}")
+
+    async def _request(self, path: str, body: dict) -> dict:
         result = await self.page.evaluate(
             """async ({path, body, token}) => {
                 const r = await fetch(path, {
@@ -58,14 +77,7 @@ class KimiAPIClient:
             }""",
             {"path": path, "body": body, "token": self.token},
         )
-        if result["status"] != 200:
-            raise RuntimeError(
-                f"HTTP {result['status']} on POST {path}: {result['body'][:300]}"
-            )
-        try:
-            return json.loads(result["body"])
-        except Exception as e:
-            raise RuntimeError(f"Bad JSON from {path}: {e}: {result['body'][:200]}")
+        return result
 
     async def list_chats_page(
         self, page_size: int = 100, page_token: str | None = None

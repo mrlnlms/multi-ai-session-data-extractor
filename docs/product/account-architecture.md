@@ -113,6 +113,22 @@ como `Unclassified`. O UUIDv5 deterministico dessas contas legadas preserva a
 identidade entre previews. Profile ausente, logout ou token perdido nunca
 alteram lifecycle automaticamente.
 
+### 2.4 Sessao da plataforma versus identidade do navegador
+
+Um profile persistente do extrator e apenas um diretorio isolado de estado do
+navegador. A autenticacao relevante e a sessao criada pelo servico upstream
+dentro desse diretorio. Vincular o Chrome a uma conta Google, ativar sync do
+navegador ou aceitar a criacao de um perfil nomeado pelo provedor e uma escolha
+independente e opcional.
+
+Nenhum inventario, auth-check, login ou sync pode usar o estado da conta do
+Chrome como requisito, prova de autenticacao ou identidade da conta upstream.
+O operador pode recusar o vinculo sem degradar a coleta. A identidade deve ser
+confirmada pela propria plataforma; a saude da sessao, por uma leitura
+upstream explicita. Um token local rejeitado tambem nao prova, sozinho, logout:
+o cliente deve permitir que uma sessao ainda valida conclua seu refresh antes
+de classificar a autenticacao como expirada.
+
 No NotebookLM, cada subdiretorio de `data/external/notebooklm-snapshots/`
 tambem materializa uma conta `archive:<nome-normalizado>`, igual a identidade
 emitida pelo parser historico. A evidencia permite mostrar o acervo corporativo

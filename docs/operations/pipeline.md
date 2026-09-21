@@ -172,11 +172,12 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.parse
 PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.sync --account account-2
 PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.parse
 
-# Gemini e NotebookLM: tres contas ativas
-PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync
-PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.parse
-PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.sync
-PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.parse
+# Gemini e NotebookLM: o workflow seleciona as contas e faz um parse ao final
+PYTHONPATH=. .venv/bin/python -m src.workflows.headless --plats=Gemini,NotebookLM --no-publish
+
+# Sync direto e excepcional sempre recebe uma conta; nao chama parse
+PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync --account 1
+PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.sync --account 1
 
 # Fonte CLI: sync ja inclui parse
 PYTHONPATH=. .venv/bin/python -m src.platforms.codex.commands.sync

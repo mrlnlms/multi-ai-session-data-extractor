@@ -108,12 +108,17 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.login --accou
 4. O perfil e preservado e os syncs seguintes nao pedem login ate a sessao
    expirar.
 
-Ao criar cada perfil persistente, mantenha tambem o navegador visivelmente
-vinculado a identidade correspondente sempre que o provedor oferecer esse
-recurso. Esse vinculo nao substitui o login na plataforma: antes de fechar a
-janela, confira a conta exibida pelo proprio servico. A combinacao reduz
-confusao entre perfis durante operacoes multi-conta e deve permanecer alinhada
-ao mesmo nome tecnico usado nos comandos de login e sync.
+O Chrome pode oferecer "vincular", "ativar sincronizacao" ou criar um perfil
+associado ao e-mail usado no login. Isso e **opcional** e nao faz parte da
+configuracao do extrator. Recusar esse vinculo nao invalida o profile local,
+nao significa logout da plataforma e nao deve impedir login, auth-check ou
+coleta. O extrator depende somente da sessao da plataforma salva no diretorio
+tecnico `.storage/<plataforma>-profile-<chave>/`.
+
+Para evitar confusao em operacoes multi-conta, confira a identidade mostrada
+pelo proprio servico antes de fechar a janela e mantenha a mesma chave tecnica
+nos comandos de login e sync. Nunca use o avatar, e-mail ou estado de sync do
+Chrome como evidencia de qual conta da plataforma esta autenticada.
 
 **CLIs (Claude Code, Codex, Gemini CLI e Antigravity CLI):** o coletor nao
 faz login. Ele copia dados dos diretorios locais da ferramenta, como
@@ -124,7 +129,7 @@ faz login. Ele copia dados dos diretorios locais da ferramenta, como
 Comece por uma plataforma para validar o ambiente:
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync
+PYTHONPATH=. .venv/bin/python -m src.workflows.headless --plats=ChatGPT --no-publish
 ```
 
 For another ChatGPT account, create and log into an isolated extractor profile
@@ -211,8 +216,8 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login --account 1
 PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login --account 2
 PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login --account 3
 
-# Sync all accounts
-PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync
+# Sync all runnable accounts and parse once
+PYTHONPATH=. .venv/bin/python -m src.workflows.headless --plats=Gemini --no-publish
 
 # Or just one
 PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync --account 1
@@ -254,10 +259,10 @@ O que fazer:
 
 ```bash
 # Try again (transient instability usually resolves)
-PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync --account default
 
 # Investigate manually
-PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync --dry-run
+PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync --account default --dry-run
 ```
 
 ### O sync esta demorando demais

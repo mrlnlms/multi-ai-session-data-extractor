@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from src.assets.runtime import asset_subprocess_env
+from src.accounts import account_command_argument, runnable_account_keys
 from src.runtime.project import find_project_root
 from src.platforms.registry import (
     KNOWN_PLATFORMS,
@@ -76,7 +77,7 @@ def has_sync_script(platform: str) -> bool:
     return platform in PLATFORM_COMMAND_PACKAGES
 
 
-def sync_command(platform: str) -> Optional[list[str]]:
+def sync_command(platform: str, account: str | None = None) -> Optional[list[str]]:
     """Retorna o comando preferido pra capturar a plataforma.
 
     Retorna o sync orquestrador ou None se a plataforma nao o possuir.
@@ -87,6 +88,8 @@ def sync_command(platform: str) -> Optional[list[str]]:
         cmd = [python, "-m", f"{command_package}.sync"]
         if platform == "ChatGPT":
             cmd.append("--no-voice-pass")
+        if account is not None:
+            cmd.extend(account_command_argument(platform, account))
         return cmd
     return None
 
@@ -117,20 +120,28 @@ def run_commands(commands: tuple[tuple[str, ...], ...]) -> tuple[int, str]:
 
 def run_sync(platform: str, capture_output: bool = True) -> subprocess.CompletedProcess:
     """Run sync and, for web platforms, its mandatory parser."""
-    cmd = sync_command(platform)
-    if cmd is None:
+    base_cmd = sync_command(platform)
+    if base_cmd is None:
         raise RuntimeError(f"No sync or export script found for {platform}")
     env_pythonpath = str(PROJECT_ROOT)
-    sync_result = subprocess.run(
-        cmd,
-        cwd=str(PROJECT_ROOT),
-        capture_output=capture_output,
-        text=True,
-        env={**_safe_env(), "PYTHONPATH": env_pythonpath},
-    )
+    accounts = runnable_account_keys(platform) if platform in WEB_PLATFORMS else (None,)
+    if not accounts:
+        raise RuntimeError(f"No runnable accounts found for {platform}")
+    sync_results = []
+    for account in accounts:
+        sync_result = subprocess.run(
+            sync_command(platform, account),
+            cwd=str(PROJECT_ROOT),
+            capture_output=capture_output,
+            text=True,
+            env={**_safe_env(), "PYTHONPATH": env_pythonpath},
+        )
+        sync_results.append(sync_result)
+        if sync_result.returncode != 0:
+            return sync_result
     parser_cmd = parse_command(platform)
-    if sync_result.returncode != 0 or parser_cmd is None:
-        return sync_result
+    if parser_cmd is None:
+        return sync_results[-1]
     parse_result = subprocess.run(
         parser_cmd,
         cwd=str(PROJECT_ROOT),
@@ -139,8 +150,8 @@ def run_sync(platform: str, capture_output: bool = True) -> subprocess.Completed
         env={**_safe_env(), "PYTHONPATH": env_pythonpath},
     )
     if capture_output:
-        parse_result.stdout = (sync_result.stdout or "") + (parse_result.stdout or "")
-        parse_result.stderr = (sync_result.stderr or "") + (parse_result.stderr or "")
+        parse_result.stdout = "".join(result.stdout or "" for result in sync_results) + (parse_result.stdout or "")
+        parse_result.stderr = "".join(result.stderr or "" for result in sync_results) + (parse_result.stderr or "")
     return parse_result
 
 
@@ -161,24 +172,32 @@ def run_sync_streaming(
     montar mensagem de erro sem precisar reabrir log. `timeout` em segundos
     (default 1h) mata o processo se exceder — protege contra prompts/hang.
     """
-    cmd = sync_command(platform)
-    if cmd is None:
+    base_cmd = sync_command(platform)
+    if base_cmd is None:
         raise RuntimeError(f"No sync or export script found for {platform}")
     asset_env = asset_subprocess_env(
         asset_mode, vault_root=vault_root, data_root=data_root
     )
-    rc, sync_tail = _stream(
-        cmd,
-        on_line,
-        tail_size=tail_size,
-        timeout=timeout,
-        extra_env=asset_env,
-    )
-    if rc != 0:
-        return rc, sync_tail
+    accounts = runnable_account_keys(platform) if platform in WEB_PLATFORMS else (None,)
+    if not accounts:
+        raise RuntimeError(f"No runnable accounts found for {platform}")
+    sync_tails = []
+    for account in accounts:
+        if account is not None:
+            on_line(f"=== Sync {platform} [{account}] ===")
+        rc, sync_tail = _stream(
+            sync_command(platform, account),
+            on_line,
+            tail_size=tail_size,
+            timeout=timeout,
+            extra_env=asset_env,
+        )
+        sync_tails.append(sync_tail)
+        if rc != 0:
+            return rc, sync_tail
     parser_cmd = parse_command(platform)
     if parser_cmd is None:
-        return rc, sync_tail
+        return rc, sync_tails[-1]
     on_line(f"=== Parse {platform} -> data/processed ===")
     rc, parse_tail = _stream(
         parser_cmd,
@@ -187,7 +206,7 @@ def run_sync_streaming(
         timeout=timeout,
         extra_env=asset_env,
     )
-    combined = "\n".join(part for part in (sync_tail, parse_tail) if part)
+    combined = "\n".join(part for part in (*sync_tails, parse_tail) if part)
     return rc, "\n".join(combined.splitlines()[-tail_size:])
 
 

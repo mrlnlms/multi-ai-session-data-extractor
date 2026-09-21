@@ -85,10 +85,11 @@ uma mensagem de voz que nao veio pela API. E lenta e pode ser pulada com
 
 ### Multi-account
 
-Uma fonte com mais de uma conta capturada pelo mesmo projeto. Gemini e
-NotebookLM usam diretorios por conta e o campo canonico `Conversation.account`;
-o identificador da conversa recebe namespace da conta para impedir colisoes.
-O sync pode percorrer todas as contas ou receber `--account N`.
+Uma fonte com mais de uma conta capturada pelo mesmo projeto. O orquestrador
+compartilhado seleciona as contas capturaveis do inventario e chama cada sync
+web com uma conta explicita; contas `disabled`, `historical` e archives nao sao
+capturadas. O parser consolidado roda uma unica vez depois que todas terminam.
+Diretorios por conta e o campo canonico `Conversation.account` impedem colisoes.
 
 ## Parser canonico
 
