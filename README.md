@@ -94,7 +94,8 @@ PYTHONPATH=. .venv/bin/python -m src.workflows.headless --plats=ChatGPT --no-pub
 
 Result:
 
-- `data/raw/ChatGPT/` — raw capture (cumulative, keeps binaries)
+- `data/raw/ChatGPT/` — raw capture records and asset manifests (cumulative;
+  asset bytes live in the central vault)
 - `data/merged/ChatGPT/` — consolidated version (also keeps conversations
   deleted from the server)
 - `data/processed/ChatGPT/*.parquet` — canonical format for analysis
@@ -145,9 +146,11 @@ extractor → reconciler → parser → unify
 
 The published `Asset`/`AssetLink` schema and the physical storage of their
 bytes are separate contracts. The central content-addressed asset vault is
-materialized and verified locally and is now the default for normal runs, but
-it has not yet been staged or published through DVC. `legacy` remains an
-explicit temporary rollback, and no legacy evidence may be removed. See the
+materialized, verified, published through DVC, and is now the default for
+normal runs. The separate retention audit was applied to `raw` and `merged`:
+their redundant asset bytes were removed and now resolve through the vault,
+while capture records and manifests remain in place. `legacy` remains an
+explicit compatibility and diagnostic mode. See the
 [asset storage transition](docs/operations/pipeline.md#transicao-do-asset-vault)
 for reader selection, verification, local restore, retention, and rollback.
 

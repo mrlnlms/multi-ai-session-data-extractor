@@ -156,6 +156,7 @@ async def download_project_sources(
         account_id=account_id,
         evidence_path=root,
         capture_method="web_asset_download:project_sources",
+        staging_root=root,
     )
 
     async def _process_project(pid: str):

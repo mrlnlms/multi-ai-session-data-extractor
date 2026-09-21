@@ -220,17 +220,14 @@ def run_reconciliation(
     report.skills_official = len(skills.get("official") or [])
     report.skills_installed = len(skills.get("installed") or [])
 
-    # The vault is the authoritative reader, but the cumulative merged tree is
-    # still preservation evidence and the manifest below points into it. Keep
-    # copying new raw binaries in both reader modes; otherwise a refreshed
-    # manifest can reference paths that exist only in raw.
     raw_assets = raw_dir / "assets"
     merged_assets = merged_output / "assets"
-    preserve_asset_tree(raw_assets, merged_assets)
-    if previous_merged and previous_merged != merged_output:
-        preserve_asset_tree(previous_merged / "assets", merged_assets)
     if asset_reader is not None:
         asset_reader.projection_for("kimi", asset_account_id)
+    else:
+        preserve_asset_tree(raw_assets, merged_assets)
+        if previous_merged and previous_merged != merged_output:
+            preserve_asset_tree(previous_merged / "assets", merged_assets)
 
     raw_manifest = raw_dir / "assets_manifest.json"
     if raw_manifest.exists():

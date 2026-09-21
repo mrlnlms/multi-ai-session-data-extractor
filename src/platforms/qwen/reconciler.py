@@ -239,19 +239,15 @@ def run_reconciliation(
     # ============================================================
     # ASSETS (cumulativos, skip-existing) + manifest
     # ============================================================
-    # The vault is the authoritative reader, but the cumulative merged tree is
-    # still preservation evidence and the manifest below points into it. Keep
-    # copying new raw binaries in both reader modes; otherwise a refreshed
-    # manifest can reference paths that exist only in raw.
-    _merge_dir(raw_dir / "assets", merged_output / "assets")
-    if previous_merged and previous_merged != merged_output:
-        _merge_dir(previous_merged / "assets", merged_output / "assets")
     if asset_reader is not None:
         report.asset_binaries_total = sum(
             asset.is_binary_available
             for asset in asset_reader.projection_for("qwen", asset_account_id).assets
         )
     else:
+        _merge_dir(raw_dir / "assets", merged_output / "assets")
+        if previous_merged and previous_merged != merged_output:
+            _merge_dir(previous_merged / "assets", merged_output / "assets")
         assets_dir = merged_output / "assets"
         report.asset_binaries_total = sum(
             1 for path in assets_dir.rglob("*") if path.is_file()

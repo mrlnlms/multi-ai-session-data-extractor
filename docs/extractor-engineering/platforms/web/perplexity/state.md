@@ -58,13 +58,14 @@ legacy `account` label and all existing native IDs remain unchanged.
   upstream deletion left only manifest evidence. External featured images remain
   references and are not represented as preserved binaries.
 - Current coverage is 15 assets and 8 exact message links: 9 artifact binaries
-  resolve under `data/merged/Perplexity/assets/files`, while 6 old uploads remain
+  resolve through the vault, while 6 old uploads remain
   explicitly unavailable with `failed_upstream_deleted`. Signed URLs and errors
   are excluded from processed metadata.
-- Nine additional preserved artifact paths are older physical representations
+- Nine additional artifact paths were older physical representations
   of those same native outputs: both their upstream `asset_id` and SHA-256 bytes
-  match the canonical representation in the same account. The audit retains and
-  reports them as `duplicate_representation`. The asset index and raw pinned
+  match the canonical representation in the same account. They were reported as
+  `duplicate_representation` before the retention audit retired their byte copies.
+  The asset index and raw pinned
   listing are domain envelopes, not user-facing file outputs.
 - Idempotent (~1s to run).
 
@@ -117,8 +118,9 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.parse
 ## Asset vault transition
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
-are overridden explicitly. `legacy` remains an explicit temporary rollback;
-filesystem contents never select the mode. The legacy tree remains preserved,
+are overridden explicitly. `legacy` remains an explicit compatibility and
+diagnostic mode; filesystem contents never select the mode. Legacy records and
+manifests remain preserved, while redundant byte copies now live only in the vault,
 while the vault reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. For Perplexity, reader scope preserves exact
 message links for evidenced generated artifacts and retains older uploads as

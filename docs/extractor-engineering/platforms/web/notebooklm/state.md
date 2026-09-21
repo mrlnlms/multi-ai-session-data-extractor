@@ -11,12 +11,11 @@ slide deck PDF+PPTX, infographic, mind map).
   `python -m src.platforms.notebooklm.commands.login`).
 - **Single cumulative folder per-account:** `data/raw/NotebookLM/account-{N}/`
   and `data/merged/NotebookLM/account-{N}/`.
-- **Sync orchestrator (3 steps multi-account):**
-  `python -m src.platforms.notebooklm.commands.sync` — capture per-account + assets + reconcile
-  per-account.
-- Without `--account`, sync still visits `1`, `2`, `3` in that order. An
-  explicit `--account <safe-key>` supports a dynamically named local account;
-  archive keys and path-like values are rejected.
+- **Per-account sync command (3 steps):**
+  `python -m src.platforms.notebooklm.commands.sync --account <safe-key>` —
+  capture + assets + reconcile for exactly one account. The shared headless
+  workflow enumerates every runnable account from the inventory; archive keys
+  and path-like values are rejected.
 - **Headless capture.**
 - **Historical archive** — immutable old-format snapshots live in
   `data/external/notebooklm-snapshots/<archive>-YYYY-MM-DD/`. The official
@@ -327,8 +326,9 @@ done
 ## Asset vault transition
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
-are overridden explicitly. `legacy` remains an explicit temporary rollback;
-filesystem contents never select the mode. The legacy tree remains preserved,
+are overridden explicitly. `legacy` remains an explicit compatibility and
+diagnostic mode; filesystem contents never select the mode. Legacy records and
+manifests remain preserved, while redundant byte copies now live only in the vault,
 while the vault reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. NotebookLM is library-scoped: preserved files
 retain their evidenced source, note, or output-object links, including

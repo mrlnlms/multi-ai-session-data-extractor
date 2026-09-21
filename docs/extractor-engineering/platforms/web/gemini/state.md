@@ -7,18 +7,18 @@
   `python -m src.platforms.gemini.commands.login`).
 - **Single cumulative folder per-account:** `data/raw/Gemini/account-{N}/` and
   `data/merged/Gemini/account-{N}/`.
-- **Sync orchestrator (3 multi-account steps):**
-  `python -m src.platforms.gemini.commands.sync` — capture per-account + assets + reconcile
-  per-account. Without a flag it still iterates `1`, `2`, `3` in that order;
-  `--account <safe-key>` selects one dynamically named account.
+- **Per-account sync command (3 steps):**
+  `python -m src.platforms.gemini.commands.sync --account <safe-key>` — capture
+  + assets + reconcile for exactly one account. The shared headless workflow
+  enumerates every runnable account from the inventory and invokes this command.
 - **Headless capture** (no Cloudflare at runtime).
 
 ## Coverage
 
 Conversations + assistant messages + tool events + images
 (lh3.googleusercontent.com) + extracted Deep Research markdown reports.
-Immutable assets are hard-linked into `merged` when supported, with a normal
-copy fallback; mutable conversation JSON remains independent.
+Immutable asset bytes are written to the central vault. Raw and merged retain
+their independent conversation JSON and asset manifests.
 
 ### Latest validated collection — 2026-08-30
 
@@ -69,15 +69,17 @@ copy fallback; mutable conversation JSON remains independent.
 
 ### Preserved-file audit closure — 2026-09-15
 
-- All 391 physical files under the per-account merged asset trees are now
-  accounted for: 364 canonical available assets and 27 additional physical
+- At this checkpoint, all 391 physical files under the per-account merged asset
+  trees were accounted for: 364 canonical available assets and 27 additional physical
   representations of those same content identities.
 - The 27 duplicates comprise 25 hosted images and 2 Deep Research Markdown
   reports. Each matches a canonical file byte for byte inside the same account;
   filenames and timestamps are not used as duplicate evidence.
-- The duplicate files remain preserved. The audit classifies them as
+- The duplicate files were preserved at this checkpoint. The audit classified them as
   `duplicate_representation`, so Gemini has zero eligible-uncovered and zero
   unresolved file representations without creating duplicate Asset rows.
+- The later retention audit removed those byte copies after proving their
+  content identities in the vault; their manifest evidence remains preserved.
 - Two temporary parses were byte-identical to each other and to the current
   five processed Gemini tables. All 364 available paths and all asset/message/
   conversation relationships resolve.
@@ -177,8 +179,9 @@ done
 ## Asset vault transition
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
-are overridden explicitly. `legacy` remains an explicit temporary rollback;
-filesystem contents never select the mode. The legacy tree remains preserved,
+are overridden explicitly. `legacy` remains an explicit compatibility and
+diagnostic mode; filesystem contents never select the mode. Legacy records and
+manifests remain preserved, while redundant byte copies now live only in the vault,
 while the vault reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. For Gemini, reader scope preserves each
 evidenced turn use, including repeated appearances, while unpositioned manifest

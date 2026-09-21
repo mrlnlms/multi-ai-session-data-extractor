@@ -34,8 +34,9 @@ the "preservation at the raw level via cli-copy" pattern.
 ## Asset vault transition
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
-are overridden explicitly. `legacy` remains an explicit temporary rollback;
-filesystem contents never select the mode. The legacy tree remains preserved,
+are overridden explicitly. `legacy` remains an explicit compatibility and
+diagnostic mode; filesystem contents never select the mode. Legacy records and
+manifests remain preserved, while redundant byte copies now live only in the vault,
 while the vault reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. Gemini CLI currently has no evidenced eligible
 assets, so both readers preserve the empty canonical asset tables and do not

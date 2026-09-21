@@ -199,6 +199,7 @@ async def download_assets(
         account_id=account_id,
         evidence_path=raw_dir,
         capture_method="web_asset_download",
+        staging_root=assets_dir,
     )
 
     def _delivery_id(info: dict, url: str, payload: bytes | None) -> str:

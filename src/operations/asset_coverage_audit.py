@@ -775,6 +775,19 @@ def inventory_preserved_session_assets(data_root: Path) -> list[RepresentationEv
     ])
 
 
+def inventory_legacy_asset_files(data_root: Path) -> list[RepresentationEvidence]:
+    """Return every physical raw/merged asset copy without layer deduplication."""
+    return [
+        item
+        for item in _filesystem_evidence(Path(data_root))
+        if item.representation_kind in {
+            "preserved_binary",
+            "notebooklm_note_materialization",
+            "verified_duplicate_representation",
+        }
+    ]
+
+
 def _policy_matches(item: RepresentationEvidence, policy: Sequence[Mapping[str, str]]) -> list[Mapping[str, str]]:
     return [rule for rule in policy if rule.get("source") == item.source and rule.get("representation_kind") == item.representation_kind]
 

@@ -62,6 +62,7 @@ async def download_artifacts(
         account_id=account_id,
         evidence_path=output_dir / "assets" / "_index.json",
         capture_method="web_asset_download:artifacts",
+        staging_root=files_dir,
     )
 
     for art in artifacts:

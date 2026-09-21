@@ -47,7 +47,7 @@ def test_reconcile_preserves_nested_current_and_previous_assets(tmp_path):
         assert (merged / "assets" / relative).read_bytes() == content
 
 
-def test_vault_reader_still_preserves_raw_assets_in_merged(tmp_path):
+def test_vault_reader_does_not_copy_raw_assets_into_merged(tmp_path):
     raw = tmp_path / "raw"
     merged = tmp_path / "merged"
     _write_discovery(raw, [])
@@ -57,4 +57,4 @@ def test_vault_reader_still_preserves_raw_assets_in_merged(tmp_path):
 
     run_reconciliation(raw, merged, asset_reader=_VaultReaderStub())
 
-    assert (merged / "assets" / "chat-a" / "attachment.bin").read_bytes() == b"preserved"
+    assert not (merged / "assets" / "chat-a" / "attachment.bin").exists()

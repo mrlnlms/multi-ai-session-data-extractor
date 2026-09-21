@@ -230,3 +230,30 @@ def test_capture_session_bounds_payload_batches_and_commits_discovery(tmp_path):
     assert len(state.committed_captures) == 3
     assert len(state.by_type["delivery"]) == 2
     assert vault.verify(state.scope).blob_count == 2
+
+
+def test_capture_session_retires_only_vault_backed_staging_files(tmp_path):
+    vault = AssetVault(tmp_path / "assets", runtime_root=tmp_path / "runtime")
+    staging = tmp_path / "raw" / "assets"
+    backed = staging / "nested" / "backed.bin"
+    unbacked = staging / "keep.bin"
+    backed.parent.mkdir(parents=True)
+    backed.write_bytes(b"vault-backed")
+    unbacked.write_bytes(b"not-observed")
+    session = WebAssetCaptureSession(
+        vault,
+        source="gemini",
+        account_id="account-one",
+        evidence_path=tmp_path / "raw",
+        capture_method="fixture",
+        staging_root=staging,
+    )
+    session.observe(
+        AssetObservation("asset-1", "asset-1", "attachment", payload=b"vault-backed")
+    )
+
+    session.finish(complete_discovery=True)
+
+    assert not backed.exists()
+    assert not backed.parent.exists()
+    assert unbacked.read_bytes() == b"not-observed"

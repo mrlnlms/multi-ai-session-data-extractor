@@ -137,6 +137,7 @@ async def download_assets(
         account_id=account_id,
         evidence_path=raw_dir,
         capture_method="web_asset_download:files",
+        staging_root=assets_dir,
     )
 
     async def _one(file_uuid: str, file_kind: str, file_name: str):
@@ -263,6 +264,7 @@ def extract_artifacts(
         account_id=account_id,
         evidence_path=conv_dir,
         capture_method="web_asset_download:artifacts",
+        staging_root=artifacts_dir,
     )
 
     for jp in sorted(conv_dir.glob("*.json")):

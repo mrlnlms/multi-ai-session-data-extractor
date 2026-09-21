@@ -21,6 +21,7 @@ conflicts with the entry or the task requires a fresh verification.
 | DVC Google Drive remote | Active operational remote | [DVC runbook](operations/dvc-runbook.md) | Use it to publish and recover the canonical current dataset. |
 | Capture and processing | Unblocked | [AGENTS.md](../AGENTS.md) | Run the normal sync → parse → unify pipeline when updating a source. |
 | DVC garbage collection | Deliberate storage maintenance | [DVC runbook](operations/dvc-runbook.md) | Simulate, review and explicitly authorize it after a validated publication. |
+| Prevent asset-copy rematerialization | **Completed locally** | [Known limitations](extractor-engineering/known-limitations.md) | Publish the validated code and DVC checkpoint when requested. |
 
 Google Drive remains the active remote while alternatives are researched. This
 is not an active migration or a freeze of the normal capture/publish workflow.
@@ -38,10 +39,9 @@ Quarto profiles are current descriptive surfaces, not a required future
 frontend; authorial/exploratory notebooks remain useful. The target is one
 local-first archive application, but no replacement shell has been chosen and
 neither current surface should be removed before its function has a validated
-replacement. See the [product architecture map](product/README.md),
-[product vision](product/product-vision.md) and the selective
-[development evidence map](product/development-evidence-map.md) for the
-specific plans and records behind this transition.
+replacement. See the [product architecture map](product/README.md) and
+[product vision](product/product-vision.md) for the durable decisions behind
+this transition. Dated plans and process records live in the private workbench.
 
 The boundary already established is: source-specific capture/reconciliation/
 parsing in `src/platforms/`; UI-neutral observation and profiles in
@@ -61,21 +61,29 @@ The near-term fronts below extend this reusable domain and data contract,
 not features inside Streamlit or static Quarto reports. Read this section first
 for product alignment; open a detailed document only for the active question.
 
-The near-term data-layer fronts are the preserved ChatGPT/Claude.ai
-account-memory/configuration domain and a derived account dimension in unified
-data. The account
+Vault-mode capture now retires staging bytes only after their committed vault
+blob is verified; Kimi and Qwen no longer project those bytes into `merged`.
+The focused new-asset integration path, full suite and retention dry-run pass,
+with zero candidates and no cleanup pass.
+
+After that correction, the near-term data-layer fronts are the preserved
+ChatGPT/Claude.ai account-memory/configuration domain and a derived account
+dimension in unified data. The account
 dimension continues the already-published `account_id` work: it would expose
 the durable catalog as queryable, read-only data without making Parquet the
 account registry or inferring CLI/manual identities. The asset front has since
 materialized that central physical home: `data/assets` and its preservation
 index are the published DVC-backed source for bytes, while `assets` and
 `asset_links` remain the analytical outputs with explicit source provenance.
-The legacy source trees remain available as rollback until the first natural
-incremental collection confirms the default `vault` flow; that observation is
-post-publication follow-up, not unfinished design or migration. The memory and
-account-dimension fronts are concurrent planning priorities, not a fixed
-implementation order; schema changes and data publication retain their normal
-review and validation gates.
+The default `vault` flow has been confirmed by natural incremental collections.
+The preview-first retention audit has removed byte-proven redundant copies
+from raw/merged while retaining their records and manifests; external
+snapshots remain preserved. The vault is the authoritative physical home for
+those asset bytes, while historical DVC revisions provide full rollback.
+Incremental downloaders may use transient staging paths during capture, but
+the successful vault flow retires the verified bytes before it completes. The
+memory and account-dimension fronts remain planning priorities; schema changes and data publication retain their
+normal review and validation gates.
 
 The memory evidence is in [known limitations](extractor-engineering/known-limitations.md)
 and the [ChatGPT](extractor-engineering/platforms/web/chatgpt/state.md) and
@@ -83,10 +91,9 @@ and the [ChatGPT](extractor-engineering/platforms/web/chatgpt/state.md) and
 The account dimension starts from [`src/account_catalog.py`](../src/account_catalog.py)
 and the current [`unify` table contract](../src/workflows/unify.py); historical
 working plans in `private/` must be checked against current code before reuse.
-The asset layout starts from the [original vault proposal](#physical-asset-layout),
-the [published coverage contract](extractor-engineering/asset-coverage.md) and
-the current code, rather than treating any one of them as an unchangeable final
-design.
+The completed rematerialization correction is grounded in the
+[current physical layout](#physical-asset-layout) and the
+[published coverage contract](extractor-engineering/asset-coverage.md).
 
 Cross-session archive assurance now has a local record in
 `.runtime/archive-assurance.json`. A deliberate verification checks local
@@ -99,9 +106,8 @@ audit. Details and explicit re-verification remain available through
 [`src.operations.archive_assurance`](../src/operations/archive_assurance.py).
 
 The archive reader is a future product front, likely before any DVC remote
-change. Research or migration of the remote is later storage work; the asset
-layout is near-term and independent of that remote decision. Neither storage
-front is a prerequisite for the reader.
+change. Research or migration of the remote is later storage work. The
+completed asset-copy correction does not change the reader contract.
 This section records planning emphasis, not an implementation sequence or
 authorization to start work during an alignment conversation.
 
@@ -114,7 +120,6 @@ behavior remains in each platform's own documentation.
 | Question | Authoritative document | Role |
 |---|---|---|
 | How do today's dashboard and Quarto surfaces evolve into one application? | [product/README.md](product/README.md) | Product architecture map and transition boundaries. |
-| Where are the related private plans and records, without reading them all? | [product/development-evidence-map.md](product/development-evidence-map.md) | Selective evidence by theme and execution state; not a second work queue. |
 | What product is this becoming, and what remains deliberately open? | [product/product-vision.md](product/product-vision.md) | Product vision; not a spec. |
 | What is the current priority and what work is operationally pending? | This roadmap | Ordering and status. |
 | How should IDs, references and non-message events be interpreted? | [product/reader-and-identity-contract.md](product/reader-and-identity-contract.md) | Technical record for the reader and future curation. |
@@ -124,8 +129,8 @@ behavior remains in each platform's own documentation.
 | How is the existing dashboard operated? | [operations/dashboard.md](operations/dashboard.md) | Current operational UI. |
 | Where is the complete documentation index? | [README.md](README.md) | Documentation catalog. |
 
-Future designs and specs should be linked from this map when created, rather
-than being discoverable only by filename or Git history.
+Future durable decisions should be promoted to the relevant maintained document;
+temporary designs, plans and handoffs remain in the private workbench.
 
 ## Strategic direction — personal AI archive
 
@@ -161,7 +166,7 @@ canonical operational remote.
 |---|---|---|
 | Evaluate a single DVC object remote | Future research, not near-term | Remove DVC objects from personal Google Drive without reducing the archive merely to fit an arbitrary free tier. |
 | Oracle Object Storage proof of concept | Candidate, not approved | Test a private S3-compatible Oracle bucket. Its published Always Free allocation is 20 GB and 50,000 Object Storage API calls/month; DVC's real request count must be measured before choosing it. |
-| [Central asset vault and manifest](../private/docs/discussions/asset-pipeline-refactor-master-tracker-2026-09-15.md) | Published; operational confirmation pending | The DVC-backed central home and preservation index are implemented, migrated and published. Observe the first natural incremental collection before retiring the explicit legacy rollback; cold restore remains diagnostic rather than a publication gate. |
+| Central asset vault and manifest | Completed | The DVC-backed central home and preservation index are implemented, migrated, published and confirmed by real incremental collections. The retention audit removed byte-proven raw/merged duplicates; cold restore remains diagnostic rather than a publication gate. |
 | Retention audit for `data/external/` | Planned | Classify each set as active input, unique recovery evidence, or verified duplicate before any storage-policy change. |
 
 References: [Oracle Always Free Object Storage](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm),
@@ -184,32 +189,17 @@ References: [Oracle Always Free Object Storage](https://docs.oracle.com/en-us/ia
 
 #### Physical asset layout
 
-The published `assets` and `asset_links` tables already provide canonical file
-identity, available paths and evidence-backed relationships across sources.
-That work makes a physical layout evaluation possible without rediscovering
-asset identity. Binary copies in `raw` and `merged` remain preservation inputs;
-reconcilers link immutable files when possible. The private
-[storage maintenance architecture](../private/docs/discussions/storage-maintenance-architecture.md)
-documents that link-at-reconcile rule, while the
-[unified assets implementation plan](../private/docs/discussions/unified-assets-implementation-plan.md)
-deliberately kept binaries in cumulative `raw`/`merged` trees. Neither is an
-implementation plan for a vault. The vault proposal predates the published
-`Asset`/`AssetLink` contract: its manifest would record source record/output
-identity, MIME, size, content hash, name, capture time and central path. The
-design question is how one preservation manifest replaces current per-source
-manifests, physical duplicates and path resolvers, with `assets`/`asset_links`
-derived as analytical outputs rather than maintained as competing truth.
-Physical byte identity and upstream object identity can differ when the same
-bytes appear in multiple source contexts; final IDs and fields should be
-chosen from observed cases, not frozen around today's schema. This can improve
-layout legibility even if APFS clone sharing makes disk savings small. A bounded
-local probe found byte-identical `raw`/`merged` samples across seven sources;
-an APFS reflink
-clone consumed no additional observable space while an ordinary 46 MiB copy
-consumed 46 MiB. Physical savings in the current checkout remain unmeasured.
-Validate incremental capture, idempotency, published paths and clean restore
-before migration. This front is independent of the remote choice and does not
-block the reader.
+The published `assets` and `asset_links` tables provide canonical identity,
+available paths and evidence-backed relationships across sources. Immutable
+bytes live in the content-addressed `data/assets` vault; raw and merged retain
+capture/reconciliation records and manifests. The applied retention audit
+removed 24,056 byte-proven duplicates (9,029,881,100 logical bytes) with zero
+blocked files, and a post-audit scan found zero remaining candidates. Vault
+captures now retire verified staging bytes and do not recreate those copies. Physical
+byte identity remains distinct from upstream object identity when equal bytes
+appear in multiple source contexts. Any future storage work is limited to the
+separately preserved `data/external/` sets or remote choice; neither changes
+the authoritative vault contract.
 
 ### Archive reader product
 

@@ -87,6 +87,7 @@ async def download_assets(
         account_id=account_id,
         evidence_path=raw_dir,
         capture_method="web_asset_download",
+        staging_root=assets_dir,
     )
 
     async def _one(url: str, conv_id: str):
@@ -229,6 +230,7 @@ def extract_deep_research(
         account_id=account_id,
         evidence_path=conv_dir,
         capture_method="web_asset_download:deep_research",
+        staging_root=out_root,
     )
 
     for jp in sorted(conv_dir.glob("*.json")):

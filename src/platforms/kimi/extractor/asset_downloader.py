@@ -98,6 +98,7 @@ async def download_assets(
         account_id=account_id,
         evidence_path=conv_dir,
         capture_method="web_asset_download",
+        staging_root=out_dir,
     )
     pairs: list[tuple[str, str, dict]] = []  # (chat_id, file_id, file_obj)
     for fp in sorted(conv_dir.glob("*.json")):

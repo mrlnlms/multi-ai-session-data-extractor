@@ -60,6 +60,7 @@ def test_web_downloaders_accept_explicit_asset_vault(module_name):
 
     assert parameter.default is None
     assert "WebAssetCaptureSession" in inspect.getsource(module)
+    assert "staging_root=" in inspect.getsource(module)
 
 
 @pytest.mark.parametrize("source", WEB_SOURCES)
@@ -105,7 +106,7 @@ class _FakeContext:
 
 
 @pytest.mark.asyncio
-async def test_grok_captured_response_writes_legacy_and_committed_vault(tmp_path):
+async def test_grok_captured_response_keeps_only_committed_vault_bytes(tmp_path):
     raw_dir = tmp_path / "raw"
     raw_dir.mkdir()
     (raw_dir / "assets.json").write_text(
@@ -133,7 +134,7 @@ async def test_grok_captured_response_writes_legacy_and_committed_vault(tmp_path
 
     legacy = raw_dir / "assets" / "asset-native-1.png"
     assert stats["downloaded"] == 1
-    assert legacy.read_bytes() == b"captured response bytes"
+    assert not legacy.exists()
     state = vault.load_state(AssetScope("grok", "account-one"))
     assert state.committed_captures
     assert state.by_type["delivery"][0].payload["delivery_id"] == "asset-native-1"

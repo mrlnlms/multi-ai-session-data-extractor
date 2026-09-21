@@ -11,21 +11,22 @@ em [dvc-runbook.md](dvc-runbook.md).
 sync/copy -> raw -> reconcile -> parse -> processed -> unify -> unified
 ```
 
-Os reconcilers tratam assets binarios como imutaveis: ao preserva-los em
-`merged`, tentam criar hardlinks para evitar uma segunda copia fisica e usam
-uma copia normal como fallback quando o filesystem nao suporta links. JSON,
-manifestos e outros arquivos que podem ser anotados continuam independentes.
+Assets binarios imutaveis sao gravados no vault content-addressed. `raw` e
+`merged` preservam JSON, manifests e demais evidencias independentes. Os
+downloaders podem usar staging transitorio, mas uma captura vault bem-sucedida
+remove esses bytes somente depois de verificar o blob commitado; Kimi e Qwen
+tambem nao os projetam em `merged`.
 
 ## Transicao do asset vault
 
 O contrato publicado em `assets.parquet`, `asset_links.parquet` e
 `Message.asset_paths` nao determina onde os bytes ficam armazenados. O asset
 vault central, content-addressed por SHA-256, esta materializado e validado em
-`data/assets`; ele e o default operacional e foi publicado pelo DVC no commit
-`7b180b2`, com cache local e remoto verificados em sincronia. Ate uma coleta
-incremental real confirmar o fluxo operacional, as arvores legacy em `raw`,
-`merged` e `external` permanecem preservadas como rollback e nao podem ser
-removidas.
+`data/assets`; ele e o default operacional e foi publicado pelo DVC, com cache
+local e remoto verificados em sincronia. Coletas incrementais reais ja
+confirmaram o fluxo operacional. A auditoria preview-first classificou e
+removeu de `raw` e `merged` apenas copias com bytes identicos comprovados no
+vault; registros, manifests e snapshots em `external` foram preservados.
 
 ### Selecao explicita de leitura e escrita
 
@@ -34,8 +35,8 @@ Cada fonte usa um modo explicito, nunca inferido pela presenca de diretorios:
 - `vault` e o default e usa o log duravel e os blobs em `data/assets`, com
   `data/` como raiz de dados; ambas as raizes podem ser sobrescritas
   explicitamente;
-- `legacy` continua lendo/escrevendo os caminhos antigos e deve ser selecionado
-  explicitamente somente para rollback temporario.
+- `legacy` continua disponivel para compatibilidade e diagnostico de formatos
+  antigos, mas nao representa uma segunda copia completa dos assets.
 
 No dashboard, selecione `legacy` ou `vault` antes da execucao. No modo
 headless, o default percorre as 13 fontes e a selecao de asset e por fonte;
@@ -100,12 +101,36 @@ do remoto e diagnostico opcional para divergencia ou incidente de recuperacao,
 nao gate automatico de publicacao; os gates normais sao push bem-sucedido,
 status local/remoto limpos e um novo recibo de archive assurance.
 
-O rollback operacional e selecionar novamente `legacy` para a fonte e
-reprocessar a partir das arvores preservadas. Como a migracao e os writers nao
-removem essas arvores, o rollback nao depende de converter o vault de volta.
-O default `vault` nao autoriza remover a evidencia legacy. Mantenha o rollback
-ate a publicacao verificada e uma coleta incremental real; limpeza e `dvc gc`
-ficam fora desta transicao e exigem aprovacao separada.
+O modo `legacy` permanece para compatibilidade e diagnostico, mas nao constitui
+mais uma segunda copia completa dos assets. O rollback integral dos bytes usa
+uma revisao DVC anterior; a operacao normal e a recuperacao atual usam o vault.
+O default `vault` nunca autoriza remover registros ou manifests legacy. A
+limpeza dos bytes redundantes foi uma operacao separada, preview-first; `dvc
+gc` continua fora desta transicao e exige aprovacao separada.
+
+O dry-run abaixo calcula SHA-256, confere cada copia contra o blob central e
+grava a lista exata de candidatos, sem coletar, baixar ou excluir nada:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.operations.audit_asset_retention \
+  --data-root data --output /tmp/asset-retention-audit.json
+```
+
+O comando e dry-run por padrao. Depois de revisar o relatorio, a limpeza
+explicita reexecuta a auditoria e revalida cada hash antes da remocao:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.operations.audit_asset_retention \
+  --data-root data --apply --output /tmp/asset-retention-apply.json
+```
+
+No checkpoint aplicado, 24.056 copias (9.029.881.100 bytes logicos) foram
+removidas sem bloqueios. Uma nova auditoria retornou zero candidatos.
+
+Qualquer path sem blob identico aparece em `blocked` e nao e candidato. O
+modo `--apply` recusa a operacao quando o dry-run fresco encontra qualquer
+bloqueio e revalida tamanho, hash e identidade do arquivo imediatamente antes
+de cada remocao.
 
 Use `PYTHONPATH=. .venv/bin/python` para executar scripts sem depender do
 Python global.

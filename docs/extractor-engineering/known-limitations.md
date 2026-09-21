@@ -127,10 +127,9 @@ These validations require a Pro Max account and remain open until someone tests:
 - **Share URL:** Gemini allows sharing a conversation via public URL.
   This state is not recorded in the conversation body (the server generates the
   URL and keeps it isolated). Not an extractor gap — not capturable.
-- **Multi-account:** three active Google accounts are configured (acc-1,
-  acc-2, acc-3); the parser discovers `account-N` directories automatically.
-  For more accounts, you would need to adjust `src/platforms/gemini/commands/sync.py` and the
-  Quarto template.
+- **Multi-account:** the shared account inventory selects every runnable
+  account without a hardcoded numeric limit; the parser discovers the
+  corresponding account directories automatically.
 
 ### NotebookLM
 
@@ -232,20 +231,30 @@ These validations require a Pro Max account and remain open until someone tests:
 
 ## Cross-platform assets
 
-- **The central asset vault is not published yet.** Its append-only log,
+- **The central asset vault is published and operational.** Its append-only log,
   content-addressed blobs, explicit `legacy|vault` reader selection, full-corpus
   migration retry and clean local restore have been validated, and the verified
-  canonical vault is materialized in `data/assets`. Runtime operation now
-  defaults to `vault`, but the DVC pointer and remote objects have not been
-  staged or published. `legacy` remains an explicit temporary rollback, and no
-  legacy raw/merged/external evidence may be removed. The operational boundary
-  and rollback are documented in the
+  canonical vault is materialized in `data/assets` and published through DVC.
+  Runtime operation defaults to `vault` and has been exercised by real
+  incremental collections. The preview-first retention audit removed the
+  byte-proven redundant copies from raw/merged while preserving their records
+  and manifests. External snapshots were not part of that cleanup. `legacy`
+  remains a compatibility/diagnostic mode, not a complete asset mirror. The
+  operational boundary and rollback are
+  documented in the
   [pipeline guide](../operations/pipeline.md#transicao-do-asset-vault).
+
+- **Vault capture no longer retains compatibility copies.** Web downloaders
+  may stage bytes while capturing, but remove them only after the committed
+  vault blob is verified. Kimi and Qwen also skip binary projection into
+  `merged` when using the vault reader. The retention audit therefore remains
+  a diagnostic/maintenance operation, not a required post-capture cleanup.
 
 - **The published web scope is `preserved_web_files`.** The exact counts,
   relationship rates, reader capability and approved exclusions are maintained
   in the [source-by-source coverage matrix](asset-coverage.md). Every eligible
-  file representation preserved in raw/merged across Grok, Kimi, Qwen, Gemini,
+  file representation evidenced by raw/merged records, manifests and audited
+  historical copies across Grok, Kimi, Qwen, Gemini,
   ChatGPT, Claude.ai, DeepSeek, Perplexity, and NotebookLM is accounted for.
   ChatGPT project sources, 149 reconstructed Canvas states, Deep Research
   reports and legacy/export images are indexed. Its Project indexes and Canvas
@@ -314,12 +323,13 @@ These validations require a Pro Max account and remain open until someone tests:
 - **Windows not tested.** macOS and Linux work.
 - **Python ≥3.12 required** (tested on 3.12 and 3.14).
 - **Headless capture (no window)** works on Claude.ai, Gemini,
-  NotebookLM, Qwen, DeepSeek. ChatGPT and Perplexity require a visible
+  NotebookLM, Qwen, DeepSeek, Grok and Kimi. ChatGPT and Perplexity require a visible
   window because Cloudflare detects headless clients and blocks them with
   HTTP 403.
 - **Profile/cookies** live at `.storage/<plat>-profile-<account>/`. This
   directory is gitignored — never committed. If you delete it, you need to
   redo the login.
-- **Multi-account:** Gemini and NotebookLM support three active account
-  profiles. Several other web platforms support additional named profiles as
-  documented in the pipeline guide; coverage varies by source.
+- **Multi-account:** all nine web sources accept dynamically named account
+  profiles. The shared workflow enumerates every active account visible in the
+  lossless catalog/inventory union; current observed coverage still varies by
+  source.

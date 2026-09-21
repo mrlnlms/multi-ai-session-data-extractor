@@ -63,9 +63,11 @@ remover seu ultimo link.
 Armazenamento central append-only para assets, com blobs imutaveis enderecados
 por SHA-256 e logs duraveis por fonte/conta. `state.json`, paths compativeis e
 tabelas publicadas sao projecoes reconstruiveis desses logs e blobs. O vault
-esta materializado em `data/assets` e e o default operacional, mas ainda nao foi
-staged ou publicado pelo DVC; `legacy` permanece como rollback explicito e suas
-arvores devem ser preservadas. O
+esta materializado em `data/assets`, foi publicado pelo DVC e e o default
+operacional. A auditoria de retencao foi aplicada a `raw` e `merged`; os bytes
+redundantes foram retirados depois de comprovados no vault, sem remover seus
+registros e manifests. O modo `legacy` permanece para compatibilidade e
+diagnostico, nao como segunda copia completa dos assets. O
 [procedimento operacional](../operations/pipeline.md#transicao-do-asset-vault)
 documenta selecao, restore, retencao e rollback.
 
@@ -122,7 +124,8 @@ a `data/`; um binario ausente mantem sua linha com
 propriedade com o uso do arquivo em uma conversa. O escopo web publicado e
 `preserved_web_files`: em Grok, Kimi, Qwen, Gemini, ChatGPT, Claude.ai,
 DeepSeek, Perplexity e NotebookLM, toda representacao de arquivo elegivel
-preservada em raw/merged vira um Asset canonico, e as demais representacoes
+evidenciada por registros, manifests e copias historicamente auditadas em
+raw/merged vira um Asset canonico, e as demais representacoes
 observadas precisam corresponder a uma regra de exclusao aprovada e auditavel.
 O escopo independente das quatro CLIs e `preserved_cli_session_assets`; um path
 em ToolEvent, por si so, nao comprova um asset de sessao. A

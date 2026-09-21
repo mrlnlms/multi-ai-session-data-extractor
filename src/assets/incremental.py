@@ -50,6 +50,7 @@ class WebAssetCaptureSession:
         account_id: str | None,
         evidence_path: Path,
         capture_method: str,
+        staging_root: Path | None = None,
         max_batch_bytes: int = DEFAULT_MAX_BATCH_BYTES,
     ) -> None:
         if not isinstance(max_batch_bytes, int) or max_batch_bytes <= 0:
@@ -59,6 +60,7 @@ class WebAssetCaptureSession:
         self.account_id = account_id
         self.evidence_path = Path(evidence_path)
         self.capture_method = capture_method
+        self.staging_root = Path(staging_root) if staging_root is not None else None
         self.max_batch_bytes = max_batch_bytes
         self._pending: dict[str, AssetObservation] = {}
         self._pending_bytes = 0
@@ -103,6 +105,39 @@ class WebAssetCaptureSession:
             evidence_path=self.evidence_path,
             capture_method=f"{self.capture_method}:discovery",
         )
+        self._retire_committed_staging_files()
+
+    def _retire_committed_staging_files(self) -> None:
+        """Remove vault-backed compatibility bytes after a durable commit."""
+        if self.asset_vault is None or self.staging_root is None:
+            return
+        root = self.staging_root
+        if not root.is_dir() or root.is_symlink():
+            return
+        state = self.asset_vault.load_state(AssetScope(self.source, self.account_id))
+        committed = {
+            str(record.payload["sha256"])
+            for record in state.records
+            if record.record_type == "blob" and isinstance(record.payload.get("sha256"), str)
+        }
+        for path in sorted(root.rglob("*"), reverse=True):
+            if path.is_symlink():
+                continue
+            if path.is_dir():
+                try:
+                    path.rmdir()
+                except OSError:
+                    pass
+                continue
+            if not path.is_file():
+                continue
+            payload = path.read_bytes()
+            digest = hashlib.sha256(payload).hexdigest()
+            if digest not in committed:
+                continue
+            # read_blob verifies that the authoritative copy is present and intact.
+            if self.asset_vault.read_blob(digest) == payload:
+                path.unlink()
 
     def _flush(self) -> None:
         if not self._pending:

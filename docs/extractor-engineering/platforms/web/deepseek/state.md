@@ -16,8 +16,8 @@
 Chat sessions captured. Reconciler v3 (FEATURES_VERSION=2): no
 projects (DeepSeek does not expose them).
 
-Binary assets are immutable and enter `merged` through a hardlink when the
-filesystem supports it, with a normal copy as the portability fallback.
+Binary assets are immutable and, when available, live in the central vault.
+Raw and merged retain their records and manifests rather than binary copies.
 The canonical parser indexes every `files[].id` as a user-origin attachment and
 records each exact message use as an `input` AssetLink. Missing local binaries
 remain metadata-only assets rather than being dropped or assigned fabricated
@@ -148,8 +148,9 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.parse
 ## Asset vault transition
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
-are overridden explicitly. `legacy` remains an explicit temporary rollback;
-filesystem contents never select the mode. The legacy tree remains preserved,
+are overridden explicitly. `legacy` remains an explicit compatibility and
+diagnostic mode; filesystem contents never select the mode. Legacy records and
+manifests remain preserved, while redundant byte copies now live only in the vault,
 while the vault reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. For DeepSeek, reader scope is each evidenced
 message/file use; the current metadata-only assets remain valid and no local

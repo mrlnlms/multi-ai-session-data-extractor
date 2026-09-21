@@ -135,7 +135,7 @@ class TestRunReconciliationQwen:
         assert (merged / "conversations" / "a.json").read_bytes() == snap_a
         assert (merged / "discovery_ids.json").read_bytes() == snap_d
 
-    def test_vault_reader_still_preserves_raw_assets_in_merged(self, tmp_path):
+    def test_vault_reader_does_not_copy_raw_assets_into_merged(self, tmp_path):
         raw = _make_raw_dir(tmp_path, [
             {"id": "a", "updated_at": 1000.0, "title": "X"},
         ])
@@ -146,4 +146,4 @@ class TestRunReconciliationQwen:
         merged = tmp_path / "merged"
         run_reconciliation(raw, merged, asset_reader=_VaultReaderStub())
 
-        assert (merged / "assets" / "conversation-a" / "attachment.bin").read_bytes() == b"preserved"
+        assert not (merged / "assets" / "conversation-a" / "attachment.bin").exists()

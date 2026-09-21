@@ -49,9 +49,10 @@
   are locally available; the remaining signed URL is the previously known
   unavailable upstream object.
 - The run exposed the same preservation boundary previously observed in Qwen:
-  vault mode refreshed the manifest but skipped copying new raw binaries into
-  the cumulative merged tree. Kimi reconciliation now preserves raw binaries
-  in merged in both reader modes, with a regression test. The archive-wide
+  vault mode refreshed the manifest but skipped the then-required compatibility
+  projection into merged. Kimi reconciliation preserves that projection in
+  both reader modes, with a regression test; the later retention operation may
+  remove the byte copy after proving it in the vault. The archive-wide
   coverage audit returned to zero gaps; vault verification, unify, all 6
   selected Quarto reports, and the complete test suite pass.
 - The collector requires an authenticated `kimi.ai` session and access token.
@@ -172,8 +173,9 @@ O comportamento da migracao de origem e outros fatos upstream ficam em
 ## Asset vault transition
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
-are overridden explicitly. `legacy` remains an explicit temporary rollback;
-filesystem contents never select the mode. The legacy tree remains preserved,
+are overridden explicitly. `legacy` remains an explicit compatibility and
+diagnostic mode; filesystem contents never select the mode. Legacy records and
+manifests remain preserved, while redundant byte copies now live only in the vault,
 while the vault reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. For Kimi, reader scope preserves the observable
 conversation/file association; unknown author or message placement remains

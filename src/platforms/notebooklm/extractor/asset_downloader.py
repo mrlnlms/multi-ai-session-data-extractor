@@ -366,6 +366,7 @@ async def download_assets(
         account_id=account_id,
         evidence_path=raw_dir,
         capture_method="web_asset_download:media",
+        staging_root=assets_dir,
     )
 
     def _identity(fname: Path) -> str:
@@ -478,6 +479,7 @@ def save_notes_and_mindmaps(
         account_id=account_id,
         evidence_path=nb_dir,
         capture_method="web_asset_download:notes_mindmaps",
+        staging_root=assets_dir,
     )
 
     for jp in nb_dir.glob("*.json"):
@@ -597,6 +599,7 @@ async def fetch_text_artifacts(
         account_id=account_id,
         evidence_path=nb_dir,
         capture_method="web_asset_download:text_artifacts",
+        staging_root=assets_dir,
     )
 
     async def _one(nb_uuid: str, art_id: str, art_type: int, out: Path):

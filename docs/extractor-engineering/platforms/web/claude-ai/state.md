@@ -21,9 +21,8 @@ Automatic recovery from transient timeouts via `python -m src.platforms.claude_a
 Binaries + artifacts (code/markdown/html/react via `tool_use`) extracted
 during asset download.
 
-Immutable binaries and extracted artifacts are materialized in `merged` with
-a hardlink when supported, with a normal copy as the cross-filesystem fallback.
-Mutable JSON remains independent.
+Immutable binaries and extracted artifacts are materialized in the central
+vault. Raw and merged retain independent mutable JSON and asset manifests.
 
 Reconciler v3 (FEATURES_VERSION=2): full preservation (convs +
 projects), idempotent. Output: `data/merged/Claude.ai/conversations/<uuid>.json`
@@ -41,8 +40,8 @@ projects), idempotent. Output: `data/merged/Claude.ai/conversations/<uuid>.json`
   3,567 assets, and 3,618 exact asset links.
 - Unify and all 6 selected Quarto reports completed successfully. Vault
   verification covered 22 scopes and 11,749 physical blobs. The general
-  headless orchestrator still invokes only the default profile, so additional
-  profiles must be run explicitly until account enumeration is implemented.
+  headless orchestrator enumerates every runnable account from the shared
+  inventory and invokes this source command once per account.
 
 ### Prior validated collection — 2026-09-12
 
@@ -153,8 +152,9 @@ QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/claude-ai.qmd
 ## Asset vault transition
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
-are overridden explicitly. `legacy` remains an explicit temporary rollback;
-filesystem contents never select the mode. The legacy tree remains preserved,
+are overridden explicitly. `legacy` remains an explicit compatibility and
+diagnostic mode; filesystem contents never select the mode. Legacy records and
+manifests remain preserved, while redundant byte copies now live only in the vault,
 while the vault reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. For Claude.ai, reader scope is the evidenced
 message/file or generated-output relationship; text-only inline attachments

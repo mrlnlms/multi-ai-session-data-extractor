@@ -27,9 +27,10 @@ Chats + projects + project files captured. Reconciler v3
   2 projects with 7 project files. Both new conversation bodies and all 9
   requested asset representations were captured without errors.
 - The round exposed a vault-mode reconciliation bug: Qwen updated the merged
-  manifest but skipped copying new raw binaries into the cumulative merged
-  tree whenever an asset reader was active. Reconciliation now preserves raw
-  binaries in both reader modes; the parser consequently resolves all 372
+  manifest but skipped the then-required compatibility projection into merged
+  whenever an asset reader was active. Reconciliation preserves that projection
+  in both reader modes; the later retention operation may remove its byte copy
+  after proving it in the vault. The parser consequently resolves all 372
   canonical assets locally and the archive-wide coverage gate reports zero
   eligible-uncovered, unresolved, or broken-link findings.
 - The combined parser produces 150 conversations, 2,194 messages, 9 tool
@@ -168,8 +169,9 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.qwen.commands.parse
 ## Asset vault transition
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
-are overridden explicitly. `legacy` remains an explicit temporary rollback;
-filesystem contents never select the mode. The legacy tree remains preserved,
+are overridden explicitly. `legacy` remains an explicit compatibility and
+diagnostic mode; filesystem contents never select the mode. Legacy records and
+manifests remain preserved, while redundant byte copies now live only in the vault,
 while the vault reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. For Qwen, reader scope preserves evidenced
 inline message/project uses and their ordering; duplicate representations do

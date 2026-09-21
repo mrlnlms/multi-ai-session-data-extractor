@@ -52,7 +52,6 @@ com os relatorios antes que suas funcoes tenham substitutos validados.
 |---|---|---|
 | O que o produto esta se tornando? | [product-vision.md](product-vision.md) | Visao validada das frentes de operacao, leitor e curadoria; nao e uma especificacao. |
 | O que vem primeiro e qual trabalho esta pendente? | [../ROADMAP.md](../ROADMAP.md) | Prioridade operacional e sequencia corrente. |
-| Onde localizar planos e registros de trabalho relacionados, sem ler tudo? | [development-evidence-map.md](development-evidence-map.md) | Mapa seletivo por tema e estado; nao define prioridades. |
 | Como o leitor deve interpretar identidades, branches e eventos? | [reader-and-identity-contract.md](reader-and-identity-contract.md) | Contrato tecnico mantido para identidade e fidelidade. |
 | Como contas, login local e empacotamento podem funcionar? | [account-architecture.md](account-architecture.md) | Exploracao arquitetural pausada, com decisoes abertas. |
 | Como o dashboard atual e operado? | [../operations/dashboard.md](../operations/dashboard.md) | Manual da superficie existente, nao arquitetura-alvo. |
@@ -66,9 +65,11 @@ criacao dos planos privados.
 
 Esta e uma sequencia arquitetural para quando a aplicacao for desenvolvida,
 nao a fila de trabalho do presente. A prioridade temporal fica no
-[roadmap](../ROADMAP.md): memoria/configuracao de conta, dimensao analitica de
-contas e centralizacao fisica dos binarios preservados sao frentes proximas;
-leitor e mudanca do remoto DVC ficam no futuro.
+[roadmap](../ROADMAP.md). O vault autoritativo, a retencao inicial e a prevencao
+de rematerializacao em novas capturas ja foram concluidos.
+Memoria/configuracao e dimensao analitica de contas
+permanecem como frentes posteriores, enquanto leitor e mudanca do remoto DVC
+ficam no futuro.
 
 1. Manter captura, preservacao, schema e publicacao independentes da interface.
 2. Completar somente os contratos de dados exigidos por experiencias concretas,

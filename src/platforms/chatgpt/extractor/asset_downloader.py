@@ -289,6 +289,7 @@ def extract_canvases(
         account_id=account_id,
         evidence_path=raw_path,
         capture_method="web_asset_download:canvas",
+        staging_root=out_root,
     )
 
     for cid, conv in data.get("conversations", {}).items():
@@ -415,6 +416,7 @@ def extract_deep_research(
         account_id=account_id,
         evidence_path=raw_path,
         capture_method="web_asset_download:deep_research",
+        staging_root=out_root,
     )
 
     for cid, conv in data.get("conversations", {}).items():
@@ -520,6 +522,7 @@ async def run_asset_download(
         account_id=account_id,
         evidence_path=raw_path,
         capture_method="web_asset_download:images",
+        staging_root=images_root,
     )
 
     async with async_playwright() as p:

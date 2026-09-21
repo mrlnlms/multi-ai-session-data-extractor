@@ -108,9 +108,8 @@ Total: 10.02MB.
 
 Naming local: `data/raw/Grok/assets/<asset_id>.<ext>` (mime → ext).
 Manifest: `data/raw/Grok/assets_manifest.json` ({asset_id: {url,
-relpath, size, mime}}). Reconciler espelha pra
-`data/merged/Grok/assets/` por hardlink quando suportado, com copia normal como
-fallback entre filesystems. Parser populates coluna `asset_path` em
+relpath, size, mime}}). Os bytes ficam no vault central; raw e merged preservam
+os registros e manifests. Parser populates coluna `asset_path` em
 `grok_assets.parquet`. O parser publica o contrato canonico `Asset`; arquivos
 gerados viram `asset_kind=generated` e `asset_origin=assistant`, enquanto
 uploads viram `attachment` e `asset_origin=user`. Como `/rest/assets` e um
@@ -183,8 +182,9 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.parse
 ## Asset vault transition
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
-are overridden explicitly. `legacy` remains an explicit temporary rollback;
-filesystem contents never select the mode. The legacy tree remains preserved,
+are overridden explicitly. `legacy` remains an explicit compatibility and
+diagnostic mode; filesystem contents never select the mode. Legacy records and
+manifests remain preserved, while redundant byte copies now live only in the vault,
 while the vault reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. Grok's current reader scope is the global asset
 catalog: without evidence of conversation/message use, it preserves assets but

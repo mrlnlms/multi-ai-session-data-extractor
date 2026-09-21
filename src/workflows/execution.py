@@ -162,9 +162,9 @@ def run_sync_streaming(
     tail_size: int = 30,
     timeout: Optional[float] = 3600.0,
     *,
-    asset_mode: str = "legacy",
-    vault_root: Path | None = None,
-    data_root: Path | None = None,
+    asset_mode: str = "vault",
+    vault_root: Path | None = Path("data/assets"),
+    data_root: Path | None = Path("data"),
 ) -> tuple[int, str]:
     """Run sync and the mandatory web parser with streaming output.
 

@@ -25,15 +25,17 @@ No asset vault, `schema.json`, os blobs content-addressed e os
 compatibilidade e Parquets sao projecoes reconstruiveis. Esse contrato foi
 validado, publicado no DVC e verificado contra o remoto como fonte canonica. Um
 novo restore frio fica reservado como diagnostico de recuperacao; a confirmacao
-operacional ainda pendente e a primeira coleta incremental real. Veja a
+operacional foi confirmada por coletas incrementais reais. A auditoria de
+retencao retirou de `raw` e `merged` apenas as copias comprovadas no vault;
+registros, manifests e snapshots externos permanecem preservados. Veja a
 [transicao operacional](pipeline.md#transicao-do-asset-vault).
 
 ## Rollback de asset
 
-Retorno explicito de uma fonte ao modo `legacy`. Durante a transicao, nenhuma
-migracao ou escrita em `vault` remove as arvores legacy, portanto o rollback
-reprocessa essa evidencia preservada em vez de tentar inverter os logs do
-vault.
+Recuperacao integral dos bytes a partir de uma revisao DVC anterior. O modo
+`legacy` continua util para compatibilidade e diagnostico, mas, depois da
+retencao dos duplicados, nao e uma segunda copia completa dos assets. Registros
+e manifests em raw/merged continuam preservados.
 
 ## Cache DVC
 

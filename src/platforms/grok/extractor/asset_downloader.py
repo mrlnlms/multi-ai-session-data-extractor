@@ -127,6 +127,7 @@ async def download_assets(
         account_id=account_id,
         evidence_path=assets_path,
         capture_method="web_asset_download",
+        staging_root=out_dir,
     )
     total = len(assets)
 
