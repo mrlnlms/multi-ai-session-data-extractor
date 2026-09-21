@@ -21,7 +21,7 @@ conflicts with the entry or the task requires a fresh verification.
 | DVC Google Drive remote | Active operational remote | [DVC runbook](operations/dvc-runbook.md) | Use it to publish and recover the canonical current dataset. |
 | Capture and processing | Unblocked | [AGENTS.md](../AGENTS.md) | Run the normal sync → parse → unify pipeline when updating a source. |
 | DVC garbage collection | Deliberate storage maintenance | [DVC runbook](operations/dvc-runbook.md) | Simulate, review and explicitly authorize it after a validated publication. |
-| Prevent asset-copy rematerialization | **Completed locally** | [Known limitations](extractor-engineering/known-limitations.md) | Publish the validated code and DVC checkpoint when requested. |
+| Prevent asset-copy rematerialization | **Completed and published** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the retention audit as a diagnostic after future capture changes. |
 
 Google Drive remains the active remote while alternatives are researched. This
 is not an active migration or a freeze of the normal capture/publish workflow.
