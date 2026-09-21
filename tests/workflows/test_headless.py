@@ -3,6 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 
+def test_terminal_pipeline_defaults_to_all_known_platforms():
+    from src.platforms.registry import KNOWN_PLATFORMS
+    from src.workflows import headless
+
+    assert headless.PIPELINE_DEFAULT == KNOWN_PLATFORMS
+
+
 def test_headless_defaults_to_vault_and_canonical_roots(monkeypatch):
     from src.workflows import headless
 

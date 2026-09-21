@@ -38,7 +38,8 @@ Cada fonte usa um modo explicito, nunca inferido pela presenca de diretorios:
   explicitamente somente para rollback temporario.
 
 No dashboard, selecione `legacy` ou `vault` antes da execucao. No modo
-headless, a selecao e por fonte; fontes omitidas usam `vault`:
+headless, o default percorre as 13 fontes e a selecao de asset e por fonte;
+fontes omitidas em `--asset-mode` usam `vault`:
 
 ```bash
 PYTHONPATH=. .venv/bin/python -m src.workflows.headless --no-publish

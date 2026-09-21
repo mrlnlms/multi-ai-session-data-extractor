@@ -1,18 +1,18 @@
 #!/usr/bin/env python
-"""Headless orchestrator for the four-stage pipeline.
+"""Terminal orchestrator for the four-stage pipeline.
 
-Default: fontes que rodam headless (sem browser visivel) — exclui ChatGPT e
-Perplexity, que precisam de Cloudflare interativo.
+Default: todas as 13 fontes. Fontes que exigem browser visivel abrem sua
+janela normalmente durante a mesma execucao.
 
 Uso:
-    # Fontes headless + publish (default)
+    # Pipeline completo + publish (default)
     PYTHONPATH=. .venv/bin/python -m src.workflows.headless
 
     # Subset especifico, sem publish
     PYTHONPATH=. .venv/bin/python -m src.workflows.headless \\
         --plats=Claude.ai,Gemini --no-publish
 
-    # Inclui ChatGPT (vai abrir browser — so funciona com $DISPLAY OK)
+    # Subconjunto com ChatGPT (abre browser visivel)
     PYTHONPATH=. .venv/bin/python -m src.workflows.headless \\
         --plats=ChatGPT,Claude.ai
 
@@ -42,10 +42,7 @@ from src.workflows.execution import (
 )
 
 
-# Plats que exigem browser visivel (Cloudflare detecta headless e 403/challenge).
-# Derivado de KNOWN_PLATFORMS pra evitar drift quando nova plat for adicionada.
-_HEADED_REQUIRED = {"ChatGPT", "Perplexity"}
-HEADLESS_DEFAULT = [p for p in KNOWN_PLATFORMS if p not in _HEADED_REQUIRED]
+PIPELINE_DEFAULT = list(KNOWN_PLATFORMS)
 
 
 def _log(line: str) -> None:
@@ -61,10 +58,10 @@ def main() -> int:
     )
     p.add_argument(
         "--plats",
-        default=",".join(HEADLESS_DEFAULT),
+        default=",".join(PIPELINE_DEFAULT),
         help=(
-            f"Lista CSV. Default = {len(HEADLESS_DEFAULT)} headless: "
-            f"{','.join(HEADLESS_DEFAULT)}"
+            f"Lista CSV. Default = todas as {len(PIPELINE_DEFAULT)} fontes: "
+            f"{','.join(PIPELINE_DEFAULT)}"
         ),
     )
     p.add_argument("--no-publish", action="store_true", help="Pula Stage 4 (DVC + git push).")

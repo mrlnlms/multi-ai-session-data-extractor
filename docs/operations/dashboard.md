@@ -132,7 +132,7 @@ inconsistência de dados; resolva primeiro a causa e siga as regras do
 O equivalente para terminal é:
 
 ```bash
-# Exclui por padrão ChatGPT e Perplexity, que exigem browser visível.
+# Executa as 13 fontes; ChatGPT e Perplexity abrem browser visível.
 PYTHONPATH=. .venv/bin/python -m src.workflows.headless --no-publish
 
 # Para um subconjunto explícito:
@@ -141,8 +141,8 @@ PYTHONPATH=. .venv/bin/python -m src.workflows.headless \
 ```
 
 Sem `--no-publish`, o comando solicita a mesma publicação deliberada do
-pipeline completo. Incluir ChatGPT ou Perplexity em `--plats` pode abrir uma
-janela de navegador e requer ambiente gráfico funcional.
+pipeline completo. ChatGPT e Perplexity abrem uma janela de navegador e
+requerem ambiente gráfico funcional; isso não as exclui do fluxo padrão.
 
 ## Logs, locks e diagnóstico
 
