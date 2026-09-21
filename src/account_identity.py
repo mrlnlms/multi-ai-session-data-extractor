@@ -27,17 +27,26 @@ def technical_key_from_profile(profile_key: str) -> str:
     return profile_key
 
 
-def resolve_account_id(platform: str, technical_key: str, catalog_path: Path) -> str:
-    """Resolve one exact catalog identity and return its canonical UUID string."""
+def resolve_account_id(platform: str, account_reference: str, catalog_path: Path) -> str:
+    """Resolve a UUID directory, or a version-1 locator during migration."""
     if platform not in PLATFORM_ACCOUNT_METADATA:
         raise ValueError(f"Unsupported catalog platform: {platform!r}")
 
-    normalized_key = technical_key_from_profile(technical_key)
-    matches = [
-        record
-        for record in load_account_catalog(catalog_path).records
-        if record.platform == platform and record.technical_key == normalized_key
-    ]
+    catalog = load_account_catalog(catalog_path)
+    normalized_key = technical_key_from_profile(account_reference)
+    try:
+        candidate_id = str(uuid.UUID(normalized_key))
+    except (ValueError, AttributeError):
+        candidate_id = None
+    if candidate_id is not None:
+        matches = [record for record in catalog.records
+                   if record.platform == platform and record.account_id == candidate_id]
+    elif catalog.requires_identity_migration:
+        matches = [record for record in catalog.records
+                   if record.platform == platform
+                   and catalog.legacy_technical_key(record.account_id) == normalized_key]
+    else:
+        raise ValueError("Version-2 account paths must contain the canonical account UUID")
     if len(matches) != 1:
         raise ValueError(
             "Expected exactly one catalog account for "

@@ -12,7 +12,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from src.accounts import load_account_registry
+from src.accounts import account_presentation
 from src.account_identity import resolve_account_id
 from src.platforms.gemini.parser import GeminiParser
 
@@ -34,13 +34,17 @@ def main():
     log.info("Input merged: %s", args.merged_root)
     log.info("Output dir:   %s", args.output_dir)
 
-    account_labels = load_account_registry(args.accounts_file).get("gemini", {})
+    account_dirs = [path for path in args.merged_root.glob("account-*") if path.is_dir()]
     account_ids = {
         account_dir.name.removeprefix("account-"): resolve_account_id(
             "Gemini", account_dir.name, args.catalog_path,
-        )
-        for account_dir in args.merged_root.glob("account-*")
-        if account_dir.is_dir()
+        ) for account_dir in account_dirs
+    }
+    account_labels = {
+        account_dir.name: account_presentation(
+            "Gemini", account_dir.name, args.catalog_path,
+            registry_source="gemini", registry_path=args.accounts_file,
+        ) for account_dir in account_dirs
     }
     parser = GeminiParser(
         merged_root=args.merged_root,

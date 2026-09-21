@@ -20,14 +20,14 @@ def test_inactive_accounts_expose_no_enabled_sync():
 
 def test_add_account_requires_confirmation_to_write(tmp_path):
     path = tmp_path / "catalog.json"
-    assert add_account_action(platform="Qwen", technical_key="work", confirmed=False, catalog_path=path).ok
+    assert add_account_action(platform="Qwen", display_name="Work", confirmed=False, catalog_path=path).ok
     assert not path.exists()
-    assert add_account_action(platform="Qwen", technical_key="work", confirmed=True, catalog_path=path).ok
+    assert add_account_action(platform="Qwen", display_name="Work", confirmed=True, catalog_path=path).ok
     assert path.exists()
 
 def test_auth_and_sync_actions_are_confirmation_gated(monkeypatch, tmp_path):
     assert auth_check_action("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", confirmed=False).ok
-    plan = AccountSyncPlan("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "Qwen", "work", ())
+    plan = AccountSyncPlan("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "Qwen", ())
     monkeypatch.setattr("src.application.accounts.plan_account_sync", lambda *a, **k: plan)
     calls = []
     assert sync_action("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", confirmed=False).ok

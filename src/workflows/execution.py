@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from src.assets.runtime import asset_subprocess_env
-from src.accounts import account_command_argument, runnable_account_keys
+from src.accounts import ACCOUNT_ID_ENV, account_command_argument, runnable_accounts
 from src.runtime.project import find_project_root
 from src.platforms.registry import (
     KNOWN_PLATFORMS,
@@ -105,13 +105,16 @@ def parse_command(platform: str) -> Optional[list[str]]:
     return None
 
 
-def run_commands(commands: tuple[tuple[str, ...], ...]) -> tuple[int, str]:
+def run_commands(
+    commands: tuple[tuple[str, ...], ...], *, extra_env: dict[str, str] | None = None,
+) -> tuple[int, str]:
     """Run an already-reviewed command sequence without publication stages."""
     output: list[str] = []
     for command in commands:
         result = subprocess.run(
             list(command), cwd=str(PROJECT_ROOT), capture_output=True, text=True,
-            env={**_safe_env(), "PYTHONPATH": str(PROJECT_ROOT), **_NONINTERACTIVE_ENV},
+            env={**_safe_env(), "PYTHONPATH": str(PROJECT_ROOT), **_NONINTERACTIVE_ENV,
+                 **(extra_env or {})},
         )
         output.extend(part for part in (result.stdout, result.stderr) if part)
         if result.returncode:
@@ -125,17 +128,19 @@ def run_sync(platform: str, capture_output: bool = True) -> subprocess.Completed
     if base_cmd is None:
         raise RuntimeError(f"No sync or export script found for {platform}")
     env_pythonpath = str(PROJECT_ROOT)
-    accounts = runnable_account_keys(platform) if platform in WEB_PLATFORMS else (None,)
+    accounts = runnable_accounts(platform) if platform in WEB_PLATFORMS else (None,)
     if not accounts:
         raise RuntimeError(f"No runnable accounts found for {platform}")
     sync_results = []
     for account in accounts:
+        profile_key = account.profile_key if account is not None else None
         sync_result = subprocess.run(
-            sync_command(platform, account),
+            sync_command(platform, profile_key),
             cwd=str(PROJECT_ROOT),
             capture_output=capture_output,
             text=True,
-            env={**_safe_env(), "PYTHONPATH": env_pythonpath},
+            env={**_safe_env(), "PYTHONPATH": env_pythonpath,
+                 **({ACCOUNT_ID_ENV: account.account_id} if account is not None else {})},
         )
         sync_results.append(sync_result)
         if sync_result.returncode != 0:
@@ -179,19 +184,21 @@ def run_sync_streaming(
     asset_env = asset_subprocess_env(
         asset_mode, vault_root=vault_root, data_root=data_root
     )
-    accounts = runnable_account_keys(platform) if platform in WEB_PLATFORMS else (None,)
+    accounts = runnable_accounts(platform) if platform in WEB_PLATFORMS else (None,)
     if not accounts:
         raise RuntimeError(f"No runnable accounts found for {platform}")
     sync_tails = []
     for account in accounts:
         if account is not None:
-            on_line(f"=== Sync {platform} [{account}] ===")
+            on_line(f"=== Sync {platform} [{account.account_id}] ===")
+        profile_key = account.profile_key if account is not None else None
+        account_env = ({ACCOUNT_ID_ENV: account.account_id} if account is not None else {})
         rc, sync_tail = _stream(
-            sync_command(platform, account),
+            sync_command(platform, profile_key),
             on_line,
             tail_size=tail_size,
             timeout=timeout,
-            extra_env=asset_env,
+            extra_env={**asset_env, **account_env},
         )
         sync_tails.append(sync_tail)
         if rc != 0:

@@ -12,7 +12,6 @@ from src.account_catalog import (
     AccountCatalog,
     AccountCatalogRecord,
     LifecycleStatus,
-    validate_technical_key,
 )
 from src.platforms.registry import PLATFORM_ACCOUNT_METADATA
 
@@ -34,16 +33,14 @@ def create_account(
     catalog: AccountCatalog,
     *,
     platform: str,
-    technical_key: str,
+    display_name: str | None = None,
+    email: str | None = None,
     now: datetime,
     account_id_factory: Callable[[], UUID] = uuid.uuid4,
 ) -> AccountCatalogChange:
     _aware(now, "now")
     if platform not in PLATFORM_ACCOUNT_METADATA:
         raise ValueError(f"Unsupported account platform: {platform!r}")
-    technical_key = validate_technical_key(technical_key, allow_archive=False)
-    if any((record.platform, record.technical_key) == (platform, technical_key) for record in catalog.records):
-        raise ValueError(f"Duplicate account identity: {platform}:{technical_key}")
     generated = account_id_factory()
     if not isinstance(generated, UUID):
         raise ValueError("account_id_factory must return a UUID")
@@ -53,7 +50,8 @@ def create_account(
     record = AccountCatalogRecord(
         account_id=account_id,
         platform=platform,
-        technical_key=technical_key,
+        display_name=_normalized_optional(display_name, "display_name"),
+        email=_normalized_optional(email, "email"),
         lifecycle_status=LifecycleStatus.ACTIVE,
         created_at=now,
         updated_at=now,
@@ -85,7 +83,8 @@ def set_lifecycle(
     replacement = AccountCatalogRecord(
         account_id=current.account_id,
         platform=current.platform,
-        technical_key=current.technical_key,
+        display_name=current.display_name,
+        email=current.email,
         lifecycle_status=lifecycle_status,
         created_at=current.created_at,
         updated_at=now,
@@ -93,5 +92,49 @@ def set_lifecycle(
     after = AccountCatalog(
         version=catalog.version,
         records=tuple(replacement if record.account_id == account_id else record for record in catalog.records),
+        legacy_technical_keys=catalog.legacy_technical_keys,
     )
     return AccountCatalogChange(catalog, after, account_id, f"lifecycle:{lifecycle_status.value}")
+
+
+def _normalized_optional(value: str | None, field: str) -> str | None:
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str) or value != value.strip():
+        raise ValueError(f"{field} must be a trimmed string or None")
+    return value
+
+
+def set_account_metadata(
+    catalog: AccountCatalog,
+    account_id: str,
+    *,
+    display_name: str | None,
+    email: str | None,
+    now: datetime,
+) -> AccountCatalogChange:
+    _aware(now, "now")
+    current = next((record for record in catalog.records if record.account_id == account_id), None)
+    if current is None:
+        raise ValueError(f"Unknown account_id: {account_id}")
+    normalized_name = _normalized_optional(display_name, "display_name")
+    normalized_email = _normalized_optional(email, "email")
+    if (normalized_name, normalized_email) == (current.display_name, current.email):
+        raise ValueError("Account metadata update is a no-op")
+    if now < current.created_at or now < current.updated_at:
+        raise ValueError("Account metadata timestamp cannot move backward")
+    replacement = AccountCatalogRecord(
+        account_id=current.account_id,
+        platform=current.platform,
+        display_name=normalized_name,
+        email=normalized_email,
+        lifecycle_status=current.lifecycle_status,
+        created_at=current.created_at,
+        updated_at=now,
+    )
+    after = AccountCatalog(
+        version=catalog.version,
+        records=tuple(replacement if record.account_id == account_id else record for record in catalog.records),
+        legacy_technical_keys=catalog.legacy_technical_keys,
+    )
+    return AccountCatalogChange(catalog, after, account_id, "metadata")

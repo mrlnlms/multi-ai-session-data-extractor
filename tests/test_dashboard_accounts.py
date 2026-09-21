@@ -59,10 +59,10 @@ def test_account_rows_preserve_platform_and_service_order():
 
     rows = _account_rows(states)
 
-    assert [(row["Platform"], row["Technical account"]) for row in rows] == [
-        ("Gemini", "1"),
-        ("Gemini", "2"),
-        ("ChatGPT", "default"),
+    assert [(row["Platform"], row["Account"]) for row in rows] == [
+        ("Gemini", f"Gemini · {legacy_account_id('Gemini', '1')}"),
+        ("Gemini", f"Gemini · {legacy_account_id('Gemini', '2')}"),
+        ("ChatGPT", f"ChatGPT · {legacy_account_id('ChatGPT', 'default')}"),
     ]
 
 
@@ -82,10 +82,9 @@ def test_account_rows_expose_independent_evidence_without_claiming_login():
 
     assert row == {
         "Platform": "Gemini",
-        "Technical account": "1",
+        "Account": "owner@example.test",
         "Account ID": legacy_account_id("Gemini", "1"),
         "Lifecycle": "Active",
-        "Private label": "owner@example.test",
         "Registry": "Present",
         "Profile": "Present",
         "Raw": "Present",
@@ -107,7 +106,7 @@ def test_account_rows_keep_data_only_account_visible_as_preserved():
 
     row = _account_rows([PlatformState("Gemini", None, None, accounts=(account,))])[0]
 
-    assert row["Private label"] == "—"
+    assert row["Account"].startswith("Gemini · ")
     assert row["Authentication"] == "Not configured"
     assert row["Archive"] == "Preserved data without profile"
     assert row["Lifecycle"] == "Unclassified"

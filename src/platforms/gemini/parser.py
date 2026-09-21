@@ -39,6 +39,8 @@ from typing import Mapping, Optional
 
 import pandas as pd
 
+from src.account_catalog import legacy_fallback_key
+
 from src.assets.reader import AssetReader
 from src.platforms.gemini._parser_helpers import (
     conv_last_timestamp,
@@ -78,7 +80,7 @@ def _raw_gemini_root(merged_root: Path) -> Path:
     return Path("data/raw/Gemini")
 
 
-def _load_assets_manifest(merged_root: Path, account: int) -> dict[str, dict]:
+def _load_assets_manifest(merged_root: Path, account: str) -> dict[str, dict]:
     """Load the per-account image manifest keyed by its preserved URL.
 
     Manifest fica em data/raw/Gemini/account-{N}/assets_manifest.json
@@ -153,18 +155,18 @@ class GeminiParser(BaseParser):
 
         account_dirs = []
         for acc_dir in root.glob("account-*"):
-            try:
-                account_dirs.append((int(acc_dir.name.removeprefix("account-")), acc_dir))
-            except ValueError:
-                continue
+            account_dirs.append((acc_dir.name.removeprefix("account-"), acc_dir))
         for acc, acc_dir in sorted(account_dirs):
             self._parse_account(acc_dir, acc)
         self.apply_asset_reader(asset.account_id for asset in self.assets)
 
-    def _parse_account(self, account_dir: Path, account: int) -> None:
+    def _parse_account(self, account_dir: Path, account: str) -> None:
         manifest = _load_assets_manifest(self.merged_root, account)
         account_label = self.account_labels.get(f"account-{account}", str(account))
         account_id = self.account_ids.get(str(account))
+        conversation_namespace = (
+            legacy_fallback_key("Gemini", account_id) if account_id else None
+        ) or account
         conv_dir = account_dir / "conversations"
         if not conv_dir.exists():
             return
@@ -202,7 +204,7 @@ class GeminiParser(BaseParser):
                 logger.warning(f"skip {jp.name}: {e}")
                 continue
             self._parse_conv(
-                obj, account, account_label, account_id,
+                obj, account, conversation_namespace, account_label, account_id,
                 titles, created_at_secs, pinned_set, manifest
             )
         self._append_manifest_catalog(account, account_id, manifest)
@@ -229,17 +231,15 @@ class GeminiParser(BaseParser):
                     Path(path_value).name
                 )
                 asset = image_assets.get(self._asset_id(representation, str(path_value)))
-                canonical_paths.append(
-                    asset.asset_path
-                    if asset is not None and asset.asset_path is not None
-                    else path_value
-                )
-            message.asset_paths = canonical_paths
+                if asset is not None and asset.asset_path is not None:
+                    canonical_paths.append(asset.asset_path)
+            message.asset_paths = canonical_paths or None
 
     def _parse_conv(
         self,
         obj: dict,
-        account: int,
+        account: str,
+        conversation_namespace: str,
         account_label: str,
         account_id: str | None,
         titles: dict[str, str],
@@ -256,7 +256,7 @@ class GeminiParser(BaseParser):
         last_seen = obj.get("_last_seen_in_server")
 
         # Namespace por account
-        conv_id = f"account-{account}_{uuid}"
+        conv_id = f"account-{conversation_namespace}_{uuid}"
 
         title = titles.get(uuid) or ""
         created_secs = created_at_secs.get(uuid, 0) or 0
@@ -518,6 +518,11 @@ class GeminiParser(BaseParser):
                     prior.asset_origin = "unknown"
                     prior.asset_kind = "other"
                     prior.is_model_generated = None
+            # A stale manifest may retain a URL after its binary delivery has
+            # disappeared. Keep the unavailable Asset row, but do not invent
+            # semantic appearances for a delivery the vault never captured.
+            if not path.is_file():
+                continue
             for role, message_id, ordinal in uses.get(asset_id, []):
                 link_role = "input" if role == "user" else "output"
                 link_id = make_asset_link_id(

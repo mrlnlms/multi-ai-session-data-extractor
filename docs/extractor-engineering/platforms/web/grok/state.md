@@ -2,8 +2,9 @@
 
 ## Pipeline
 
-- **Pastas cumulativas por conta:** a conta padrao usa `data/raw/Grok/` e
-  `data/merged/Grok/`; as demais usam `account-<n>/` sob essas raizes.
+- **Pastas cumulativas por conta:** todas as arvores duraveis raw/merged usam
+  `account-<account_id>/`. O profile local e resolvido pelo binding do UUID;
+  sync seletivo usa `python -m src.workflows.account_sync <account_id> --apply`.
 - **Sync orchestrator (3 steps):** `python -m src.platforms.grok.commands.sync` (capture +
   assets + reconcile).
 - **Headless capture** (Cloudflare did not block on smoke 2026-05-09).

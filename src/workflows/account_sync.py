@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from src.account_bindings import DEFAULT_BINDINGS_PATH, load_account_bindings
 from src.account_catalog import LifecycleStatus, load_account_catalog
-from src.accounts import account_command_argument
+from src.accounts import ACCOUNT_ID_ENV, account_command_argument
 from src.auth_health import (
     AuthEvidenceMethod, AuthObservation, AuthStatus, DEFAULT_HEALTH_PATH,
     load_auth_health, set_auth_observation, write_auth_health_atomic,
@@ -24,7 +24,6 @@ from src.workflows.execution import run_commands
 class AccountSyncPlan:
     account_id: str
     platform: str
-    technical_key: str
     commands: tuple[tuple[str, ...], ...]
     warning: str | None = None
 
@@ -43,8 +42,6 @@ def plan_account_sync(
         raise ValueError(f"Unknown account_id: {account_id}")
     if record.lifecycle_status is not LifecycleStatus.ACTIVE:
         raise ValueError(f"Account lifecycle prevents sync: {record.lifecycle_status.value}")
-    if record.technical_key.startswith("archive:"):
-        raise ValueError("Archive accounts cannot sync")
     binding = load_account_bindings(bindings_path).get(account_id)
     if binding is None:
         raise ValueError("Account has no local profile binding")
@@ -68,11 +65,12 @@ def plan_account_sync(
     if record.platform == "ChatGPT":
         sync.append("--no-voice-pass")
     parse = [sys.executable, "-m", f"{package}.parse"]
-    return AccountSyncPlan(account_id, record.platform, record.technical_key,
-                           (tuple(sync), tuple(parse)), warning)
+    return AccountSyncPlan(account_id, record.platform, (tuple(sync), tuple(parse)), warning)
 
 
 def execute_account_sync(plan: AccountSyncPlan, *, runner: Callable = run_commands) -> tuple[int, str]:
+    if runner is run_commands:
+        return runner(plan.commands, extra_env={ACCOUNT_ID_ENV: plan.account_id})
     return runner(plan.commands)
 
 
@@ -109,7 +107,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     plan = plan_account_sync(args.account_id, catalog_path=args.catalog_path,
                              bindings_path=args.bindings_path, health_path=args.health_path,
                              storage_root=args.storage_root)
-    print(f"Account sync preview: {plan.platform}:{plan.technical_key}")
+    print(f"Account sync preview: {plan.platform}:{plan.account_id}")
     for command in plan.commands:
         print("  " + " ".join(command))
     if plan.warning:

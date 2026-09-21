@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from src.workflows import execution as sync
+from src.accounts import RunnableAccount
 
 
 PROJECT_ROOT = sync.PROJECT_ROOT
@@ -34,7 +35,7 @@ def test_streaming_web_sync_runs_parser_after_success(monkeypatch):
         return 0, command[-1]
 
     monkeypatch.setattr(sync, "_stream", fake_stream)
-    monkeypatch.setattr(sync, "runnable_account_keys", lambda _platform: ("default",))
+    monkeypatch.setattr(sync, "runnable_accounts", lambda _platform: (RunnableAccount("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "default"),))
     rc, _tail = sync.run_sync_streaming("Claude.ai", lambda _line: None)
 
     assert rc == 0
@@ -68,7 +69,10 @@ def test_streaming_failed_sync_does_not_parse(monkeypatch):
         return 1, "failed"
 
     monkeypatch.setattr(sync, "_stream", fake_stream)
-    monkeypatch.setattr(sync, "runnable_account_keys", lambda _platform: ("default", "account-2"))
+    monkeypatch.setattr(sync, "runnable_accounts", lambda _platform: (
+        RunnableAccount("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "default"),
+        RunnableAccount("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "account-2"),
+    ))
     rc, _tail = sync.run_sync_streaming("Claude.ai", lambda _line: None)
 
     assert rc == 1
@@ -97,7 +101,7 @@ def test_streaming_vault_mode_propagates_validated_environment(monkeypatch, tmp_
         return 0, "ok"
 
     monkeypatch.setattr(sync, "_stream", fake_stream)
-    monkeypatch.setattr(sync, "runnable_account_keys", lambda _platform: ("default",))
+    monkeypatch.setattr(sync, "runnable_accounts", lambda _platform: (RunnableAccount("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "default"),))
     data_root = tmp_path / "data"
     rc, _tail = sync.run_sync_streaming(
         "Claude.ai",
@@ -109,12 +113,13 @@ def test_streaming_vault_mode_propagates_validated_environment(monkeypatch, tmp_
 
     assert rc == 0
     assert len(calls) == 2
-    for _command, env in calls:
-        assert env == {
+    expected = {
             "AI_ARCHIVE_ASSET_MODE": "vault",
             "AI_ARCHIVE_ASSET_VAULT_ROOT": str(data_root / "assets"),
             "AI_ARCHIVE_ASSET_DATA_ROOT": str(data_root),
-        }
+    }
+    assert calls[0][1] == {**expected, "AI_ARCHIVE_ACCOUNT_ID": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
+    assert calls[1][1] == expected
 
 
 def test_streaming_web_sync_runs_each_account_then_parses_once(monkeypatch):
@@ -126,7 +131,10 @@ def test_streaming_web_sync_runs_each_account_then_parses_once(monkeypatch):
         return 0, "ok"
 
     monkeypatch.setattr(sync, "_stream", fake_stream)
-    monkeypatch.setattr(sync, "runnable_account_keys", lambda _platform: ("default", "account-2"))
+    monkeypatch.setattr(sync, "runnable_accounts", lambda _platform: (
+        RunnableAccount("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "default"),
+        RunnableAccount("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "account-2"),
+    ))
 
     rc, _tail = sync.run_sync_streaming("ChatGPT", lines.append)
 
@@ -145,7 +153,10 @@ def test_streaming_web_failure_on_later_account_blocks_parser(monkeypatch):
         return (9, "failed") if "account-2" in command else (0, "ok")
 
     monkeypatch.setattr(sync, "_stream", fake_stream)
-    monkeypatch.setattr(sync, "runnable_account_keys", lambda _platform: ("default", "account-2"))
+    monkeypatch.setattr(sync, "runnable_accounts", lambda _platform: (
+        RunnableAccount("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "default"),
+        RunnableAccount("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "account-2"),
+    ))
 
     rc, tail = sync.run_sync_streaming("ChatGPT", lambda _line: None)
 

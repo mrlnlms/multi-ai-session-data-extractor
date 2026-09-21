@@ -1,6 +1,6 @@
 outs:
-- md5: 69f3f685878466d75d3107f4ed692864.dir
-  size: 623114526
-  nfiles: 47
+- md5: 494d3c2f397c81c3f998aa7f201ec265.dir
+  size: 623114572
+  nfiles: 48
   hash: md5
   path: notebooklm-snapshots

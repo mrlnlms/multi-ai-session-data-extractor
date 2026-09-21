@@ -5,8 +5,11 @@
 - **Multi-account** — three compatibility-default Google accounts. Profiles in
   `.storage/gemini-profile-<key>/` (generated via
   `python -m src.platforms.gemini.commands.login`).
-- **Single cumulative folder per-account:** `data/raw/Gemini/account-{N}/` and
-  `data/merged/Gemini/account-{N}/`.
+- **Single cumulative folder per-account:** durable trees use
+  `data/raw/Gemini/account-<account_id>/` and
+  `data/merged/Gemini/account-<account_id>/`. The compatibility profile key is
+  local binding state; selective sync uses
+  `python -m src.workflows.account_sync <account_id> --apply`.
 - **Per-account sync command (3 steps):**
   `python -m src.platforms.gemini.commands.sync --account <safe-key>` — capture
   + assets + reconcile for exactly one account. The shared headless workflow

@@ -2,8 +2,9 @@
 
 ## Pipeline
 
-- **Pastas cumulativas por conta:** a conta padrao usa `data/raw/Perplexity/`
-  e `data/merged/Perplexity/`; as demais usam `account-<n>/` sob essas raizes.
+- **Pastas cumulativas por conta:** todas as arvores duraveis raw/merged usam
+  `account-<account_id>/`. O profile local e resolvido pelo binding do UUID;
+  sync seletivo usa `python -m src.workflows.account_sync <account_id> --apply`.
 - **Sync orchestrator (2 steps):**
   `python -m src.platforms.perplexity.commands.sync`
   (capture + reconcile). Captures everything in one shot (no separate

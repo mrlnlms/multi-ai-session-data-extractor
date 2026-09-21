@@ -24,6 +24,9 @@ from src.runtime.project import find_project_root
 
 import pandas as pd
 
+from src.account_catalog import load_account_catalog
+from src.platforms.registry import PLATFORM_ACCOUNT_METADATA
+
 from src.schema.models import (
     VALID_ASSET_LINK_OBJECT_TYPES,
     VALID_ASSET_LINK_ROLES,
@@ -193,6 +196,40 @@ def _validate_account_integrity(frames: dict[str, pd.DataFrame]) -> None:
                 f"account_id mismatch between conversations and {table}: "
                 f"{mismatches} row(s)"
             )
+
+
+def account_dimension(catalog_path: Path) -> pd.DataFrame:
+    """Project the durable catalog into its read-only analytical dimension."""
+    catalog = load_account_catalog(catalog_path)
+    columns = [
+        "account_id", "source", "platform", "display_name", "email",
+        "lifecycle_status", "created_at", "updated_at",
+    ]
+    rows = [{
+        "account_id": record.account_id,
+        "source": PLATFORM_ACCOUNT_METADATA[record.platform].registry_key,
+        "platform": record.platform,
+        "display_name": record.display_name,
+        "email": record.email,
+        "lifecycle_status": record.lifecycle_status.value,
+        "created_at": pd.Timestamp(record.created_at),
+        "updated_at": pd.Timestamp(record.updated_at),
+    } for record in catalog.records]
+    frame = pd.DataFrame(rows, columns=columns)
+    if frame["account_id"].duplicated().any():
+        raise ValueError("accounts dimension contains duplicate account_id")
+    return frame.sort_values("account_id", kind="stable").reset_index(drop=True)
+
+
+def _validate_fact_accounts(frames: dict[str, pd.DataFrame], accounts: pd.DataFrame) -> None:
+    known = set(accounts["account_id"])
+    for table, frame in frames.items():
+        if "account_id" not in frame.columns:
+            continue
+        observed = {str(value) for value in frame.loc[frame["account_id"].notna(), "account_id"]}
+        unknown = sorted(observed - known)
+        if unknown:
+            raise ValueError(f"{table} contains account_id absent from accounts dimension: {unknown}")
 
 
 def _identity(value) -> str | None:
@@ -374,7 +411,12 @@ def _validate_asset_integrity(
                 raise ValueError(f"asset_link {row.object_type} does not resolve: {key}")
 
 
-def unify(processed_dir: Path, unified_dir: Path) -> dict[str, int]:
+def unify(
+    processed_dir: Path,
+    unified_dir: Path,
+    *,
+    catalog_path: Path | None = None,
+) -> dict[str, int]:
     """Materializa data/unified/<table>.parquet pra cada tabela presente.
 
     Returns: {table: row_count} de cada arquivo escrito.
@@ -396,6 +438,12 @@ def unify(processed_dir: Path, unified_dir: Path) -> dict[str, int]:
     _validate_account_integrity(frames)
     _validate_asset_integrity(frames, processed_dir.parent)
 
+    resolved_catalog = catalog_path or processed_dir.parent / "accounts" / "catalog.json"
+    accounts = None
+    if resolved_catalog.exists():
+        accounts = account_dimension(resolved_catalog)
+        _validate_fact_accounts(frames, accounts)
+
     counts: dict[str, int] = {}
     for table, merged in frames.items():
         out = unified_dir / f"{table}.parquet"
@@ -406,6 +454,11 @@ def unify(processed_dir: Path, unified_dir: Path) -> dict[str, int]:
             f"  {table:18} {len(merged):>7,} rows  "
             f"{size_mb:>5.1f} MB  ({file_counts[table]} files concat)"
         )
+
+    if accounts is not None:
+        out = unified_dir / "accounts.parquet"
+        accounts.to_parquet(out, index=False)
+        counts["accounts"] = len(accounts)
 
     return counts
 

@@ -2,9 +2,10 @@
 
 ## Pipeline
 
-- **Per-account cumulative folders:** the legacy `default` account remains in
-  `data/raw/Claude.ai/` and `data/merged/Claude.ai/`; another profile key uses
-  `account-<key>/` below each tree.
+- **Per-account cumulative folders:** every durable raw/merged tree uses
+  `account-<account_id>/`. The local profile key is resolved from the UUID
+  binding; selective sync uses `python -m src.workflows.account_sync
+  <account_id> --apply`.
 - **Sync orchestrator (3 steps):** `python -m src.platforms.claude_ai.commands.sync` (capture +
   assets + reconcile).
 - **Headless capture** (no Cloudflare challenge at runtime).

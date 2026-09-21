@@ -438,3 +438,28 @@ def test_gemini_parser_keeps_unreferenced_manifest_asset_unavailable(tmp_path: P
     assert asset.is_binary_available is False
     assert parser.asset_links == []
     assert "http" not in (asset.metadata_json or "")
+
+
+def test_gemini_parser_does_not_link_referenced_missing_manifest_asset(tmp_path: Path):
+    merged = tmp_path / "merged" / "Gemini"
+    conv_dir = merged / "account-1" / "conversations"
+    manifest_dir = tmp_path / "raw" / "Gemini" / "account-1"
+    conv_dir.mkdir(parents=True)
+    manifest_dir.mkdir(parents=True)
+    image_url = "https://lh3.googleusercontent.com/missing"
+    (manifest_dir / "assets_manifest.json").write_text(json.dumps({"stable-key": {
+        "url": image_url, "conv_id": "c_missing", "content_type": "image/png",
+        "size": 123, "filename": "missing.png",
+    }}))
+    turn = _make_turn("draw", "done", 1762000000, images=[image_url])
+    (conv_dir / "c_missing.json").write_text(json.dumps({
+        "uuid": "c_missing", "raw": [[turn], None, None, []],
+    }))
+
+    parser = GeminiParser(merged_root=merged)
+    parser.parse(merged)
+
+    assert len(parser.assets) == 1
+    assert parser.assets[0].is_binary_available is False
+    assert parser.asset_links == []
+    assert all(message.asset_paths is None for message in parser.messages)

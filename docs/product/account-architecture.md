@@ -1,10 +1,9 @@
 # Instancias de conta e arquitetura da aplicacao
 
-**Status:** contrato mantido do backend de contas. Identidade/lifecycle,
-bindings locais, verificacao explicita de autenticacao, sync seletivo e
-propagacao do UUID ao schema publicado estao implementados. Empacotamento da
-aplicacao e uma eventual dimensao analitica derivada permanecem frentes
-separadas.
+**Status:** contrato v2 implementado no codigo: UUID unico, metadados editaveis,
+bindings locais, paths UUID-native e dimensao analitica derivada. A migracao
+dos dados DVC do catalogo/layout v1 permanece deliberadamente nao aplicada;
+empacotamento da aplicacao continua uma frente separada.
 
 **Origem:** 2026-08-31. **Revisto contra codigo e dados:** 2026-09-21.
 
@@ -79,8 +78,9 @@ sessao, o suporte pode ser adicionado com base nessa evidencia.
 ### 2.3 Consumidores e identidade atual
 
 O unificador considera conversa por `(source, account_id, conversation_id)` e
-usa a mesma dimensao nas chaves das tabelas filhas. `account_id` vem somente do
-catalogo por `(platform, technical_key)`; `account` permanece como rotulo legado.
+usa a mesma dimensao nas chaves das tabelas filhas. No contrato v2,
+`account_id` vem do diretorio UUID e e validado contra o catalogo; `account`
+permanece como rotulo legado.
 IDs nativos e IDs derivados existentes nao mudam.
 
 O projeto `AI Interaction Analysis` consome `processed` e `unified` por DVC.
@@ -171,6 +171,27 @@ ChatGPT
 A quantidade de contas nao deve ser codificada em listas fixas nem exigir
 alteracao de parser, dashboard ou relatorio a cada adicao.
 
+### 3.1 Glossario de conta
+
+Os nomes abaixo descrevem responsabilidades diferentes e nao devem ser
+apresentados ao usuario como se fossem equivalentes:
+
+| Nome | Significado |
+|---|---|
+| `display_name` | Nome livre e editavel escolhido pelo usuario, como `Trabalho` ou `Estudos`. Quando estiver vazio, a aplicacao deve gerar uma apresentacao util a partir da plataforma e do e-mail conhecido. |
+| `email` | E-mail usado na conta upstream, quando informado pelo usuario ou observado de forma confiavel pelo conector. Nao e senha, cookie nem chave interna. |
+| `account_id` | UUID imutavel que identifica a conta dentro do acervo. E a identidade canonica usada pelos servicos, bindings e dados publicados. |
+| `technical_key` | Locator presente apenas no catalogo v1 e no planejamento da migracao; nao pertence ao modelo v2. |
+| `profile_key` | Nome local, especifico da maquina, do profile de navegador vinculado ao `account_id`. |
+| binding | Associacao local entre o `account_id` e o `profile_key` que contem a sessao autenticada naquela instalacao. |
+| auth health | Ultima observacao explicita sobre a validade da sessao local; nao e inferida apenas porque um profile existe. |
+
+O `account_id` e o identificador duravel. O codigo le o catalogo v1 somente
+para produzir um plano de migracao completo e nao serializa seu locator legado
+no v2. Paths duraveis usam `account-<UUID>`; o binding continua resolvendo o
+UUID para um profile local. A compatibilidade termina quando a migracao
+preview-first for aplicada aos dados DVC.
+
 ## 4. Contratos implementados
 
 Os pontos abaixo descrevem o comportamento canonico atual:
@@ -183,9 +204,10 @@ Os pontos abaixo descrevem o comportamento canonico atual:
    explicitamente nao dependem de uma quantidade fixa.
 3. CLI e dashboard chamam os mesmos servicos UI-neutral. Regras de conta nao
    moram em `argparse` ou Streamlit.
-4. O label privado atual e apenas apresentacao e nunca funciona como chave,
-   path ou identidade. Um display name livre e editavel continua fora do
-   catalogo arquivavel.
+4. O label privado atual e apenas apresentacao, foi preenchido manualmente e
+   nunca funciona como chave, path ou identidade. O produto agora requer um
+   `display_name` livre e editavel, com fallback automatico quando o usuario
+   nao fornecer um nome; sua persistencia ainda nao foi implementada.
 5. A identidade interna da conta e um UUID imutavel. Contas anteriores ao
    catalogo receberam UUIDv5 deterministico; novas contas recebem UUID proprio.
 6. Um futuro identificador estavel fornecido pela plataforma sera dado
@@ -205,8 +227,8 @@ Os pontos abaixo descrevem o comportamento canonico atual:
 11. `account_id` ja foi publicado nos Parquets sem substituir o campo legado
     `account`; o consumidor continua recebendo `processed` e `unified` por DVC
     import.
-12. A dimensao analitica de contas, se aprovada, sera derivada do catalogo e
-    nao o substituira como fonte autoritativa.
+12. `accounts.parquet` e derivado do catalogo e nao o substitui como fonte
+    autoritativa; ele nao publica locators legados nem estado local.
 
 ## 5. Modelo de dominio atual
 
@@ -219,7 +241,8 @@ autenticacao. Campos futuros nao sao presumidos pelo contrato existente.
 Account
   account_id             UUID imutavel gerado pelo sistema
   platform               nome canonico da plataforma
-  technical_key          chave operacional estavel nessa plataforma
+  display_name           nome livre opcional
+  email                  e-mail opcional
   lifecycle_status       active | disabled | historical
   created_at
   updated_at
@@ -231,8 +254,10 @@ Regras atuais:
 - `historical` e uma decisao explicita de preservacao sem novas capturas;
 - `disabled` interrompe operacao sem apagar dados ou identidade;
 - profile ausente ou autenticacao expirada nao altera lifecycle; e
-- `upstream_subject` e display name editavel continuam fora do catalogo ate
-  existir requisito e evidencia suficientes.
+- `display_name` e e-mail ainda nao fazem parte deste schema implementado. O
+  requisito de produto para ambos esta definido no glossario; falta decidir e
+  implementar a migracao do label privado atual e a captura confiavel do e-mail
+  por plataforma, com entrada manual quando ela nao estiver disponivel.
 
 ### 5.2 Vinculo local de autenticacao
 
@@ -255,13 +280,31 @@ continua existindo, mas a autenticacao fica ausente ate um novo binding e
 login. Uma futura verificacao por subject upstream exigira evidencia estavel
 da plataforma e nao faz parte do contrato atual.
 
+### 5.3 Por que catalogo, `.storage` e Parquet coexistem
+
+As tres superficies nao sao cadastros concorrentes:
+
+| Superficie | Papel | Autoritativa para |
+|---|---|---|
+| `data/accounts/catalog.json` | Estado operacional pequeno, duravel e restauravel | Quais contas existem, seus UUIDs e lifecycle |
+| `.storage/` | Estado desta instalacao | Qual profile local esta vinculado e qual foi a ultima observacao de autenticacao |
+| `data/unified/accounts.parquet` | Projecao analitica regeneravel e somente leitura | Consultas e joins dos consumidores com `account_id` |
+
+O Parquet nao substitui o catalogo: ele e gerado a partir dele e nao deve ser
+editado para cadastrar ou renomear contas. O `.storage/` tambem nao substitui o
+catalogo: ao restaurar o acervo em outra maquina, a identidade permanece, mas o
+login precisa ser refeito. Uma futura aplicacao pode armazenar catalogo e
+estado local em tabelas distintas de um mesmo banco local, como SQLite, sem
+eliminar essa separacao de responsabilidades; isso seria uma migracao propria,
+nao uma consequencia da criacao da dimensao Parquet.
+
 Presenca de profile nunca produz `valid` por inferencia. Uma observacao valida
 declara como foi obtida: leitura minima automatizada (`probe`), confirmacao
 explicita em navegador visivel (`operator`) ou sync seletivo e parse concluídos
 com sucesso (`sync`). A confirmacao do operador nao tenta contornar protecoes
 anti-bot e permanece estado local.
 
-### 5.3 Registro de plataformas
+### 5.4 Registro de plataformas
 
 `src/platforms/registry.py` declara metadados e capacidades de selecao das nove
 fontes web sem acoplar a interface aos extractors. Os modulos de login, probe,
@@ -315,8 +358,8 @@ confirmacao para mutacoes; lifecycle nunca exclui identidade ou dados.
 O fluxo operacional disponivel hoje permite:
 
 1. Selecionar uma plataforma suportada.
-2. Adicionar uma conta com uma chave tecnica segura.
-3. O sistema gera a identidade imutavel.
+2. Adicionar uma conta com nome de exibicao e e-mail opcional.
+3. O sistema gera o UUID imutavel antes de qualquer path duravel.
 4. Abrir o fluxo de login; senha e MFA continuam sendo fornecidos diretamente
    pelo usuario a plataforma.
 5. Validar uma chamada minima ou registrar confirmacao explicita do operador.

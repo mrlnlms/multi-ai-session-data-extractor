@@ -47,12 +47,21 @@ def test_missing_registry_leaves_account_unset(tmp_path):
     assert account_email("chatgpt", "default", path) is None
 
 
-def test_account_data_dir_keeps_default_and_accepts_both_account_key_forms():
+def test_account_data_dir_keeps_default_and_accepts_both_account_key_forms(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     base = Path("data/raw/ChatGPT")
 
     assert account_data_dir(base, "default") == base
     assert account_data_dir(base, "2") == base / "account-2"
     assert account_data_dir(base, "account-2") == base / "account-2"
+
+
+def test_account_data_dir_runtime_uuid_governs_durable_path(monkeypatch):
+    account_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    monkeypatch.setenv("AI_ARCHIVE_ACCOUNT_ID", account_id)
+    assert account_data_dir(Path("data/raw/Qwen"), "work") == (
+        Path("data/raw/Qwen") / f"account-{account_id}"
+    )
 
 
 def test_canonical_account_fallbacks_preserve_current_command_contracts():

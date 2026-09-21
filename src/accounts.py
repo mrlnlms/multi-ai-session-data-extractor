@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,16 +13,18 @@ from pathlib import Path
 from src.account_catalog import (
     LifecycleStatus, legacy_account_id, load_account_catalog, validate_technical_key,
 )
+from src.account_bindings import DEFAULT_BINDINGS_PATH, load_account_bindings
 from src.platforms.registry import PLATFORM_ACCOUNT_CAPABILITIES, PLATFORM_ACCOUNT_METADATA
 from src.auth_health import DEFAULT_HEALTH_PATH, load_auth_health
 
 
 DEFAULT_ACCOUNTS_FILE = Path(".storage/accounts.json")
+ACCOUNT_ID_ENV = "AI_ARCHIVE_ACCOUNT_ID"
 
 
 @dataclass(frozen=True)
 class AccountDefinition:
-    """Canonical technical identity used by the current filesystem layout."""
+    """Legacy source-command defaults retained only for v1 compatibility."""
 
     platform: str
     key: str
@@ -69,6 +73,12 @@ class AccountState:
     authentication_method: str | None = None
 
 
+@dataclass(frozen=True)
+class RunnableAccount:
+    account_id: str
+    profile_key: str
+
+
 def account_definitions(platform: str) -> tuple[AccountDefinition, ...]:
     """Return compatibility defaults for a supported web platform."""
     metadata = PLATFORM_ACCOUNT_METADATA.get(platform)
@@ -100,6 +110,26 @@ def runnable_account_keys(platform: str) -> tuple[str, ...]:
     )
 
 
+def runnable_accounts(platform: str) -> tuple[RunnableAccount, ...]:
+    """Return UUID/profile pairs without making the profile an identity."""
+    result = []
+    metadata = PLATFORM_ACCOUNT_METADATA.get(platform)
+    if metadata is None:
+        return ()
+    for state in discover_accounts(platform):
+        if state.lifecycle_status not in {None, LifecycleStatus.ACTIVE}:
+            continue
+        if state.evidence.profile_path is None:
+            continue
+        name = state.evidence.profile_path.name
+        profile_key = (
+            name[len(metadata.profile_prefix):]
+            if name.startswith(metadata.profile_prefix) else "default"
+        )
+        result.append(RunnableAccount(state.account_id, profile_key))
+    return tuple(result)
+
+
 def _observed_execution_key(state: AccountState) -> str:
     """Preserve the exact profile/data suffix expected by legacy sync CLIs."""
     metadata = PLATFORM_ACCOUNT_METADATA[state.platform]
@@ -113,12 +143,12 @@ def _observed_execution_key(state: AccountState) -> str:
     return state.key
 
 
-def account_command_argument(platform: str, technical_key: str) -> tuple[str, str]:
-    """Resolve an immutable catalog identity to the platform's existing sync flag."""
+def account_command_argument(platform: str, profile_key: str) -> tuple[str, str]:
+    """Pass a machine-local profile locator to a source sync command."""
     capability = PLATFORM_ACCOUNT_CAPABILITIES.get(platform)
     if capability is None:
         raise ValueError(f"Platform does not support web account selection: {platform!r}")
-    key = validate_technical_key(technical_key, allow_archive=False)
+    key = validate_technical_key(profile_key, allow_archive=False)
     return capability.sync_argument, key
 
 
@@ -163,15 +193,55 @@ def account_email(platform: str, profile: str, registry_path: Path = DEFAULT_ACC
     return load_account_registry(registry_path).get(platform, {}).get(profile)
 
 
+def uses_legacy_account_layout(catalog_path: Path) -> bool:
+    return load_account_catalog(catalog_path).requires_identity_migration
+
+
+def account_presentation(
+    platform: str,
+    account_reference: str,
+    catalog_path: Path,
+    *,
+    registry_source: str,
+    registry_path: Path = DEFAULT_ACCOUNTS_FILE,
+) -> str | None:
+    """Return catalog presentation, falling back only for legacy v1 data."""
+    from src.account_identity import resolve_account_id
+
+    catalog = load_account_catalog(catalog_path)
+    account_id = resolve_account_id(platform, account_reference, catalog_path)
+    record = next(item for item in catalog.records if item.account_id == account_id)
+    if record.display_name:
+        return record.display_name
+    if record.email:
+        return f"{platform} · {record.email}"
+    if catalog.requires_identity_migration:
+        return account_email(registry_source, account_reference, registry_path)
+    return platform
+
+
 def account_data_dir(base: Path, account_key: str) -> Path:
-    """Return the per-account tree without changing the legacy default path."""
+    """Return the UUID tree, with version-1 layout as finite compatibility."""
+    runtime_account_id = os.environ.get(ACCOUNT_ID_ENV)
+    if runtime_account_id:
+        try:
+            runtime_account_id = str(uuid.UUID(runtime_account_id))
+        except ValueError as exc:
+            raise ValueError(f"{ACCOUNT_ID_ENV} must contain a canonical UUID") from exc
+        return base / f"account-{runtime_account_id}"
+    catalog_path = Path("data/accounts/catalog.json")
+    if catalog_path.exists() and not load_account_catalog(catalog_path).requires_identity_migration:
+        raise ValueError(
+            f"UUID runtime is required with catalog v2; run through the account workflow "
+            f"so {ACCOUNT_ID_ENV} is set"
+        )
     if account_key == "default":
         return base
     suffix = account_key if account_key.startswith("account-") else f"account-{account_key}"
     return base / suffix
 
 
-def _technical_key(value: str) -> str:
+def _account_path_suffix(value: str) -> str:
     return value.removeprefix("account-")
 
 
@@ -207,6 +277,7 @@ def discover_accounts(
     external_root: Path = Path("data/external"),
     catalog_path: Path = Path("data/accounts/catalog.json"),
     registry_path: Path = DEFAULT_ACCOUNTS_FILE,
+    bindings_path: Path | None = None,
     health_path: Path | None = None,
 ) -> tuple[AccountState, ...]:
     """Inventory all locally observable accounts without validating login."""
@@ -214,16 +285,18 @@ def discover_accounts(
     if metadata is None:
         return ()
 
+    catalog = load_account_catalog(catalog_path)
     registry = load_account_registry(registry_path).get(metadata.registry_key, {})
-    keys = set(metadata.fallback_keys) | {_technical_key(key) for key in registry}
+    legacy_inventory = catalog.requires_identity_migration or not catalog.records
+    keys = (set(metadata.fallback_keys) | {_account_path_suffix(key) for key in registry}) if legacy_inventory else set()
     catalog_records = {
-        record.technical_key: record
-        for record in load_account_catalog(catalog_path).records
-        if record.platform == platform
+        (catalog.legacy_technical_key(record.account_id) or record.account_id): record
+        for record in catalog.records if record.platform == platform
     }
     health = load_auth_health(health_path or storage_root / DEFAULT_HEALTH_PATH.name)
     keys.update(catalog_records)
     profiles: dict[str, Path] = {}
+    bindings = load_account_bindings(bindings_path or storage_root / DEFAULT_BINDINGS_PATH.name)
 
     if storage_root.exists():
         try:
@@ -233,7 +306,7 @@ def discover_accounts(
         for path in children:
             if not path.is_dir() or not path.name.startswith(metadata.profile_prefix):
                 continue
-            key = _technical_key(path.name[len(metadata.profile_prefix):])
+            key = _account_path_suffix(path.name[len(metadata.profile_prefix):])
             if key:
                 keys.add(key)
                 profiles[key] = path
@@ -242,6 +315,17 @@ def discover_accounts(
             if legacy_path.is_dir():
                 profiles.setdefault("default", legacy_path)
                 keys.add("default")
+    for key, record in catalog_records.items():
+        binding = bindings.get(record.account_id)
+        if binding is None:
+            continue
+        bound_path = storage_root / f"{metadata.profile_prefix}{binding.profile_key}"
+        if record.platform == "Perplexity" and binding.profile_key == "default":
+            legacy_path = storage_root / "perplexity-profile"
+            if legacy_path.is_dir():
+                bound_path = legacy_path
+        if bound_path.is_dir():
+            profiles[key] = bound_path
 
     raw_platform = raw_root / platform
     merged_platform = merged_root / platform
@@ -256,7 +340,7 @@ def discover_accounts(
                 children = ()
             for path in children:
                 if path.is_dir() and path.name.startswith("account-"):
-                    key = _technical_key(path.name)
+                    key = _account_path_suffix(path.name)
                     if key:
                         keys.add(key)
                         paths[key] = path
@@ -284,15 +368,22 @@ def discover_accounts(
     states = []
     for key in ordered_keys:
         registry_lookup = key if key in registry else f"account-{key}"
-        label = registry.get(registry_lookup)
+        catalog_record = catalog_records.get(key)
+        legacy_label = registry.get(registry_lookup)
+        label = (
+            catalog_record.display_name
+            if catalog_record is not None and catalog_record.display_name
+            else catalog_record.email
+            if catalog_record is not None and catalog_record.email
+            else legacy_label
+        )
         evidence = AccountEvidence(
-            registry_present=label is not None,
+            registry_present=legacy_label is not None,
             profile_path=profiles.get(key),
             raw_path=raw_paths.get(key),
             merged_path=merged_paths.get(key),
             historical_path=historical_paths.get(key),
         )
-        catalog_record = catalog_records.get(key)
         account_id = catalog_record.account_id if catalog_record is not None else legacy_account_id(platform, key)
         observation = health.get(account_id)
         authentication = (

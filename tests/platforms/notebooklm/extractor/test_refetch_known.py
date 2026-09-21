@@ -142,6 +142,11 @@ class TestRefetchKnownNotebooklm:
 class TestOrchestratorFallback:
     """Quando discovery cai >threshold, orchestrator NAO raise — chama refetch_known."""
 
+    @pytest.fixture(autouse=True)
+    def _legacy_layout_context(self, tmp_path, monkeypatch):
+        """Keep legacy-path tests independent from the checkout catalog version."""
+        monkeypatch.chdir(tmp_path)
+
     async def test_drop_dispatches_refetch_and_logs_mode(self, tmp_path, mocker):
         from src.platforms.notebooklm.extractor import orchestrator as orch
 

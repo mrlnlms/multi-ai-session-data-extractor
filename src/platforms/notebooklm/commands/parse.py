@@ -11,7 +11,7 @@ import argparse
 import json
 from pathlib import Path
 
-from src.accounts import account_email
+from src.accounts import account_presentation
 from src.account_identity import resolve_account_id
 from src.platforms.notebooklm.parser import NotebookLMParser
 from src.platforms.notebooklm.historical_parser import (
@@ -176,15 +176,27 @@ def main(argv: list[str] | None = None):
     historical = NotebookLMHistoricalResult()
     if not args.without_historical:
         try:
+            archive_keys = {}
+            for path in args.historical_root.iterdir():
+                if not path.is_dir():
+                    continue
+                metadata_path = path / "archive_metadata.json"
+                if metadata_path.is_file():
+                    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                    archive_keys[path.name] = metadata["archive_key"]
             archive_account_ids = {
                 path.name: resolve_account_id(
-                    "NotebookLM", f"archive:{path.name}", args.catalog_path,
+                    "NotebookLM",
+                    path.name if path.name.startswith("account-") else f"archive:{path.name}",
+                    args.catalog_path,
                 )
                 for path in args.historical_root.iterdir()
                 if path.is_dir()
             }
             historical = parse_historical_archives(
-                args.historical_root, account_ids=archive_account_ids,
+                args.historical_root,
+                account_ids=archive_account_ids,
+                archive_keys=archive_keys,
             )
         except (FileNotFoundError, ValueError) as exc:
             print(f"ERRO: {exc}")
@@ -193,7 +205,10 @@ def main(argv: list[str] | None = None):
 
     for account_dir in sorted(args.merged_root.glob("account-*")):
         account_key = account_dir.name.replace("account-", "")
-        account_label = account_email("notebooklm", account_dir.name, args.accounts_file) or account_key
+        account_label = account_presentation(
+            "NotebookLM", account_dir.name, args.catalog_path,
+            registry_source="notebooklm", registry_path=args.accounts_file,
+        ) or account_key
         account_id = resolve_account_id("NotebookLM", account_dir.name, args.catalog_path)
         data = _load_account(account_dir, account_key, account_label, account_id)
         merged_combined["notebooks"].extend(data["notebooks"])

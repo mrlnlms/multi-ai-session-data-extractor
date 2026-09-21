@@ -13,7 +13,7 @@ from src.account_bindings import (
     set_account_binding, write_account_bindings_atomic,
 )
 from src.account_catalog import LifecycleStatus, load_account_catalog, serialize_account_catalog, write_account_catalog_atomic
-from src.account_service import create_account, set_lifecycle
+from src.account_service import create_account, set_account_metadata, set_lifecycle
 from src.auth_health import (
     DEFAULT_HEALTH_PATH, AuthEvidenceMethod, AuthObservation, AuthStatus,
     load_auth_health, set_auth_observation, write_auth_health_atomic,
@@ -44,8 +44,14 @@ def _parser() -> argparse.ArgumentParser:
     sub.add_parser("list")
     create = sub.add_parser("create")
     create.add_argument("--platform", required=True)
-    create.add_argument("--technical-key", required=True)
+    create.add_argument("--display-name")
+    create.add_argument("--email")
     create.add_argument("--apply", action="store_true")
+    edit = sub.add_parser("edit")
+    edit.add_argument("account_id")
+    edit.add_argument("--display-name")
+    edit.add_argument("--email")
+    edit.add_argument("--apply", action="store_true")
     lifecycle = sub.add_parser("lifecycle")
     lifecycle.add_argument("account_id")
     lifecycle.add_argument("status", choices=[item.value for item in LifecycleStatus])
@@ -69,7 +75,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     catalog = load_account_catalog(args.catalog_path)
     if args.command == "list":
         for item in catalog.records:
-            print(f"{item.account_id}  {item.platform}  {item.technical_key}  {item.lifecycle_status.value}")
+            name = item.display_name or ""
+            email = item.email or ""
+            print(f"{item.account_id}  {item.platform}  {name}  {email}  {item.lifecycle_status.value}")
         return 0
     if args.command == "auth-check":
         result = check_and_optionally_persist_auth(args.account_id, catalog_path=args.catalog_path,
@@ -102,7 +110,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("Applied.")
         return 0
     if args.command == "create":
-        change = create_account(catalog, platform=args.platform, technical_key=args.technical_key, now=now)
+        change = create_account(
+            catalog, platform=args.platform, display_name=args.display_name,
+            email=args.email, now=now,
+        )
+        apply = args.apply
+        target, before, after = args.catalog_path, catalog, change.after
+    elif args.command == "edit":
+        change = set_account_metadata(
+            catalog, args.account_id, display_name=args.display_name,
+            email=args.email, now=now,
+        )
         apply = args.apply
         target, before, after = args.catalog_path, catalog, change.after
     elif args.command == "lifecycle":

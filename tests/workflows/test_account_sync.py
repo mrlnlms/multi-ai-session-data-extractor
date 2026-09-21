@@ -13,7 +13,7 @@ NOW = datetime(2026, 9, 13, tzinfo=timezone.utc)
 
 def _state(tmp_path, lifecycle=LifecycleStatus.ACTIVE, health=AuthStatus.VALID, bound=True, profile=True):
     catalog_path, bindings_path, health_path = tmp_path / "catalog.json", tmp_path / "bindings.json", tmp_path / "health.json"
-    catalog = AccountCatalog(records=(AccountCatalogRecord(ACCOUNT_ID, "Qwen", "work", lifecycle, NOW, NOW),))
+    catalog = AccountCatalog(records=(AccountCatalogRecord(ACCOUNT_ID, "Qwen", None, None, lifecycle, NOW, NOW),))
     write_account_catalog_atomic(catalog_path, catalog, expected_before=AccountCatalog())
     if bound:
         bindings = AccountBindings(records=(AccountBinding(ACCOUNT_ID, "work", NOW),))

@@ -14,7 +14,7 @@ NOW = datetime(2026, 9, 13, tzinfo=timezone.utc)
 
 def _catalog(status=LifecycleStatus.ACTIVE, key="work"):
     return AccountCatalog(records=(AccountCatalogRecord(
-        ACCOUNT_ID, "Qwen", key, status, NOW, NOW,
+        ACCOUNT_ID, "Qwen", None, None, status, NOW, NOW,
     ),))
 
 

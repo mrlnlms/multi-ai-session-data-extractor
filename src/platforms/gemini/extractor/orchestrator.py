@@ -23,6 +23,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from src.accounts import account_data_dir
 
 from src.platforms.gemini.extractor.auth import load_context
 from src.platforms.gemini.extractor.api_client import GeminiAPIClient
@@ -47,7 +48,7 @@ DISCOVERY_DROP_ABORT_THRESHOLD = DISCOVERY_DROP_FALLBACK_THRESHOLD
 
 
 def _account_dir(account: str) -> Path:
-    return BASE_DIR / f"account-{account}"
+    return account_data_dir(BASE_DIR, account)
 
 
 def _get_max_known_discovery(account_dir: Path) -> int:

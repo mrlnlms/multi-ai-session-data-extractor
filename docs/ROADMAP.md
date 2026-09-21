@@ -85,9 +85,12 @@ snapshots remain preserved. The vault is the authoritative physical home for
 those asset bytes, while historical DVC revisions provide full rollback.
 Incremental downloaders may use transient staging paths during capture, but
 the successful vault flow retires the verified bytes before it completes. The
-account dimension is the current planning priority; the memory/configuration
-domain comes next. Schema changes and data publication retain their normal
-review and validation gates.
+account dimension and UUID-native account contract are implemented in code.
+The preview-first migration of the DVC-managed catalog and account paths is an
+unapplied operational gate; it does not imply publication. The
+memory/configuration domain comes next only after that deliberate migration.
+Schema changes and data publication retain their normal review and validation
+gates.
 
 The account dimension starts from [`src/account_catalog.py`](../src/account_catalog.py)
 and the current [`unify` table contract](../src/workflows/unify.py); historical

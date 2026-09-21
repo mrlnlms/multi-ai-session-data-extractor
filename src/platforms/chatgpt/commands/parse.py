@@ -11,7 +11,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from src.accounts import account_email
+from src.accounts import account_presentation, uses_legacy_account_layout
 from src.account_identity import resolve_account_id
 from src.platforms.chatgpt.parser import ChatGPTParser
 
@@ -42,14 +42,13 @@ def main():
     )
     log = logging.getLogger(__name__)
 
-    if not args.merged_path.is_file():
-        raise FileNotFoundError(f"Merged nao encontrado: {args.merged_path}")
-
     log.info(f"Input merged: {args.merged_path}")
     log.info(f"Raw root (assets): {args.raw_root}")
     log.info(f"Output dir: {args.output_dir}")
 
-    account_trees = [("default", args.merged_path, args.raw_root)]
+    account_trees = []
+    if uses_legacy_account_layout(args.catalog_path):
+        account_trees.append(("default", args.merged_path, args.raw_root))
     merged_base = args.merged_path.parent
     for account_dir in sorted(merged_base.glob("account-*")):
         merged = account_dir / "chatgpt_merged.json"
@@ -58,11 +57,18 @@ def main():
             # chatgpt-login/sync and by .storage/accounts.json.
             key = account_dir.name
             account_trees.append((key, merged, args.raw_root / account_dir.name))
+    if not account_trees:
+        raise FileNotFoundError(
+            f"Nenhuma arvore merged encontrada em {merged_base}"
+        )
 
     parser = ChatGPTParser(raw_root=args.raw_root)
     parser.reset()
     for profile, merged, raw_root in account_trees:
-        account = args.account or account_email("chatgpt", profile, args.accounts_file)
+        account = args.account or account_presentation(
+            "ChatGPT", profile, args.catalog_path,
+            registry_source="chatgpt", registry_path=args.accounts_file,
+        )
         account_id = resolve_account_id("ChatGPT", profile, args.catalog_path)
         per_account = ChatGPTParser(account=account, account_id=account_id, raw_root=raw_root)
         per_account.parse(merged)

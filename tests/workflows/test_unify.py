@@ -530,3 +530,47 @@ class TestUnifyEndToEnd:
             df = pd.read_parquet(f)
             assert "source" in df.columns, f"{f.name} sem coluna source"
             assert "account_id" in df.columns, f"{f.name} sem coluna account_id"
+
+
+def test_accounts_dimension_is_catalog_derived_and_rejects_orphans(tmp_path):
+    processed = tmp_path / "data/processed"
+    platform = processed / "ChatGPT"
+    platform.mkdir(parents=True)
+    account_id = "810f3e91-ae10-5cb1-931a-53b80630af16"
+    pd.DataFrame({
+        "source": ["chatgpt"],
+        "account_id": [account_id],
+        "conversation_id": ["conversation-1"],
+    }).to_parquet(platform / "chatgpt_conversations.parquet")
+    catalog = tmp_path / "data/accounts/catalog.json"
+    catalog.parent.mkdir(parents=True)
+    catalog.write_text(json.dumps({
+        "version": 2,
+        "accounts": [{
+            "account_id": account_id,
+            "platform": "ChatGPT",
+            "display_name": "Work",
+            "email": "owner@example.test",
+            "lifecycle_status": "active",
+            "created_at": "2026-09-13T00:00:00Z",
+            "updated_at": "2026-09-13T00:00:00Z",
+        }],
+    }))
+    unified = tmp_path / "data/unified"
+    counts = unify_module.unify(processed, unified, catalog_path=catalog)
+    accounts = pd.read_parquet(unified / "accounts.parquet")
+    assert counts["accounts"] == 1
+    assert list(accounts.columns) == [
+        "account_id", "source", "platform", "display_name", "email",
+        "lifecycle_status", "created_at", "updated_at",
+    ]
+    assert accounts.iloc[0]["source"] == "chatgpt"
+    assert "technical_key" not in accounts.columns
+
+    pd.DataFrame({
+        "source": ["chatgpt"],
+        "account_id": ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
+        "conversation_id": ["conversation-2"],
+    }).to_parquet(platform / "chatgpt_conversations.parquet")
+    with pytest.raises(ValueError, match="absent from accounts dimension"):
+        unify_module.unify(processed, unified, catalog_path=catalog)

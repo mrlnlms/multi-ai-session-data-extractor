@@ -50,7 +50,7 @@ def check_account_auth(
     record = next((item for item in catalog.records if item.account_id == account_id), None)
     if record is None:
         raise ValueError(f"Unknown account_id: {account_id}")
-    if record.lifecycle_status is LifecycleStatus.HISTORICAL or record.technical_key.startswith("archive:"):
+    if record.lifecycle_status is LifecycleStatus.HISTORICAL:
         raise ValueError("Historical archive accounts cannot be authentication-probed")
     binding = bindings.get(account_id)
     if binding is None:

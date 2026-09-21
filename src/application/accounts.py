@@ -42,9 +42,12 @@ def account_actions(account: AccountState) -> tuple[AccountActionView, ...]:
         True if name in {"lifecycle", "bind"} else active, command if name == "login" else None)
         for name in ("lifecycle", "bind", "auth-check", "auth-confirm", "sync", "login"))
 
-def add_account_action(*, platform: str, technical_key: str, confirmed: bool,
+def add_account_action(*, platform: str, display_name: str | None = None,
+                       email: str | None = None, confirmed: bool,
                        catalog_path: Path = DEFAULT_CATALOG_PATH) -> AccountActionOutcome:
-    args = ["--catalog-path", str(catalog_path), "create", "--platform", platform, "--technical-key", technical_key]
+    args = ["--catalog-path", str(catalog_path), "create", "--platform", platform]
+    if display_name is not None: args.extend(["--display-name", display_name])
+    if email is not None: args.extend(["--email", email])
     if confirmed: args.append("--apply")
     try:
         account_cli(args)

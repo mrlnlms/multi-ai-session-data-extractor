@@ -15,10 +15,20 @@ from pathlib import Path
 from src.platforms.registry import PLATFORM_ACCOUNT_METADATA
 
 
-CATALOG_VERSION = 1
+CATALOG_VERSION = 2
+LEGACY_CATALOG_VERSION = 1
 LEGACY_ACCOUNT_NAMESPACE = uuid.UUID("87ebca56-7875-5f47-9071-5d9db7508442")
 _ROOT_FIELDS = frozenset({"version", "accounts"})
 _RECORD_FIELDS = frozenset({
+    "account_id",
+    "platform",
+    "display_name",
+    "email",
+    "lifecycle_status",
+    "created_at",
+    "updated_at",
+})
+_LEGACY_RECORD_FIELDS = frozenset({
     "account_id",
     "platform",
     "technical_key",
@@ -39,7 +49,8 @@ class LifecycleStatus(StrEnum):
 class AccountCatalogRecord:
     account_id: str
     platform: str
-    technical_key: str
+    display_name: str | None
+    email: str | None
     lifecycle_status: LifecycleStatus
     created_at: datetime
     updated_at: datetime
@@ -49,6 +60,16 @@ class AccountCatalogRecord:
 class AccountCatalog:
     version: int = CATALOG_VERSION
     records: tuple[AccountCatalogRecord, ...] = ()
+    # Version-1 locators exist only long enough to migrate legacy paths. They
+    # are never serialized into the canonical version-2 catalog.
+    legacy_technical_keys: tuple[tuple[str, str], ...] = ()
+
+    @property
+    def requires_identity_migration(self) -> bool:
+        return bool(self.legacy_technical_keys)
+
+    def legacy_technical_key(self, account_id: str) -> str | None:
+        return dict(self.legacy_technical_keys).get(account_id)
 
 
 def validate_technical_key(value: object, *, allow_archive: bool = True) -> str:
@@ -70,6 +91,18 @@ def legacy_account_id(platform: str, technical_key: str) -> str:
     return str(uuid.uuid5(LEGACY_ACCOUNT_NAMESPACE, f"{platform}\0{technical_key}"))
 
 
+def legacy_fallback_key(platform: str, account_id: str) -> str | None:
+    """Recover only fixed pre-catalog namespaces needed to preserve row IDs."""
+    metadata = PLATFORM_ACCOUNT_METADATA.get(platform)
+    if metadata is None:
+        return None
+    return next(
+        (key for key in metadata.fallback_keys
+         if legacy_account_id(platform, key) == account_id),
+        None,
+    )
+
+
 def _parse_timestamp(value: object, field: str) -> datetime:
     if not isinstance(value, str):
         raise ValueError(f"Catalog {field} must be an ISO-8601 string")
@@ -82,9 +115,19 @@ def _parse_timestamp(value: object, field: str) -> datetime:
     return parsed
 
 
-def _parse_record(value: object) -> AccountCatalogRecord:
-    if not isinstance(value, Mapping) or set(value) != _RECORD_FIELDS:
-        raise ValueError("Catalog account fields must match version 1 exactly")
+def _optional_text(value: object, field: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or value != value.strip():
+        raise ValueError(f"Catalog {field} must be null or a trimmed string")
+    return value or None
+
+
+def _parse_record(value: object, *, legacy: bool) -> tuple[AccountCatalogRecord, str | None]:
+    expected_fields = _LEGACY_RECORD_FIELDS if legacy else _RECORD_FIELDS
+    if not isinstance(value, Mapping) or set(value) != expected_fields:
+        version = LEGACY_CATALOG_VERSION if legacy else CATALOG_VERSION
+        raise ValueError(f"Catalog account fields must match version {version} exactly")
 
     account_id = value["account_id"]
     if not isinstance(account_id, str):
@@ -98,10 +141,12 @@ def _parse_record(value: object) -> AccountCatalogRecord:
     if not isinstance(platform, str) or platform not in PLATFORM_ACCOUNT_METADATA:
         raise ValueError(f"Catalog platform is not supported: {platform!r}")
 
-    try:
-        technical_key = validate_technical_key(value["technical_key"], allow_archive=True)
-    except ValueError as exc:
-        raise ValueError("Catalog technical_key must be a safe relative string") from exc
+    technical_key = None
+    if legacy:
+        try:
+            technical_key = validate_technical_key(value["technical_key"], allow_archive=True)
+        except ValueError as exc:
+            raise ValueError("Catalog technical_key must be a safe relative string") from exc
 
     lifecycle_value = value["lifecycle_status"]
     try:
@@ -112,11 +157,12 @@ def _parse_record(value: object) -> AccountCatalogRecord:
     return AccountCatalogRecord(
         account_id=account_id,
         platform=platform,
-        technical_key=technical_key,
+        display_name=None if legacy else _optional_text(value["display_name"], "display_name"),
+        email=None if legacy else _optional_text(value["email"], "email"),
         lifecycle_status=lifecycle_status,
         created_at=_parse_timestamp(value["created_at"], "created_at"),
         updated_at=_parse_timestamp(value["updated_at"], "updated_at"),
-    )
+    ), technical_key
 
 
 def load_account_catalog(path: Path) -> AccountCatalog:
@@ -130,23 +176,38 @@ def load_account_catalog(path: Path) -> AccountCatalog:
 
     if not isinstance(raw, Mapping) or set(raw) != _ROOT_FIELDS:
         raise ValueError("Account catalog root fields must be version and accounts")
-    if type(raw["version"]) is not int or raw["version"] != CATALOG_VERSION:
+    if type(raw["version"]) is not int or raw["version"] not in {
+        LEGACY_CATALOG_VERSION, CATALOG_VERSION,
+    }:
         raise ValueError(f"Unsupported account catalog version: {raw['version']!r}")
     if not isinstance(raw["accounts"], list):
         raise ValueError("Account catalog accounts must be an array")
 
-    records = tuple(_parse_record(value) for value in raw["accounts"])
+    legacy = raw["version"] == LEGACY_CATALOG_VERSION
+    parsed = tuple(_parse_record(value, legacy=legacy) for value in raw["accounts"])
+    records = tuple(record for record, _ in parsed)
+    legacy_keys = tuple(
+        (record.account_id, technical_key)
+        for record, technical_key in parsed
+        if technical_key is not None
+    )
     account_ids: set[str] = set()
-    identities: set[tuple[str, str]] = set()
+    legacy_identities: set[tuple[str, str]] = set()
     for record in records:
         if record.account_id in account_ids:
             raise ValueError(f"Duplicate account_id: {record.account_id}")
-        identity = (record.platform, record.technical_key)
-        if identity in identities:
-            raise ValueError(f"Duplicate account identity: {record.platform}:{record.technical_key}")
+        technical_key = dict(legacy_keys).get(record.account_id)
+        identity = (record.platform, technical_key) if technical_key is not None else None
+        if identity is not None and identity in legacy_identities:
+            raise ValueError(f"Duplicate legacy account identity: {record.platform}:{technical_key}")
         account_ids.add(record.account_id)
-        identities.add(identity)
-    return AccountCatalog(version=CATALOG_VERSION, records=records)
+        if identity is not None:
+            legacy_identities.add(identity)
+    return AccountCatalog(
+        version=CATALOG_VERSION,
+        records=records,
+        legacy_technical_keys=legacy_keys,
+    )
 
 
 def _timestamp(value: datetime) -> str:
@@ -163,7 +224,8 @@ def serialize_account_catalog(catalog: AccountCatalog) -> str:
             {
                 "account_id": record.account_id,
                 "platform": record.platform,
-                "technical_key": record.technical_key,
+                "display_name": record.display_name,
+                "email": record.email,
                 "lifecycle_status": record.lifecycle_status.value,
                 "created_at": _timestamp(record.created_at),
                 "updated_at": _timestamp(record.updated_at),

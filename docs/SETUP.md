@@ -87,17 +87,18 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.login
 PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.login
 ```
 
-Para uma segunda conta de uma plataforma, use um perfil separado, por exemplo
-`PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.login --account account-2`.
-
-Para Gemini e NotebookLM, informe a conta explicitamente:
+Para uma conta adicional, crie primeiro a identidade no catalogo, escolha um
+nome de profile apenas local, faca o login nesse profile e vincule-o ao UUID:
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login --account 1
-PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login --account 2
-PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.login --account 1
-PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.login --account 2
+PYTHONPATH=. .venv/bin/python -m src.operations.accounts create --platform DeepSeek --display-name "Pessoal"
+PYTHONPATH=. .venv/bin/python -m src.operations.accounts create --platform DeepSeek --display-name "Pessoal" --apply
+PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.login --account pessoal
+PYTHONPATH=. .venv/bin/python -m src.operations.accounts bind ACCOUNT_ID --profile-key pessoal --apply
 ```
+
+O nome `pessoal` identifica somente o profile nesta instalacao. A identidade
+duravel e os paths raw/merged usam sempre `ACCOUNT_ID`.
 
 **O que esperar:**
 
@@ -116,9 +117,9 @@ coleta. O extrator depende somente da sessao da plataforma salva no diretorio
 tecnico `.storage/<plataforma>-profile-<chave>/`.
 
 Para evitar confusao em operacoes multi-conta, confira a identidade mostrada
-pelo proprio servico antes de fechar a janela e mantenha a mesma chave tecnica
-nos comandos de login e sync. Nunca use o avatar, e-mail ou estado de sync do
-Chrome como evidencia de qual conta da plataforma esta autenticada.
+pelo proprio servico antes de fechar a janela e vincule o profile local ao UUID
+correto. Nunca use o avatar, e-mail ou estado de sync do Chrome como evidencia
+de qual conta da plataforma esta autenticada.
 
 **CLIs (Claude Code, Codex, Gemini CLI e Antigravity CLI):** o coletor nao
 faz login. Ele copia dados dos diretorios locais da ferramenta, como
@@ -132,62 +133,28 @@ Comece por uma plataforma para validar o ambiente:
 PYTHONPATH=. .venv/bin/python -m src.workflows.headless --plats=ChatGPT --no-publish
 ```
 
-For another ChatGPT account, create and log into an isolated extractor profile
-once, then pass the same key to sync. The default account keeps the original
-paths; `account-2` uses its own raw and merged subdirectories.
+Para sincronizar uma conta web especifica, selecione sua identidade imutavel.
+O preview nao altera dados; `--apply` executa sync + parse para a conta, sem
+unify ou publicacao:
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.login --profile account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync --account account-2 --no-voice-pass
-PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.parse
+PYTHONPATH=. .venv/bin/python -m src.operations.accounts list
+PYTHONPATH=. .venv/bin/python -m src.workflows.account_sync ACCOUNT_ID
+PYTHONPATH=. .venv/bin/python -m src.workflows.account_sync ACCOUNT_ID --apply
 ```
 
-Claude.ai follows the same profile-key pattern:
+O workflow seletivo chama o sync web da fonte, que faz captura, download de
+assets e reconciliacao:
 
-```bash
-PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.login --profile account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.sync --profile account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.parse
-```
-
-Kimi also uses a named isolated profile for each additional account:
-
-```bash
-PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.login --account account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.sync --account account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.parse
-```
-
-Grok e Perplexity seguem o mesmo padrao quando uma segunda conta existir:
-
-```bash
-PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.login --account account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.sync --account account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.parse
-
-PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.login --account account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.sync --account account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.parse
-```
-
-Um sync web executado diretamente faz captura, download de assets e
-reconciliacao:
-
-1. **Captura** — baixa pela API interna e salva em `data/raw/ChatGPT/` para
-   `default`, ou em `data/raw/ChatGPT/account-<key>/` para outra conta.
+1. **Captura** — baixa pela API interna e salva em
+   `data/raw/ChatGPT/account-<UUID>/`.
 2. **Assets** — imagens, uploads, arquivos de projeto e equivalentes.
 3. **Reconciliacao** — consolida com a captura anterior em
-   `data/merged/ChatGPT/` (ou na subpasta da conta). Conversas que sumiram do servidor ficam com
+   `data/merged/ChatGPT/account-<UUID>/`. Conversas que sumiram do servidor ficam com
    `is_preserved_missing=True`.
 
-Ao executar um sync web diretamente, rode depois o parser para converter o
-merged em Parquet:
-
-```bash
-PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.parse
-```
-
-Isso gera os Parquets de `data/processed/ChatGPT/` no schema canonico.
+Em seguida, o mesmo workflow roda o parser para converter o merged em Parquet
+no schema canonico.
 
 O dashboard e a pipeline automatizada fazem esse parser depois de cada sync
 web bem-sucedido e antes da unificacao. Os syncs de CLI ja incluem o parser.
@@ -202,29 +169,19 @@ Isso materializa os Parquets unificados em `data/unified/`.
 
 ## 5. Multiplas contas (Gemini, NotebookLM)
 
-Gemini e NotebookLM suportam contas isoladas por chave tecnica; `1`, `2` e `3`
-abaixo sao exemplos das contas configuradas no acervo atual, nao um limite do
-modelo. O NotebookLM tambem possui um arquivo corporativo historico, separado
-das contas de login atuais. O `parse.py` oficial inclui esse snapshot quando
-ele esta restaurado pelo DVC e falha com seguranca quando o diretorio esperado
-esta ausente; `--without-historical` e uma exclusao deliberada, nao o padrao.
-
-Para Gemini:
+Gemini e NotebookLM suportam qualquer quantidade de identidades catalogadas.
+Cada UUID ativo aponta para um profile local por binding; o modo headless
+seleciona todas as contas executaveis, enquanto `account_sync` seleciona uma:
 
 ```bash
-# Login to each account separately
-PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login --account 1
-PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login --account 2
-PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login --account 3
-
-# Sync all runnable accounts and parse once
-PYTHONPATH=. .venv/bin/python -m src.workflows.headless --plats=Gemini --no-publish
-
-# Or just one
-PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync --account 1
+PYTHONPATH=. .venv/bin/python -m src.workflows.headless --plats=Gemini,NotebookLM --no-publish
+PYTHONPATH=. .venv/bin/python -m src.workflows.account_sync ACCOUNT_ID --apply
 ```
 
-Para NotebookLM, use o mesmo padrao com a chave tecnica correspondente.
+O NotebookLM tambem possui um arquivo corporativo historico, separado das
+contas de login atuais. O parser oficial inclui esse snapshot quando ele esta
+restaurado pelo DVC e falha com seguranca quando o diretorio esperado esta
+ausente; `--without-historical` e uma exclusao deliberada, nao o padrao.
 
 ## 6. Problemas comuns
 

@@ -18,8 +18,7 @@ CLIs ja copia e parseia.
 
 ```bash
 python -m src.platforms.chatgpt.commands.login
-python -m src.platforms.chatgpt.commands.sync --account default
-python -m src.platforms.chatgpt.commands.parse
+python -m src.workflows.account_sync ACCOUNT_ID --apply
 python -m src.platforms.codex.commands.sync
 ```
 
@@ -70,12 +69,45 @@ nao entra no inventario nem na avaliacao de autenticacao.
 Um sync seletivo concluido com sucesso tambem atualiza a observacao local para
 `valid` com metodo `sync`.
 
+As acoes expostas pela interface e por esses servicos significam:
+
+| Acao | Efeito |
+|---|---|
+| `lifecycle` | Altera explicitamente a conta entre `active`, `disabled` e `historical`, sem apagar identidade ou dados. |
+| `bind` | Associa o UUID da conta ao profile de navegador local que contem sua sessao autenticada. |
+| `auth-check` | Faz uma leitura minima na plataforma e registra localmente o resultado observado. |
+| `auth-confirm` | Registra a confirmacao manual de que o operador viu a conta autenticada no navegador. |
+| `sync` | Executa captura e parse seletivos para a conta identificada pelo UUID; nao executa unify nem publicacao. |
+| `login` | Abre o fluxo headed especifico da plataforma; senha e MFA sao fornecidos diretamente pelo usuario ao servico. |
+
+`account_id` e a unica identidade imutavel. `profile_key` identifica somente o
+profile local apontado pelo binding dessa instalacao. O catalogo v2 e a
+dimensao analitica nao possuem `technical_key`; o leitor v1 existe apenas na
+fronteira da migracao dos paths antigos. O glossario e a justificativa completa
+ficam em
+[`account-architecture.md`](../product/account-architecture.md#31-glossario-de-conta).
+
 Manual saves nao substituem a captura oficial. Eles geram arquivos
 `<source>_manual_<table>.parquet` na pasta processada da plataforma e sao
 incluidos pela unificacao. Consulte `src/importers/manual/` para os formatos
 aceitos.
 
 ## Operacoes excepcionais
+
+### Migracao da identidade e dos paths de contas
+
+O migrador preserva os UUIDs do catalogo v1, planeja a passagem de raw, merged
+e snapshots historicos aplicaveis para `account-<UUID>` e grava o catalogo v2
+por ultimo. O padrao e apenas preview; ele nao executa DVC, Git ou publicacao:
+
+```bash
+python -m src.operations.migrate_account_identity
+python -m src.operations.migrate_account_identity --apply
+```
+
+`--apply` altera dados canonicos e exige uma rodada operacional deliberada. A
+migracao local foi aplicada em 2026-09-21; o comando permanece documentado para
+restauracoes ou checkouts que ainda contenham o catalogo v1.
 
 ### Adocao do catalogo de contas
 

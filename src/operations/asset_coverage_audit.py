@@ -961,10 +961,10 @@ def build_coverage_report(
     account_ids: dict[tuple[str, str], str] = {}
     if data_root is not None:
         catalog = load_account_catalog(Path(data_root) / "accounts" / "catalog.json")
-        account_ids = {
-            (record.platform, record.technical_key): record.account_id
-            for record in catalog.records
-        }
+        account_ids = {}
+        for record in catalog.records:
+            locator = catalog.legacy_technical_key(record.account_id) or record.account_id
+            account_ids[(record.platform, locator)] = record.account_id
     findings = tuple(
         reconcile_asset_coverage(
             evidence_rows, assets, links, policy, data_root=data_root

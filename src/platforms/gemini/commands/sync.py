@@ -25,7 +25,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Mapping
-from src.accounts import capturable_account_key
+from src.accounts import account_data_dir, capturable_account_key
 
 from src.assets.vault import AssetVault
 from src.assets.reader import AssetReader
@@ -124,7 +124,7 @@ async def _sync_account(
         return 0
 
     _section(f"Etapa 3/3 — Reconcile (account {account})")
-    merged_dir = MERGED_BASE / f"account-{account}"
+    merged_dir = account_data_dir(MERGED_BASE, account)
     report = run_reconciliation(
         raw_dir,
         merged_dir,

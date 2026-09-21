@@ -367,7 +367,10 @@ class NotebookLMHistoricalParser:
 
 
 def parse_historical_archives(
-    root: Path, *, account_ids: dict[str, str] | None = None,
+    root: Path,
+    *,
+    account_ids: dict[str, str] | None = None,
+    archive_keys: dict[str, str] | None = None,
 ) -> NotebookLMHistoricalResult:
     """Parse each direct child snapshot using its directory name as provenance."""
 
@@ -384,7 +387,8 @@ def parse_historical_archives(
         if not any((child / "notebook.json").is_file() for child in archive_dir.iterdir()):
             raise ValueError(f"historical archive has no notebook snapshots: {archive_dir}")
         account_id = (account_ids or {}).get(archive_dir.name)
+        archive_key = (archive_keys or {}).get(archive_dir.name, archive_dir.name)
         combined.extend(
-            NotebookLMHistoricalParser(archive_dir.name, account_id=account_id).parse(archive_dir)
+            NotebookLMHistoricalParser(archive_key, account_id=account_id).parse(archive_dir)
         )
     return combined

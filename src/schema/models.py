@@ -8,6 +8,8 @@ import uuid
 
 import pandas as pd
 
+from src.account_catalog import LifecycleStatus
+
 
 VALID_SOURCES = ("claude_ai", "chatgpt", "qwen", "claude_code", "deepseek", "perplexity", "gemini", "notebooklm", "codex", "gemini_cli", "antigravity_cli", "grok", "kimi")
 VALID_ROLES = ("user", "assistant", "system")
@@ -17,6 +19,29 @@ VALID_ASSET_ORIGINS = ("user", "assistant", "platform", "imported", "unknown")
 VALID_ASSET_LINK_OBJECT_TYPES = ("message", "conversation", "project", "source", "output", "note")
 VALID_ASSET_LINK_ROLES = ("input", "output", "context", "reference", "unknown")
 ASSET_LINK_NAMESPACE = uuid.UUID("c76d54a8-9ba8-5f33-b2a3-0ae129545238")
+
+
+@dataclass(frozen=True)
+class AccountDimension:
+    """Read-only analytical projection of one durable catalog account."""
+
+    account_id: str
+    source: str
+    platform: str
+    display_name: Optional[str]
+    email: Optional[str]
+    lifecycle_status: str
+    created_at: pd.Timestamp
+    updated_at: pd.Timestamp
+
+    def __post_init__(self):
+        _validate_account_id(self.account_id)
+        if self.source not in VALID_SOURCES:
+            raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
+        LifecycleStatus(self.lifecycle_status)
+
+    def to_dict(self) -> dict:
+        return asdict(self)
 
 
 def _validate_account_id(account_id: Optional[str]) -> None:

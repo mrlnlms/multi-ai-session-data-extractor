@@ -9,8 +9,11 @@ slide deck PDF+PPTX, infographic, mind map).
 - **Multi-account** — three compatibility-default active accounts (acc-1,
   acc-2, acc-3). Profiles in `.storage/notebooklm-profile-<key>/` (generated via
   `python -m src.platforms.notebooklm.commands.login`).
-- **Single cumulative folder per-account:** `data/raw/NotebookLM/account-{N}/`
-  and `data/merged/NotebookLM/account-{N}/`.
+- **Single cumulative folder per-account:** durable trees use
+  `data/raw/NotebookLM/account-<account_id>/` and
+  `data/merged/NotebookLM/account-<account_id>/`. The local profile key is
+  resolved from the UUID binding; selective sync uses
+  `python -m src.workflows.account_sync <account_id> --apply`.
 - **Per-account sync command (3 steps):**
   `python -m src.platforms.notebooklm.commands.sync --account <safe-key>` —
   capture + assets + reconcile for exactly one account. The shared headless

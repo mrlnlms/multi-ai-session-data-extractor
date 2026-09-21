@@ -7,7 +7,7 @@ Uso:
 import argparse
 from pathlib import Path
 
-from src.accounts import account_email
+from src.accounts import account_presentation, uses_legacy_account_layout
 from src.account_identity import resolve_account_id, stamp_account_id_rows
 from src.platforms.kimi.parser import KimiParser
 
@@ -22,7 +22,7 @@ def main():
     args = ap.parse_args()
 
     merged_root = Path(args.merged)
-    account_trees = [("default", merged_root)]
+    account_trees = [("default", merged_root)] if uses_legacy_account_layout(args.catalog_path) else []
     for account_dir in sorted(merged_root.glob("account-*")):
         if account_dir.is_dir():
             account_trees.append((account_dir.name, account_dir))
@@ -30,7 +30,10 @@ def main():
     parser = KimiParser(merged_root=merged_root)
     parser.reset()
     for profile, tree in account_trees:
-        account = args.account or account_email("kimi", profile, args.accounts_file)
+        account = args.account or account_presentation(
+            "Kimi", profile, args.catalog_path,
+            registry_source="kimi", registry_path=args.accounts_file,
+        )
         account_id = resolve_account_id("Kimi", profile, args.catalog_path)
         per_account = KimiParser(account=account, account_id=account_id, merged_root=tree)
         per_account.parse(tree)

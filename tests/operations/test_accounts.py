@@ -13,15 +13,15 @@ def _args(tmp_path, *command):
 
 
 def test_create_previews_then_applies_to_injected_catalog(tmp_path, capsys):
-    assert main(_args(tmp_path, "create", "--platform", "Qwen", "--technical-key", "work")) == 0
+    assert main(_args(tmp_path, "create", "--platform", "Qwen", "--display-name", "Work")) == 0
     assert not (tmp_path / "catalog.json").exists()
     assert "preserved data will not be deleted" in capsys.readouterr().out
-    assert main(_args(tmp_path, "create", "--platform", "Qwen", "--technical-key", "work", "--apply")) == 0
-    assert load_account_catalog(tmp_path / "catalog.json").records[0].technical_key == "work"
+    assert main(_args(tmp_path, "create", "--platform", "Qwen", "--display-name", "Work", "--apply")) == 0
+    assert load_account_catalog(tmp_path / "catalog.json").records[0].display_name == "Work"
 
 
 def test_lifecycle_and_bind_are_preview_first(tmp_path):
-    catalog = AccountCatalog(records=(AccountCatalogRecord(ACCOUNT_ID, "Qwen", "work", LifecycleStatus.ACTIVE, NOW, NOW),))
+    catalog = AccountCatalog(records=(AccountCatalogRecord(ACCOUNT_ID, "Qwen", None, None, LifecycleStatus.ACTIVE, NOW, NOW),))
     write_account_catalog_atomic(tmp_path / "catalog.json", catalog, expected_before=AccountCatalog())
     assert main(_args(tmp_path, "lifecycle", ACCOUNT_ID, "historical")) == 0
     assert load_account_catalog(tmp_path / "catalog.json").records[0].lifecycle_status is LifecycleStatus.ACTIVE
@@ -32,11 +32,11 @@ def test_lifecycle_and_bind_are_preview_first(tmp_path):
 def test_parser_exposes_no_delete_command():
     from src.operations.accounts import _parser
     choices = _parser()._subparsers._group_actions[0].choices
-    assert set(choices) == {"list", "create", "lifecycle", "bind", "auth-check", "auth-confirm"}
+    assert set(choices) == {"list", "create", "edit", "lifecycle", "bind", "auth-check", "auth-confirm"}
 
 
 def test_auth_confirm_is_preview_first_and_records_operator_evidence(tmp_path):
-    catalog = AccountCatalog(records=(AccountCatalogRecord(ACCOUNT_ID, "Qwen", "work", LifecycleStatus.ACTIVE, NOW, NOW),))
+    catalog = AccountCatalog(records=(AccountCatalogRecord(ACCOUNT_ID, "Qwen", None, None, LifecycleStatus.ACTIVE, NOW, NOW),))
     write_account_catalog_atomic(tmp_path / "catalog.json", catalog, expected_before=AccountCatalog())
     assert main(_args(tmp_path, "auth-confirm", ACCOUNT_ID)) == 0
     assert not (tmp_path / "health.json").exists()

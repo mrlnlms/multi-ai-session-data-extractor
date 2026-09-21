@@ -64,7 +64,8 @@ def build_catalog(
             records.append(AccountCatalogRecord(
                 account_id=account.account_id or legacy_account_id(platform, account.key),
                 platform=platform,
-                technical_key=account.key,
+                display_name=None,
+                email=account.label,
                 lifecycle_status=lifecycle,
                 created_at=captured_at,
                 updated_at=captured_at,

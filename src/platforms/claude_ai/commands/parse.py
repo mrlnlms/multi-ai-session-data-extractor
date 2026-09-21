@@ -19,7 +19,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from src.accounts import account_email
+from src.accounts import account_presentation, uses_legacy_account_layout
 from src.account_identity import resolve_account_id, stamp_account_id_rows
 from src.platforms.claude_ai.parser import ClaudeAIParser
 
@@ -55,7 +55,7 @@ def main():
     log.info(f"Input merged: {args.merged_root}")
     log.info(f"Output dir:   {args.output_dir}")
 
-    account_trees = [("default", args.merged_root)]
+    account_trees = [("default", args.merged_root)] if uses_legacy_account_layout(args.catalog_path) else []
     for account_dir in sorted(args.merged_root.glob("account-*")):
         if account_dir.is_dir():
             account_trees.append((account_dir.name, account_dir))
@@ -63,7 +63,10 @@ def main():
     parser = ClaudeAIParser(merged_root=args.merged_root)
     parser.reset()
     for profile, merged_root in account_trees:
-        account = args.account or account_email("claude_ai", profile, args.accounts_file)
+        account = args.account or account_presentation(
+            "Claude.ai", profile, args.catalog_path,
+            registry_source="claude_ai", registry_path=args.accounts_file,
+        )
         account_id = resolve_account_id("Claude.ai", profile, args.catalog_path)
         per_account = ClaudeAIParser(
             account=account, account_id=account_id, merged_root=merged_root,

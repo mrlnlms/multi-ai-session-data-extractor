@@ -79,14 +79,20 @@ def asset_subprocess_env(
 def runtime_account_id(
     runtime: AssetRuntime,
     platform: str,
-    technical_key: str,
+    profile_key: str,
     *,
     explicit: str | None = None,
     catalog_path: Path = Path("data/accounts/catalog.json"),
 ) -> str | None:
     """Resolve the durable account UUID only when vault mode selected it."""
+    from src.accounts import ACCOUNT_ID_ENV
+    runtime_account = os.environ.get(ACCOUNT_ID_ENV)
+    if runtime_account:
+        if explicit is not None and explicit != runtime_account:
+            raise ValueError("Explicit account_id disagrees with the runtime account UUID")
+        return runtime_account
     if explicit is not None or runtime.mode is AssetMode.LEGACY:
         return explicit
     from src.account_identity import resolve_account_id
 
-    return resolve_account_id(platform, technical_key, catalog_path)
+    return resolve_account_id(platform, profile_key, catalog_path)

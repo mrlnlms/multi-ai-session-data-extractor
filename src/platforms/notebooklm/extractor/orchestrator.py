@@ -21,6 +21,7 @@ import json
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
+from src.accounts import account_data_dir
 
 from src.platforms.notebooklm.extractor.auth import load_context, ACCOUNT_LANG
 from src.platforms.notebooklm.extractor.api_client import NotebookLMClient
@@ -77,7 +78,7 @@ def _lite_metadata_equal(previous: object, current: object) -> bool:
 
 
 def _account_dir(account: str) -> Path:
-    return BASE_DIR / f"account-{account}"
+    return account_data_dir(BASE_DIR, account)
 
 
 def _resolve_output_dir(account: str) -> Path:

@@ -55,10 +55,9 @@ def _account_rows(states: list[PlatformState]) -> list[dict[str, object]]:
             rows.append(
                 {
                     "Platform": state.name,
-                    "Technical account": account.key,
+                    "Account": account.label or f"{state.name} · {account.account_id}",
                     "Account ID": account.account_id,
                     "Lifecycle": _lifecycle_label(account),
-                    "Private label": account.label or "—",
                     "Registry": _present(evidence.registry_present),
                     "Profile": _present(evidence.profile_present),
                     "Raw": _present(evidence.raw_present),
@@ -79,15 +78,19 @@ def render(states: list[PlatformState]) -> None:
     )
     with st.expander("Add account"):
         platform_name = st.selectbox("Platform", sorted(WEB_PLATFORMS), key="account_add_platform")
-        technical_key = st.text_input("Technical profile key", key="account_add_key")
+        display_name = st.text_input("Display name (optional)", key="account_add_name")
+        email = st.text_input("E-mail (optional)", key="account_add_email")
         if st.button("Preview add account", key="account_add_preview"):
-            st.session_state["account_add_pending"] = (platform_name, technical_key)
+            st.session_state["account_add_pending"] = (platform_name, display_name, email)
         pending = st.session_state.get("account_add_pending")
         if pending:
             st.warning("Identity and preserved data will not be deleted.")
             confirmed = st.checkbox("I confirm this account catalog change", key="account_add_confirm")
             if st.button("Apply add account", disabled=not confirmed, key="account_add_apply"):
-                outcome = add_account_action(platform=pending[0], technical_key=pending[1], confirmed=True)
+                outcome = add_account_action(
+                    platform=pending[0], display_name=pending[1] or None,
+                    email=pending[2] or None, confirmed=True,
+                )
                 (st.success if outcome.ok else st.error)(outcome.message)
 
     accounts = [account for state in states for account in state.accounts]

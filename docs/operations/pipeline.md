@@ -173,40 +173,13 @@ o modo headless executam esse parse automaticamente após um sync web
 bem-sucedido. Os quatro syncs de CLI ja fazem copy e parse.
 
 ```bash
-# Fonte web: exemplo ChatGPT
-PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync --no-voice-pass
-# Outra conta ChatGPT, depois de executar python -m src.platforms.chatgpt.commands.login --profile account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.sync --account account-2 --no-voice-pass
-PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.parse
+# Conta web: preview e execucao seletiva por UUID
+PYTHONPATH=. .venv/bin/python -m src.operations.accounts list
+PYTHONPATH=. .venv/bin/python -m src.workflows.account_sync ACCOUNT_ID
+PYTHONPATH=. .venv/bin/python -m src.workflows.account_sync ACCOUNT_ID --apply
 
-# Outra conta Claude.ai, depois de executar python -m src.platforms.claude_ai.commands.login --profile account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.sync --profile account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.parse
-
-# Outra conta Kimi, depois de executar python -m src.platforms.kimi.commands.login --account account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.sync --account account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.kimi.commands.parse
-
-# Outra conta DeepSeek, depois de executar python -m src.platforms.deepseek.commands.login --account account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.sync --account account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.parse
-
-# Outra conta Qwen, depois de executar python -m src.platforms.qwen.commands.login --account account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.qwen.commands.sync --account account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.qwen.commands.parse
-
-# Outra conta Grok ou Perplexity, depois do login no perfil separado
-PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.sync --account account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.parse
-PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.sync --account account-2
-PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.parse
-
-# Gemini e NotebookLM: o workflow seleciona as contas e faz um parse ao final
+# Varias contas/fontes: o workflow seleciona contas ativas, faz sync e parse
 PYTHONPATH=. .venv/bin/python -m src.workflows.headless --plats=Gemini,NotebookLM --no-publish
-
-# Sync direto e excepcional sempre recebe uma conta; nao chama parse
-PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.sync --account 1
-PYTHONPATH=. .venv/bin/python -m src.platforms.notebooklm.commands.sync --account 1
 
 # Fonte CLI: sync ja inclui parse
 PYTHONPATH=. .venv/bin/python -m src.platforms.codex.commands.sync
@@ -238,28 +211,15 @@ fontes web usam o modo documentado no estado tecnico.
 
 ## Proveniencia de conta web
 
-Os parsers web leem opcionalmente `.storage/accounts.json`, um arquivo local
-ignorado pelo Git que associa uma plataforma e um profile tecnico ao e-mail da
-conta. O formato e `plataforma -> profile -> e-mail`; inclua apenas os profiles
-que existem na maquina:
+O catalogo DVC guarda `display_name` e o e-mail opcional da conta. O binding
+local em `.storage/account-bindings.json` associa o UUID ao profile desta
+instalacao; profiles e autenticacao nao entram nos Parquets publicados. O
+registro legado `.storage/accounts.json` e lido somente pela fronteira de
+migracao do catalogo v1 e nao deve ser usado como nova fonte de identidade.
 
-```json
-{
-  "chatgpt": {
-    "default": "name@example.com"
-  },
-  "gemini": {
-    "account-1": "name@example.com",
-    "account-2": "other@example.com"
-  }
-}
-```
-
-O parser preserva esse e-mail na coluna legada `account`; se o arquivo ou o
-mapeamento nao existir, o rótulo continua nulo. Separadamente, ele resolve o
-UUID imutável `account_id` por plataforma e chave técnica no catálogo DVC. A
-resolução falha antes de publicar a saída se uma conta web não estiver no
-catálogo. IDs históricos de conversa não mudam. Por conter dados pessoais, o
+Os parsers derivam o UUID imutavel diretamente do diretorio
+`account-<UUID>`. A resolucao falha antes de publicar a saida se uma conta web
+nao estiver no catalogo. IDs historicos de conversa nao mudam. Por conter dados pessoais, o
 arquivo real de rótulos permanece em `.storage/` e nunca entra no Git.
 
 Na unificação, as chaves começam por `(source, account_id, ...)`. Parquets
@@ -279,8 +239,8 @@ ser refeita a partir de `processed`.
 ## Conferir uma rodada
 
 ```bash
-cat data/raw/ChatGPT/LAST_CAPTURE.md
-cat data/merged/ChatGPT/LAST_RECONCILE.md
+PYTHONPATH=. .venv/bin/python -m src.operations.accounts list
+PYTHONPATH=. .venv/bin/python -m src.operations.archive_assurance status
 PYTHONPATH=. .venv/bin/pytest
 ```
 

@@ -60,7 +60,7 @@ def test_resolve_account_id_uses_catalog_identity(tmp_path):
 
 
 def test_missing_web_identity_fails_closed(tmp_path):
-    with pytest.raises(ValueError, match="catalog account"):
+    with pytest.raises(ValueError, match="canonical account UUID"):
         resolve_account_id("Kimi", "default", tmp_path / "missing.json")
 
 

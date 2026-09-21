@@ -2,9 +2,10 @@
 
 ## Pipeline
 
-- **Per-account cumulative folders:** the legacy `default` account remains in
-  `data/raw/ChatGPT/` and `data/merged/ChatGPT/`; another profile key uses
-  `account-<key>/` below each tree.
+- **Per-account cumulative folders:** every durable raw/merged tree uses
+  `account-<account_id>/`. Local browser profile keys remain only in the UUID
+  binding under `.storage/`; selective sync uses
+  `python -m src.workflows.account_sync <account_id> --apply`.
 - **Sync orchestrator (4 steps):** `python -m src.platforms.chatgpt.commands.sync` — capture +
   assets + project_sources + reconcile.
 - **Capture:** **headed** (Cloudflare detects headless). Project discovery is

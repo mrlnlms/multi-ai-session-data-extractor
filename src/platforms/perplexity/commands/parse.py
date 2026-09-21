@@ -10,7 +10,7 @@ Uso: PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.parse
 import argparse
 from pathlib import Path
 
-from src.accounts import account_email
+from src.accounts import account_presentation, uses_legacy_account_layout
 from src.account_identity import resolve_account_id
 from src.platforms.perplexity.parser import PerplexityParser
 
@@ -24,7 +24,8 @@ def main():
     ap.add_argument("--accounts-file", type=Path, default=Path(".storage/accounts.json"))
     ap.add_argument("--catalog-path", type=Path, default=Path("data/accounts/catalog.json"))
     args = ap.parse_args()
-    account_trees = [("default", args.merged_root, args.raw_root)]
+    account_trees = ([("default", args.merged_root, args.raw_root)]
+                     if uses_legacy_account_layout(args.catalog_path) else [])
     for account_dir in sorted(args.merged_root.glob("account-*")):
         if account_dir.is_dir():
             account_trees.append((account_dir.name, account_dir, args.raw_root / account_dir.name))
@@ -32,7 +33,10 @@ def main():
     parser = PerplexityParser(merged_root=args.merged_root, raw_root=args.raw_root)
     parser.reset()
     for profile, merged_tree, raw_tree in account_trees:
-        account = args.account or account_email("perplexity", profile, args.accounts_file)
+        account = args.account or account_presentation(
+            "Perplexity", profile, args.catalog_path,
+            registry_source="perplexity", registry_path=args.accounts_file,
+        )
         account_id = resolve_account_id("Perplexity", profile, args.catalog_path)
         per_account = PerplexityParser(
             account=account, account_id=account_id,

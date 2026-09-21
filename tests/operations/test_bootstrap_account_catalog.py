@@ -46,7 +46,8 @@ def test_build_catalog_classifies_fallback_and_historical_archive():
         captured_at=CAPTURED_AT,
     )
 
-    assert [record.technical_key for record in catalog.records] == ["1", "archive:former-work"]
+    assert [record.platform for record in catalog.records] == ["NotebookLM", "NotebookLM"]
+    assert all(record.account_id for record in catalog.records)
     assert [record.lifecycle_status for record in catalog.records] == [
         LifecycleStatus.ACTIVE,
         LifecycleStatus.HISTORICAL,
@@ -81,7 +82,8 @@ def test_serialization_is_reproducible_ordered_and_private_data_free():
     assert first == second
     payload = json.loads(first)
     assert [record["platform"] for record in payload["accounts"]] == ["ChatGPT", "Qwen"]
-    assert "owner@example.test" not in first
+    assert "owner@example.test" in first
+    assert all("technical_key" not in record for record in payload["accounts"])
     assert "/secret/profile" not in first
 
 
