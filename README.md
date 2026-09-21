@@ -139,8 +139,9 @@ immutable assets → central content-addressed vault ←─┘
    selective sync. CLI and manual rows keep `account_id` null until a durable
    identity is observable.
 4. **Unify** consolidates the parquets from the 13 sources into a single
-   `data/unified/` with 15 parquet tables (4 canonical + 11 auxiliaries),
-   ready for cross-platform analysis.
+   `data/unified/` with 16 parquet tables (4 canonical + 12 auxiliary tables,
+   including the catalog-derived `accounts` dimension), ready for
+   cross-platform analysis.
 
 The published `Asset`/`AssetLink` schema and the physical storage of their
 bytes are separate contracts. The central content-addressed asset vault is

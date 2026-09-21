@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from dashboard.views.accounts import _account_rows
+from dashboard.views.accounts import _account_rows, _actionable_accounts
 from src.account_catalog import LifecycleStatus, legacy_account_id
 from src.accounts import AccountEvidence, AccountState
 from src.application.platforms import PlatformState
@@ -152,3 +152,55 @@ def test_active_account_without_profile_keeps_independent_statuses():
     assert row["Lifecycle"] == "Active"
     assert row["Authentication"] == "Not configured"
     assert row["Archive"] == "Preserved data without profile"
+
+
+def test_account_rows_emit_one_row_per_canonical_uuid():
+    account_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    account = AccountState(
+        platform="ChatGPT",
+        key=account_id,
+        label="Primary",
+        evidence=AccountEvidence(
+            profile_path=Path("profile"),
+            raw_path=Path("raw"),
+            merged_path=Path("merged"),
+        ),
+        authentication="valid",
+        account_id=account_id,
+        lifecycle_status=LifecycleStatus.ACTIVE,
+    )
+
+    rows = _account_rows([PlatformState("ChatGPT", None, None, accounts=(account,))])
+
+    assert len(rows) == 1
+    assert rows[0]["Account ID"] == account_id
+    assert rows[0]["Lifecycle"] == "Active"
+    assert rows[0]["Profile"] == "Present"
+    assert rows[0]["Raw"] == "Present"
+    assert rows[0]["Merged"] == "Present"
+
+
+def test_unclassified_evidence_is_visible_but_not_an_action_target():
+    unclassified = AccountState(
+        platform="ChatGPT",
+        key="unbound",
+        label=None,
+        evidence=AccountEvidence(profile_path=Path("profile-unbound")),
+        authentication="unknown",
+        account_id=None,
+        lifecycle_status=None,
+    )
+    catalogued = _account(
+        "ChatGPT",
+        "catalogued",
+        lifecycle=LifecycleStatus.ACTIVE,
+    )
+    state = PlatformState("ChatGPT", None, None, accounts=(catalogued, unclassified))
+
+    rows = _account_rows([state])
+
+    assert len(rows) == 2
+    assert rows[1]["Account"] == "ChatGPT · unbound"
+    assert rows[1]["Account ID"] == "—"
+    assert rows[1]["Lifecycle"] == "Unclassified"
+    assert _actionable_accounts([state]) == [catalogued]

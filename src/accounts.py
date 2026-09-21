@@ -68,7 +68,7 @@ class AccountState:
     label: str | None
     evidence: AccountEvidence
     authentication: str
-    account_id: str = ""
+    account_id: str | None = None
     lifecycle_status: LifecycleStatus | None = None
     authentication_method: str | None = None
 
@@ -105,7 +105,8 @@ def runnable_account_keys(platform: str) -> tuple[str, ...]:
     return tuple(
         _observed_execution_key(state)
         for state in discover_accounts(platform)
-        if state.lifecycle_status in {None, LifecycleStatus.ACTIVE}
+        if state.account_id is not None
+        and state.lifecycle_status in {None, LifecycleStatus.ACTIVE}
         and not state.key.startswith("archive:")
     )
 
@@ -117,6 +118,8 @@ def runnable_accounts(platform: str) -> tuple[RunnableAccount, ...]:
     if metadata is None:
         return ()
     for state in discover_accounts(platform):
+        if state.account_id is None:
+            continue
         if state.lifecycle_status not in {None, LifecycleStatus.ACTIVE}:
             continue
         if state.evidence.profile_path is None:
@@ -268,6 +271,205 @@ def _contains_source_artifacts(path: Path) -> bool:
         return False
 
 
+def _canonical_uuid(value: str) -> str | None:
+    try:
+        parsed = str(uuid.UUID(value))
+    except ValueError:
+        return None
+    return parsed if parsed == value else None
+
+
+def _empty_evidence_bucket() -> dict[str, object]:
+    return {
+        "registry_present": False,
+        "profile_path": None,
+        "raw_path": None,
+        "merged_path": None,
+        "historical_path": None,
+    }
+
+
+def _discover_v2_accounts(
+    platform: str,
+    *,
+    metadata,
+    catalog,
+    registry: dict[str, str],
+    bindings,
+    health,
+    storage_root: Path,
+    raw_root: Path,
+    merged_root: Path,
+    external_root: Path,
+) -> tuple[AccountState, ...]:
+    """Collect v2 evidence by explicit UUID, never by a profile locator."""
+    records_by_id = {
+        record.account_id: record
+        for record in catalog.records
+        if record.platform == platform
+    }
+    uuid_buckets = {
+        account_id: _empty_evidence_bucket()
+        for account_id in records_by_id
+    }
+    unmatched_buckets: dict[str, dict[str, object]] = {}
+    unmatched_labels: dict[str, str] = {}
+
+    def uuid_bucket(account_id: str) -> dict[str, object]:
+        return uuid_buckets.setdefault(account_id, _empty_evidence_bucket())
+
+    def unmatched_bucket(key: str) -> dict[str, object]:
+        return unmatched_buckets.setdefault(key, _empty_evidence_bucket())
+
+    bound_id_by_profile_key: dict[str, str] = {}
+    for account_id in records_by_id:
+        binding = bindings.get(account_id)
+        if binding is None:
+            continue
+        previous = bound_id_by_profile_key.get(binding.profile_key)
+        if previous is not None and previous != account_id:
+            raise ValueError(
+                f"Duplicate account binding profile key for {platform}: "
+                f"{binding.profile_key!r}"
+            )
+        bound_id_by_profile_key[binding.profile_key] = account_id
+
+    matched_profiles: set[Path] = set()
+    matched_registry_keys: set[str] = set()
+    for profile_key, account_id in bound_id_by_profile_key.items():
+        bucket = uuid_bucket(account_id)
+        bound_path = storage_root / f"{metadata.profile_prefix}{profile_key}"
+        if platform == "Perplexity" and profile_key == "default":
+            legacy_path = storage_root / "perplexity-profile"
+            if legacy_path.is_dir():
+                bound_path = legacy_path
+        if bound_path.is_dir():
+            bucket["profile_path"] = bound_path
+            matched_profiles.add(bound_path)
+
+        for registry_key in (profile_key, f"account-{profile_key}"):
+            if registry_key in registry:
+                bucket["registry_present"] = True
+                matched_registry_keys.add(registry_key)
+
+    if storage_root.exists():
+        try:
+            children = tuple(storage_root.iterdir())
+        except OSError:
+            children = ()
+        for path in children:
+            if (
+                path in matched_profiles
+                or not path.is_dir()
+                or not path.name.startswith(metadata.profile_prefix)
+            ):
+                continue
+            key = _account_path_suffix(path.name[len(metadata.profile_prefix):])
+            if key:
+                unmatched_bucket(key)["profile_path"] = path
+        for legacy_name in metadata.legacy_default_profiles:
+            legacy_path = storage_root / legacy_name
+            if legacy_path.is_dir() and legacy_path not in matched_profiles:
+                bucket = unmatched_bucket("default")
+                if bucket["profile_path"] is None:
+                    bucket["profile_path"] = legacy_path
+
+    for registry_key, label in registry.items():
+        if registry_key in matched_registry_keys:
+            continue
+        key = _account_path_suffix(registry_key)
+        if key:
+            unmatched_bucket(key)["registry_present"] = True
+            unmatched_labels[key] = label
+
+    for base, field in (
+        (raw_root / platform, "raw_path"),
+        (merged_root / platform, "merged_path"),
+    ):
+        if not base.exists():
+            continue
+        try:
+            children = tuple(base.iterdir())
+        except OSError:
+            children = ()
+        for path in children:
+            if not path.is_dir() or not path.name.startswith("account-"):
+                continue
+            suffix = _account_path_suffix(path.name)
+            account_id = _canonical_uuid(suffix)
+            if account_id is not None:
+                uuid_bucket(account_id)[field] = path
+            elif suffix:
+                unmatched_bucket(suffix)[field] = path
+        if _contains_source_artifacts(base):
+            unmatched_bucket("default")[field] = base
+
+    if metadata.historical_archive_root:
+        archive_root = external_root / metadata.historical_archive_root
+        if archive_root.exists():
+            try:
+                archives = tuple(archive_root.iterdir())
+            except OSError:
+                archives = ()
+            for path in archives:
+                if not path.is_dir():
+                    continue
+                if path.name.startswith("account-"):
+                    account_id = _canonical_uuid(_account_path_suffix(path.name))
+                    if account_id is not None:
+                        uuid_bucket(account_id)["historical_path"] = path
+                        continue
+                key = _historical_account_key(path.name)
+                if key is None:
+                    continue
+                preserved_id = legacy_account_id(platform, key)
+                if preserved_id in records_by_id:
+                    uuid_bucket(preserved_id)["historical_path"] = path
+                else:
+                    unmatched_bucket(key)["historical_path"] = path
+
+    states: list[AccountState] = []
+    for account_id in sorted(uuid_buckets):
+        record = records_by_id.get(account_id)
+        evidence = AccountEvidence(**uuid_buckets[account_id])
+        observation = health.get(account_id)
+        authentication = (
+            observation.status.value if observation is not None
+            else ("unknown" if evidence.profile_present else "not_configured")
+        )
+        label = None
+        if record is not None:
+            label = record.display_name or (
+                f"{platform} · {record.email}" if record.email else platform
+            )
+        states.append(AccountState(
+            platform=platform,
+            key=account_id,
+            label=label,
+            evidence=evidence,
+            authentication=authentication,
+            account_id=account_id,
+            lifecycle_status=record.lifecycle_status if record is not None else None,
+            authentication_method=(
+                observation.evidence_method.value
+                if observation is not None and observation.evidence_method is not None else None
+            ),
+        ))
+
+    for key in sorted(unmatched_buckets):
+        evidence = AccountEvidence(**unmatched_buckets[key])
+        states.append(AccountState(
+            platform=platform,
+            key=key,
+            label=unmatched_labels.get(key),
+            evidence=evidence,
+            authentication="unknown" if evidence.profile_present else "not_configured",
+            account_id=None,
+            lifecycle_status=None,
+        ))
+    return tuple(states)
+
+
 def discover_accounts(
     platform: str,
     *,
@@ -288,15 +490,29 @@ def discover_accounts(
     catalog = load_account_catalog(catalog_path)
     registry = load_account_registry(registry_path).get(metadata.registry_key, {})
     legacy_inventory = catalog.requires_identity_migration or not catalog.records
+    health = load_auth_health(health_path or storage_root / DEFAULT_HEALTH_PATH.name)
+    bindings = load_account_bindings(bindings_path or storage_root / DEFAULT_BINDINGS_PATH.name)
+    if not legacy_inventory:
+        return _discover_v2_accounts(
+            platform,
+            metadata=metadata,
+            catalog=catalog,
+            registry=registry,
+            bindings=bindings,
+            health=health,
+            storage_root=storage_root,
+            raw_root=raw_root,
+            merged_root=merged_root,
+            external_root=external_root,
+        )
+
     keys = (set(metadata.fallback_keys) | {_account_path_suffix(key) for key in registry}) if legacy_inventory else set()
     catalog_records = {
         (catalog.legacy_technical_key(record.account_id) or record.account_id): record
         for record in catalog.records if record.platform == platform
     }
-    health = load_auth_health(health_path or storage_root / DEFAULT_HEALTH_PATH.name)
     keys.update(catalog_records)
     profiles: dict[str, Path] = {}
-    bindings = load_account_bindings(bindings_path or storage_root / DEFAULT_BINDINGS_PATH.name)
 
     if storage_root.exists():
         try:

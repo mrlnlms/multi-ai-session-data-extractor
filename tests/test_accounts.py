@@ -15,6 +15,7 @@ from src.accounts import (
     default_sync_accounts,
     discover_accounts,
     load_account_registry,
+    runnable_accounts,
     runnable_account_keys,
 )
 from src.account_catalog import LifecycleStatus, legacy_account_id
@@ -30,6 +31,43 @@ def _catalog_record(platform, key, lifecycle):
         "created_at": "2026-09-13T00:00:00Z",
         "updated_at": "2026-09-13T00:00:00Z",
     }
+
+
+def _v2_catalog_record(
+    platform: str,
+    account_id: str,
+    lifecycle: str = "active",
+    *,
+    display_name: str | None = "Primary",
+    email: str | None = "primary@example.test",
+):
+    return {
+        "account_id": account_id,
+        "platform": platform,
+        "display_name": display_name,
+        "email": email,
+        "lifecycle_status": lifecycle,
+        "created_at": "2026-09-21T00:00:00Z",
+        "updated_at": "2026-09-21T00:00:00Z",
+    }
+
+
+def _write_v2_catalog(path: Path, *records: dict[str, object]) -> None:
+    path.write_text(json.dumps({"version": 2, "accounts": list(records)}))
+
+
+def _write_bindings(path: Path, *bindings: tuple[str, str]) -> None:
+    path.write_text(json.dumps({
+        "version": 1,
+        "bindings": [
+            {
+                "account_id": account_id,
+                "profile_key": profile_key,
+                "updated_at": "2026-09-21T00:00:00Z",
+            }
+            for account_id, profile_key in bindings
+        ],
+    }))
 
 
 def test_load_account_registry_returns_profile_email_mapping(tmp_path):
@@ -125,6 +163,7 @@ def test_default_unsuffixed_tree_requires_source_artifacts(tmp_path):
 
     before = discover_accounts(
         "ChatGPT", storage_root=storage, raw_root=raw, merged_root=merged,
+        catalog_path=tmp_path / "missing-catalog.json",
         registry_path=storage / "missing.json",
     )[0]
     assert not before.evidence.raw_present
@@ -132,6 +171,7 @@ def test_default_unsuffixed_tree_requires_source_artifacts(tmp_path):
     (empty_raw / "conversation.json").write_text("{}")
     after = discover_accounts(
         "ChatGPT", storage_root=storage, raw_root=raw, merged_root=merged,
+        catalog_path=tmp_path / "missing-catalog.json",
         registry_path=storage / "missing.json",
     )[0]
     assert after.evidence.raw_path == empty_raw
@@ -174,6 +214,7 @@ def test_notebooklm_historical_archive_is_a_first_class_account_evidence(tmp_pat
         raw_root=raw,
         merged_root=merged,
         external_root=external,
+        catalog_path=tmp_path / "missing-catalog.json",
         registry_path=storage / "missing.json",
     )
     by_key = {state.key: state for state in states}
@@ -261,6 +302,190 @@ def test_uncatalogued_data_account_is_visible_and_unclassified(tmp_path):
     assert account.evidence.raw_path == raw_account
 
 
+def test_v2_discovery_consolidates_catalog_binding_profile_and_uuid_paths(tmp_path):
+    account_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    storage = tmp_path / ".storage"
+    catalog_path = tmp_path / "catalog.json"
+    bindings_path = storage / "account-bindings.json"
+    storage.mkdir()
+    _write_v2_catalog(catalog_path, _v2_catalog_record("ChatGPT", account_id))
+    _write_bindings(bindings_path, (account_id, "bound"))
+    profile = storage / "chatgpt-profile-bound"
+    raw_account = tmp_path / "raw" / "ChatGPT" / f"account-{account_id}"
+    merged_account = tmp_path / "merged" / "ChatGPT" / f"account-{account_id}"
+    profile.mkdir()
+    raw_account.mkdir(parents=True)
+    merged_account.mkdir(parents=True)
+
+    states = discover_accounts(
+        "ChatGPT",
+        storage_root=storage,
+        raw_root=tmp_path / "raw",
+        merged_root=tmp_path / "merged",
+        catalog_path=catalog_path,
+        registry_path=storage / "missing-registry.json",
+        bindings_path=bindings_path,
+    )
+
+    assert len(states) == 1
+    account = states[0]
+    assert account.account_id == account_id
+    assert account.key == account_id
+    assert account.label == "Primary"
+    assert account.lifecycle_status is LifecycleStatus.ACTIVE
+    assert account.evidence.profile_path == profile
+    assert account.evidence.raw_path == raw_account
+    assert account.evidence.merged_path == merged_account
+
+
+def test_v2_unbound_profile_remains_unclassified_without_aliasing_catalog_account(tmp_path):
+    account_id = legacy_account_id("ChatGPT", "default")
+    storage = tmp_path / ".storage"
+    catalog_path = tmp_path / "catalog.json"
+    bindings_path = storage / "account-bindings.json"
+    storage.mkdir()
+    _write_v2_catalog(catalog_path, _v2_catalog_record("ChatGPT", account_id))
+    _write_bindings(bindings_path, (account_id, "bound"))
+    bound_profile = storage / "chatgpt-profile-bound"
+    unbound_profile = storage / "chatgpt-profile-default"
+    bound_profile.mkdir()
+    unbound_profile.mkdir()
+
+    states = discover_accounts(
+        "ChatGPT",
+        storage_root=storage,
+        raw_root=tmp_path / "raw",
+        merged_root=tmp_path / "merged",
+        catalog_path=catalog_path,
+        registry_path=storage / "missing-registry.json",
+        bindings_path=bindings_path,
+    )
+
+    assert [state.account_id for state in states].count(account_id) == 1
+    canonical = next(state for state in states if state.account_id == account_id)
+    unclassified = next(state for state in states if state.account_id is None)
+    assert canonical.evidence.profile_path == bound_profile
+    assert unclassified.key == "default"
+    assert unclassified.lifecycle_status is None
+    assert unclassified.evidence.profile_path == unbound_profile
+
+
+def test_v2_unknown_uuid_path_preserves_its_explicit_identity(tmp_path):
+    catalog_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    unknown_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    catalog_path = tmp_path / "catalog.json"
+    _write_v2_catalog(catalog_path, _v2_catalog_record("Qwen", catalog_id))
+    raw_account = tmp_path / "raw" / "Qwen" / f"account-{unknown_id}"
+    raw_account.mkdir(parents=True)
+
+    states = discover_accounts(
+        "Qwen",
+        storage_root=tmp_path / ".storage",
+        raw_root=tmp_path / "raw",
+        merged_root=tmp_path / "merged",
+        catalog_path=catalog_path,
+        registry_path=tmp_path / "missing-registry.json",
+    )
+
+    account = next(state for state in states if state.account_id == unknown_id)
+    assert account.key == unknown_id
+    assert account.lifecycle_status is None
+    assert account.evidence.raw_path == raw_account
+
+
+def test_v2_historical_archive_joins_its_preserved_catalog_uuid(tmp_path):
+    archive_key = "archive:former-work"
+    account_id = legacy_account_id("NotebookLM", archive_key)
+    catalog_path = tmp_path / "catalog.json"
+    _write_v2_catalog(
+        catalog_path,
+        _v2_catalog_record(
+            "NotebookLM",
+            account_id,
+            "historical",
+            display_name="Former work",
+            email=None,
+        ),
+    )
+    archive = tmp_path / "external" / "notebooklm-snapshots" / "Former Work"
+    archive.mkdir(parents=True)
+
+    states = discover_accounts(
+        "NotebookLM",
+        storage_root=tmp_path / ".storage",
+        raw_root=tmp_path / "raw",
+        merged_root=tmp_path / "merged",
+        external_root=tmp_path / "external",
+        catalog_path=catalog_path,
+        registry_path=tmp_path / "missing-registry.json",
+    )
+
+    assert [state.account_id for state in states].count(account_id) == 1
+    account = next(state for state in states if state.account_id == account_id)
+    assert account.lifecycle_status is LifecycleStatus.HISTORICAL
+    assert account.evidence.historical_path == archive
+
+
+def test_v2_uuid_historical_archive_attaches_directly(tmp_path):
+    account_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    catalog_path = tmp_path / "catalog.json"
+    _write_v2_catalog(
+        catalog_path,
+        _v2_catalog_record(
+            "NotebookLM",
+            account_id,
+            "historical",
+            display_name="Former work",
+            email=None,
+        ),
+    )
+    archive = (
+        tmp_path
+        / "external"
+        / "notebooklm-snapshots"
+        / f"account-{account_id}"
+    )
+    archive.mkdir(parents=True)
+
+    states = discover_accounts(
+        "NotebookLM",
+        storage_root=tmp_path / ".storage",
+        raw_root=tmp_path / "raw",
+        merged_root=tmp_path / "merged",
+        external_root=tmp_path / "external",
+        catalog_path=catalog_path,
+        registry_path=tmp_path / "missing-registry.json",
+    )
+
+    assert len(states) == 1
+    assert states[0].account_id == account_id
+    assert states[0].evidence.historical_path == archive
+
+
+def test_v2_duplicate_profile_binding_is_rejected(tmp_path):
+    first_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    second_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    catalog_path = tmp_path / "catalog.json"
+    bindings_path = tmp_path / "bindings.json"
+    _write_v2_catalog(
+        catalog_path,
+        _v2_catalog_record("Qwen", first_id),
+        _v2_catalog_record("Qwen", second_id),
+    )
+    _write_bindings(bindings_path, (first_id, "shared"), (second_id, "shared"))
+
+    with pytest.raises(ValueError, match="profile key.*shared"):
+        discover_accounts(
+            "Qwen",
+            storage_root=tmp_path / ".storage",
+            raw_root=tmp_path / "raw",
+            merged_root=tmp_path / "merged",
+            catalog_path=catalog_path,
+            registry_path=tmp_path / "missing-registry.json",
+            bindings_path=bindings_path,
+        )
+
+
 def test_missing_profile_does_not_change_active_lifecycle(tmp_path):
     catalog_path = tmp_path / "catalog.json"
     catalog_path.write_text(json.dumps({
@@ -305,15 +530,33 @@ def test_account_models_are_immutable():
 
 def test_runnable_accounts_keep_order_and_exclude_inactive_or_archived(monkeypatch):
     states = (
-        AccountState("NotebookLM", "1", None, AccountEvidence(), "unknown", lifecycle_status=LifecycleStatus.ACTIVE),
-        AccountState("NotebookLM", "uncatalogued", None, AccountEvidence(), "unknown"),
-        AccountState("NotebookLM", "2", None, AccountEvidence(), "unknown", lifecycle_status=LifecycleStatus.DISABLED),
-        AccountState("NotebookLM", "archive:more-design-2026-03-30", None, AccountEvidence(), "not_configured", lifecycle_status=LifecycleStatus.HISTORICAL),
-        AccountState("NotebookLM", "3", None, AccountEvidence(), "unknown", lifecycle_status=LifecycleStatus.ACTIVE),
+        AccountState("NotebookLM", "1", None, AccountEvidence(), "unknown", legacy_account_id("NotebookLM", "1"), LifecycleStatus.ACTIVE),
+        AccountState("NotebookLM", "uncatalogued", None, AccountEvidence(), "unknown", legacy_account_id("NotebookLM", "uncatalogued")),
+        AccountState("NotebookLM", "2", None, AccountEvidence(), "unknown", legacy_account_id("NotebookLM", "2"), LifecycleStatus.DISABLED),
+        AccountState("NotebookLM", "archive:more-design-2026-03-30", None, AccountEvidence(), "not_configured", legacy_account_id("NotebookLM", "archive:more-design-2026-03-30"), LifecycleStatus.HISTORICAL),
+        AccountState("NotebookLM", "3", None, AccountEvidence(), "unknown", legacy_account_id("NotebookLM", "3"), LifecycleStatus.ACTIVE),
     )
     monkeypatch.setattr("src.accounts.discover_accounts", lambda _platform: states)
 
     assert runnable_account_keys("NotebookLM") == ("1", "uncatalogued", "3")
+
+
+def test_runnable_accounts_exclude_evidence_without_canonical_identity(monkeypatch):
+    profile = Path(".storage/qwen-profile-unbound")
+    states = (
+        AccountState(
+            "Qwen",
+            "unbound",
+            None,
+            AccountEvidence(profile_path=profile),
+            "unknown",
+            account_id=None,
+        ),
+    )
+    monkeypatch.setattr("src.accounts.discover_accounts", lambda _platform: states)
+
+    assert runnable_account_keys("Qwen") == ()
+    assert runnable_accounts("Qwen") == ()
 
 
 def test_runnable_account_uses_exact_observed_profile_suffix(tmp_path, monkeypatch):

@@ -55,8 +55,8 @@ def _account_rows(states: list[PlatformState]) -> list[dict[str, object]]:
             rows.append(
                 {
                     "Platform": state.name,
-                    "Account": account.label or f"{state.name} · {account.account_id}",
-                    "Account ID": account.account_id,
+                    "Account": account.label or f"{state.name} · {account.account_id or account.key}",
+                    "Account ID": account.account_id or "—",
                     "Lifecycle": _lifecycle_label(account),
                     "Registry": _present(evidence.registry_present),
                     "Profile": _present(evidence.profile_present),
@@ -68,6 +68,16 @@ def _account_rows(states: list[PlatformState]) -> list[dict[str, object]]:
                 }
             )
     return rows
+
+
+def _actionable_accounts(states: list[PlatformState]) -> list[AccountState]:
+    """Return only catalog identities that can back explicit account actions."""
+    return [
+        account
+        for state in states
+        for account in state.accounts
+        if account.account_id is not None and account.lifecycle_status is not None
+    ]
 
 
 def render(states: list[PlatformState]) -> None:
@@ -145,9 +155,10 @@ def render(states: list[PlatformState]) -> None:
         st.caption("No account definitions are available.")
 
     st.subheader("Account actions")
-    selected = st.selectbox("Account", accounts,
+    actionable_accounts = _actionable_accounts(states)
+    selected = st.selectbox("Account", actionable_accounts,
         format_func=lambda item: f"{item.platform} · {item.key} · {item.account_id}",
-        key="account_action_selected") if accounts else None
+        key="account_action_selected") if actionable_accounts else None
     if selected is not None:
         actions = account_actions(selected)
         login = next(item for item in actions if item.action == "login")

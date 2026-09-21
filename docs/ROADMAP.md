@@ -22,6 +22,7 @@ conflicts with the entry or the task requires a fresh verification.
 | Capture and processing | Unblocked | [AGENTS.md](../AGENTS.md) | Run the normal sync → parse → unify pipeline when updating a source. |
 | DVC garbage collection | Deliberate storage maintenance | [DVC runbook](operations/dvc-runbook.md) | Simulate, review and explicitly authorize it after a validated publication. |
 | Prevent asset-copy rematerialization | **Completed and published** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the retention audit as a diagnostic after future capture changes. |
+| Canonical account identity and analytical dimension | **Completed and published** | [Account architecture](product/account-architecture.md) | Preserve the UUID-only contract; treat memory/configuration as a separate front. |
 
 Google Drive remains the active remote while alternatives are researched. This
 is not an active migration or a freeze of the normal capture/publish workflow.
@@ -66,14 +67,13 @@ blob is verified; Kimi and Qwen no longer project those bytes into `merged`.
 The focused new-asset integration path, full suite and retention dry-run pass,
 with zero candidates and no cleanup pass.
 
-After that correction, the next data-layer front is a derived account
-dimension in unified data. It continues the already-published `account_id`
-work and would expose
-the durable catalog as queryable, read-only data without making Parquet the
-account registry or inferring CLI/manual identities. Once that account
-contract is settled, the preserved ChatGPT/Claude.ai
-account-memory/configuration domain follows as a separate front whose scope
-must be discovered from the captured evidence rather than assumed in advance.
+The derived account dimension is published in unified data alongside the
+UUID-native account contract. It exposes the durable catalog as queryable,
+read-only data without making Parquet the account registry or inferring
+CLI/manual identities. The preserved ChatGPT/Claude.ai
+account-memory/configuration domain is now the next separate account-related
+front; its scope must be discovered from captured evidence rather than assumed
+in advance.
 The asset front has since
 materialized that central physical home: `data/assets` and its preservation
 index are the published DVC-backed source for bytes, while `assets` and
@@ -85,17 +85,16 @@ snapshots remain preserved. The vault is the authoritative physical home for
 those asset bytes, while historical DVC revisions provide full rollback.
 Incremental downloaders may use transient staging paths during capture, but
 the successful vault flow retires the verified bytes before it completes. The
-account dimension and UUID-native account contract are implemented in code.
-The preview-first migration of the DVC-managed catalog and account paths is an
-unapplied operational gate; it does not imply publication. The
-memory/configuration domain comes next only after that deliberate migration.
-Schema changes and data publication retain their normal review and validation
-gates.
+account dimension, UUID-native paths and catalog v2 migration are implemented
+and published through Git and DVC. The memory/configuration domain comes next
+as an independent front. Schema changes and data publication retain their
+normal review and validation gates.
 
-The account dimension starts from [`src/account_catalog.py`](../src/account_catalog.py)
-and the current [`unify` table contract](../src/workflows/unify.py); historical
-working plans in `private/` must be checked against current code before reuse.
-The later memory/configuration front starts from the evidence in
+The completed account contract is maintained in
+[`src/account_catalog.py`](../src/account_catalog.py) and the current
+[`unify` table contract](../src/workflows/unify.py); historical working plans
+in `private/` must be checked against current code before reuse. The
+memory/configuration front starts from the evidence in
 [known limitations](extractor-engineering/known-limitations.md) and the
 [ChatGPT](extractor-engineering/platforms/web/chatgpt/state.md) and
 [Claude.ai](extractor-engineering/platforms/web/claude-ai/state.md) state records.

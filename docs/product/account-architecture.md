@@ -1,9 +1,9 @@
 # Instancias de conta e arquitetura da aplicacao
 
-**Status:** contrato v2 implementado no codigo: UUID unico, metadados editaveis,
-bindings locais, paths UUID-native e dimensao analitica derivada. A migracao
-dos dados DVC do catalogo/layout v1 permanece deliberadamente nao aplicada;
-empacotamento da aplicacao continua uma frente separada.
+**Status:** contrato v2 implementado e publicado: UUID unico, metadados
+editaveis, bindings locais, paths UUID-native e dimensao analitica derivada.
+A migracao DVC do catalogo/layout v1 foi aplicada preservando os UUIDs e os
+dados existentes; empacotamento da aplicacao continua uma frente separada.
 
 **Origem:** 2026-08-31. **Revisto contra codigo e dados:** 2026-09-21.
 
@@ -189,8 +189,8 @@ apresentados ao usuario como se fossem equivalentes:
 O `account_id` e o identificador duravel. O codigo le o catalogo v1 somente
 para produzir um plano de migracao completo e nao serializa seu locator legado
 no v2. Paths duraveis usam `account-<UUID>`; o binding continua resolvendo o
-UUID para um profile local. A compatibilidade termina quando a migracao
-preview-first for aplicada aos dados DVC.
+UUID para um profile local. A compatibilidade v1 permanece somente como leitor
+finito para restauracoes anteriores a migracao ja publicada.
 
 ## 4. Contratos implementados
 
@@ -204,10 +204,10 @@ Os pontos abaixo descrevem o comportamento canonico atual:
    explicitamente nao dependem de uma quantidade fixa.
 3. CLI e dashboard chamam os mesmos servicos UI-neutral. Regras de conta nao
    moram em `argparse` ou Streamlit.
-4. O label privado atual e apenas apresentacao, foi preenchido manualmente e
-   nunca funciona como chave, path ou identidade. O produto agora requer um
-   `display_name` livre e editavel, com fallback automatico quando o usuario
-   nao fornecer um nome; sua persistencia ainda nao foi implementada.
+4. O registro privado legado e apenas evidencia local e nunca funciona como
+   chave, path ou identidade. O catalogo persiste `display_name` livre e
+   editavel e e-mail opcional; quando o nome estiver vazio, a apresentacao usa
+   plataforma e e-mail conhecido.
 5. A identidade interna da conta e um UUID imutavel. Contas anteriores ao
    catalogo receberam UUIDv5 deterministico; novas contas recebem UUID proprio.
 6. Um futuro identificador estavel fornecido pela plataforma sera dado
@@ -253,11 +253,10 @@ Regras atuais:
 - `account_id` nunca e reutilizado;
 - `historical` e uma decisao explicita de preservacao sem novas capturas;
 - `disabled` interrompe operacao sem apagar dados ou identidade;
-- profile ausente ou autenticacao expirada nao altera lifecycle; e
-- `display_name` e e-mail ainda nao fazem parte deste schema implementado. O
-  requisito de produto para ambos esta definido no glossario; falta decidir e
-  implementar a migracao do label privado atual e a captura confiavel do e-mail
-  por plataforma, com entrada manual quando ela nao estiver disponivel.
+- profile ausente ou autenticacao expirada nao altera lifecycle;
+- `display_name` e e-mail sao metadados opcionais editaveis do catalogo; e
+- nenhum desses campos substitui o UUID nem e inferido de profile ou estado de
+  autenticacao.
 
 ### 5.2 Vinculo local de autenticacao
 
@@ -478,9 +477,9 @@ contas.
 
 A fundacao reutilizavel de contas esta implementada nas nove plataformas web:
 catalogo, inventario lossless, lifecycle, bindings, auth health, sync seletivo,
-isolamento de paths e `account_id` publicado. A proxima decisao da camada de
-dados e o contrato de uma dimensao analitica derivada do catalogo, conforme o
-roadmap. Ela nao depende da escolha do shell futuro.
+isolamento de paths, `account_id` publicado e `accounts.parquet` derivado do
+catalogo. A frente estrutural de identidade de contas esta concluida; ela nao
+depende da escolha do shell futuro.
 
 Memoria/configuracao preservada, leitor, fila operacional, empacotamento e
 distribuicao sao frentes separadas. Implementa-las nao deve reabrir a identidade
@@ -491,15 +490,14 @@ arquivavel ja publicada sem nova evidencia ou requisito incompatível.
 A numeracao abaixo preserva os identificadores da lista original para manter
 referencias historicas legiveis.
 
-### Identidade e schema — decisões fechadas em 2026-09-14
+### Identidade e schema — decisoes fechadas ate 2026-09-21
 
 1. Contas legadas usam UUIDv5 determinístico já persistido no catálogo.
 2. A identidade arquivável vive em `data/accounts/catalog.json`, sob DVC.
 3. `account_id` foi acrescentado; `account` foi preservado para compatibilidade.
-4. A migração de `account_id` não criou `accounts.parquet`; o catálogo continuou
-   sendo a fonte autoritativa. Uma dimensão analítica derivada, somente leitura,
-   é a próxima etapa analítica do mesmo trabalho de identidade de contas, não
-   uma revisão dessa decisão de escopo.
+4. A migracao preservou o catalogo como fonte autoritativa e publicou
+   `accounts.parquet` como dimensao analitica derivada, somente leitura e sem
+   locators legados.
 5. `account_id` compõe as chaves sem alterar IDs existentes.
 6. Web e NotebookLM histórico recebem UUID; CLI/manual permanecem nulos.
 7. `upstream_subject` continua fora do contrato até existir evidência estável.
@@ -561,5 +559,5 @@ publicacao do projeto.
 
 Empacotamento ou substituicao da interface exigem, adicionalmente, threat model,
 tratamento de profiles, estrategia de distribuicao e rollback. Essas decisoes
-nao bloqueiam manutencao do backend atual nem a discussao independente da
-dimensao analitica de contas.
+nao bloqueiam manutencao do backend atual nem a frente independente de
+memoria/configuracao de contas.

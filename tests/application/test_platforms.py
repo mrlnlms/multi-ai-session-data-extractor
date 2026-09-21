@@ -174,6 +174,51 @@ def test_platform_state_loads_catalog_lifecycle_without_changing_evidence(tmp_pa
     assert account.authentication == "not_configured"
 
 
+def test_platform_state_exposes_one_v2_account_for_catalog_binding_and_uuid_data(tmp_path, monkeypatch):
+    account_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    storage = tmp_path / ".storage"
+    catalog_dir = tmp_path / "accounts"
+    storage.mkdir()
+    catalog_dir.mkdir()
+    (catalog_dir / "catalog.json").write_text(json.dumps({
+        "version": 2,
+        "accounts": [{
+            "account_id": account_id,
+            "platform": "ChatGPT",
+            "display_name": "Primary",
+            "email": "primary@example.test",
+            "lifecycle_status": "active",
+            "created_at": "2026-09-21T00:00:00Z",
+            "updated_at": "2026-09-21T00:00:00Z",
+        }],
+    }))
+    (storage / "account-bindings.json").write_text(json.dumps({
+        "version": 1,
+        "bindings": [{
+            "account_id": account_id,
+            "profile_key": "bound",
+            "updated_at": "2026-09-21T00:00:00Z",
+        }],
+    }))
+    (storage / "chatgpt-profile-bound").mkdir()
+    (tmp_path / "raw" / "ChatGPT" / f"account-{account_id}").mkdir(parents=True)
+    (tmp_path / "merged" / "ChatGPT" / f"account-{account_id}").mkdir(parents=True)
+
+    monkeypatch.setattr(platforms, "STORAGE_ROOT", storage)
+    monkeypatch.setattr(platforms, "DATA_RAW", tmp_path / "raw")
+    monkeypatch.setattr(platforms, "DATA_MERGED", tmp_path / "merged")
+    monkeypatch.setattr(platforms, "DATA_ACCOUNTS", catalog_dir)
+
+    state = platforms.load_platform_state("ChatGPT")
+
+    assert len(state.accounts) == 1
+    account = state.accounts[0]
+    assert account.account_id == account_id
+    assert account.evidence.profile_present
+    assert account.evidence.raw_present
+    assert account.evidence.merged_present
+
+
 def test_platform_state_includes_notebooklm_external_archive(tmp_path, monkeypatch):
     storage = tmp_path / ".storage"
     external = tmp_path / "external"
