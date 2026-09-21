@@ -96,6 +96,7 @@ legacy `account` label and all existing native IDs remain unchanged.
 
 ## Related documents
 
+- [Discovery and technical evidence](discovery.md)
 - Probes: engineering modules in `src/platforms/perplexity/probes/`.
 
 ## Commands
@@ -115,13 +116,14 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.login --accou
 PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.sync --account account-2
 PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.parse
 ```
-## Asset vault transition
+
+## Asset vault contract
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
 are overridden explicitly. `legacy` remains an explicit compatibility and
 diagnostic mode; filesystem contents never select the mode. Legacy records and
-manifests remain preserved, while redundant byte copies now live only in the vault,
-while the vault reader projects the same public `Asset`, `AssetLink`, and
+manifests remain preserved. Redundant byte copies now live only in the vault,
+whose reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. For Perplexity, reader scope preserves exact
 message links for evidenced generated artifacts and retains older uploads as
 metadata-only assets when no binary or position is available. See the

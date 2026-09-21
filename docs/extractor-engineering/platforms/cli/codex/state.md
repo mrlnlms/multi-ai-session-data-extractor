@@ -49,13 +49,13 @@ amarela no dashboard mesmo que o Parquet tenha sido escrito depois do raw;
 isso evita declarar a pipeline saudavel quando um formato novo for descartado
 silenciosamente.
 
-## Asset vault transition
+## Asset vault contract
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
 are overridden explicitly. `legacy` remains an explicit compatibility and
 diagnostic mode; filesystem contents never select the mode. Legacy records and
-manifests remain preserved, while redundant byte copies now live only in the vault,
-while the vault reader projects the same public `Asset`, `AssetLink`, and
+manifests remain preserved. Redundant byte copies now live only in the vault,
+whose reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. For Codex, reader scope is the inline input
 image and its evidenced message position; unrelated filesystem paths are not
 promoted to assets. See the [operational

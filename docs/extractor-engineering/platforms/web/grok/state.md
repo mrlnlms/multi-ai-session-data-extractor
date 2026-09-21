@@ -179,13 +179,14 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.login --account acc
 PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.sync --account account-2
 PYTHONPATH=. .venv/bin/python -m src.platforms.grok.commands.parse
 ```
-## Asset vault transition
+
+## Asset vault contract
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
 are overridden explicitly. `legacy` remains an explicit compatibility and
 diagnostic mode; filesystem contents never select the mode. Legacy records and
-manifests remain preserved, while redundant byte copies now live only in the vault,
-while the vault reader projects the same public `Asset`, `AssetLink`, and
+manifests remain preserved. Redundant byte copies now live only in the vault,
+whose reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. Grok's current reader scope is the global asset
 catalog: without evidence of conversation/message use, it preserves assets but
 does not fabricate `AssetLink` rows. See the [operational

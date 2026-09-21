@@ -254,9 +254,9 @@ preserved record) and 126 legacy-schema records (`notebook_uuid`,
 
 Before a rerun, compare the three lite-fetch inputs (`rLM1Ne`, `cFji9`, and
 `gArtLc`) for a small sampled set against the prior raw body, with special
-attention to volatile/presigned values. Confirm the account identity through a
-non-secret local profile-preferences mapping: account-1 is
-`hello.marlonlemes@gmail.com`; account-2 is `marloonlemes@gmail.com`.
+attention to volatile/presigned values. Confirm the account identity through
+the non-secret local profile-preferences mapping; public documentation records
+only the stable profile keys `account-1` and `account-2`.
 
 ### Diagnostic outcome — 2026-08-30
 
@@ -307,9 +307,10 @@ publication.
 
 ## Related documents
 
-- `incident-lite-fetch-regression-2026-08-30.md` — diagnosis, narrow fix, validation,
-  and future-change protocol for the lite-fetch regression.
-- `docs/extractor-engineering/platforms/web/notebooklm/server-behavior.md` — upstream behavior.
+- [Discovery and technical evidence](discovery.md)
+- [Lite-fetch regression incident](incident-lite-fetch-regression-2026-08-30.md) —
+  diagnosis, narrow fix, validation, and future-change protocol.
+- [Upstream behavior](server-behavior.md)
 
 ## Commands
 
@@ -323,13 +324,14 @@ for f in notebooklm notebooklm-acc-1 notebooklm-acc-2; do
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd
 done
 ```
-## Asset vault transition
+
+## Asset vault contract
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
 are overridden explicitly. `legacy` remains an explicit compatibility and
 diagnostic mode; filesystem contents never select the mode. Legacy records and
-manifests remain preserved, while redundant byte copies now live only in the vault,
-while the vault reader projects the same public `Asset`, `AssetLink`, and
+manifests remain preserved. Redundant byte copies now live only in the vault,
+whose reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. NotebookLM is library-scoped: preserved files
 retain their evidenced source, note, or output-object links, including
 multi-file outputs, without treating text-only domain records as assets. See

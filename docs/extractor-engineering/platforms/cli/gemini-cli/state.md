@@ -31,13 +31,13 @@ as operational filesystem metadata and is not promoted to an Asset.
 The CLI has no server. See `docs/extractor-engineering/platforms/cli/claude-code/state.md` for
 the "preservation at the raw level via cli-copy" pattern.
 
-## Asset vault transition
+## Asset vault contract
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
 are overridden explicitly. `legacy` remains an explicit compatibility and
 diagnostic mode; filesystem contents never select the mode. Legacy records and
-manifests remain preserved, while redundant byte copies now live only in the vault,
-while the vault reader projects the same public `Asset`, `AssetLink`, and
+manifests remain preserved. Redundant byte copies now live only in the vault,
+whose reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. Gemini CLI currently has no evidenced eligible
 assets, so both readers preserve the empty canonical asset tables and do not
 promote `ToolEvent.file_path` values. See the [operational

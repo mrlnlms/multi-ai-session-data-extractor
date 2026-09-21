@@ -162,7 +162,8 @@ discovered via probe (`src/platforms/gemini/probes/schema.py`):
 
 ## Related documents
 
-- `docs/extractor-engineering/platforms/web/gemini/server-behavior.md` — upstream behavior.
+- [Discovery and technical evidence](discovery.md)
+- [Upstream behavior](server-behavior.md)
 - Probes: `src/platforms/gemini/probes/schema.py`,
   `src/platforms/gemini/probes/pin_share.py`.
 
@@ -176,13 +177,14 @@ for f in gemini gemini-acc-1 gemini-acc-2 gemini-acc-3; do
   QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/${f}.qmd
 done
 ```
-## Asset vault transition
+
+## Asset vault contract
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
 are overridden explicitly. `legacy` remains an explicit compatibility and
 diagnostic mode; filesystem contents never select the mode. Legacy records and
-manifests remain preserved, while redundant byte copies now live only in the vault,
-while the vault reader projects the same public `Asset`, `AssetLink`, and
+manifests remain preserved. Redundant byte copies now live only in the vault,
+whose reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. For Gemini, reader scope preserves each
 evidenced turn use, including repeated appearances, while unpositioned manifest
 entries remain assets without fabricated message links. See the [operational

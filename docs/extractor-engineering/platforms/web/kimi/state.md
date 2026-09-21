@@ -33,7 +33,7 @@
 
 ### Additional account validation — 2026-09-12
 
-- An isolated `account-2` profile for `mrlnlms.me@gmail.com` captured 5 chats,
+- An isolated `account-2` profile captured 5 chats,
   1 installed skill, and 5 binary files with zero fetch or asset errors.
 - The combined parser produced 56 conversations, 1,389 messages, 249 tool
   events, 56 branches, and 5 installed skills.
@@ -170,13 +170,13 @@ Cursor pagination via `nextPageToken`. Bearer token obrigatorio em
 
 O comportamento da migracao de origem e outros fatos upstream ficam em
 [server-behavior.md](server-behavior.md).
-## Asset vault transition
+## Asset vault contract
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
 are overridden explicitly. `legacy` remains an explicit compatibility and
 diagnostic mode; filesystem contents never select the mode. Legacy records and
-manifests remain preserved, while redundant byte copies now live only in the vault,
-while the vault reader projects the same public `Asset`, `AssetLink`, and
+manifests remain preserved. Redundant byte copies now live only in the vault,
+whose reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. For Kimi, reader scope preserves the observable
 conversation/file association; unknown author or message placement remains
 unknown rather than being inferred. See the [operational

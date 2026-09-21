@@ -46,8 +46,7 @@ projects), idempotent. Output: `data/merged/Claude.ai/conversations/<uuid>.json`
 ### Prior validated collection — 2026-09-12
 
 - A second isolated profile, `account-2`, captured 14 conversations, 3
-  projects, and 7 binary files with zero fetch or asset errors. Its canonical
-  account label is `mrlnlms.me@gmail.com`.
+  projects, and 7 binary files with zero fetch or asset errors.
 - The combined parser produced 934 conversations, 26,367 messages, 17,792
   tool events, 1,269 branches, and 87 projects.
 
@@ -137,6 +136,10 @@ color: Anthropic burnt orange `#CC785C`.
 
 8 reconciler tests passing + byte-for-byte idempotency validated.
 
+## Related documents
+
+- [Discovery and technical evidence](discovery.md)
+
 ## Commands
 
 ```bash
@@ -149,13 +152,14 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.refetch_known
 PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.parse
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/claude-ai.qmd
 ```
-## Asset vault transition
+
+## Asset vault contract
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
 are overridden explicitly. `legacy` remains an explicit compatibility and
 diagnostic mode; filesystem contents never select the mode. Legacy records and
-manifests remain preserved, while redundant byte copies now live only in the vault,
-while the vault reader projects the same public `Asset`, `AssetLink`, and
+manifests remain preserved. Redundant byte copies now live only in the vault,
+whose reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. For Claude.ai, reader scope is the evidenced
 message/file or generated-output relationship; text-only inline attachments
 remain message content rather than binary assets. See the [operational

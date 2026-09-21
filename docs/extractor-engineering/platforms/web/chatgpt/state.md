@@ -135,14 +135,16 @@ missing deps (duckdb, plotly, itables).
 
 ## Related documents
 
-- `docs/extractor-engineering/platforms/web/chatgpt/server-behavior.md` — upstream behavior.
-## Asset vault transition
+- [Discovery and technical evidence](discovery.md)
+- [Upstream behavior](server-behavior.md)
+
+## Asset vault contract
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
 are overridden explicitly. `legacy` remains an explicit compatibility and
 diagnostic mode; filesystem contents never select the mode. Legacy records and
-manifests remain preserved, while redundant byte copies now live only in the vault,
-while the vault reader projects the same public `Asset`, `AssetLink`, and
+manifests remain preserved. Redundant byte copies now live only in the vault,
+whose reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. For ChatGPT, reader scope preserves evidenced
 inline/message placements and metadata-only rows; Canvas actions are not
 promoted unless they materialize an eligible reconstructable output. See the

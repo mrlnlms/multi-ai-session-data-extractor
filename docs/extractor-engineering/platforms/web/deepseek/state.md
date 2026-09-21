@@ -126,7 +126,8 @@ legacy `account` label and all existing native IDs remain unchanged.
 
 ## Related documents
 
-- `docs/extractor-engineering/platforms/web/deepseek/server-behavior.md` — upstream behavior.
+- [Discovery and technical evidence](discovery.md)
+- [Upstream behavior](server-behavior.md)
 
 ## Commands
 
@@ -145,13 +146,14 @@ PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.login --account
 PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.sync --account account-2
 PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.commands.parse
 ```
-## Asset vault transition
+
+## Asset vault contract
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
 are overridden explicitly. `legacy` remains an explicit compatibility and
 diagnostic mode; filesystem contents never select the mode. Legacy records and
-manifests remain preserved, while redundant byte copies now live only in the vault,
-while the vault reader projects the same public `Asset`, `AssetLink`, and
+manifests remain preserved. Redundant byte copies now live only in the vault,
+whose reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. For DeepSeek, reader scope is each evidenced
 message/file use; the current metadata-only assets remain valid and no local
 path is fabricated when bytes are absent. See the [operational

@@ -128,7 +128,7 @@ Plus:
 - **`hNvQHb` payload:** `[conv_uuid, 10, None, 1, [0], [4], None, 1]` —
   functional in 2026-05-02. The rpcid hash may change — fail-fast covers it.
 
-## UI CRUD battery — 2026-05-02 (account-1, hello.marlonlemes@gmail.com)
+## UI CRUD battery — 2026-05-02 (account-1)
 
 User executed 4 actions in the UI. 4/4 scenarios covered:
 

@@ -73,13 +73,13 @@ trajetória legacy recuperada e, por último, stub opaco.
 - **Sync orchestrator:** `python -m src.platforms.antigravity_cli.commands.sync`
 - **Quarto data profile:** `notebooks/antigravity-cli.qmd`
 
-## Asset vault transition
+## Asset vault contract
 
 `vault` is the default asset reader, using `data/assets` and `data` unless roots
 are overridden explicitly. `legacy` remains an explicit compatibility and
 diagnostic mode; filesystem contents never select the mode. Legacy records and
-manifests remain preserved, while redundant byte copies now live only in the vault,
-while the vault reader projects the same public `Asset`, `AssetLink`, and
+manifests remain preserved. Redundant byte copies now live only in the vault,
+whose reader projects the same public `Asset`, `AssetLink`, and
 `Message.asset_paths` contract. For Antigravity CLI, the evidenced scope is the
 assistant artifact linked as `output` to its exact `PLANNER_RESPONSE`; recovered
 opaque history does not justify additional links. See the [operational
