@@ -66,12 +66,15 @@ blob is verified; Kimi and Qwen no longer project those bytes into `merged`.
 The focused new-asset integration path, full suite and retention dry-run pass,
 with zero candidates and no cleanup pass.
 
-After that correction, the near-term data-layer fronts are the preserved
-ChatGPT/Claude.ai account-memory/configuration domain and a derived account
-dimension in unified data. The account
-dimension continues the already-published `account_id` work: it would expose
+After that correction, the next data-layer front is a derived account
+dimension in unified data. It continues the already-published `account_id`
+work and would expose
 the durable catalog as queryable, read-only data without making Parquet the
-account registry or inferring CLI/manual identities. The asset front has since
+account registry or inferring CLI/manual identities. Once that account
+contract is settled, the preserved ChatGPT/Claude.ai
+account-memory/configuration domain follows as a separate front whose scope
+must be discovered from the captured evidence rather than assumed in advance.
+The asset front has since
 materialized that central physical home: `data/assets` and its preservation
 index are the published DVC-backed source for bytes, while `assets` and
 `asset_links` remain the analytical outputs with explicit source provenance.
@@ -82,15 +85,17 @@ snapshots remain preserved. The vault is the authoritative physical home for
 those asset bytes, while historical DVC revisions provide full rollback.
 Incremental downloaders may use transient staging paths during capture, but
 the successful vault flow retires the verified bytes before it completes. The
-memory and account-dimension fronts remain planning priorities; schema changes and data publication retain their
-normal review and validation gates.
+account dimension is the current planning priority; the memory/configuration
+domain comes next. Schema changes and data publication retain their normal
+review and validation gates.
 
-The memory evidence is in [known limitations](extractor-engineering/known-limitations.md)
-and the [ChatGPT](extractor-engineering/platforms/web/chatgpt/state.md) and
-[Claude.ai](extractor-engineering/platforms/web/claude-ai/state.md) state records.
 The account dimension starts from [`src/account_catalog.py`](../src/account_catalog.py)
 and the current [`unify` table contract](../src/workflows/unify.py); historical
 working plans in `private/` must be checked against current code before reuse.
+The later memory/configuration front starts from the evidence in
+[known limitations](extractor-engineering/known-limitations.md) and the
+[ChatGPT](extractor-engineering/platforms/web/chatgpt/state.md) and
+[Claude.ai](extractor-engineering/platforms/web/claude-ai/state.md) state records.
 The completed rematerialization correction is grounded in the
 [current physical layout](#physical-asset-layout) and the
 [published coverage contract](extractor-engineering/asset-coverage.md).
@@ -269,18 +274,10 @@ prerequisite.
 
 ## Operational work
 
-### Reactivation and compatibility cycle
-
-**Status:** completed on 2026-09-15. The capture and DVC update were validated
-and published; the local archive assurance record in
-`.runtime/archive-assurance.json` holds the publication baseline. A later
-snapshot is a new operational cycle, not unfinished work from this one.
-
-For a later production snapshot, refresh each platform safely: start with
-discovery or `--dry-run`, run one source at a time, repair only extractors
-affected by upstream changes, then parse and unify. Validate that produced
-Parquets are not older than their raw/merged inputs. New DVC pushes remain
-explicitly user-authorized.
+Routine capture, parsing and publication are the product's normal operation,
+not future roadmap work. Their current availability is recorded in
+[Current operational state](#current-operational-state), and their procedures
+belong in the operations documentation.
 
 ### ChatGPT capture-delete cycle
 
