@@ -5,7 +5,7 @@ import asyncio
 from pathlib import Path
 from src.platforms.perplexity.extractor.auth import load_context
 
-OUTPUT_PNG = Path("/tmp/perplexity-more-submenu.png")
+OUTPUT_PNG = Path(".runtime/probes/perplexity-more-submenu.png")
 
 
 async def main():
@@ -97,6 +97,7 @@ async def main():
 
     # 3. Screenshot do estado atual
     print(f"\nScreenshot em {OUTPUT_PNG}")
+    OUTPUT_PNG.parent.mkdir(parents=True, exist_ok=True)
     await page.screenshot(path=str(OUTPUT_PNG), full_page=False)
 
     # 4. Pega texto visivel de todos os items do popover/submenu

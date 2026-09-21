@@ -13,7 +13,7 @@ from playwright.async_api import Request, Response
 from src.platforms.perplexity.extractor.auth import load_context
 
 
-OUTPUT = Path("/tmp/perplexity-attachments-probe.json")
+OUTPUT = Path(".runtime/probes/perplexity-attachments-probe.json")
 WAIT_PER_THREAD = 12  # segundos
 
 # Threads com attachments (do raw)
@@ -103,6 +103,7 @@ async def main():
         c = sum(1 for x in captured if x.get("thread_uuid") == uuid)
         print(f"         {c} XHRs capturadas", flush=True)
 
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(captured, ensure_ascii=False, indent=2))
     print(f"\nTotal: {len(captured)} events em {OUTPUT}", flush=True)
 

@@ -13,7 +13,7 @@ from playwright.async_api import Request, Response
 from src.platforms.perplexity.extractor.auth import load_context
 
 
-OUTPUT = Path("/tmp/perplexity-pages-probe.json")
+OUTPUT = Path(".runtime/probes/perplexity-pages-probe.json")
 BOOKMARKS_SLUG = "bookmarks-9XLOIIv8SZeZI.gC9.47Ww"
 BOOKMARKS_UUID = "f572ce20-8bfc-4997-9923-e802f7ee3b5b"
 
@@ -155,6 +155,7 @@ async def main():
             probe_results.append({"method": method, "path": path, "error": str(e)[:200]})
             print(f"    {method:5} {path[:80]} ERROR {str(e)[:60]}", flush=True)
 
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps({"captured": captured, "probe_results": probe_results}, ensure_ascii=False, indent=2))
     print(f"\nDump em {OUTPUT}", flush=True)
     await context.close()

@@ -1,5 +1,6 @@
 """Probe autonomo DeepSeek: abre headless com profile logado, carrega home,
-abre 1-2 convs e dumpa XHR/fetch requests em /tmp/deepseek-probe.json.
+abre 1-2 convs e dumpa XHR/fetch requests em
+.runtime/probes/deepseek-probe.json.
 
 Uso: PYTHONPATH=. .venv/bin/python -m src.platforms.deepseek.probes.core
 Requer profile logado previo (`python -m src.platforms.deepseek.commands.login`).
@@ -20,7 +21,7 @@ from playwright.async_api import Request, Response
 from src.platforms.deepseek.extractor.auth import load_context, HOME_URL
 
 
-OUTPUT = Path("/tmp/deepseek-probe.json")
+OUTPUT = Path(".runtime/probes/deepseek-probe.json")
 WAIT_AFTER_LOAD = 8
 WAIT_AFTER_CONV = 10
 
@@ -122,6 +123,7 @@ async def main():
     else:
         print("[2/3] Nao achou conv_id no listing. Dumpando o que tem.")
 
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(captured, ensure_ascii=False, indent=2))
     print(f"\n[3/3] {len(captured)} requests capturados em {OUTPUT}")
 

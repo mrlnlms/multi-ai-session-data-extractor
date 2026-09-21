@@ -105,7 +105,7 @@ async def main(
     print(f"\nCapture OK em: {raw_dir}")
 
     if asset_vault is not None and not args.no_binaries:
-        _section("Vault asset capture (temporary rollout)")
+        _section("Vault asset capture")
         try:
             await _run_assets(
                 raw_dir,

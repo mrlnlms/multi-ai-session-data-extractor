@@ -7,7 +7,7 @@ from pathlib import Path
 from playwright.async_api import Request, Response
 from src.platforms.perplexity.extractor.auth import load_context
 
-OUTPUT = Path("/tmp/perplexity-tabs-user-probe.json")
+OUTPUT = Path(".runtime/probes/perplexity-tabs-user-probe.json")
 
 
 def _capture(url: str) -> bool:
@@ -92,6 +92,7 @@ async def main():
         except Exception as e:
             print(f"    GET  {path[:60]} ERROR {str(e)[:60]}")
 
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(captured, ensure_ascii=False, indent=2))
     print(f"\nDump em {OUTPUT}")
     await ctx.close()

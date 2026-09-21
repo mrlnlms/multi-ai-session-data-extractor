@@ -47,6 +47,10 @@ notebooks/_output/
 
 # Backups
 *.bak
+*.orig
+*.rej
+*.tmp
+*~
 
 # Local-only docs (planos internos, journeys, housekeeping, superpowers).
 # Conteudo util pra contributor externo foi extraido pros docs publicos

@@ -6,7 +6,7 @@ Endpoint de listing ja conhecido pelo legacy script:
 Este probe:
   1. Chama list_ask_threads via page.evaluate pra pegar uma thread uuid + slug
   2. Abre /search/<slug> pra capturar fetch da thread
-  3. Dumpa em /tmp/perplexity-probe.json
+  3. Dumpa em .runtime/probes/perplexity-probe.json
 """
 
 import asyncio
@@ -18,7 +18,7 @@ from playwright.async_api import Request, Response
 from src.platforms.perplexity.extractor.auth import load_context, HOME_URL
 
 
-OUTPUT = Path("/tmp/perplexity-probe.json")
+OUTPUT = Path(".runtime/probes/perplexity-probe.json")
 WAIT_AFTER_LIST = 5
 WAIT_AFTER_THREAD = 10
 
@@ -124,6 +124,7 @@ async def main():
     else:
         print("[3/3] Sem slug. Dumpando oq tem.")
 
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(captured, ensure_ascii=False, indent=2))
     print(f"\n{len(captured)} entries em {OUTPUT}")
 

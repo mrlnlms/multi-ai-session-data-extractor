@@ -4,7 +4,7 @@
 3. Probra endpoints REST chutados (threads/pages/files)
 
 Uso: PYTHONPATH=. .venv/bin/python src/platforms/perplexity/probes/spaces.py
-Output: /tmp/perplexity-spaces-probe.json
+Output: .runtime/probes/perplexity-spaces-probe.json
 """
 
 import asyncio
@@ -15,7 +15,7 @@ from playwright.async_api import Request, Response
 from src.platforms.perplexity.extractor.auth import load_context
 
 
-OUTPUT = Path("/tmp/perplexity-spaces-probe.json")
+OUTPUT = Path(".runtime/probes/perplexity-spaces-probe.json")
 WAIT_AFTER_NAV = 6
 
 
@@ -199,6 +199,7 @@ async def main():
             except Exception as e:
                 pass
 
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps({
         "collections": collections,
         "captured": captured,

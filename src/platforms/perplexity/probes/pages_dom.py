@@ -1,7 +1,7 @@
 """Mapeia DOM de items dentro de um Space (Bookmarks) pra distinguir
 threads de pages e descobrir como extrair URL/slug/uuid de cada page.
 
-Output: /tmp/perplexity-pages-dom.json com lista de items + estrutura.
+Output: .runtime/probes/perplexity-pages-dom.json com lista de items + estrutura.
 """
 
 import asyncio
@@ -10,7 +10,7 @@ from pathlib import Path
 from src.platforms.perplexity.extractor.auth import load_context
 
 BOOKMARKS_SLUG = "bookmarks-9XLOIIv8SZeZI.gC9.47Ww"
-OUTPUT = Path("/tmp/perplexity-pages-dom.json")
+OUTPUT = Path(".runtime/probes/perplexity-pages-dom.json")
 
 
 async def main():
@@ -65,6 +65,7 @@ async def main():
         seen.add(p['href'])
         print(f"    href={p['href']!r} text={p['text'][:80]!r}")
 
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps({"rows": items, "links": page_links}, ensure_ascii=False, indent=2))
     print(f"\nDump em {OUTPUT}")
     await ctx.close()

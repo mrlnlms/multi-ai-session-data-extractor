@@ -18,7 +18,7 @@ from src.platforms.deepseek.extractor.auth import load_context
 TARGET_CONV = "08115596-1546-4de3-93da-66903b1671cc"
 TARGET_URL = f"https://chat.deepseek.com/a/chat/s/{TARGET_CONV}"
 
-OUTPUT = Path("/tmp/deepseek-download-probe.json")
+OUTPUT = Path(".runtime/probes/deepseek-download-probe.json")
 WAIT_SECONDS = 90
 
 
@@ -75,6 +75,7 @@ async def main():
     await page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=60000)
     await page.wait_for_timeout(WAIT_SECONDS * 1000)
 
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(captured, ensure_ascii=False, indent=2))
     print(f"\n{len(captured)} requests/responses capturados em {OUTPUT}")
 

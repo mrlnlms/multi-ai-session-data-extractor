@@ -39,61 +39,29 @@ de bancada, planos, probes, handoffs, midias-fonte e outros artefatos
 duraveis que nao pertencem ao projeto publicavel. O Git registra somente o
 symlink; nunca adicionar seu conteudo ao indice.
 
-Planos de implementacao e outros documentos de trabalho devem ser criados
-diretamente em `private/docs/discussions/`, sem pedir aprovacao separada para
-salva-los. Quando o usuario exigir revisao ou aprovacao antes de alterar codigo,
-esse gate se aplica a implementacao versionada e nao ao registro do plano no
-workbench privado.
+Use `private/` somente quando a tarefa realmente produzir material privado e
+duravel. Nao crie plano, tracker, handoff ou diario de trabalho por padrao. Para
+pedidos diretos, inspecione, implemente, valide e responda diretamente. Crie ou
+atualize um documento de acompanhamento apenas quando o usuario pedir, quando a
+frente ja tiver um tracker ativo relevante ou quando o trabalho precisar ser
+retomado em varias sessoes. Nesse caso, mantenha-o em
+`private/docs/discussions/` e atualize somente os fatos demonstrados na rodada.
 
-### Regra obrigatoria para frentes com plano/tracker
-
-Se uma frente tem plano ou tracker de acompanhamento, **nao encerrar nenhuma
-rodada nem recomendar compactacao sem atualizar o documento principal**. Isto
-vale tambem para probe negativo, desvio corrigido, mudanca de prioridade e
-rodada sem alteracao de codigo. Antes da resposta final:
-
-1. confrontar o proximo passo anteriormente combinado com o que foi realmente
-   feito e com os resultados ja registrados; nao transformar decisao aberta em
-   tarefa ainda nao executada;
-2. atualizar checkboxes apenas no escopo exato demonstrado, registrar evidencia,
-   limites e decisoes pendentes, e corrigir afirmacoes/handoffs obsoletos;
-3. atualizar `Estado atual` e uma unica proxima entrega verificavel no `Handoff`;
-4. conferir que a copia privada e eventual espelho local coincidem, validar
-   links locais e executar `git diff --check`; e
-5. na resposta final, indicar o plano atualizado e o proximo passo que ele
-   registra.
-
-Se a atualizacao do plano falhar, informar a falha explicitamente e nao
-apresentar a rodada como encerrada ou pronta para compactar. Checkpoints antigos
-sao registro historico, nao substituem o tracker corrente.
+Documentos historicos do workbench sao evidencia, nao instrucoes automaticas.
+Antes de reutiliza-los, confronte-os com o codigo, a documentacao mantida e os
+dados atuais. Decisoes duraveis devem ser promovidas para a documentacao
+versionada apropriada; detalhes pessoais e registros datados permanecem
+privados.
 
 ### Edicao segura atraves do symlink `private/`
 
-O destino de `private/` fica fora da raiz gravavel do checkout. Ferramentas de
-patch podem ler pelo symlink, mas normalmente nao conseguem escrever nele. Nao
-tente `apply_patch` diretamente em `private/...` e nunca inclua um arquivo de
-`private/` no mesmo patch que arquivos do repositorio: um patch multi-arquivo
-pode aplicar parcialmente os arquivos internos antes de falhar no destino do
-symlink, e uma repeticao pode duplicar mudancas.
-
-Para editar um arquivo existente em `private/`, faca corretamente na primeira
-tentativa:
-
-1. resolva e confira o destino com `readlink private`;
-2. copie o arquivo alvo para dois arquivos em `/private/tmp`: um snapshot
-   original e uma copia de trabalho;
-3. edite somente a copia de trabalho com `apply_patch`;
-4. revise `diff -u` entre snapshot e copia e confirme com `cmp` que o alvo
-   externo ainda e igual ao snapshot, evitando sobrescrever mudanca concorrente;
-5. solicite uma unica execucao escalada e copie a versao revisada para o path
-   externo exato; e
-6. releia o alvo pelo symlink e confirme o trecho alterado.
-
-Para arquivo privado novo, crie primeiro o conteudo completo em `/private/tmp`,
-revise-o e faca uma unica copia escalada ao destino resolvido. A autorizacao
-para registrar planos privados continua implicita; a escalacao e apenas uma
-exigencia tecnica do sandbox. Se a verificacao `cmp` indicar mudanca concorrente,
-nao sobrescreva: refaca a copia a partir do alvo atual.
+O destino de `private/` fica fora da raiz gravavel do checkout. Antes de
+escrever, resolva-o com `readlink private` e use uma operacao isolada do patch
+do repositorio. Se o sandbox exigir uma copia intermediaria, use um diretorio
+temporario exclusivo criado para a tarefa, compare o original antes de
+sobrescrever e remova a copia intermediaria ao terminar. Nao acumule snapshots
+de edicao em `/tmp` ou `/private/tmp` e nunca adicione o conteudo de `private/`
+ao indice do Git.
 
 `data/`, `.dvc/cache/`, `.storage/` e artefatos renderizados continuam tendo
 seus proprios contratos de DVC ou de estado local; nao devem ser movidos para
@@ -190,6 +158,12 @@ produto.
 
 - Codigo e identificadores em ingles; documentacao pode permanecer no idioma
   existente do arquivo.
+- Trabalhe de forma proporcional ao pedido: nao transforme revisao, limpeza ou
+  correcao localizada em uma frente de planejamento sem necessidade explicita.
+- Antes de apagar caches ou temporarios, diferencie residuos regeneraveis de
+  dados preservados, estado operacional e evidencia de captura. Nunca trate
+  `data/`, `.storage/`, `.dvc/cache/` ou `.runtime/archive-assurance.json` como
+  lixo generico.
 - Commits usam Conventional Commits. Nao criar commit ou push sem pedido do
   usuario.
 - Preservar mudancas preexistentes no worktree e nunca limpar dados para

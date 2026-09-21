@@ -56,10 +56,11 @@ com os relatorios antes que suas funcoes tenham substitutos validados.
 | Como contas, login local e empacotamento podem funcionar? | [account-architecture.md](account-architecture.md) | Exploracao arquitetural pausada, com decisoes abertas. |
 | Como o dashboard atual e operado? | [../operations/dashboard.md](../operations/dashboard.md) | Manual da superficie existente, nao arquitetura-alvo. |
 
-Planos temporarios, probes de decisao e handoffs de implementacao pertencem a
-`private/docs/discussions/`. Uma decisao duravel deve ser promovida ao documento
-publico correspondente acima; nao deve permanecer visivel apenas por ordem de
-criacao dos planos privados.
+Quando existirem, planos temporarios, probes de decisao e handoffs de
+implementacao pertencem a `private/docs/discussions/`; tarefas diretas nao
+exigem a criacao desses documentos. Uma decisao duravel deve ser promovida ao
+documento publico correspondente acima e nao deve permanecer visivel apenas
+por ordem de criacao dos planos privados.
 
 ## Sequencia de transicao
 

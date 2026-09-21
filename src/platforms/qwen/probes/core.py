@@ -4,7 +4,7 @@ Estrategia:
   1. Home chat.qwen.ai -> sidebar carrega listing via XHR
   2. Pesca conv_id do response
   3. Abre /c/<id> pra capturar fetch individual
-  4. Dumpa /tmp/qwen-probe.json
+  4. Dumpa .runtime/probes/qwen-probe.json
 """
 
 import asyncio
@@ -16,7 +16,7 @@ from playwright.async_api import Request, Response
 from src.platforms.qwen.extractor.auth import load_context, HOME_URL
 
 
-OUTPUT = Path("/tmp/qwen-probe.json")
+OUTPUT = Path(".runtime/probes/qwen-probe.json")
 WAIT_AFTER_LOAD = 8
 WAIT_AFTER_CONV = 10
 
@@ -106,6 +106,7 @@ async def main():
     else:
         print("[2/3] Nao achou conv_id. Dumpando oq tem.")
 
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(captured, ensure_ascii=False, indent=2))
     print(f"\n[3/3] {len(captured)} requests capturados em {OUTPUT}")
 

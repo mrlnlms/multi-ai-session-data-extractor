@@ -90,13 +90,13 @@ Nenhum desses comandos apaga evidencia legacy.
 
 ### Retencao e rollback
 
-Durante a transicao, retenha juntos os blobs, `schema.json` e todos os
+No contrato atual, retenha juntos os blobs, `schema.json` e todos os
 `scopes/*/*/records.jsonl`; os logs commitados sao a fonte duravel do estado do
 vault. `state.json`, paths compativeis e Parquets podem ser reconstruidos. Nao
 existe coleta de lixo autorizada para o vault e blobs nao devem ser removidos
 isoladamente.
 
-`processed` e `unified` continuam no DVC durante esta transicao. Um restore frio
+`processed` e `unified` permanecem no DVC. Um restore frio
 do remoto e diagnostico opcional para divergencia ou incidente de recuperacao,
 nao gate automatico de publicacao; os gates normais sao push bem-sucedido,
 status local/remoto limpos e um novo recibo de archive assurance.
@@ -106,14 +106,14 @@ mais uma segunda copia completa dos assets. O rollback integral dos bytes usa
 uma revisao DVC anterior; a operacao normal e a recuperacao atual usam o vault.
 O default `vault` nunca autoriza remover registros ou manifests legacy. A
 limpeza dos bytes redundantes foi uma operacao separada, preview-first; `dvc
-gc` continua fora desta transicao e exige aprovacao separada.
+gc` continua sendo manutencao separada e exige aprovacao explicita.
 
 O dry-run abaixo calcula SHA-256, confere cada copia contra o blob central e
 grava a lista exata de candidatos, sem coletar, baixar ou excluir nada:
 
 ```bash
 PYTHONPATH=. .venv/bin/python -m src.operations.audit_asset_retention \
-  --data-root data --output /tmp/asset-retention-audit.json
+  --data-root data --output .runtime/audits/asset-retention-audit.json
 ```
 
 O comando e dry-run por padrao. Depois de revisar o relatorio, a limpeza
@@ -121,7 +121,8 @@ explicita reexecuta a auditoria e revalida cada hash antes da remocao:
 
 ```bash
 PYTHONPATH=. .venv/bin/python -m src.operations.audit_asset_retention \
-  --data-root data --apply --output /tmp/asset-retention-apply.json
+  --data-root data --apply \
+  --output .runtime/audits/asset-retention-apply.json
 ```
 
 No checkpoint aplicado, 24.056 copias (9.029.881.100 bytes logicos) foram

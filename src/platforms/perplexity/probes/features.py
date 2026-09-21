@@ -6,7 +6,7 @@ Tambem inclui probe explicito de pinned threads (HTTP 400 conhecido)
 testando variacoes de version/method.
 
 Uso: PYTHONPATH=. .venv/bin/python src/platforms/perplexity/probes/features.py
-Output: /tmp/perplexity-features-probe.json + sumario no stdout
+Output: .runtime/probes/perplexity-features-probe.json + sumario no stdout
 """
 
 import asyncio
@@ -18,7 +18,7 @@ from playwright.async_api import Request, Response
 from src.platforms.perplexity.extractor.auth import load_context
 
 
-OUTPUT = Path("/tmp/perplexity-features-probe.json")
+OUTPUT = Path(".runtime/probes/perplexity-features-probe.json")
 WAIT_AFTER_NAV = 6  # segundos pra SPA disparar XHRs
 
 SECTIONS = [
@@ -172,6 +172,7 @@ async def main():
     current_section["name"] = "_pinned_probe"
     pinned_results = await _probe_pinned_variations(page)
 
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps({
         "captured": captured,
         "pinned_probe": pinned_results,

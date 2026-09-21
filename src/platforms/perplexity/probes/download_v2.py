@@ -18,7 +18,7 @@ from src.platforms.perplexity.extractor.auth import load_context
 TARGET = "c78e3e1b-a1de-4677-baa9-0b1dc6ac1a34"
 TARGET_URL = f"https://www.perplexity.ai/search/{TARGET}"
 
-OUTPUT = Path("/tmp/perplexity-download-v2-probe.json")
+OUTPUT = Path(".runtime/probes/perplexity-download-v2-probe.json")
 WAIT_SECONDS = 120
 
 
@@ -90,6 +90,7 @@ async def main():
     await page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=60000)
     await page.wait_for_timeout(WAIT_SECONDS * 1000)
 
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(events, ensure_ascii=False, indent=2))
     print(f"\n{len(events)} events em {OUTPUT}", flush=True)
 
