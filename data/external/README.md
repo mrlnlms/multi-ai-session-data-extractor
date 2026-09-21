@@ -1,39 +1,43 @@
 # data/external/
 
-Dados que **NÃO vêm do extractor automatizado** — preservados aqui pra
-contexto histórico, recuperação e análise futura. Diferente de `data/raw/`
-(produzido pelos extractors deste projeto), `data/external/` recebe dados
-de origens diversas: exports oficiais, snapshots via extensões, clippings
-manuais, copy-paste, etc.
+Dados cuja aquisicao fica **fora da captura automatizada regular** — preservados
+aqui para contexto historico, recuperacao e analise. Diferente de `data/raw/`,
+produzido pelos coletores deste projeto, `data/external/` recebe exports
+oficiais, snapshots, clippings manuais, copy-paste e snapshots excepcionais de
+configuracao.
+
+Alguns conjuntos possuem adaptadores explicitos e podem alimentar
+`data/processed/`; isso nao torna sua aquisicao reproduzivel pelo sync normal.
+Esses inputs permanecem imutaveis e nao fazem parte da limpeza de copias de
+assets em `raw`/`merged`. Nao migrar, deduplicar ou remover esta arvore apenas
+porque uma representacao equivalente exista no pipeline programavel.
 
 ## Estrutura
 
 ```
 data/external/
-├── manual-saves/                       # parsável (sync via scripts/manual-saves-sync.py)
-│   ├── clippings-obsidian/
-│   ├── copypaste-web/
-│   └── terminal-claude-code/
-├── openai-gdpr-export/                 # GDPR oficial OpenAI
-│   ├── 2026-03-27/                     #   primeiro snapshot
-│   └── 2026-04-27/                     #   segundo snapshot (mais recente)
-├── chatgpt-extension-snapshot/         # snapshot via extensão Chrome (ChatGPT)
-│   └── 2026-03-27/
-├── claude-ai-snapshots/                # snapshots brutos Claude.ai (pré-extractor)
-│   ├── 2026-03-26/
-│   ├── 2026-03-30/
-│   └── 2026-04-18/
-├── deep-research-md/                   # 2 exports manuais Deep Research em .md
-└── grok-snapshots/                     # exports oficiais xAI Grok
-    └── 2026-05-09/                     #   primeiro snapshot
+├── manual-saves/                       # clippings, copy-paste e terminal
+├── openai-gdpr-export/                 # exports oficiais OpenAI
+├── chatgpt-extension-snapshot/         # snapshot via extensao Chrome
+├── claude-ai-snapshots/                # snapshots pre-extractor
+├── deepseek-snapshots/                 # snapshot historico DeepSeek
+├── notebooklm-snapshots/               # arquivo historico lido pelo parser oficial
+├── perplexity-orphan-threads/          # threads historicas fora da discovery atual
+├── deep-research-md/                   # exports manuais em Markdown
+├── grok-snapshots/                     # export oficial xAI Grok
+├── claude-code-config-snapshots/       # snapshot explicito de configuracao
+├── codex-config-snapshots/             # snapshot explicito de configuracao
+└── gemini-config-snapshots/            # snapshot explicito de configuracao
 ```
 
 ## Categorias
 
 ### manual-saves/ ✅ parsável
 
-Convertido pra parquets canônicos via `scripts/manual-saves-sync.py`. Os 3
-parsers (`src/importers/manual/`):
+Convertido para Parquets canonicos pelo comando
+`PYTHONPATH=. .venv/bin/python -m src.workflows.manual_saves`. Os tres parsers
+ficam em `src/importers/manual/`:
+
 - **clippings-obsidian** — Obsidian Web Clipper (markdown com YAML frontmatter)
 - **copypaste-web** — copy-paste manual (.txt) de chats web
 - **terminal-claude-code** — output renderizado do terminal Claude Code (.txt)
@@ -41,7 +45,17 @@ parsers (`src/importers/manual/`):
 Output: `data/processed/<Plataforma>/<source>_manual_<table>.parquet`. Quartos
 fazem UNION via `setup_views_with_manual()` em `src/reporting/quarto_helpers.py`.
 
-Stats atuais (29 convs / 403 msgs / 70 tool_events):
+### Snapshots consumidos por adaptadores
+
+| Conjunto | Consumo atual | Limite |
+|---|---|---|
+| `notebooklm-snapshots/` | O parser oficial do NotebookLM inclui o acervo historico, salvo uso deliberado de `--without-historical`. | O parser le o snapshot; o sync nao o recaptura. |
+| `deepseek-snapshots/` | Evidencia historica e input conhecido da projecao de assets. | Nao substitui a captura atual nem autoriza descarte. |
+| `perplexity-orphan-threads/` | Evidencia historica para threads orfas e projecao de assets. | Continua fora da discovery regular. |
+| `*-config-snapshots/` | Criados apenas pela operacao explicita `python -m src.capture.cli.snapshot`. | Nao sao profiles ativos nem credenciais de runtime. |
+
+Stats atuais (29 convs / 403 msgs / 75 tool_events):
+
 | Plataforma | Convs | capture_method |
 |---|---|---|
 | ChatGPT | 21 | manual_clipping_obsidian (20) + manual_copypaste (1) |
@@ -124,21 +138,19 @@ específico antes de implementar.
 
 1. Criar pasta `data/external/<categoria>/` com naming descritivo
 2. Adicionar entrada em **Categorias** acima documentando o que é
-3. Decidir se vira parser ou fica preservado como blob
-4. Se virar parser:
+3. Decidir se um adaptador explicito deve ler o conjunto ou se ele fica
+   preservado como blob; isso nao muda sua origem externa
+4. Se ganhar adaptador:
+
    - Criar `src/importers/manual/<source>.py` (ou `external/<source>.py`)
-   - Atualizar `scripts/workflows/manual-saves-sync.py` (se aplicável) ou criar sync próprio
+   - Atualizar `src/workflows/manual_saves.py` quando o formato pertencer a
+     manual saves, ou o parser da plataforma quando for evidencia historica
    - Output em `data/processed/<Plataforma>/<source>_manual_<table>.parquet`
 
-## Total atual
+## Retencao
 
-```
-manual-saves/                  1.8MB (parsável)
-openai-gdpr-export/            1.0GB (extraídos + zip)
-chatgpt-extension-snapshot/     51MB
-claude-ai-snapshots/           360MB
-deep-research-md/              208KB
-grok-snapshots/                 10MB (binarios usados em data/raw/Grok/assets)
-                              -------
-                              ~1.4GB
-```
+Cada subdiretorio e rastreado por seu proprio ponteiro DVC. Tamanho, idade ou
+equivalencia aparente com `raw`, `merged` ou `assets` nao sao autorizacao para
+remocao. Uma mudanca futura de politica exige uma decisao explicita sobre este
+acervo; a manutencao rotineira do pipeline e o GC do DVC nao reclassificam seu
+conteudo.

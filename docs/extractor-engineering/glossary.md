@@ -21,9 +21,12 @@ corrompida. O baseline pode ser refeito sem perder o acervo; o merged nao.
 
 ### Raw
 
-Captura direta do servidor em `data/raw/<Source>/`, com JSON, binarios e logs.
-E atualizada a cada execucao e ainda nao recebeu as regras cumulativas de
-preservacao.
+Captura direta da origem em `data/raw/<Source>/`, com registros, manifests,
+logs e a evidencia nativa que a fonte exigir. Downloaders web em modo `vault`
+podem usar paths sob `raw` como staging, mas retiram esses bytes somente depois
+de verificar o blob commitado em `data/assets`; fontes CLI podem preservar
+arquivos nativos como parte do proprio input cumulativo. Raw e atualizado a
+cada execucao e ainda nao recebeu as regras cumulativas de reconciliacao.
 
 ### Reconcile
 

@@ -55,9 +55,11 @@ Each web platform has a login command under its vertical package:
 .storage/account-health.json    # local explicit auth observations
 data/raw/        # raw captured data (your conversations)
 data/merged/     # consolidated data
+data/assets/     # immutable content-addressed asset vault
 data/processed/  # canonical parquets
 data/unified/    # cross-platform parquets
 data/external/   # manual snapshots (GDPR exports, clippings, etc)
+data/accounts/   # durable account catalog without credentials
 .venv/           # Python virtual environment
 ```
 

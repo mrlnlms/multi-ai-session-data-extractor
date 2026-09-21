@@ -468,10 +468,10 @@ data/unified selecionado + manifest
 input local e reproduzivel do consumidor
 ```
 
-O produtor continua sendo o cofre canonico de `raw`, `merged`, `processed` e
-`unified`. Um snapshot analitico com manifesto permanece apenas uma possivel
-evolucao futura; nao e migracao em andamento nem bloqueio para a dimensao de
-contas.
+O produtor continua sendo o cofre canonico de `raw`, `merged`, `assets`,
+`processed`, `unified` e do catalogo em `accounts`. Um snapshot analitico com
+manifesto permanece apenas uma possivel evolucao futura; nao e migracao em
+andamento nem bloqueio para a dimensao de contas.
 
 ## 10. Fundacao concluida e proximas fronteiras
 

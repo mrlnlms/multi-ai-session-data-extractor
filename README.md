@@ -153,6 +153,12 @@ explicit compatibility and diagnostic mode. See the
 [asset storage transition](docs/operations/pipeline.md#transicao-do-asset-vault)
 for reader selection, verification, local restore, retention, and rollback.
 
+`data/external/` is a separate preservation boundary for manual, exported or
+exceptional inputs outside regular automated capture. Some of those immutable
+inputs are consumed by explicit adapters, but their acquisition is not made
+reproducible by the normal sync pipeline. They are not candidates for the
+raw/merged asset-retention cleanup; see [`data/external/README.md`](data/external/README.md).
+
 Full schema in `src/schema/models.py`. Capture and parser terminology is in
 [the extractor engineering glossary](docs/extractor-engineering/glossary.md).
 
@@ -241,6 +247,7 @@ PYTHONPATH=. .venv/bin/pytest tests/parsers/     # parsers only
 ## Documentation
 
 - [docs/README.md](docs/README.md) — full index
+- [docs/ROADMAP.md](docs/ROADMAP.md) — current operational state and product horizon
 - [docs/SETUP.md](docs/SETUP.md) — detailed setup, first login, and
   troubleshooting
 - [docs/operations/dvc-runbook.md](docs/operations/dvc-runbook.md) — DVC operational guide

@@ -19,6 +19,12 @@ downloaders podem usar staging transitorio, mas uma captura vault bem-sucedida
 remove esses bytes somente depois de verificar o blob commitado; Kimi e Qwen
 tambem nao os projetam em `merged`.
 
+`data/external/` fica fora da aquisicao automatizada regular. Ele preserva
+inputs manuais, exports e snapshots excepcionais; alguns entram em `processed`
+por adaptadores explicitos, mas continuam sendo fontes imutaveis cuja obtencao
+nao e reproduzida pelo sync. A retencao de assets de `raw`/`merged` nao percorre
+nem autoriza limpar essa arvore.
+
 ## Transicao do asset vault
 
 O contrato publicado em `assets.parquet`, `asset_links.parquet` e

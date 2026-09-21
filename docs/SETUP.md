@@ -284,9 +284,12 @@ preservar esta publicada e recuperavel pelo DVC.
 
 ## DVC: cofre recuperavel da base atual
 
-A pipeline grava em `data/raw/`, `data/merged/`, `data/processed/`,
-`data/unified/` e `data/external/`. Esses diretorios sao ignorados pelo Git e
-contem dados pessoais que nao devem entrar no repositorio.
+A pipeline regular grava em `data/raw/`, `data/merged/`, `data/assets/`,
+`data/processed/` e `data/unified/`. `data/external/` preserva inputs manuais,
+exports e snapshots excepcionais fora da aquisicao automatizada; operacoes e
+adaptadores explicitos podem le-los ou cria-los sem transforma-los em captura
+reproduzivel. Esses diretorios sao ignorados pelo Git e contem dados pessoais
+que nao devem entrar no repositorio.
 
 Este repositorio usa DVC como cofre recuperavel da **base canonica atual**. O
 Git versiona o codigo e os ponteiros `.dvc`; o remoto guarda os dados grandes.

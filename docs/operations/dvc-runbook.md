@@ -30,11 +30,12 @@ remoto DVC e.
 
 | Pasta | Conteudo | Papel |
 |---|---|---|
-| `data/raw/` | Captura bruta e binarios | Evidencia primaria; downloaders preservam binarios existentes. |
+| `data/raw/` | Captura bruta, registros, manifests e evidencia nativa | Evidencia primaria; downloads vault podem usar staging transitorio, removido depois do commit verificado. |
 | `data/merged/` | Reconciliacao cumulativa | Mantem registros `preserved_missing`. |
+| `data/assets/` | Blobs imutaveis content-addressed e logs do vault | Casa fisica canonica dos assets cobertos pelo pipeline programavel. |
 | `data/processed/` | Parquets canonicos por fonte | Interface de leitura para analises. |
 | `data/unified/` | Parquets cross-platform | Contrato de dados para consumidores downstream. |
-| `data/external/` | Inputs manuais e snapshots preservados | Evidencia ou entradas ativas fora da captura regular. |
+| `data/external/` | Inputs manuais, exports e snapshots excepcionais | Evidencia imutavel fora da captura regular; alguns adaptadores leem esses inputs, mas isso nao torna sua aquisicao reproduzivel. |
 | `data/accounts/` | Catalogo de identidade e lifecycle | Estado arquivavel de contas, sem profiles, credenciais ou rotulos privados. |
 
 O conteudo dessas pastas nao vai para Git diretamente: os arquivos `.dvc` sao
@@ -75,7 +76,7 @@ no contrato com seus consumidores downstream.
 .venv/bin/dvc status --cloud
 
 # Depois de sync + parse + unify, atualizar ponteiros DVC
-.venv/bin/dvc add data/raw data/merged data/processed data/unified \
+.venv/bin/dvc add data/raw data/merged data/assets data/processed data/unified \
     data/accounts \
     data/external/manual-saves data/external/deep-research-md \
     data/external/perplexity-orphan-threads data/external/deepseek-snapshots \

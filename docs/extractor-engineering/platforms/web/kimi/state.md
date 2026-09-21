@@ -51,9 +51,10 @@
   unavailable upstream object.
 - The run exposed the same preservation boundary previously observed in Qwen:
   vault mode refreshed the manifest but skipped the then-required compatibility
-  projection into merged. Kimi reconciliation preserves that projection in
-  both reader modes, with a regression test; the later retention operation may
-  remove the byte copy after proving it in the vault. The archive-wide
+  projection into merged. The immediate parity fix preserved that projection
+  in both reader modes. The subsequent vault-only correction stopped
+  rematerializing it during normal capture, and the retention audit removed the
+  prior byte copy only after proving it in the vault. The archive-wide
   coverage audit returned to zero gaps; vault verification, unify, all 6
   selected Quarto reports, and the complete test suite pass.
 - The collector requires an authenticated `kimi.ai` session and access token.
@@ -103,12 +104,13 @@ legacy `account` label and all existing native IDs remain unchanged.
   por block, com `args` em `command` e `contents` em `result`),
   `file` (attachment_names + asset_path).
 - **Files inline em `chat.files[]`:** signUrl (TTL) → download direto
-  via fetch sem auth (URLs pre-assinadas Moonshot CDN). Salvos em
-  `data/raw/Kimi/assets/<chat_id>/<file_id>.<ext>` (mime → ext) com
-  manifest em `assets_manifest.json`. O reconciler preserva a arvore aninhada
-  em `merged`; caminhos publicados sao relativos a `data/` e incluem a raiz da
-  conta (`account-<n>`) quando aplicavel. A URL assinada permanece apenas no
-  manifest sob DVC e nunca entra no Parquet processado. O catalogo canonico
+  via fetch sem auth (URLs pre-assinadas Moonshot CDN). O layout
+  `data/raw/Kimi/assets/<chat_id>/<file_id>.<ext>` e staging ou compatibilidade
+  legacy; no fluxo `vault` normal, o blob verificado fica em `data/assets` e o
+  staging e retirado. `assets_manifest.json` permanece como evidencia, e o
+  reconciler nao rematerializa a arvore binaria em `merged` no modo vault.
+  Caminhos publicados sao relativos a `data/`. A URL assinada permanece apenas
+  no manifest sob DVC e nunca entra no Parquet processado. O catalogo canonico
   mantem esses arquivos com `asset_origin=unknown`, pois `chat.files[]` nao
   prova autoria. `kimi_asset_links.parquet` registra a associacao observavel a
   conversa com `role=unknown`; mensagem, posicao inline e direcao nao sao

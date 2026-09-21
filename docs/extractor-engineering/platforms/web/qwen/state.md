@@ -29,11 +29,12 @@ Chats + projects + project files captured. Reconciler v3
   requested asset representations were captured without errors.
 - The round exposed a vault-mode reconciliation bug: Qwen updated the merged
   manifest but skipped the then-required compatibility projection into merged
-  whenever an asset reader was active. Reconciliation preserves that projection
-  in both reader modes; the later retention operation may remove its byte copy
-  after proving it in the vault. The parser consequently resolves all 372
-  canonical assets locally and the archive-wide coverage gate reports zero
-  eligible-uncovered, unresolved, or broken-link findings.
+  whenever an asset reader was active. The immediate parity fix preserved that
+  projection in both reader modes. The subsequent vault-only correction stopped
+  rematerializing it during normal capture, and the retention audit removed the
+  prior byte copy only after proving it in the vault. The parser consequently
+  resolves all 372 canonical assets locally and the archive-wide coverage gate
+  reports zero eligible-uncovered, unresolved, or broken-link findings.
 - The combined parser produces 150 conversations, 2,194 messages, 9 tool
   events, 181 branches, 8 projects, 22 project docs, 372 assets, and 372 exact
   asset links. Unify, all 6 selected Quarto reports, vault verification across

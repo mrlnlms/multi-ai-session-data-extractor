@@ -107,11 +107,13 @@ Smoke 2026-05-09: 44/44 baixados, sha256 + size **bit-identical** ao
 export oficial — confirma que API e export referenciam o mesmo storage.
 Total: 10.02MB.
 
-Naming local: `data/raw/Grok/assets/<asset_id>.<ext>` (mime → ext).
-Manifest: `data/raw/Grok/assets_manifest.json` ({asset_id: {url,
-relpath, size, mime}}). Os bytes ficam no vault central; raw e merged preservam
-os registros e manifests. Parser populates coluna `asset_path` em
-`grok_assets.parquet`. O parser publica o contrato canonico `Asset`; arquivos
+O layout `data/raw/Grok/assets/<asset_id>.<ext>` e usado como staging ou pelo
+modo legacy. No fluxo `vault` normal, o downloader verifica o blob commitado e
+retira o staging; `data/raw/Grok/assets_manifest.json` preserva o mapa
+`{asset_id: {url, relpath, size, mime}}`. Os bytes duraveis ficam no vault
+central; raw e merged preservam os registros e manifests. O parser popula a
+coluna `asset_path` em `grok_assets.parquet` e publica o contrato canonico
+`Asset`; arquivos
 gerados viram `asset_kind=generated` e `asset_origin=assistant`, enquanto
 uploads viram `attachment` e `asset_origin=user`. Como `/rest/assets` e um
 catalogo global sem evidencia de uso, `grok_asset_links.parquet` tem schema

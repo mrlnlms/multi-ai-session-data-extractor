@@ -81,8 +81,10 @@ index are the published DVC-backed source for bytes, while `assets` and
 The default `vault` flow has been confirmed by natural incremental collections.
 The preview-first retention audit has removed byte-proven redundant copies
 from raw/merged while retaining their records and manifests; external
-snapshots remain preserved. The vault is the authoritative physical home for
-those asset bytes, while historical DVC revisions provide full rollback.
+snapshots remain preserved outside the regular automated-capture boundary and
+are not a cleanup target. The vault is the authoritative physical home for
+the programmable pipeline's asset bytes, while historical DVC revisions
+provide rollback for the retained revisions.
 Incremental downloaders may use transient staging paths during capture, but
 the successful vault flow retires the verified bytes before it completes. The
 account dimension, UUID-native paths and catalog v2 migration are implemented
@@ -174,7 +176,7 @@ canonical operational remote.
 | Evaluate a single DVC object remote | Future research, not near-term | Remove DVC objects from personal Google Drive without reducing the archive merely to fit an arbitrary free tier. |
 | Oracle Object Storage proof of concept | Candidate, not approved | Test a private S3-compatible Oracle bucket. Its published Always Free allocation is 20 GB and 50,000 Object Storage API calls/month; DVC's real request count must be measured before choosing it. |
 | Central asset vault and manifest | Completed | The DVC-backed central home and preservation index are implemented, migrated, published and confirmed by real incremental collections. The retention audit removed byte-proven raw/merged duplicates; cold restore remains diagnostic rather than a publication gate. |
-| Retention audit for `data/external/` | Planned | Classify each set as active input, unique recovery evidence, or verified duplicate before any storage-policy change. |
+| `data/external/` preservation boundary | Preserved; outside automated capture | Keep manual, exported and exceptional inputs immutable. Explicit adapters may read them, but no retention cleanup or migration into `raw` is planned. |
 
 References: [Oracle Always Free Object Storage](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm),
 [Oracle S3 Compatibility API](https://docs.oracle.com/en-us/iaas/Content/Object/Tasks/s3compatibleapi.htm), and
@@ -204,9 +206,9 @@ removed 24,056 byte-proven duplicates (9,029,881,100 logical bytes) with zero
 blocked files, and a post-audit scan found zero remaining candidates. Vault
 captures now retire verified staging bytes and do not recreate those copies. Physical
 byte identity remains distinct from upstream object identity when equal bytes
-appear in multiple source contexts. Any future storage work is limited to the
-separately preserved `data/external/` sets or remote choice; neither changes
-the authoritative vault contract.
+appear in multiple source contexts. The separately preserved `data/external/`
+sets are not part of this retention policy. Future storage research concerns
+the DVC remote and does not change the authoritative vault contract.
 
 ### Archive reader product
 

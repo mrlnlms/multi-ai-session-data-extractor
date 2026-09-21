@@ -27,7 +27,9 @@ validado, publicado no DVC e verificado contra o remoto como fonte canonica. Um
 novo restore frio fica reservado como diagnostico de recuperacao; a confirmacao
 operacional foi confirmada por coletas incrementais reais. A auditoria de
 retencao retirou de `raw` e `merged` apenas as copias comprovadas no vault;
-registros, manifests e snapshots externos permanecem preservados. Veja a
+registros e manifests permanecem preservados. `data/external/` e uma fronteira
+separada para inputs fora da captura automatizada regular: adaptadores podem
+le-los, mas a retencao do vault nao os percorre nem reclassifica. Veja a
 [transicao operacional](pipeline.md#transicao-do-asset-vault).
 
 ## Rollback de asset

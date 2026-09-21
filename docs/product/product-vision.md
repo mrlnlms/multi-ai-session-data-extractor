@@ -30,11 +30,12 @@ O **arquivo e leitor** continua sendo uma frente central do produto: a coleta
 e a análise já possuem infraestrutura utilizável, mas ainda falta a superfície
 que permita inspecionar diretamente o principal dado preservado: a conversa.
 Isso descreve um gap de uso, não a próxima tarefa. No horizonte atual, memória/
-configuração de conta e a dimensão analítica derivada do trabalho de
-`account_id` já publicado são frentes próximas. A centralização física dos
-assets preservados já foi concluída e publicada. O leitor fica no futuro,
-provavelmente antes de uma eventual mudança do remoto
-DVC. O [roadmap](../ROADMAP.md) registra a prioridade temporal; esta visão
+configuração de conta é a próxima frente separada; a identidade canônica,
+`account_id` e a dimensão analítica de contas já foram concluídos e publicados.
+A centralização física dos assets preservados, sua retenção inicial e a limpeza
+do histórico DVC não utilizado também foram concluídas. O leitor fica no
+futuro, provavelmente antes de uma eventual mudança do remoto DVC. O
+[roadmap](../ROADMAP.md) registra a prioridade temporal; esta visão
 descreve o produto-alvo e não fixa a ordem de implementação das três frentes.
 
 O arquivo substitui a necessidade de consultar o histórico diretamente em cada

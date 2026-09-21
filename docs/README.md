@@ -20,6 +20,9 @@ define as regras de trabalho para agentes.
   [mapa de comandos](operations/commands.md),
   [termos operacionais](operations/glossary.md), incluindo o
   [runbook de coleta web](operations/web-collection.md).
+- [`data/external/README.md`](../data/external/README.md) — fronteira de
+  preservacao para inputs manuais, exports e snapshots excepcionais fora da
+  aquisicao automatizada regular.
 - [extractor-engineering/](extractor-engineering/) — engenharia da captura,
   validacao cross-platform, [limites conhecidos](extractor-engineering/known-limitations.md)
   [cobertura canonica de assets](extractor-engineering/asset-coverage.md) e
