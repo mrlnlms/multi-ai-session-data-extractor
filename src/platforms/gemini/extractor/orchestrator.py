@@ -19,6 +19,7 @@ antigo e refresca cada conv via hNvQHb — caminho que nao depende de discovery)
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 from datetime import datetime, timezone
@@ -109,6 +110,69 @@ def _write_last_capture_md(output_dir: Path, log: dict) -> None:
     (output_dir / "LAST_CAPTURE.md").write_text(md, encoding="utf-8")
 
 
+def _persist_instructions_snapshot(
+    output_dir: Path,
+    envelope: list,
+    *,
+    observed_at: datetime,
+) -> dict[str, str | bool]:
+    """Persist one immutable native Instructions envelope and its observation.
+
+    Snapshot identity is content-addressed so repeated reads do not duplicate
+    payload bytes, while the append-only observation log retains every capture.
+    An empty later response therefore cannot remove an earlier non-empty state.
+    """
+    payload = json.dumps(
+        envelope,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    digest = hashlib.sha256(payload).hexdigest()
+    instructions_dir = output_dir / "instructions"
+    snapshots_dir = instructions_dir / "snapshots"
+    snapshots_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_path = snapshots_dir / f"{digest}.json"
+
+    created = not snapshot_path.exists()
+    if created:
+        snapshot_path.write_bytes(payload)
+    elif snapshot_path.read_bytes() != payload:
+        raise ValueError(f"Instructions snapshot hash collision: {digest}")
+
+    relative_path = snapshot_path.relative_to(output_dir).as_posix()
+    observation = {
+        "observed_at": observed_at.isoformat(),
+        "sha256": digest,
+        "snapshot_path": relative_path,
+        "snapshot_created": created,
+    }
+    with open(instructions_dir / "observations.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps(observation, ensure_ascii=False) + "\n")
+    return observation
+
+
+async def _capture_instructions(
+    client: GeminiAPIClient,
+    output_dir: Path,
+    *,
+    observed_at: datetime,
+) -> dict:
+    """Capture Instructions without making conversation capture depend on it."""
+    try:
+        envelope = await client.list_instructions()
+        return {
+            "status": "captured",
+            **_persist_instructions_snapshot(
+                output_dir,
+                envelope,
+                observed_at=observed_at,
+            ),
+        }
+    except Exception as exc:
+        logger.warning("Gemini Instructions capture failed: %s", exc)
+        return {"status": "error", "error": str(exc)}
+
+
 async def run_export(
     account: str = "1",
     full: bool = False,
@@ -130,6 +194,12 @@ async def run_export(
     try:
         session = await load_session(context)
         client = GeminiAPIClient(context, session)
+
+        instructions_capture = await _capture_instructions(
+            client,
+            output_dir,
+            observed_at=datetime.now(timezone.utc),
+        )
 
         convs = await discover(client, output_dir)
 
@@ -162,6 +232,7 @@ async def run_export(
                         "conversations_errors": stats["errors"],
                     },
                     "errors": {"conversations": []},
+                    "instructions": instructions_capture,
                     "discovery_partial": {"observed": curr, "baseline": baseline},
                 }
                 log_jsonl = output_dir / "capture_log.jsonl"
@@ -239,6 +310,7 @@ async def run_export(
                 "conversations_errors": len(errs),
             },
             "errors": {"conversations": errs[:50]},
+            "instructions": instructions_capture,
         }
 
         # Append em capture_log.jsonl

@@ -23,6 +23,71 @@ Conversations + assistant messages + tool events + images
 Immutable asset bytes are written to the central vault. Raw and merged retain
 their independent conversation JSON and asset manifests.
 
+### Instructions discovery checkpoint — 2026-09-23
+
+- Account-level **Instructions for Gemini** are exposed by batchexecute RPC
+  `ZKcapf` with read payload `[100]` on the `/saved-info` surface.
+- A controlled item demonstrated a positional native envelope with stable
+  identity, content, temporal fields, and state/type fields. Its reuse in a
+  separate conversation was also observed; a conflicting per-message request
+  could override the persistent instruction.
+- `GeminiAPIClient.list_instructions()` performs this read and the account
+  capture stores the untouched native list envelope under
+  `instructions/snapshots/<sha256>.json`. An append-only
+  `instructions/observations.jsonl` records every observation; identical
+  payloads reuse their content-addressed snapshot, and a later empty state
+  cannot remove a prior non-empty one.
+- A live account-1 capture on `2026-09-23` durably retained the controlled
+  item and verified the snapshot filename against its payload hash. This raw
+  surface is not reconciled or canonically parsed yet.
+- After the owner deleted that controlled item upstream, a second live capture
+  stored the empty native envelope as a distinct snapshot and retained the
+  original non-empty snapshot byte-for-byte. The two append-only observations
+  validate the intended Instructions lifecycle preservation.
+- This surface is distinct from conversation-derived **Memory**, whose
+  readable transport remains unresolved.
+
+### Conversation-derived Memory transport checkpoint — 2026-09-23
+
+- A read-only account-1 probe compared the network activity of
+  `/personalization-settings` and `/saved-info` without sending a message or
+  changing account state. It retained only response hashes, sizes, container
+  shapes, and public navigation metadata; response scalar values and request
+  bodies were not persisted.
+- The Personal Intelligence page produced no exclusive batchexecute RPC. Its
+  RPC set was the shared Gemini bootstrap/configuration set. The Instructions
+  page produced one additional RPC, the already identified `ZKcapf` list
+  transport.
+- No response loaded by either surface contained a literal English `memory`,
+  `past chats`, or `saved-info` indicator. The Personal Intelligence page
+  still rendered the enabled Memory control, so the control can be delivered
+  through page/bootstrap state without exposing a readable list of learned
+  memory items.
+- This observation does **not** prove that Gemini stores no conversation-
+  derived memory. It establishes only that no separate readable memory-item
+  envelope was observed on either account-management surface. Conversation-
+  derived personalization without a user-inspectable record or stable native
+  payload is outside the extractor's preservation scope; do not reconstruct
+  inferred memories from answers or continue behavioral transport probing.
+- The reproducible structural probe is
+  `src/platforms/gemini/probes/personalization_transport.py`. Its reports are
+  local runtime diagnostics under `.runtime/probes/`, outside the preserved
+  raw archive.
+
+### Canonical projection boundary — 2026-09-23
+
+- Instructions are an approved routine raw-capture surface, not a pending
+  experiment. Normal account capture reads the native envelope and preserves
+  its cumulative lifecycle even when the current upstream list becomes empty.
+- Instructions are classified as `persistent_instructions`, not learned
+  `native_memory`. Their canonical/Parquet projection is deliberately deferred
+  until the equivalent exposed surfaces from ChatGPT, Claude.ai and other web
+  platforms can define a shared contract for scope, enabled state, native
+  identity, timestamps and deletion history.
+- This deferral does not require another Gemini capture and does not make the
+  raw coverage incomplete. The untouched snapshots and observations retain the
+  fields needed for later schema design and deterministic reprocessing.
+
 ### Latest validated collection — 2026-08-30
 
 - Accounts 1 and 2 reauthenticated, then collected incrementally.

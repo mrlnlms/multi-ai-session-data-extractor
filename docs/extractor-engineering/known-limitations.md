@@ -225,13 +225,14 @@ These validations require a Pro Max account and remain open until someone tests:
 
 ### Antigravity CLI
 
-- **Native Knowledge is documented but not yet observed in this corpus:**
+- **Native Knowledge is documented but not an active collection target:**
   Google documents Knowledge Items for the Antigravity IDE/2.0 application,
   whose local state is under `~/.gemini/antigravity/`; current AGY CLI docs do
   not state that the CLI creates or consumes them. The captured `agy 1.1.22`
   state exposes only an empty `knowledge.lock`, so it does not yet support an
-  `AgentMemory` parser contract. A controlled IDE sample must demonstrate
-  creation and cross-conversation reuse before this limitation can close.
+  `AgentMemory` parser contract. Behavioral reuse alone is insufficient: only
+  a user-inspectable/manageable item or a stable native payload with identity
+  and provenance would reopen this capture question.
   Markdown in CLI `brain/` is conversation output and is not reclassified as
   cross-session memory. The complete conversation-scoped `brain/` regular-file
   surface is preserved in raw for comparison, excluding Finder metadata,
@@ -239,6 +240,11 @@ These validations require a Pro Max account and remain open until someone tests:
   promoted without a demonstrated canonical use. Top-level documents with
   Antigravity metadata sidecars are conversation-scoped output assets,
   deduplicated against tool-call artifacts by content hash.
+
+- **Projects have no owner sample yet.** They are treated as future explicit
+  `project_context`, not native memory. After the owner starts using Projects,
+  inspect their IDs, workspace bindings, settings and conversation associations
+  before defining capture behavior; absence must remain a valid no-op.
 
 - **Two local storage generations.** Legacy `.pb` containers are opaque and
   current SQLite containers hold undocumented Protobuf payloads. Both are

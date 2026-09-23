@@ -63,14 +63,21 @@ snapshots produced inside a conversation, so it is conversation output rather
 than cross-session memory. Those files must not be published as `AgentMemory`
 without new format evidence.
 
-The next bounded investigation is therefore experimental rather than a parser
-assumption: use the documented Antigravity 2.0/IDE Knowledge feature, ask it to
-save a distinctive non-sensitive item, reuse that item in a separate
-conversation, then compare `~/.gemini/antigravity/` before and after. Only the
-demonstrated durable payload, its identifiers and provenance should define a
-new capture/parser contract. A separate CLI experiment is warranted only if a
-current AGY release exposes Knowledge creation or retrieval; IDE evidence must
-not be silently attributed to `antigravity_cli`.
+The extractor does not pursue hidden or behaviorally inferred Knowledge. A new
+capture/parser contract is warranted only when the owner can inspect or manage
+a concrete native item, or when the product exposes a stable durable payload
+with demonstrated identity and provenance. Until then, Knowledge remains a
+documented but unobserved product capability rather than a collection target;
+IDE evidence must not be silently attributed to `antigravity_cli`.
+
+Projects are a separate future surface. The owner does not currently use them,
+so no local Project sample or capture contract has been demonstrated. When a
+Project is deliberately created in normal use, a bounded comparison should
+identify its native ID, workspace association, configuration and conversation
+links. The collector may then preserve those concrete artifacts as
+`project_context`; it must tolerate an absent Projects surface and must not
+reclassify it as learned memory. Rules, skills, custom-agent definitions and
+conversation history likewise retain their own explicit categories.
 
 This differs from Claude Code's project-scoped `memory/*.md` and Codex's
 global `memories/**/*.md`: both of those are durable cross-session memory

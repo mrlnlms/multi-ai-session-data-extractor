@@ -23,7 +23,7 @@ conflicts with the entry or the task requires a fresh verification.
 | DVC garbage collection | **Completed for checkpoint `4b314afc` (2026-09-21)** | [DVC runbook](operations/dvc-runbook.md) | Repeat only after a future validated publication accumulates unused objects; simulate, review and explicitly authorize it again. |
 | Prevent asset-copy rematerialization | **Completed and published** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the retention audit as a diagnostic after future capture changes. |
 | Canonical account identity and analytical dimension | **Completed and published** | [Account architecture](product/account-architecture.md) | Preserve the UUID-only contract; treat memory/configuration as a separate front. |
-| CLI memory/configuration coverage | **Completed and published (2026-09-23)** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the demonstrated Claude Code/Codex/Gemini CLI contracts; revisit Antigravity Knowledge only after a controlled IDE/2.0 sample exists. |
+| CLI memory/configuration coverage | **Completed and published (2026-09-23)** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the demonstrated Claude Code/Codex/Gemini CLI contracts; revisit Antigravity Knowledge only if an inspectable native item or stable payload becomes available, and treat a future owner-created Project separately as project context. |
 | Web memory/configuration capability census | **Next front** | [ChatGPT state](extractor-engineering/platforms/web/chatgpt/state.md) | Inventory explicit product/API/export surfaces across web platforms, then choose one evidenced integration to deepen. |
 
 Google Drive remains the active remote while alternatives are researched. This

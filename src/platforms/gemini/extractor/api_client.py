@@ -19,6 +19,7 @@ from src.platforms.gemini.extractor.batchexecute import call_rpc, load_session
 # rpcids confirmados empiricamente 24/abr/2026
 RPC_LIST = "MaZiqc"
 RPC_FETCH = "hNvQHb"
+RPC_INSTRUCTIONS = "ZKcapf"
 
 
 class GeminiAPIClient:
@@ -79,6 +80,22 @@ class GeminiAPIClient:
         if data is None:
             return None
         return {"uuid": conv_uuid, "raw": data}
+
+    async def list_instructions(self) -> list:
+        """Return the native account-level Instructions response.
+
+        The payload was observed on the ``/saved-info`` surface.  Keep the
+        positional response intact here; parsing and durable persistence are
+        separate concerns.
+        """
+        data = await call_rpc(
+            self.context,
+            self.session,
+            RPC_INSTRUCTIONS,
+            [100],
+            reqid=self._next_reqid(),
+        )
+        return data if isinstance(data, list) else []
 
     async def download_asset(self, url: str) -> bytes | None:
         """Baixa binario de uma URL (lh3.googleusercontent.com / gstatic).

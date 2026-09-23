@@ -6,11 +6,17 @@ Cobre `extract_image_urls` (puro, recebe dict → lista) e
 
 from __future__ import annotations
 
+import asyncio
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.platforms.gemini.extractor.api_client import extract_image_urls
-from src.platforms.gemini.extractor.orchestrator import _get_max_known_discovery
+from src.platforms.gemini.extractor.orchestrator import (
+    _capture_instructions,
+    _get_max_known_discovery,
+    _persist_instructions_snapshot,
+)
 
 
 # === extract_image_urls ===
@@ -77,3 +83,79 @@ class TestGetMaxKnownDiscovery:
         )
         # Maior é o da subpasta
         assert _get_max_known_discovery(tmp_path) == 100
+
+
+class TestPersistInstructionsSnapshot:
+    def test_preserves_native_envelope_and_deduplicates_identical_payload(self, tmp_path):
+        envelope = [[[
+            "native-id",
+            "synthetic instruction",
+            [1_725_000_000, 123],
+            None,
+            [1_725_000_100, 456],
+            None,
+            None,
+            None,
+            1,
+            2,
+            3,
+        ]], "next-page-token"]
+        first_at = datetime(2026, 9, 23, 17, 0, tzinfo=timezone.utc)
+        second_at = datetime(2026, 9, 23, 18, 0, tzinfo=timezone.utc)
+
+        first = _persist_instructions_snapshot(
+            tmp_path, envelope, observed_at=first_at
+        )
+        second = _persist_instructions_snapshot(
+            tmp_path, envelope, observed_at=second_at
+        )
+
+        assert first["sha256"] == second["sha256"]
+        assert first["snapshot_created"] is True
+        assert second["snapshot_created"] is False
+        snapshots = list((tmp_path / "instructions" / "snapshots").glob("*.json"))
+        assert len(snapshots) == 1
+        assert json.loads(snapshots[0].read_text(encoding="utf-8")) == envelope
+        observations = [
+            json.loads(line)
+            for line in (tmp_path / "instructions" / "observations.jsonl")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        ]
+        assert [item["observed_at"] for item in observations] == [
+            first_at.isoformat(),
+            second_at.isoformat(),
+        ]
+
+    def test_empty_later_state_cannot_remove_prior_snapshot(self, tmp_path):
+        observed_at = datetime(2026, 9, 23, 17, 0, tzinfo=timezone.utc)
+
+        prior = _persist_instructions_snapshot(
+            tmp_path, [["native-id", "instruction"]], observed_at=observed_at
+        )
+        empty = _persist_instructions_snapshot(
+            tmp_path, [], observed_at=observed_at
+        )
+
+        assert prior["sha256"] != empty["sha256"]
+        snapshots = list((tmp_path / "instructions" / "snapshots").glob("*.json"))
+        assert len(snapshots) == 2
+        assert [["native-id", "instruction"]] in [
+            json.loads(path.read_text(encoding="utf-8")) for path in snapshots
+        ]
+
+    def test_capture_error_is_reported_without_writing_a_false_snapshot(self, tmp_path):
+        class FailingClient:
+            async def list_instructions(self):
+                raise RuntimeError("surface unavailable")
+
+        result = asyncio.run(
+            _capture_instructions(
+                FailingClient(),
+                tmp_path,
+                observed_at=datetime(2026, 9, 23, 17, 0, tzinfo=timezone.utc),
+            )
+        )
+
+        assert result == {"status": "error", "error": "surface unavailable"}
+        assert not (tmp_path / "instructions").exists()
