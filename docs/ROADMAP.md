@@ -6,7 +6,7 @@ than duplicating it here. Completed work is marked here so its status can be
 read without searching Git history; implementation detail belongs in `git log`,
 and platform-specific behavior belongs in its own documentation.
 
-**Last reviewed:** 2026-09-21.
+**Last reviewed:** 2026-09-23.
 
 For one-time work, use **planned**, **active**, or **completed**. Mark completion
 when closing the work, with its date and an evidence pointer when available.
@@ -23,6 +23,8 @@ conflicts with the entry or the task requires a fresh verification.
 | DVC garbage collection | **Completed for checkpoint `4b314afc` (2026-09-21)** | [DVC runbook](operations/dvc-runbook.md) | Repeat only after a future validated publication accumulates unused objects; simulate, review and explicitly authorize it again. |
 | Prevent asset-copy rematerialization | **Completed and published** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the retention audit as a diagnostic after future capture changes. |
 | Canonical account identity and analytical dimension | **Completed and published** | [Account architecture](product/account-architecture.md) | Preserve the UUID-only contract; treat memory/configuration as a separate front. |
+| CLI memory/configuration coverage | **Completed and published (2026-09-23)** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the demonstrated Claude Code/Codex/Gemini CLI contracts; revisit Antigravity Knowledge only after a controlled IDE/2.0 sample exists. |
+| Web memory/configuration capability census | **Next front** | [ChatGPT state](extractor-engineering/platforms/web/chatgpt/state.md) | Inventory explicit product/API/export surfaces across web platforms, then choose one evidenced integration to deepen. |
 
 Google Drive remains the active remote while alternatives are researched. This
 is not an active migration or a freeze of the normal capture/publish workflow.
@@ -70,10 +72,13 @@ with zero candidates and no cleanup pass.
 The derived account dimension is published in unified data alongside the
 UUID-native account contract. It exposes the durable catalog as queryable,
 read-only data without making Parquet the account registry or inferring
-CLI/manual identities. The preserved ChatGPT/Claude.ai
-account-memory/configuration domain is now the next separate account-related
-front; its scope must be discovered from captured evidence rather than assumed
-in advance.
+CLI/manual identities. The first memory/configuration front is now complete:
+Claude Code and Codex durable representations are versioned, Gemini CLI context
+coverage is bounded, and Antigravity preserves its complete conversation
+`brain/` while keeping the product's unobserved Knowledge feature separate.
+The next front is a web capability census before choosing which account-memory
+integration to deepen. Scope must be discovered from captured evidence rather
+than assumed in advance.
 The asset front has since
 materialized that central physical home: `data/assets` and its preservation
 index are the published DVC-backed source for bytes, while `assets` and
@@ -88,18 +93,25 @@ provide rollback for the retained revisions.
 Incremental downloaders may use transient staging paths during capture, but
 the successful vault flow retires the verified bytes before it completes. The
 account dimension, UUID-native paths and catalog v2 migration are implemented
-and published through Git and DVC. The memory/configuration domain comes next
-as an independent front. Schema changes and data publication retain their
-normal review and validation gates.
+and published through Git and DVC. The completed CLI memory/configuration
+checkpoint is the baseline for the next, independent web-platform census.
+Schema changes and data publication retain their normal review and validation
+gates.
 
 The completed account contract is maintained in
 [`src/account_catalog.py`](../src/account_catalog.py) and the current
 [`unify` table contract](../src/workflows/unify.py); historical working plans
-in `private/` must be checked against current code before reuse. The
-memory/configuration front starts from the evidence in
-[known limitations](extractor-engineering/known-limitations.md) and the
+in `private/` must be checked against current code before reuse. The completed
+CLI memory/configuration front is recorded in
+[known limitations](extractor-engineering/known-limitations.md), the
+[Claude Code](extractor-engineering/platforms/cli/claude-code/state.md),
+[Codex](extractor-engineering/platforms/cli/codex/state.md) and
+[Antigravity](extractor-engineering/platforms/cli/antigravity-cli/state.md)
+state records. The next web census uses each platform state before deeper
+investigation of the already preserved
 [ChatGPT](extractor-engineering/platforms/web/chatgpt/state.md) and
-[Claude.ai](extractor-engineering/platforms/web/claude-ai/state.md) state records.
+[Claude.ai](extractor-engineering/platforms/web/claude-ai/state.md)
+representations.
 The completed rematerialization correction is grounded in the
 [current physical layout](#physical-asset-layout) and the
 [published coverage contract](extractor-engineering/asset-coverage.md).

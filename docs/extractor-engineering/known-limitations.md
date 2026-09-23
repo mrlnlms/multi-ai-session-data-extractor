@@ -1,7 +1,7 @@
 # Known limitations
 
 Honest list of what **does not work** or **has not been validated**. Updated
-on 2026-09-19.
+on 2026-09-23.
 
 Limitations fall into 3 categories:
 
@@ -225,14 +225,20 @@ These validations require a Pro Max account and remain open until someone tests:
 
 ### Antigravity CLI
 
-- **No durable memory format observed:** `agy 1.1.22` exposes only an empty
-  `knowledge.lock`. Markdown in `brain/` is conversation output and is not
-  reclassified as cross-session memory. The complete conversation-scoped
-  `brain/` regular-file surface is preserved in raw for comparison, excluding
-  Finder metadata, embedded `.git/` trees and symlinks; internal task/message
-  evidence is not promoted without a demonstrated canonical use. Top-level
-  documents with Antigravity metadata sidecars are conversation-scoped output
-  assets, deduplicated against tool-call artifacts by content hash.
+- **Native Knowledge is documented but not yet observed in this corpus:**
+  Google documents Knowledge Items for the Antigravity IDE/2.0 application,
+  whose local state is under `~/.gemini/antigravity/`; current AGY CLI docs do
+  not state that the CLI creates or consumes them. The captured `agy 1.1.22`
+  state exposes only an empty `knowledge.lock`, so it does not yet support an
+  `AgentMemory` parser contract. A controlled IDE sample must demonstrate
+  creation and cross-conversation reuse before this limitation can close.
+  Markdown in CLI `brain/` is conversation output and is not reclassified as
+  cross-session memory. The complete conversation-scoped `brain/` regular-file
+  surface is preserved in raw for comparison, excluding Finder metadata,
+  embedded `.git/` trees and symlinks; internal task/message evidence is not
+  promoted without a demonstrated canonical use. Top-level documents with
+  Antigravity metadata sidecars are conversation-scoped output assets,
+  deduplicated against tool-call artifacts by content hash.
 
 - **Two local storage generations.** Legacy `.pb` containers are opaque and
   current SQLite containers hold undocumented Protobuf payloads. Both are

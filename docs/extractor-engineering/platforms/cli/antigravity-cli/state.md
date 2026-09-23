@@ -42,14 +42,35 @@ would misclassify conversation-scoped execution state.
 
 ## Agent memory census
 
-No durable agent-memory document was observed in the installed `agy 1.1.22`
-state. `knowledge/` contains only an empty `knowledge.lock`; it does not prove
-the existence of recoverable knowledge. Markdown under `brain/<conversation>`
-contains plans, reports and snapshots produced inside a conversation, so it is
-conversation output rather than cross-session memory. Those files must not be
-published as `AgentMemory` without new format evidence. The census is
-documented so a future version can be added deliberately if the storage
-contract changes.
+Google documents Knowledge as a core component of the Antigravity agent and
+describes Knowledge Items as useful context and code snippets saved to a
+knowledge base for future tasks. The current documentation places that feature
+on the Antigravity IDE/2.0 surface and says its local application directory is
+`~/.gemini/antigravity/`. The AGY CLI documentation, by contrast, documents
+conversation resume, configuration, rules, skills and MCP but does not state
+that the CLI creates or consumes native Knowledge Items. Sources checked on
+2026-09-23: [Agent overview](https://www.antigravity.google/docs/agent),
+[Agent settings](https://www.antigravity.google/docs/agent-settings),
+[Google launch article](https://developers.googleblog.com/build-with-google-antigravity-our-new-agentic-development-platform/)
+and [Using AGY CLI](https://www.agy.dev/docs/cli/using/).
+
+No durable agent-memory document was observed in this owner's installed
+`agy 1.1.22` CLI state, so the native Knowledge feature has not yet been used
+or demonstrated in the captured CLI corpus. `knowledge/` contains only an
+empty `knowledge.lock`; it does not prove the existence of recoverable
+knowledge. Markdown under `brain/<conversation>` contains plans, reports and
+snapshots produced inside a conversation, so it is conversation output rather
+than cross-session memory. Those files must not be published as `AgentMemory`
+without new format evidence.
+
+The next bounded investigation is therefore experimental rather than a parser
+assumption: use the documented Antigravity 2.0/IDE Knowledge feature, ask it to
+save a distinctive non-sensitive item, reuse that item in a separate
+conversation, then compare `~/.gemini/antigravity/` before and after. Only the
+demonstrated durable payload, its identifiers and provenance should define a
+new capture/parser contract. A separate CLI experiment is warranted only if a
+current AGY release exposes Knowledge creation or retrieval; IDE evidence must
+not be silently attributed to `antigravity_cli`.
 
 This differs from Claude Code's project-scoped `memory/*.md` and Codex's
 global `memories/**/*.md`: both of those are durable cross-session memory
