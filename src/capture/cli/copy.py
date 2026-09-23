@@ -335,13 +335,34 @@ def _copy_antigravity_file(
     return dst_file, is_new, True
 
 
+def _antigravity_brain_files(brain: Path) -> list[Path]:
+    """Return conversation-scoped evidence without VCS/Finder residue.
+
+    Antigravity stores readable trajectories, generated artifacts, uploads and
+    internal task/message evidence below ``brain/<conversation_id>``.  The
+    whole conversation-scoped surface is preservation evidence even when only
+    ``transcript.jsonl`` is currently promoted to the canonical schema.
+    """
+    if not brain.is_dir():
+        return []
+    return sorted(
+        path
+        for path in brain.rglob("*")
+        if path.is_file()
+        and not path.is_symlink()
+        and len(path.relative_to(brain).parts) >= 2
+        and path.name != ".DS_Store"
+        and ".git" not in path.relative_to(brain).parts
+    )
+
+
 def copy_antigravity_cli() -> dict[str, list[Path]]:
     """Preserva conversas Antigravity sem copiar configs ou credenciais.
 
-    Inclui os containers de conversa (SQLite atual e ``.pb`` legado), as
-    trajetorias JSONL legiveis em ``brain/`` e os indices minimos usados para
-    titulo/projeto. O parser usa ``transcript.jsonl``; ``transcript_full`` e
-    os containers permanecem no raw como preservacao/fallback.
+    Inclui os containers de conversa (SQLite atual e ``.pb`` legado), toda a
+    evidencia de conversa em ``brain/`` e os indices minimos usados para
+    titulo/projeto. O parser usa ``transcript.jsonl``; os demais arquivos de
+    ``brain`` permanecem no raw ate que seu valor semantico seja demonstrado.
     """
     src = SOURCES["antigravity_cli"]["src"]
     dst = SOURCES["antigravity_cli"]["dst"]
@@ -355,9 +376,7 @@ def copy_antigravity_cli() -> dict[str, list[Path]]:
         candidates.extend((p, p.suffix == ".db") for p in conversations.iterdir()
                           if p.is_file() and p.suffix in (".db", ".pb"))
     brain = src / "brain"
-    if brain.is_dir():
-        candidates.extend((p, False) for p in brain.glob("*/.system_generated/logs/transcript*.jsonl")
-                          if p.is_file())
+    candidates.extend((p, False) for p in _antigravity_brain_files(brain))
     for rel in ("history.jsonl", "conversation_summaries.db", "cache/conversation_metadata.json", "cache/last_conversations.json"):
         p = src / rel
         if p.is_file():
@@ -437,12 +456,10 @@ def current_source_files(source: str) -> set[str]:
                 if p.is_file() and p.suffix in (".db", ".pb")
             }
         brain = src / "brain"
-        if brain.is_dir():
-            out |= {
-                str(p.relative_to(src))
-                for p in brain.glob("*/.system_generated/logs/transcript*.jsonl")
-                if p.is_file()
-            }
+        out |= {
+            str(p.relative_to(src))
+            for p in _antigravity_brain_files(brain)
+        }
         for rel in ("history.jsonl", "conversation_summaries.db", "cache/conversation_metadata.json", "cache/last_conversations.json"):
             if (src / rel).is_file():
                 out.add(rel)

@@ -61,7 +61,7 @@ canonical parsing, and descriptive visualization (Quarto):
 | **Claude Code** | CLI | local sessions (`~/.claude/projects/`), subagents |
 | **Codex** | CLI | local sessions (`~/.codex/sessions/`), exact latency per tool call |
 | **Gemini CLI** | CLI | local sessions plus hierarchical Markdown memory/context |
-| **Antigravity CLI** | CLI | current trajectories plus decoded legacy `.pb` sidecars; no durable memory observed |
+| **Antigravity CLI** | CLI | current trajectories, conversation-scoped `brain/` evidence and decoded legacy `.pb` sidecars; no durable memory observed |
 
 The automated test suite covers extractors, reconcilers, parsers, the
 canonical schema, dashboard, and unification. Known limitations and gaps are

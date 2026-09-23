@@ -3,9 +3,11 @@
 Antigravity stores durable conversation containers in two generations:
 legacy encrypted ``conversations/<id>.pb`` files and current per-conversation
 SQLite databases. Both are preserved in raw. Current readable transcripts live
-under ``brain/<id>/.system_generated/logs/transcript.jsonl``. Legacy PBs can
-also have a decoded ``recovered/<id>.trajectory.json`` sidecar produced through
-Antigravity's local daemon; the current transcript always takes precedence.
+under ``brain/<id>/.system_generated/logs/``. The parser prefers the complete
+``transcript_full.jsonl`` representation and falls back to the compact
+``transcript.jsonl``. Legacy PBs can also have a decoded
+``recovered/<id>.trajectory.json`` sidecar produced through Antigravity's local
+daemon; the current transcript always takes precedence.
 Explicit artifact writes whose trajectory preserves ``ArtifactMetadata`` and
 ``CodeContent`` are materialized as assistant output assets.
 """
@@ -54,6 +56,13 @@ def make_artifact_asset_id(
     content_sha256: str,
 ) -> str:
     locator = "\x1f".join((conversation_id, message_id, str(tool_index), content_sha256))
+    return hashlib.sha256(locator.encode("utf-8")).hexdigest()
+
+
+def make_brain_artifact_asset_id(
+    conversation_id: str, relative_path: str, content_sha256: str
+) -> str:
+    locator = "\x1f".join((conversation_id, relative_path, content_sha256))
     return hashlib.sha256(locator.encode("utf-8")).hexdigest()
 
 
@@ -150,6 +159,8 @@ class AntigravityCLIParser(BaseParser):
             self._input_path / "_artifacts" / conversation_id
             / f"{message_id.rsplit('_', 1)[-1]}_{tool_index}{suffix}"
         )
+        if out.exists() and hashlib.sha256(out.read_bytes()).hexdigest() != digest:
+            out = out.with_name(f"{out.stem}_{digest[:12]}{out.suffix}")
         if self._asset_capture is None:
             out.parent.mkdir(parents=True, exist_ok=True)
             if out.exists():
@@ -220,9 +231,16 @@ class AntigravityCLIParser(BaseParser):
         brain = input_path / "brain"
         current_ids: set[str] = set()
         if brain.is_dir():
-            for transcript in sorted(brain.glob("*/.system_generated/logs/transcript.jsonl")):
-                current_ids.add(transcript.parent.parent.parent.name)
+            for conversation_dir in sorted(path for path in brain.iterdir() if path.is_dir()):
+                logs = conversation_dir / ".system_generated" / "logs"
+                transcript = logs / "transcript_full.jsonl"
+                if not transcript.is_file():
+                    transcript = logs / "transcript.jsonl"
+                if not transcript.is_file():
+                    continue
+                current_ids.add(conversation_dir.name)
                 self._parse_transcript(transcript)
+            self._record_brain_artifacts(brain)
 
         recovered = input_path / "recovered"
         if recovered.is_dir():
@@ -238,6 +256,61 @@ class AntigravityCLIParser(BaseParser):
         if self._asset_capture is not None:
             self._asset_capture.finish()
         self.apply_asset_reader()
+
+    def _record_brain_artifacts(self, brain: Path) -> None:
+        """Publish sidecar-declared documents absent from parsed tool calls."""
+        known_hashes = {
+            json.loads(asset.metadata_json).get("content_sha256")
+            for asset in self.assets if asset.metadata_json
+        }
+        for sidecar in sorted(brain.glob("*/*.metadata.json")):
+            document = sidecar.with_name(sidecar.name.removesuffix(".metadata.json"))
+            if not document.is_file():
+                continue
+            try:
+                metadata = json.loads(sidecar.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            payload = document.read_bytes()
+            digest = hashlib.sha256(payload).hexdigest()
+            if digest in known_hashes:
+                continue
+            conversation_id = document.parent.name
+            relative_path = str(document.relative_to(self._input_path))
+            asset_id = make_brain_artifact_asset_id(conversation_id, relative_path, digest)
+            asset = Asset(
+                asset_id=asset_id, source=self.source_name, account_id=self.account_id,
+                asset_kind="artifact", asset_origin="assistant",
+                file_name=document.name, mime_type=mimetypes.guess_type(document.name)[0],
+                size_bytes=len(payload), asset_path=f"raw/Antigravity CLI/{relative_path}",
+                is_model_generated=True, is_preserved_missing=False,
+                is_binary_available=True, created_at=self._ts(metadata.get("updatedAt")),
+                metadata_json=json.dumps(
+                    {"content_sha256": digest, "sidecar": metadata},
+                    ensure_ascii=False, sort_keys=True,
+                ),
+            )
+            link = AssetLink(
+                asset_link_id=make_asset_link_id(
+                    self.source_name, self.account_id, asset_id, "conversation",
+                    conversation_id, "output",
+                ),
+                source=self.source_name, account_id=self.account_id, asset_id=asset_id,
+                object_type="conversation", object_id=conversation_id,
+                conversation_id=conversation_id, message_id=None, project_id=None,
+                role="output", ordinal=None, content_block_index=None,
+                metadata_json=json.dumps(
+                    {"sidecar_path": str(sidecar.relative_to(self._input_path))}
+                ),
+            )
+            self.assets.append(asset)
+            self.asset_links.append(link)
+            known_hashes.add(digest)
+            if self._asset_capture is not None:
+                self._asset_capture.observe(CLIAssetObservation(
+                    asset=asset, link=link, payload=payload,
+                    representation_kind="assistant_artifact",
+                ))
 
     def _relative_path(self, path: Path) -> Optional[str]:
         if self._input_path is None:

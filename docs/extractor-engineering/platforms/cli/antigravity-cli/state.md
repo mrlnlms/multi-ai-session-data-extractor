@@ -13,12 +13,32 @@ Source: `antigravity_cli`. Mode: `cli`. Local data from
   Its payload columns are undocumented Protobuf blobs, so they are preserved
   as raw rather than parsed directly.
 - **Canonical readable input:**
-  `brain/<id>/.system_generated/logs/transcript.jsonl`. It contains JSONL
-  records for user input, planner responses, thinking and tool activity.
+  `brain/<id>/.system_generated/logs/transcript_full.jsonl`, with fallback to
+  `transcript.jsonl` when the complete representation is absent. Both contain
+  JSONL records for user input, planner responses, thinking and tool activity,
+  but the compact form can mark large fields as truncated.
 
 The incremental copy takes a consistent SQLite backup for `.db` containers;
 this safely incorporates an active WAL without copying credentials or general
-configuration files.
+configuration files. It also preserves the complete regular-file surface below
+each `brain/<conversation>` directory, including generated documents and their
+metadata sidecars, user uploads, readable trajectories, task logs and message
+records. Finder metadata, embedded `.git/` trees and symlinks are excluded.
+The readable trajectory, artifacts explicitly delivered through tool calls and
+top-level documents carrying an Antigravity metadata sidecar are promoted to
+the canonical schema. A sidecar document already represented byte-for-byte by
+a tool-call artifact is deduplicated by content hash. The broader `brain/` copy
+remains raw evidence for format comparison and future, evidence-backed
+enrichment.
+
+In the 2026-09-23 local census, the 13 conversations containing both forms had
+identical row counts. The complete form restored differences in 413 of 927
+records and removed all 91 observed `truncated_fields` markers, so it is the
+preferred parser input. Files under `.system_generated/messages/` are internal
+task/subagent messages, while `.system_generated/tasks/` contains operational
+command and timer logs. They remain raw evidence: promoting them as user-facing
+messages would duplicate part of the trajectory and promoting them as memory
+would misclassify conversation-scoped execution state.
 
 ## Agent memory census
 
@@ -30,6 +50,12 @@ conversation output rather than cross-session memory. Those files must not be
 published as `AgentMemory` without new format evidence. The census is
 documented so a future version can be added deliberately if the storage
 contract changes.
+
+This differs from Claude Code's project-scoped `memory/*.md` and Codex's
+global `memories/**/*.md`: both of those are durable cross-session memory
+representations with immutable version manifests. Antigravity `brain/`
+documents remain tied to one conversation. Comparisons should test recurrence,
+cross-session reuse and provenance rather than infer memory from Markdown alone.
 
 ## Recuperação de legados opacos
 

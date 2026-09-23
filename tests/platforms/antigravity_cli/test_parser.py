@@ -3,11 +3,10 @@ import json
 import sqlite3
 from pathlib import Path
 
-import pytest
-
 from src.platforms.antigravity_cli.parser import (
     AntigravityCLIParser,
     make_artifact_asset_id,
+    make_brain_artifact_asset_id,
 )
 
 
@@ -115,6 +114,41 @@ def test_antigravity_writes_six_canonical_parquets(tmp_path, monkeypatch):
         assert (output / f"antigravity_cli_{table}.parquet").exists()
 
 
+def test_antigravity_prefers_full_transcript_and_falls_back_to_compact(tmp_path, monkeypatch):
+    raw = _setup_raw(tmp_path)
+    logs = raw / "brain" / CONVERSATION_ID / ".system_generated" / "logs"
+    full_records = [
+        {"step_index": 0, "type": "USER_INPUT", "source": "USER_EXPLICIT", "status": "DONE", "created_at": "2026-08-30T14:00:00Z", "content": "Complete question"},
+        {"step_index": 1, "type": "PLANNER_RESPONSE", "source": "MODEL", "status": "DONE", "created_at": "2026-08-30T14:00:01Z", "content": "Complete answer", "thinking": "Complete reasoning"},
+    ]
+    (logs / "transcript_full.jsonl").write_text(
+        "\n".join(json.dumps(record) for record in full_records) + "\n"
+    )
+    fallback_id = "conv-compact-only"
+    _write_transcript(raw, fallback_id)
+    monkeypatch.setattr("src.capture.cli.preservation.mark_cli_preservation", lambda parser: 0)
+
+    parser = AntigravityCLIParser()
+    parser.parse(raw)
+
+    by_conversation = {}
+    for message in parser.messages:
+        by_conversation.setdefault(message.conversation_id, []).append(message)
+    assert [message.content for message in by_conversation[CONVERSATION_ID]] == [
+        "Complete question", "Complete answer"
+    ]
+    assert by_conversation[CONVERSATION_ID][1].thinking == "Complete reasoning"
+    assert fallback_id in by_conversation
+    assert (
+        f"brain/{CONVERSATION_ID}/.system_generated/logs/transcript_full.jsonl"
+        in parser._conv_source_files[CONVERSATION_ID]
+    )
+    assert not any(
+        path.endswith("/transcript.jsonl")
+        for path in parser._conv_source_files[CONVERSATION_ID]
+    )
+
+
 def test_explicit_artifact_content_becomes_assistant_output_asset(tmp_path, monkeypatch):
     raw = _setup_raw(tmp_path)
     content = "# Generated report\n"
@@ -153,7 +187,7 @@ def test_explicit_artifact_content_becomes_assistant_output_asset(tmp_path, monk
     assert parser.messages[1].asset_paths == [asset.asset_path]
 
 
-def test_antigravity_artifact_existing_bytes_must_match(tmp_path, monkeypatch):
+def test_antigravity_artifact_content_change_preserves_both_versions(tmp_path, monkeypatch):
     raw = _setup_raw(tmp_path)
     transcript = raw / "brain" / CONVERSATION_ID / ".system_generated" / "logs" / "transcript.jsonl"
     records = [
@@ -168,10 +202,39 @@ def test_antigravity_artifact_existing_bytes_must_match(tmp_path, monkeypatch):
     monkeypatch.setattr("src.capture.cli.preservation.mark_cli_preservation", lambda parser: 0)
     AntigravityCLIParser().parse(raw)
     materialized = raw / "_artifacts" / CONVERSATION_ID / "1_0.md"
-    AntigravityCLIParser().parse(raw)
     materialized.write_text("mismatch")
-    with pytest.raises(ValueError, match="Antigravity artifact hash mismatch"):
-        AntigravityCLIParser().parse(raw)
+    parser = AntigravityCLIParser()
+    parser.parse(raw)
+
+    digest = hashlib.sha256(b"content").hexdigest()
+    versioned = raw / "_artifacts" / CONVERSATION_ID / f"1_0_{digest[:12]}.md"
+    assert materialized.read_text() == "mismatch"
+    assert versioned.read_text() == "content"
+    assert parser.assets[0].asset_path.endswith(f"/1_0_{digest[:12]}.md")
+
+
+def test_sidecar_declared_brain_document_becomes_conversation_asset(tmp_path, monkeypatch):
+    raw = _setup_raw(tmp_path)
+    document = raw / "brain" / CONVERSATION_ID / "implementation_plan.md"
+    document.write_text("# Plan\n")
+    document.with_name("implementation_plan.md.metadata.json").write_text(json.dumps({
+        "artifactType": "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+        "summary": "Implementation plan",
+        "updatedAt": "2026-08-30T14:01:00Z",
+    }))
+    monkeypatch.setattr("src.capture.cli.preservation.mark_cli_preservation", lambda parser: 0)
+
+    parser = AntigravityCLIParser()
+    parser.parse(raw)
+
+    digest = hashlib.sha256(document.read_bytes()).hexdigest()
+    asset = parser.assets[0]
+    assert asset.asset_id == make_brain_artifact_asset_id(
+        CONVERSATION_ID, f"brain/{CONVERSATION_ID}/implementation_plan.md", digest
+    )
+    assert asset.asset_path.endswith(f"brain/{CONVERSATION_ID}/implementation_plan.md")
+    assert parser.asset_links[0].object_type == "conversation"
+    assert parser.asset_links[0].role == "output"
 
 
 def test_antigravity_parses_recovered_legacy_trajectory(tmp_path, monkeypatch):

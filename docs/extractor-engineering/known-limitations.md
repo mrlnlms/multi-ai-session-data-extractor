@@ -227,12 +227,18 @@ These validations require a Pro Max account and remain open until someone tests:
 
 - **No durable memory format observed:** `agy 1.1.22` exposes only an empty
   `knowledge.lock`. Markdown in `brain/` is conversation output and is not
-  reclassified as cross-session memory.
+  reclassified as cross-session memory. The complete conversation-scoped
+  `brain/` regular-file surface is preserved in raw for comparison, excluding
+  Finder metadata, embedded `.git/` trees and symlinks; internal task/message
+  evidence is not promoted without a demonstrated canonical use. Top-level
+  documents with Antigravity metadata sidecars are conversation-scoped output
+  assets, deduplicated against tool-call artifacts by content hash.
 
 - **Two local storage generations.** Legacy `.pb` containers are opaque and
   current SQLite containers hold undocumented Protobuf payloads. Both are
-  preserved in raw; canonical parsing uses current JSONL trajectories or a
-  daemon-decoded legacy trajectory sidecar when one has been recovered.
+  preserved in raw; canonical parsing prefers `transcript_full.jsonl`, falls
+  back to compact `transcript.jsonl`, or uses a daemon-decoded legacy
+  trajectory sidecar when one has been recovered.
 - **Opaque legacy containers.** When no readable trajectory exists, the
   canonical output contains a zero-message Conversation stub. It is not a
   claim that the conversation was empty; it makes the preserved-but-not-yet-

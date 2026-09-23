@@ -203,17 +203,46 @@ def test_copy_antigravity_cli_copies_selected_conversation_artifacts(tmp_path, m
     transcript = source / "brain" / "conv" / ".system_generated" / "logs"
     transcript.mkdir(parents=True)
     (transcript / "transcript.jsonl").write_text('{"type":"USER_INPUT"}\n')
+    brain = source / "brain" / "conv"
+    (source / "brain" / ".gitignore").write_text("conversation roots only")
+    (brain / "implementation_plan.md").write_text("# plan\n")
+    (brain / "implementation_plan.md.metadata.json").write_text(
+        '{"artifactType":"ARTIFACT_TYPE_IMPLEMENTATION_PLAN"}'
+    )
+    uploads = brain / ".user_uploaded"
+    uploads.mkdir()
+    (uploads / "reference.png").write_bytes(b"png")
+    tasks = brain / ".system_generated" / "tasks"
+    tasks.mkdir()
+    (tasks / "task-1.log").write_text("task evidence")
+    git_dir = brain / ".git"
+    git_dir.mkdir()
+    (git_dir / "config").write_text("must not be copied")
+    (brain / ".DS_Store").write_bytes(b"finder metadata")
     (source / "cache").mkdir()
     (source / "cache" / "conversation_metadata.json").write_text("{}")
 
     result = copy_antigravity_cli()
-    assert len(result["new"]) == 4
+    assert len(result["new"]) == 8
     assert (destination / "conversations" / "conv.db").exists()
     assert (destination / "conversations" / "legacy.pb").read_bytes() == b"legacy"
     assert (destination / "brain" / "conv" / ".system_generated" / "logs" / "transcript.jsonl").exists()
+    assert (destination / "brain" / "conv" / "implementation_plan.md").exists()
+    assert (destination / "brain" / "conv" / "implementation_plan.md.metadata.json").exists()
+    assert (destination / "brain" / "conv" / ".user_uploaded" / "reference.png").exists()
+    assert (destination / "brain" / "conv" / ".system_generated" / "tasks" / "task-1.log").exists()
+    assert not (destination / "brain" / "conv" / ".git").exists()
+    assert not (destination / "brain" / "conv" / ".DS_Store").exists()
+    assert not (destination / "brain" / ".gitignore").exists()
     assert not (destination / "settings.json").exists()
 
     current = current_source_files("antigravity_cli")
     assert "conversations/conv.db" in current
     assert "conversations/legacy.pb" in current
     assert "brain/conv/.system_generated/logs/transcript.jsonl" in current
+    assert "brain/conv/implementation_plan.md" in current
+    assert "brain/conv/implementation_plan.md.metadata.json" in current
+    assert "brain/conv/.user_uploaded/reference.png" in current
+    assert "brain/conv/.system_generated/tasks/task-1.log" in current
+    assert "brain/conv/.git/config" not in current
+    assert "brain/conv/.DS_Store" not in current
