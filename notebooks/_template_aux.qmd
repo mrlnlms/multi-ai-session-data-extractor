@@ -5,6 +5,7 @@ Some platforms have auxiliary tables beyond the 4 canonical ones
 
 - **NotebookLM**: sources, notes, outputs, guide_questions, source_guides, assets, asset links
 - **Qwen / Claude.ai**: project_metadata, project_docs
+- **Claude Code / Codex / Gemini CLI**: current agent memories, immutable versions, temporal evidence
 - **Grok / Kimi / Qwen / Gemini / ChatGPT / Claude.ai / Perplexity**: assets and asset links (native catalogs and file structures; evidence-based placement)
 
 This section iterates over `AUX_TABLES` configured in the notebook setup.
@@ -117,9 +118,13 @@ AUX_CONFIG = {
     "agent_memories": {
         "title": "Agent Memory Files",
         "id_col": "memory_id",
-        "desc": "Memory files generated/read by the agent across sessions (Claude Code per-project, Codex global). Each file has YAML frontmatter (`name`, `description`, `type`).",
+        "desc": "Current projection of derived memory documents. Consult version and temporal-evidence tables before treating historical dates as known.",
         "fields": {
-            "memory_id": "Unique ID (`source:project_key:file_name`)",
+            "memory_id": "Stable ID (`source:relative_path`)",
+            "relative_path": "Full path relative to the CLI memory root",
+            "current_version_id": "Current immutable content version",
+            "first_seen_at": "First extractor observation, when known",
+            "last_seen_at": "Most recent extractor observation",
             "source": "Source CLI (`claude_code` or `codex`)",
             "project_path": "Decoded cwd (NULL for global Codex memories)",
             "project_key": "Encoded-cwd raw, e.g. `-Users-x-proj`",
@@ -129,9 +134,46 @@ AUX_CONFIG = {
             "kind": "user / feedback / project / reference / index / other",
             "content": "Markdown content (frontmatter included)",
             "content_size": "Bytes in content (UTF-8 encoded)",
-            "created_at": "File mtime (best effort)",
-            "updated_at": "File mtime",
+            "created_at": "Best effective creation date; inspect basis/confidence on the version",
+            "updated_at": "Best effective update date",
             "is_preserved_missing": "True if file was deleted from home but kept in raw",
+        },
+    },
+    "agent_memory_versions": {
+        "title": "Agent Memory Versions",
+        "id_col": "version_id",
+        "desc": "Immutable content history. Effective dates are estimates whose basis and confidence remain explicit.",
+        "fields": {
+            "version_id": "Memory ID plus content SHA-256",
+            "memory_id": "Owning logical document",
+            "relative_path": "Full source-relative path",
+            "content_sha256": "SHA-256 of the exact Markdown bytes",
+            "source_modified_at": "Observed source mtime; not a creation date",
+            "source_birth_at": "Observed filesystem birth time when available",
+            "first_seen_at": "First observation of this content",
+            "last_seen_at": "Latest observation of this content",
+            "effective_created_at": "Best selected creation estimate",
+            "effective_updated_at": "Best selected update estimate",
+            "created_at_basis": "Evidence type selected for creation",
+            "updated_at_basis": "Evidence type selected for update",
+            "created_at_confidence": "high / medium / low / unknown",
+            "updated_at_confidence": "high / medium / low / unknown",
+        },
+    },
+    "agent_memory_temporal_evidence": {
+        "title": "Agent Memory Temporal Evidence",
+        "id_col": "evidence_id",
+        "desc": "Observed and inferred timestamp evidence. Low-confidence inference is not equivalent to an observed date.",
+        "fields": {
+            "evidence_id": "Deterministic evidence ID",
+            "memory_id": "Logical document",
+            "version_id": "Exact content version",
+            "evidence_type": "Observed or inferred evidence class",
+            "timestamp": "Timestamp asserted by this evidence",
+            "confidence": "high / medium / low / unknown",
+            "locator": "File, manifest, revision or content locator",
+            "details_json": "Machine-readable evidence details",
+            "is_inference": "True when the timestamp was inferred",
         },
     },
     "assets": {

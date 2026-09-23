@@ -46,12 +46,16 @@ same way — sessions are JSONL files in the user's filesystem.
 - `claude_code_tool_events.parquet` — tool calls/results
 - `claude_code_branches.parquet` — 1 _main por sessao
 - `claude_code_agent_memories.parquet` — parser le `<encoded-cwd>/memory/*.md` por projeto, materializa parquet com kind/name/description da frontmatter; preservation tracked via `home_memory_files` do `current_source_files("claude_code")`
+- `claude_code_agent_memory_versions.parquet` — conteudo imutavel por SHA-256
+- `claude_code_agent_memory_temporal_evidence.parquet` — evidencia temporal
+  auditavel, incluindo base, confianca e distincao entre observacao/inferencia
 - `claude_code_assets.parquet` — imagens de entrada embutidas e preservadas
 - `claude_code_asset_links.parquet` — relacao exata imagem → mensagem/bloco
-- `_memory_metadata.json` no raw preserva o `mtime_ns` observado na fonte para
-  que `created_at`/`updated_at` das memorias sejam reproduziveis apos um
-  checkout DVC. Entradas de arquivos ausentes permanecem no sidecar junto do
-  conteudo preservado.
+- `_memory_metadata.json` v2 mantem primeira/ultima observacao, presenca e a
+  sequencia de hashes; `_memory_versions/` guarda os bytes imutaveis. O parser
+  separa `mtime`, birth time e estimativas efetivas. O comando
+  `src.operations.reconstruct_agent_memory_history` semeia o acervo legado sem
+  inventar datas ausentes.
 
 ## Asset vault contract
 

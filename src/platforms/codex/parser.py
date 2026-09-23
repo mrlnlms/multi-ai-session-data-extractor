@@ -12,7 +12,8 @@ Schema empirico:
 - `response_item.function_call`: tool_use, correlacionado com exec_command_end via call_id
 
 Output: data/processed/Codex/{codex_conversations,messages,tool_events,branches,
-agent_memories,assets,asset_links}.parquet.
+agent_memories,agent_memory_versions,agent_memory_temporal_evidence,
+assets,asset_links}.parquet.
 
 Branches: 1 _main por Conversation (Codex nao tem fork).
 """
@@ -32,10 +33,12 @@ from src.assets.cli_incremental import CLIAssetCaptureSession, CLIAssetObservati
 from src.assets.incremental import DEFAULT_MAX_BATCH_BYTES
 from src.assets.reader import AssetReader, VaultAssetReader
 from src.assets.vault import AssetVault
-from src.parsing.agent_memory import parse_memories_for_source
+from src.parsing.agent_memory import parse_memory_archive, parse_memories_for_source
 from src.parsing.base import BaseParser
 from src.schema.models import (
     AgentMemory,
+    AgentMemoryTemporalEvidence,
+    AgentMemoryVersion,
     Asset,
     AssetLink,
     Branch,
@@ -43,6 +46,8 @@ from src.schema.models import (
     Message,
     ToolEvent,
     agent_memories_to_df,
+    agent_memory_temporal_evidence_to_df,
+    agent_memory_versions_to_df,
     asset_links_to_df,
     assets_to_df,
     branches_to_df,
@@ -92,6 +97,8 @@ class CodexParser(BaseParser):
         )
         self.branches: list[Branch] = []
         self.agent_memories: list[AgentMemory] = []
+        self.agent_memory_versions: list[AgentMemoryVersion] = []
+        self.agent_memory_temporal_evidence: list[AgentMemoryTemporalEvidence] = []
         self._conv_source_files: dict[str, set[str]] = {}
         self._input_path: Optional[Path] = None
 
@@ -99,6 +106,8 @@ class CodexParser(BaseParser):
         super().reset()
         self.branches = []
         self.agent_memories = []
+        self.agent_memory_versions = []
+        self.agent_memory_temporal_evidence = []
         self._conv_source_files = {}
         self._input_path = None
         self.files_seen = 0
@@ -205,7 +214,13 @@ class CodexParser(BaseParser):
 
         # Agent memory ingestion (Slice D — Task D1)
         mem_files = home_memory_files if home_memory_files is not None else set()
-        self.agent_memories = parse_memories_for_source(input_path, "codex", mem_files)
+        memory_result = parse_memory_archive(input_path, "codex", mem_files)
+        if memory_result.memories:
+            self.agent_memories = memory_result.memories
+            self.agent_memory_versions = memory_result.versions
+            self.agent_memory_temporal_evidence = memory_result.temporal_evidence
+        else:
+            self.agent_memories = parse_memories_for_source(input_path, "codex", mem_files)
         if self._asset_capture is not None:
             self._asset_capture.finish()
         self.apply_asset_reader()
@@ -500,7 +515,7 @@ class CodexParser(BaseParser):
         return branches_to_df(self.branches)
 
     def write_parquets(self, output_dir: Path) -> dict[str, int]:
-        """Escreve 7 parquets canonicos. Idempotente."""
+        """Escreve 9 parquets canonicos e auxiliares. Idempotente."""
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         conversations_to_df(self.conversations).to_parquet(
@@ -513,6 +528,10 @@ class CodexParser(BaseParser):
             output_dir / "codex_branches.parquet", index=False)
         agent_memories_to_df(self.agent_memories).to_parquet(
             output_dir / "codex_agent_memories.parquet", index=False)
+        agent_memory_versions_to_df(self.agent_memory_versions).to_parquet(
+            output_dir / "codex_agent_memory_versions.parquet", index=False)
+        agent_memory_temporal_evidence_to_df(self.agent_memory_temporal_evidence).to_parquet(
+            output_dir / "codex_agent_memory_temporal_evidence.parquet", index=False)
         assets_to_df(self.assets).to_parquet(
             output_dir / "codex_assets.parquet", index=False)
         asset_links_to_df(self.asset_links).to_parquet(
@@ -523,6 +542,8 @@ class CodexParser(BaseParser):
             "tool_events": len(self.events),
             "branches": len(self.branches),
             "agent_memories": len(self.agent_memories),
+            "agent_memory_versions": len(self.agent_memory_versions),
+            "agent_memory_temporal_evidence": len(self.agent_memory_temporal_evidence),
             "assets": len(self.assets),
             "asset_links": len(self.asset_links),
         }

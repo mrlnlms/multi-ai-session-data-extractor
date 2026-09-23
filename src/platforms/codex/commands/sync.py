@@ -50,10 +50,24 @@ def main(
         from src.capture.cli.copy import SOURCES
         cfg = SOURCES["codex"]
         src = cfg["src"]
-        n_in_source = sum(1 for _ in src.rglob("*.jsonl")) if src.exists() else 0
-        n_in_dst = sum(1 for _ in RAW_DIR.rglob("*.jsonl"))
+        memories_src = src.parent / "memories"
+        memories_dst = RAW_DIR / "memories"
+        n_in_source = sum(1 for _ in src.rglob("rollout-*.jsonl")) if src.exists() else 0
+        n_in_dst = sum(1 for _ in RAW_DIR.rglob("rollout-*.jsonl"))
+        n_memories_source = (
+            sum(1 for _ in memories_src.rglob("*.md"))
+            if memories_src.exists()
+            else 0
+        )
+        n_memories_dst = (
+            sum(1 for _ in memories_dst.rglob("*.md"))
+            if memories_dst.exists()
+            else 0
+        )
         print(f"  source ({src}): {n_in_source} JSONLs")
         print(f"  destino ({RAW_DIR}): {n_in_dst} JSONLs")
+        print(f"  memories source ({memories_src}): {n_memories_source} Markdown files")
+        print(f"  memories destino ({memories_dst}): {n_memories_dst} Markdown files")
         return 0
 
     print("=" * 60)

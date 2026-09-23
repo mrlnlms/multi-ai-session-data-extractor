@@ -300,7 +300,9 @@ def test_write_parquets(tmp_path):
         "claude_code_messages.parquet",
         "claude_code_tool_events.parquet",
         "claude_code_branches.parquet",
-        "claude_code_agent_memories.parquet",
+            "claude_code_agent_memories.parquet",
+            "claude_code_agent_memory_versions.parquet",
+            "claude_code_agent_memory_temporal_evidence.parquet",
         "claude_code_assets.parquet",
         "claude_code_asset_links.parquet",
     }

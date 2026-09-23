@@ -172,7 +172,7 @@ def test_codex_parses_memory_files(tmp_path):
     assert m.project_path is None
     assert m.project_key is None
     assert m.is_preserved_missing is True
-    assert m.memory_id == "codex::global.md"
+    assert m.memory_id == "codex:memories/global.md"
 
 
 def test_codex_no_memory_dir_skips_silently(tmp_path):

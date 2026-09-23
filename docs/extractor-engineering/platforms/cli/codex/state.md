@@ -37,7 +37,12 @@ the "preservation at the raw level via cli-copy" pattern.
 ## Parquets gerados
 
 - `codex_conversations.parquet`, `codex_messages.parquet`, `codex_tool_events.parquet`, `codex_branches.parquet` — schema canonico v3
-- `codex_agent_memories.parquet` — le `data/raw/Codex/memories/**/*.md` (vazio hoje, schema valido pra populacao futura quando user comecar a usar Codex memory features)
+- `codex_agent_memories.parquet` — le `data/raw/Codex/memories/**/*.md`;
+  a copia cumulativa preserva a arvore observada em `~/.codex/memories/`, e o
+  parser mantem `project_path=NULL` porque a representacao atual e global
+- `codex_agent_memory_versions.parquet` — versoes imutaveis por SHA-256
+- `codex_agent_memory_temporal_evidence.parquet` — datas observadas e inferidas
+  com base e confianca explicitas; `mtime` nunca e renomeado como criacao
 - `codex_assets.parquet`, `codex_asset_links.parquet` — imagens de entrada
   embutidas e suas relações exatas com mensagens
 
@@ -67,3 +72,10 @@ transition](../../../../operations/pipeline.md#transicao-do-asset-vault).
 - **Copy script:** `src/capture/cli/copy.py`
 - **Quarto data profile:** `notebooks/codex.qmd`
 - **Sync orchestrator:** `python -m src.platforms.codex.commands.sync`
+
+## Limite historico
+
+O periodo anterior ao manifesto v2 pode ser semeado com
+`src.operations.reconstruct_agent_memory_history`; datas sem evidencia
+permanecem nulas. Memories sao sinteses derivadas, nao substitutos das
+conversas/rollouts que constituem evidencia primaria.

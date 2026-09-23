@@ -47,13 +47,15 @@ def main(
         print("=" * 60)
         print("  Dry-run — Gemini CLI (copy + parse pulados)")
         print("=" * 60)
-        from src.capture.cli.copy import SOURCES
+        from src.capture.cli.copy import SOURCES, _discover_gemini_memories
         cfg = SOURCES["gemini_cli"]
         src = cfg["src"]
         n_in_source = sum(1 for _ in src.rglob("*.json")) if src.exists() else 0
         n_in_dst = sum(1 for _ in RAW_DIR.rglob("*.json"))
+        n_memories = len(_discover_gemini_memories(src.parent, src))
         print(f"  source ({src}): {n_in_source} JSONs")
         print(f"  destino ({RAW_DIR}): {n_in_dst} JSONs")
+        print(f"  hierarchical memory documents: {n_memories}")
         return 0
 
     print("=" * 60)
@@ -88,6 +90,11 @@ def main(
             "messages": stats["messages"],
             "tool_events": stats["tool_events"],
             "branches": stats["branches"],
+            "agent_memories": stats["agent_memories"],
+            "agent_memory_versions": stats.get("agent_memory_versions", 0),
+            "agent_memory_temporal_evidence": stats.get(
+                "agent_memory_temporal_evidence", 0
+            ),
         },
     }
     log_path = RAW_DIR / "capture_log.jsonl"

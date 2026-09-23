@@ -169,14 +169,41 @@ def test_gemini_cli_write_parquets(tmp_path):
         "gemini_cli_messages.parquet",
         "gemini_cli_tool_events.parquet",
         "gemini_cli_branches.parquet",
+        "gemini_cli_agent_memories.parquet",
+        "gemini_cli_agent_memory_versions.parquet",
+        "gemini_cli_agent_memory_temporal_evidence.parquet",
         "gemini_cli_assets.parquet",
         "gemini_cli_asset_links.parquet",
     }
     assert {p.name for p in out_dir.glob("*.parquet")} == expected
     assert stats["conversations"] == 1
     assert stats["branches"] == 1
+    assert stats["agent_memories"] == 0
     assert stats["assets"] == 0
     assert stats["asset_links"] == 0
+
+
+def test_gemini_cli_parses_versioned_hierarchical_memory(tmp_path):
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    _setup_gemini_dir(raw)
+    memory = raw / "_agent_memory" / "projects" / "project-key" / "GEMINI.md"
+    memory.parent.mkdir(parents=True)
+    memory.write_text("# Project rules\n", encoding="utf-8")
+
+    from src.capture.cli.memory_metadata import observe_memory_files
+
+    observe_memory_files(raw, raw, "gemini_cli")
+    parser = GeminiCLIParser()
+    parser.parse(raw)
+
+    assert len(parser.agent_memories) == 1
+    assert parser.agent_memories[0].project_key == "project-key"
+    assert parser.agent_memories[0].relative_path == (
+        "_agent_memory/projects/project-key/GEMINI.md"
+    )
+    assert len(parser.agent_memory_versions) == 1
+    assert parser.agent_memory_temporal_evidence
 
 
 def test_gemini_cli_idempotent(tmp_path):

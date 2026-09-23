@@ -384,6 +384,7 @@ class Branch:
 # === AgentMemory (Claude Code per-project, Codex global) ===
 
 VALID_MEMORY_KINDS = ("user", "feedback", "project", "reference", "index", "other")
+VALID_MEMORY_TIMESTAMP_CONFIDENCE = ("high", "medium", "low", "unknown")
 
 
 @dataclass
@@ -405,6 +406,10 @@ class AgentMemory:
     content_size: int
     created_at: Optional[pd.Timestamp]
     updated_at: Optional[pd.Timestamp]
+    relative_path: Optional[str] = None
+    current_version_id: Optional[str] = None
+    first_seen_at: Optional[pd.Timestamp] = None
+    last_seen_at: Optional[pd.Timestamp] = None
     is_preserved_missing: bool = False
     account_id: Optional[str] = None
 
@@ -414,6 +419,75 @@ class AgentMemory:
             raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
         if self.kind not in VALID_MEMORY_KINDS:
             raise ValueError(f"kind '{self.kind}' invalido. Validos: {VALID_MEMORY_KINDS}")
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class AgentMemoryVersion:
+    """Immutable content version of an agent-memory document."""
+
+    version_id: str
+    memory_id: str
+    source: str
+    relative_path: str
+    content_sha256: str
+    content: str
+    content_size: int
+    source_modified_at: Optional[pd.Timestamp]
+    source_birth_at: Optional[pd.Timestamp]
+    first_seen_at: Optional[pd.Timestamp]
+    last_seen_at: Optional[pd.Timestamp]
+    captured_at: Optional[pd.Timestamp]
+    effective_created_at: Optional[pd.Timestamp]
+    effective_updated_at: Optional[pd.Timestamp]
+    created_at_basis: Optional[str]
+    updated_at_basis: Optional[str]
+    created_at_confidence: str = "unknown"
+    updated_at_confidence: str = "unknown"
+    account_id: Optional[str] = None
+
+    def __post_init__(self):
+        _validate_account_id(self.account_id)
+        if self.source not in VALID_SOURCES:
+            raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
+        for value in (self.created_at_confidence, self.updated_at_confidence):
+            if value not in VALID_MEMORY_TIMESTAMP_CONFIDENCE:
+                raise ValueError(
+                    f"confidence '{value}' invalido. Validos: "
+                    f"{VALID_MEMORY_TIMESTAMP_CONFIDENCE}"
+                )
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class AgentMemoryTemporalEvidence:
+    """Auditable observed or inferred timestamp for a memory version."""
+
+    evidence_id: str
+    memory_id: str
+    version_id: str
+    source: str
+    evidence_type: str
+    timestamp: Optional[pd.Timestamp]
+    confidence: str
+    locator: Optional[str]
+    details_json: Optional[str]
+    is_inference: bool
+    account_id: Optional[str] = None
+
+    def __post_init__(self):
+        _validate_account_id(self.account_id)
+        if self.source not in VALID_SOURCES:
+            raise ValueError(f"source '{self.source}' invalido. Validos: {VALID_SOURCES}")
+        if self.confidence not in VALID_MEMORY_TIMESTAMP_CONFIDENCE:
+            raise ValueError(
+                f"confidence '{self.confidence}' invalido. Validos: "
+                f"{VALID_MEMORY_TIMESTAMP_CONFIDENCE}"
+            )
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -623,4 +697,16 @@ def notebooklm_source_guides_to_df(guides: list[NotebookLMSourceGuide]) -> pd.Da
 
 def agent_memories_to_df(items: list[AgentMemory]) -> pd.DataFrame:
     cols = [f.name for f in fields(AgentMemory)]
+    return _models_to_df(items, cols)
+
+
+def agent_memory_versions_to_df(items: list[AgentMemoryVersion]) -> pd.DataFrame:
+    cols = [f.name for f in fields(AgentMemoryVersion)]
+    return _models_to_df(items, cols)
+
+
+def agent_memory_temporal_evidence_to_df(
+    items: list[AgentMemoryTemporalEvidence],
+) -> pd.DataFrame:
+    cols = [f.name for f in fields(AgentMemoryTemporalEvidence)]
     return _models_to_df(items, cols)

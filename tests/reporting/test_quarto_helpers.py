@@ -264,6 +264,26 @@ class TestSetupViewsWithManual:
 
 
 class TestSetupUnifiedViews:
+    def test_agent_memory_history_views_are_available(self, tmp_path):
+        unified = tmp_path / "unified"
+        unified.mkdir()
+        pd.DataFrame({
+            "source": ["codex"], "account_id": [None],
+            "version_id": ["v1"], "created_at_basis": ["first_observed"],
+            "created_at_confidence": ["high"],
+        }).to_parquet(unified / "agent_memory_versions.parquet")
+        pd.DataFrame({
+            "source": ["codex"], "account_id": [None],
+            "evidence_id": ["e1"], "confidence": ["high"],
+            "is_inference": [False],
+        }).to_parquet(unified / "agent_memory_temporal_evidence.parquet")
+
+        con = duckdb.connect()
+        counts = setup_unified_views(con, unified)
+
+        assert counts["agent_memory_versions"] == 1
+        assert counts["agent_memory_temporal_evidence"] == 1
+
     def test_asset_graph_is_available_to_overview_and_source_filter(self, tmp_path):
         unified = tmp_path / "unified"
         unified.mkdir()

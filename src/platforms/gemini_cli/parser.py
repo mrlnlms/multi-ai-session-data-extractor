@@ -11,7 +11,8 @@ Schema empirico (JSON, NAO JSONL como Codex/Claude Code):
 - `.project_root` file resolve nome do projeto (senao usa dir name)
 
 Output: data/processed/Gemini CLI/{gemini_cli_conversations,messages,
-tool_events,branches,assets,asset_links}.parquet.
+tool_events,branches,agent_memories,agent_memory_versions,
+agent_memory_temporal_evidence,assets,asset_links}.parquet.
 
 Branches: 1 _main por Conversation.
 """
@@ -30,11 +31,18 @@ from src.assets.incremental import DEFAULT_MAX_BATCH_BYTES
 from src.assets.reader import AssetReader, VaultAssetReader
 from src.assets.vault import AssetVault
 from src.parsing.base import BaseParser
+from src.parsing.agent_memory import parse_memory_archive, parse_memories_for_source
 from src.schema.models import (
+    AgentMemory,
+    AgentMemoryTemporalEvidence,
+    AgentMemoryVersion,
     Branch,
     Conversation,
     Message,
     ToolEvent,
+    agent_memories_to_df,
+    agent_memory_temporal_evidence_to_df,
+    agent_memory_versions_to_df,
     asset_links_to_df,
     assets_to_df,
     branches_to_df,
@@ -74,12 +82,18 @@ class GeminiCLIParser(BaseParser):
         self.branches: list[Branch] = []
         self._conv_source_files: dict[str, set[str]] = {}
         self._input_path: Optional[Path] = None
+        self.agent_memories: list[AgentMemory] = []
+        self.agent_memory_versions: list[AgentMemoryVersion] = []
+        self.agent_memory_temporal_evidence: list[AgentMemoryTemporalEvidence] = []
 
     def reset(self):
         super().reset()
         self.branches = []
         self._conv_source_files = {}
         self._input_path = None
+        self.agent_memories = []
+        self.agent_memory_versions = []
+        self.agent_memory_temporal_evidence = []
         self.assets = []
         self.asset_links = []
         self._asset_capture: CLIAssetCaptureSession | None = None
@@ -116,6 +130,15 @@ class GeminiCLIParser(BaseParser):
         self._build_branches()
         from src.capture.cli.preservation import mark_cli_preservation
         mark_cli_preservation(self)
+        memory_result = parse_memory_archive(input_path, "gemini_cli", set())
+        if memory_result.memories:
+            self.agent_memories = memory_result.memories
+            self.agent_memory_versions = memory_result.versions
+            self.agent_memory_temporal_evidence = memory_result.temporal_evidence
+        else:
+            self.agent_memories = parse_memories_for_source(
+                input_path, "gemini_cli", set()
+            )
         if self._asset_capture is not None:
             self._asset_capture.finish()
         self.apply_asset_reader()
@@ -426,6 +449,14 @@ class GeminiCLIParser(BaseParser):
             output_dir / "gemini_cli_tool_events.parquet", index=False)
         branches_to_df(self.branches).to_parquet(
             output_dir / "gemini_cli_branches.parquet", index=False)
+        agent_memories_to_df(self.agent_memories).to_parquet(
+            output_dir / "gemini_cli_agent_memories.parquet", index=False)
+        agent_memory_versions_to_df(self.agent_memory_versions).to_parquet(
+            output_dir / "gemini_cli_agent_memory_versions.parquet", index=False)
+        agent_memory_temporal_evidence_to_df(
+            self.agent_memory_temporal_evidence
+        ).to_parquet(
+            output_dir / "gemini_cli_agent_memory_temporal_evidence.parquet", index=False)
         assets_to_df([]).to_parquet(
             output_dir / "gemini_cli_assets.parquet", index=False)
         asset_links_to_df([]).to_parquet(
@@ -435,6 +466,9 @@ class GeminiCLIParser(BaseParser):
             "messages": len(self.messages),
             "tool_events": len(self.events),
             "branches": len(self.branches),
+            "agent_memories": len(self.agent_memories),
+            "agent_memory_versions": len(self.agent_memory_versions),
+            "agent_memory_temporal_evidence": len(self.agent_memory_temporal_evidence),
             "assets": 0,
             "asset_links": 0,
         }

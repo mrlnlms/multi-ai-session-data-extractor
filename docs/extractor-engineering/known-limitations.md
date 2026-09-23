@@ -205,6 +205,11 @@ These validations require a Pro Max account and remain open until someone tests:
 - **Periodic snapshots:** Gemini CLI writes multiple
   `session-<timestamp>-<sid>.json` files for the same session. The parser
   consolidates via `sessionId` with dedup by `message_id`.
+- **Memory discovery is bounded:** configured context files are captured from
+  the global scope and up to 200 directories per project already represented
+  by `tmp/*/.project_root`. A project never opened by the CLI is not discoverable
+  from CLI state alone; pending experimental auto-memory patches are candidates,
+  not approved memory, and remain outside the canonical table.
 
 ## Lower-priority CLI coverage
 
@@ -219,6 +224,10 @@ These validations require a Pro Max account and remain open until someone tests:
   schema.
 
 ### Antigravity CLI
+
+- **No durable memory format observed:** `agy 1.1.22` exposes only an empty
+  `knowledge.lock`. Markdown in `brain/` is conversation output and is not
+  reclassified as cross-session memory.
 
 - **Two local storage generations.** Legacy `.pb` containers are opaque and
   current SQLite containers hold undocumented Protobuf payloads. Both are
@@ -319,6 +328,13 @@ These validations require a Pro Max account and remain open until someone tests:
   the current case; refactor when someone reports it.
 
 ## Operational limitations
+
+- **Agent-memory history begins with available evidence.** Claude Code, Codex
+  and Gemini CLI now preserve every newly observed content version.
+  Reconstruction can
+  seed older preserved Markdown and retain filesystem/name/explicit-date
+  evidence, but cannot prove an unavailable intermediate version or timestamp;
+  unknown values remain null and inferred dates remain labeled by confidence.
 
 - **Windows not tested.** macOS and Linux work.
 - **Python ≥3.12 required** (tested on 3.12 and 3.14).

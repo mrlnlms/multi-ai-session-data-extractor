@@ -181,7 +181,9 @@ def test_codex_write_parquets(tmp_path):
         "codex_messages.parquet",
         "codex_tool_events.parquet",
         "codex_branches.parquet",
-        "codex_agent_memories.parquet",
+            "codex_agent_memories.parquet",
+            "codex_agent_memory_versions.parquet",
+            "codex_agent_memory_temporal_evidence.parquet",
         "codex_assets.parquet",
         "codex_asset_links.parquet",
     }

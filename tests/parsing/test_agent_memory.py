@@ -2,12 +2,15 @@ import pytest
 import pandas as pd
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
+from src.capture.cli.memory_metadata import observe_memory_files
 from src.parsing.agent_memory import (
     parse_agent_memory_file,
     parse_frontmatter,
     decode_project_path,
     parse_memories_for_source,
+    parse_memory_archive,
 )
 
 
@@ -80,7 +83,8 @@ Marlon Lemes.
     assert m.description == "Senior researcher"
     assert "Marlon" in m.content
     assert m.file_name == "user_profile.md"
-    assert m.memory_id == "claude_code:-Users-x-p:user_profile.md"
+    assert m.memory_id == "claude_code:-Users-x-p/memory/user_profile.md"
+    assert m.relative_path == "-Users-x-p/memory/user_profile.md"
 
 
 def test_parse_memory_md_index_no_frontmatter(tmp_path):
@@ -126,7 +130,34 @@ def test_parse_codex_memory_null_project(tmp_path):
         is_preserved_missing=False,
     )
     assert m.kind == "feedback"
-    assert m.memory_id == "codex::global.md"
+    assert m.memory_id == "codex:memories/global.md"
+
+
+def test_parse_memory_archive_exposes_versions_and_temporal_evidence(tmp_path):
+    source = tmp_path / ".codex"
+    memory = source / "memories" / "2025-04-03-notes.md"
+    memory.parent.mkdir(parents=True)
+    memory.write_text("---\ncreated_at: 2025-04-02T10:00:00Z\n---\nbody")
+    raw = tmp_path / "raw"
+    observe_memory_files(
+        raw, source, "codex", datetime(2026, 1, 1, tzinfo=timezone.utc)
+    )
+
+    result = parse_memory_archive(raw, "codex", {"memories/2025-04-03-notes.md"})
+
+    assert len(result.memories) == len(result.versions) == 1
+    memory_row = result.memories[0]
+    version = result.versions[0]
+    assert memory_row.current_version_id == version.version_id
+    assert version.created_at_basis == "explicit_structured_timestamp"
+    assert version.created_at_confidence == "high"
+    assert {item.evidence_type for item in result.temporal_evidence} >= {
+        "explicit_structured_timestamp", "first_observed", "source_mtime",
+        "filename_timestamp",
+    }
+    assert len({item.evidence_id for item in result.temporal_evidence}) == len(
+        result.temporal_evidence
+    )
 
 
 # --- decode_project_path ---

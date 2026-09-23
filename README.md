@@ -60,8 +60,8 @@ canonical parsing, and descriptive visualization (Quarto):
 | **Kimi** | web | chats, installed skills, tool events, signed asset downloads |
 | **Claude Code** | CLI | local sessions (`~/.claude/projects/`), subagents |
 | **Codex** | CLI | local sessions (`~/.codex/sessions/`), exact latency per tool call |
-| **Gemini CLI** | CLI | local sessions (`~/.gemini/tmp/`) |
-| **Antigravity CLI** | CLI | current trajectories plus decoded legacy `.pb` sidecars |
+| **Gemini CLI** | CLI | local sessions plus hierarchical Markdown memory/context |
+| **Antigravity CLI** | CLI | current trajectories plus decoded legacy `.pb` sidecars; no durable memory observed |
 
 The automated test suite covers extractors, reconcilers, parsers, the
 canonical schema, dashboard, and unification. Known limitations and gaps are
@@ -128,7 +128,8 @@ immutable assets → central content-addressed vault ←─┘
    they do not delete older raw material when its origin disappears.
 3. **Parsers** convert the preserved source records into parquet with a unified schema:
    `Conversation`, `Message`, `ToolEvent`, `Branch` (and auxiliaries such as
-   `Asset`, `AssetLink`, `ProjectDoc`, and `NotebookLMOutput`). Asset coverage
+   `Asset`, `AssetLink`, `ProjectDoc`, `NotebookLMOutput`, and versioned
+   `AgentMemory`). Asset coverage
    is published under explicit web and CLI preservation scopes; the
    [source-by-source matrix](docs/extractor-engineering/asset-coverage.md)
    records relationship precision, local availability, and deliberate gaps.
@@ -139,7 +140,7 @@ immutable assets → central content-addressed vault ←─┘
    selective sync. CLI and manual rows keep `account_id` null until a durable
    identity is observable.
 4. **Unify** consolidates the parquets from the 13 sources into a single
-   `data/unified/` with 16 parquet tables (4 canonical + 12 auxiliary tables,
+   `data/unified/` with 18 parquet tables (4 canonical + 14 auxiliary tables,
    including the catalog-derived `accounts` dimension), ready for
    cross-platform analysis.
 

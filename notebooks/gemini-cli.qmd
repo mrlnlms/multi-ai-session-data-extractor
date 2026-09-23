@@ -32,7 +32,7 @@ SOURCE_COLOR   = "#1A56DB"  # Google CLI blue
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Gemini CLI"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
-AUX_TABLES     = ["assets", "asset_links"]
+AUX_TABLES     = ["agent_memories", "agent_memory_versions", "agent_memory_temporal_evidence", "assets", "asset_links"]
 ACCOUNT_FILTER = None
 
 con = duckdb.connect()
@@ -42,6 +42,8 @@ _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_
 > **About Gemini CLI:** parquets captured via incremental copy from
 > `~/.gemini/tmp/`. Source: `gemini_cli`, mode: `cli`. JSON schema (not JSONL).
 > `thoughts` array → formatted thinking. `toolCalls` correlated via status.
+> Hierarchical context (`GEMINI.md` or configured equivalents) is preserved as
+> versioned agent memory when observed.
 
 {{< include _template.qmd >}}
 

@@ -148,3 +148,17 @@ python -m src.platforms.antigravity_cli.commands.recover_legacy --all-opaque
 
 Probes empiricos ficam em `src/platforms/<source_id>/probes/`; nao sao comandos
 de coleta rotineira.
+# Reconstrucao de historico de memories CLI
+
+O comando abaixo apenas mostra o que seria semeado. Acrescente `--apply` para
+gravar o manifesto v2 e as versoes imutaveis; ele nao usa rede nem publica DVC.
+
+```bash
+PYTHONPATH=. .venv/bin/python -m src.operations.reconstruct_agent_memory_history \
+  --source codex --raw-root 'data/raw/Codex' --source-root "$HOME/.codex"
+```
+
+Use `--source gemini_cli --raw-root 'data/raw/Gemini CLI'` to seed already
+projected Gemini memory documents. Normal Gemini syncs discover and version
+global/project context automatically; Antigravity has no evidenced durable
+memory format in the currently observed version.

@@ -1,12 +1,14 @@
-"""Parse data/raw/Claude Code/ → 7 parquets canonicos.
+"""Parse data/raw/Claude Code/ → 9 parquets canonicos e auxiliares.
 
 Le todos JSONLs em data/raw/Claude Code/<encoded-cwd>/*.jsonl + subagents
-e gera 7 parquets em data/processed/Claude Code/:
+e gera 9 parquets em data/processed/Claude Code/:
 - claude_code_conversations.parquet
 - claude_code_messages.parquet
 - claude_code_tool_events.parquet
 - claude_code_branches.parquet
 - claude_code_agent_memories.parquet
+- claude_code_agent_memory_versions.parquet
+- claude_code_agent_memory_temporal_evidence.parquet
 - claude_code_assets.parquet
 - claude_code_asset_links.parquet
 

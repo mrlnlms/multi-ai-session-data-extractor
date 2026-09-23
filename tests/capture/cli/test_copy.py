@@ -1,4 +1,5 @@
 """Tests pra cli-copy memory/* extension (C3)."""
+import os
 import pytest
 import sqlite3
 from pathlib import Path
@@ -9,6 +10,7 @@ from src.capture.cli.copy import (
     copy_claude_code,
     current_source_files,
     SOURCES,
+    copy_gemini_cli_memories,
     RAW,
 )
 
@@ -26,11 +28,73 @@ def test_sync_tree_skips_macos_finder_metadata(tmp_path):
     assert not (destination / ".DS_Store").exists()
 
 
+def test_sync_tree_updates_different_content_when_raw_mtime_is_newer(tmp_path):
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    source.mkdir()
+    destination.mkdir()
+    live = source / "session.jsonl"
+    raw = destination / "session.jsonl"
+    live.write_text("complete live session", encoding="utf-8")
+    raw.write_text("older", encoding="utf-8")
+    os.utime(live, ns=(100, 100))
+    os.utime(raw, ns=(200, 200))
+
+    result = _sync_tree(source, destination)
+
+    assert result["updated"] == [raw]
+    assert raw.read_text(encoding="utf-8") == "complete live session"
+
+
+def test_sync_tree_new_file_is_independent_copy(tmp_path):
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    source.mkdir()
+    live = source / "session.jsonl"
+    live.write_text("first", encoding="utf-8")
+
+    _sync_tree(source, destination)
+    live.write_text("mutated later", encoding="utf-8")
+
+    assert (destination / "session.jsonl").read_text(encoding="utf-8") == "first"
+
+
 def test_copy_codex_memories_no_op_when_src_missing(tmp_path, monkeypatch):
     """Sem ~/.codex/memories/, retorna empty no-op."""
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     result = copy_codex_memories()
     assert result == {"new": [], "updated": []}
+
+
+def test_copy_gemini_cli_memories_discovers_global_and_project_context(tmp_path, monkeypatch):
+    gemini_home = tmp_path / ".gemini"
+    source = gemini_home / "tmp"
+    destination = tmp_path / "raw" / "Gemini CLI"
+    project = tmp_path / "project"
+    source_project = source / "project-key"
+    source_project.mkdir(parents=True)
+    project.mkdir()
+    (source_project / ".project_root").write_text(str(project), encoding="utf-8")
+    (gemini_home / "settings.json").write_text(
+        '{"context":{"fileName":["AGENTS.md","GEMINI.md"]}}', encoding="utf-8"
+    )
+    (gemini_home / "GEMINI.md").write_text("global", encoding="utf-8")
+    (project / "AGENTS.md").write_text("project", encoding="utf-8")
+    monkeypatch.setitem(SOURCES, "gemini_cli", {
+        "src": source, "dst": destination, "label": "Gemini CLI",
+    })
+
+    result = copy_gemini_cli_memories()
+
+    assert len(result["new"]) == 2
+    assert (destination / "_agent_memory/global/GEMINI.md").read_text() == "global"
+    assert (
+        destination / "_agent_memory/projects/project-key/AGENTS.md"
+    ).read_text() == "project"
+    assert set(current_source_files("gemini_cli")) >= {
+        "_agent_memory/global/GEMINI.md",
+        "_agent_memory/projects/project-key/AGENTS.md",
+    }
 
 
 def test_copy_codex_memories_copies_new_files(tmp_path, monkeypatch):

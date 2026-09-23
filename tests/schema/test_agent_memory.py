@@ -1,6 +1,16 @@
 import pandas as pd
 import pytest
-from src.schema.models import AgentMemory, VALID_MEMORY_KINDS, agent_memories_to_df
+from dataclasses import fields
+
+from src.schema.models import (
+    AgentMemory,
+    AgentMemoryTemporalEvidence,
+    AgentMemoryVersion,
+    VALID_MEMORY_KINDS,
+    agent_memories_to_df,
+    agent_memory_temporal_evidence_to_df,
+    agent_memory_versions_to_df,
+)
 
 
 def test_agent_memory_minimal_construction():
@@ -70,6 +80,37 @@ def test_agent_memories_to_df_empty():
     assert "memory_id" in df.columns
     assert "kind" in df.columns
     assert len(df) == 0
+
+
+def test_agent_memory_auxiliary_empty_frames_keep_schema():
+    assert list(agent_memory_versions_to_df([]).columns) == [
+        f.name for f in fields(AgentMemoryVersion)
+    ]
+    assert list(agent_memory_temporal_evidence_to_df([]).columns) == [
+        f.name for f in fields(AgentMemoryTemporalEvidence)
+    ]
+
+
+def test_agent_memory_version_rejects_invalid_confidence():
+    with pytest.raises(ValueError, match="confidence"):
+        AgentMemoryVersion(
+            version_id="m:abc", memory_id="m", source="codex",
+            relative_path="memories/a.md", content_sha256="abc", content="x",
+            content_size=1, source_modified_at=None, source_birth_at=None,
+            first_seen_at=None, last_seen_at=None, captured_at=None,
+            effective_created_at=None, effective_updated_at=None,
+            created_at_basis=None, updated_at_basis=None,
+            created_at_confidence="certain",
+        )
+
+
+def test_agent_memory_temporal_evidence_rejects_invalid_confidence():
+    with pytest.raises(ValueError, match="confidence"):
+        AgentMemoryTemporalEvidence(
+            evidence_id="e", memory_id="m", version_id="v", source="codex",
+            evidence_type="first_observed", timestamp=None, confidence="certain",
+            locator=None, details_json=None, is_inference=False,
+        )
 
 
 def test_agent_memories_to_df_roundtrip():

@@ -7,6 +7,21 @@ The copy ignores new macOS `.DS_Store` metadata because it is neither session
 content nor CLI state. A copy preserved before that exclusion remains in raw
 as operational filesystem metadata and is not promoted to an Asset.
 
+## Agent memory
+
+Gemini CLI remains an active upstream project and calls its hierarchical
+instructional context "memory". The collector preserves configured context
+files (default `GEMINI.md`) from the global scope and from projects previously
+observed through `tmp/*/.project_root`. It also recognizes the newer private
+project `MEMORY.md` tier when present. These documents use the shared
+versioned `AgentMemory` contract; general settings, credentials, skills and
+pending auto-memory patches are not silently promoted to memory.
+
+The current machine has preserved Gemini CLI sessions but no installed
+`gemini` executable and no live memory Markdown. This is an observed local
+state, not evidence that Gemini CLI was discontinued and not a reason to omit
+future capture support.
+
 ## Schema specifics
 
 - **JSON schema** (not JSONL like Claude Code/Codex): `session-<timestamp>-<sid>.json`
@@ -25,6 +40,9 @@ as operational filesystem metadata and is not promoted to an Asset.
   ferramentas; `write_file`/`replace` operam arquivos do working tree e ficam
   como `ToolEvent.file_path`, sem transformar paths externos em assets. O
   parser publica tabelas `assets`/`asset_links` vazias com schema canonico.
+- **Memory:** `agent_memories`, immutable `agent_memory_versions` and
+  `agent_memory_temporal_evidence` follow the same timestamp-confidence
+  contract as Claude Code and Codex.
 
 ## Why there is no `server-behavior.md`
 

@@ -66,6 +66,8 @@ TABLE_PKS: dict[str, list[str]] = {
     "conversation_projects": ["source", "account_id", "conversation_id", "project_tag"],
     # 1 auxiliar Claude Code/Codex (memorias do agente)
     "agent_memories":   ["source", "account_id", "memory_id"],
+    "agent_memory_versions": ["source", "account_id", "version_id"],
+    "agent_memory_temporal_evidence": ["source", "account_id", "evidence_id"],
     # Canonical asset catalog and evidence-backed domain relationships
     "assets":           ["source", "account_id", "asset_id"],
     "asset_links":      ["source", "account_id", "asset_link_id"],

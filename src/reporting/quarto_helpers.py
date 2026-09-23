@@ -92,7 +92,8 @@ def setup_unified_views(
         "conversations", "messages", "tool_events", "branches",
         "sources", "notes", "outputs", "guide_questions", "source_guides",
         "project_metadata", "project_docs",
-        "conversation_projects", "agent_memories", "assets", "asset_links",
+        "conversation_projects", "agent_memories", "agent_memory_versions",
+        "agent_memory_temporal_evidence", "assets", "asset_links",
     ]
     counts: dict[str, int] = {}
     for table in TABLES:

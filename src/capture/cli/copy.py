@@ -16,6 +16,7 @@ Regras:
 from __future__ import annotations
 
 import logging
+import json
 import os
 import shutil
 import sqlite3
@@ -53,8 +54,21 @@ SOURCES = {
 }
 
 
+def _same_file_content(source: Path, destination: Path) -> bool:
+    """Compare size first and hash when filesystem timestamps are insufficient."""
+    if source.stat().st_size != destination.stat().st_size:
+        return False
+    return _sha256_file(source) == _sha256_file(destination)
+
+
 def _sync_tree(src: Path, dst: Path, glob_pattern: str = "**/*") -> dict[str, list[Path]]:
-    """Copia arquivos novos/modificados de src pra dst (skip-existing por mtime)."""
+    """Copia arquivos novos/modificados sem confiar apenas em ``mtime``.
+
+    DVC materialization can make an older raw projection appear newer than its
+    live source. Content comparison prevents that restored timestamp from
+    hiding a more complete live session. New files are copied, not hardlinked,
+    so later source mutations cannot alter preserved raw bytes implicitly.
+    """
     new_files: list[Path] = []
     updated_files: list[Path] = []
     dst.mkdir(parents=True, exist_ok=True)
@@ -65,12 +79,12 @@ def _sync_tree(src: Path, dst: Path, glob_pattern: str = "**/*") -> dict[str, li
         dst_file = dst / rel
         dst_file.parent.mkdir(parents=True, exist_ok=True)
         if not dst_file.exists():
-            try:
-                os.link(src_file, dst_file)
-            except OSError:
-                shutil.copy2(src_file, dst_file)
+            shutil.copy2(src_file, dst_file)
             new_files.append(dst_file)
-        elif src_file.stat().st_mtime > dst_file.stat().st_mtime:
+        elif (
+            src_file.stat().st_mtime > dst_file.stat().st_mtime
+            or not _same_file_content(src_file, dst_file)
+        ):
             shutil.copy2(src_file, dst_file)
             updated_files.append(dst_file)
     return {"new": new_files, "updated": updated_files}
@@ -126,10 +140,7 @@ def copy_claude_code() -> dict[str, list[Path]]:
                 dst_file = dst_project / "memory" / md.name
                 if not dst_file.exists():
                     dst_file.parent.mkdir(parents=True, exist_ok=True)
-                    try:
-                        os.link(md, dst_file)
-                    except OSError:
-                        shutil.copy2(md, dst_file)
+                    shutil.copy2(md, dst_file)
                     new_files.append(dst_file)
                 elif md.stat().st_mtime > dst_file.stat().st_mtime:
                     shutil.copy2(md, dst_file)
@@ -159,10 +170,7 @@ def copy_codex_memories() -> dict[str, list[Path]]:
         dst_file = dst_root / rel
         dst_file.parent.mkdir(parents=True, exist_ok=True)
         if not dst_file.exists():
-            try:
-                os.link(src_file, dst_file)
-            except OSError:
-                shutil.copy2(src_file, dst_file)
+            shutil.copy2(src_file, dst_file)
             new_files.append(dst_file)
         elif src_file.stat().st_mtime > dst_file.stat().st_mtime:
             shutil.copy2(src_file, dst_file)
@@ -171,6 +179,107 @@ def copy_codex_memories() -> dict[str, list[Path]]:
 
     update_memory_metadata(RAW / "Codex", codex_root, "codex")
     return {"new": new_files, "updated": updated_files}
+
+
+def _gemini_context_filenames(gemini_home: Path) -> tuple[str, ...]:
+    """Return configured Gemini context filenames without retaining settings."""
+    names: list[str] = ["GEMINI.md"]
+    settings = gemini_home / "settings.json"
+    try:
+        payload = json.loads(settings.read_text(encoding="utf-8"))
+        configured = payload.get("context", {}).get("fileName")
+        values = [configured] if isinstance(configured, str) else configured
+        if isinstance(values, list):
+            names.extend(
+                value for value in values
+                if isinstance(value, str) and value and Path(value).name == value
+            )
+    except (OSError, json.JSONDecodeError, AttributeError):
+        pass
+    return tuple(dict.fromkeys(names))
+
+
+def _gemini_project_roots(tmp_root: Path) -> dict[str, Path]:
+    roots: dict[str, Path] = {}
+    if not tmp_root.is_dir():
+        return roots
+    for marker in tmp_root.glob("*/.project_root"):
+        try:
+            root = Path(marker.read_text(encoding="utf-8").strip()).expanduser()
+        except OSError:
+            continue
+        if root.is_dir():
+            roots[marker.parent.name] = root
+    return roots
+
+
+def _discover_gemini_memories(gemini_home: Path, tmp_root: Path) -> dict[str, Path]:
+    """Discover global, private and project Gemini memory Markdown files."""
+    names = _gemini_context_filenames(gemini_home)
+    found: dict[str, Path] = {}
+    for name in names:
+        path = gemini_home / name
+        if path.is_file():
+            found[f"_agent_memory/global/{name}"] = path
+
+    ignored = {".git", "node_modules", ".venv", "venv", "__pycache__", "data"}
+    for project_key, root in sorted(_gemini_project_roots(tmp_root).items()):
+        visited = 0
+        for directory, dirnames, filenames in os.walk(root):
+            dirnames[:] = sorted(name for name in dirnames if name not in ignored)
+            visited += 1
+            if visited > 200:
+                dirnames[:] = []
+                continue
+            directory_path = Path(directory)
+            for name in names:
+                if name in filenames:
+                    path = directory_path / name
+                    rel = path.relative_to(root).as_posix()
+                    found[f"_agent_memory/projects/{project_key}/{rel}"] = path
+
+        # Current tiered-memory builds keep private project memory below the
+        # per-project Gemini state directory. Preserve both MEMORY.md and the
+        # legacy configurable context filename when present.
+        state_root = tmp_root / project_key
+        for path in state_root.rglob("*.md"):
+            if path.name == "MEMORY.md" or path.name in names:
+                rel = path.relative_to(state_root).as_posix()
+                found[f"_agent_memory/private/{project_key}/{rel}"] = path
+    return found
+
+
+def copy_gemini_cli_memories() -> dict[str, list[Path]]:
+    """Copy Gemini hierarchical memory without retaining general settings."""
+    tmp_root = SOURCES["gemini_cli"]["src"]
+    gemini_home = tmp_root.parent
+    dst = SOURCES["gemini_cli"]["dst"]
+    new_files: list[Path] = []
+    updated_files: list[Path] = []
+    observed = _discover_gemini_memories(gemini_home, tmp_root)
+    for rel, source_file in sorted(observed.items()):
+        dst_file = dst / rel
+        dst_file.parent.mkdir(parents=True, exist_ok=True)
+        if not dst_file.exists():
+            shutil.copy2(source_file, dst_file)
+            new_files.append(dst_file)
+        elif _sha256_file(source_file) != _sha256_file(dst_file):
+            shutil.copy2(source_file, dst_file)
+            updated_files.append(dst_file)
+    from src.capture.cli.memory_metadata import observe_memory_files
+
+    observe_memory_files(dst, dst, "gemini_cli", observed_files=observed)
+    return {"new": new_files, "updated": updated_files}
+
+
+def _sha256_file(path: Path) -> str:
+    import hashlib
+
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _copy_sqlite_snapshot(src_file: Path, dst_file: Path) -> None:
@@ -311,11 +420,13 @@ def current_source_files(source: str) -> set[str]:
             }
         return out
     if source == "gemini_cli":
-        # ~/.gemini/tmp/<hash>/chats/session-*.json
-        return {
+        # Sessions plus hierarchical memories projected under raw.
+        sessions = {
             str(p.relative_to(src))
             for p in src.glob("**/*.json")
         }
+        memories = set(_discover_gemini_memories(src.parent, src))
+        return sessions | memories
     if source == "antigravity_cli":
         out: set[str] = set()
         conversations = src / "conversations"
@@ -354,6 +465,13 @@ def copy_source(source: str) -> dict[str, list[Path]]:
         }
     elif source == "antigravity_cli":
         result = copy_antigravity_cli()
+    elif source == "gemini_cli":
+        sessions = _sync_tree(cfg["src"], cfg["dst"])
+        memories = copy_gemini_cli_memories()
+        result = {
+            "new": sessions["new"] + memories["new"],
+            "updated": sessions["updated"] + memories["updated"],
+        }
     else:
         if not cfg["src"].exists():
             logger.warning(f"  {label}: fonte nao encontrada em {cfg['src']}")

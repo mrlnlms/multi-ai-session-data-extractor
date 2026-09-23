@@ -20,6 +20,17 @@ The incremental copy takes a consistent SQLite backup for `.db` containers;
 this safely incorporates an active WAL without copying credentials or general
 configuration files.
 
+## Agent memory census
+
+No durable agent-memory document was observed in the installed `agy 1.1.22`
+state. `knowledge/` contains only an empty `knowledge.lock`; it does not prove
+the existence of recoverable knowledge. Markdown under `brain/<conversation>`
+contains plans, reports and snapshots produced inside a conversation, so it is
+conversation output rather than cross-session memory. Those files must not be
+published as `AgentMemory` without new format evidence. The census is
+documented so a future version can be added deliberately if the storage
+contract changes.
+
 ## Recuperação de legados opacos
 
 Esta é uma ferramenta excepcional da plataforma, não uma etapa automática do
