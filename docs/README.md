@@ -25,6 +25,7 @@ define as regras de trabalho para agentes.
   aquisicao automatizada regular.
 - [extractor-engineering/](extractor-engineering/) — engenharia da captura,
   validacao cross-platform, [limites conhecidos](extractor-engineering/known-limitations.md)
+  [pendencias de memoria web](extractor-engineering/web-memory-capture-backlog.md),
   [cobertura canonica de assets](extractor-engineering/asset-coverage.md) e
   [termos de captura](extractor-engineering/glossary.md), alem dos documentos
   tecnicos por plataforma. O contrato publica separadamente os escopos

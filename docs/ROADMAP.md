@@ -6,7 +6,7 @@ than duplicating it here. Completed work is marked here so its status can be
 read without searching Git history; implementation detail belongs in `git log`,
 and platform-specific behavior belongs in its own documentation.
 
-**Last reviewed:** 2026-09-23.
+**Last reviewed:** 2026-09-25.
 
 For one-time work, use **planned**, **active**, or **completed**. Mark completion
 when closing the work, with its date and an evidence pointer when available.
@@ -24,7 +24,7 @@ conflicts with the entry or the task requires a fresh verification.
 | Prevent asset-copy rematerialization | **Completed and published** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the retention audit as a diagnostic after future capture changes. |
 | Canonical account identity and analytical dimension | **Completed and published** | [Account architecture](product/account-architecture.md) | Preserve the UUID-only contract; treat memory/configuration as a separate front. |
 | CLI memory/configuration coverage | **Completed and published (2026-09-23)** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the demonstrated Claude Code/Codex/Gemini CLI contracts; revisit Antigravity Knowledge only if an inspectable native item or stable payload becomes available, and treat a future owner-created Project separately as project context. |
-| Web memory/configuration capability census | **Active; ChatGPT, Claude.ai and Perplexity capture and canonical projection validated locally 2026-09-25** | [ChatGPT state](extractor-engineering/platforms/web/chatgpt/state.md), [Claude.ai state](extractor-engineering/platforms/web/claude-ai/state.md), [Perplexity state](extractor-engineering/platforms/web/perplexity/state.md) | These sources have raw history and versioned memory Parquets; data publication remains pending. Keep native memory, account-global instructions and project context distinct for other sources. |
+| Web memory/configuration capability census | **Active; ChatGPT, Claude.ai and Perplexity capture and canonical projection validated locally 2026-09-25** | [Pending capture](extractor-engineering/web-memory-capture-backlog.md), [memory architecture](product/agent-memory-architecture.md) | These sources have raw history and versioned memory Parquets; data publication remains pending. Follow the evidence gates in the pending-capture list; keep native memory, account-global instructions and project context distinct. |
 
 Google Drive remains the active remote while alternatives are researched. This
 is not an active migration or a freeze of the normal capture/publish workflow.
