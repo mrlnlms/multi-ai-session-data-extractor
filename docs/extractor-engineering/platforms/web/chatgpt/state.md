@@ -95,7 +95,8 @@ preceding saved-memory/instruction snapshots remained byte-for-byte intact.
 The summary source checksum matched the preceding checksum response in both
 accounts. This was a memory-only collection; it did not refetch conversations.
 The subsequent parser/unify integration materialized these records locally.
-The captured data and derived Parquets remain unpublished.
+The captured data and derived Parquets were published in the DVC snapshot
+`d3e8d5f` on 2026-09-25.
 
 ### Canonical memory projection (validated 2026-09-25)
 

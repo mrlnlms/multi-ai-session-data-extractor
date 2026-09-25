@@ -24,7 +24,7 @@ conflicts with the entry or the task requires a fresh verification.
 | Prevent asset-copy rematerialization | **Completed and published** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the retention audit as a diagnostic after future capture changes. |
 | Canonical account identity and analytical dimension | **Completed and published** | [Account architecture](product/account-architecture.md) | Preserve the UUID-only contract; treat memory/configuration as a separate front. |
 | CLI memory/configuration coverage | **Completed and published (2026-09-23)** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the demonstrated Claude Code/Codex/Gemini CLI contracts; revisit Antigravity Knowledge only if an inspectable native item or stable payload becomes available, and treat a future owner-created Project separately as project context. |
-| Web memory/configuration capability census | **Active; ChatGPT, Claude.ai and Perplexity capture and canonical projection validated locally 2026-09-25** | [Pending capture](extractor-engineering/web-memory-capture-backlog.md), [memory architecture](product/agent-memory-architecture.md) | These sources have raw history and versioned memory Parquets; data publication remains pending. Follow the evidence gates in the pending-capture list; keep native memory, account-global instructions and project context distinct. |
+| Web memory/configuration capability census | **Active; ChatGPT, Claude.ai and Perplexity memory capture published 2026-09-25** | [Pending capture](extractor-engineering/web-memory-capture-backlog.md), [memory architecture](product/agent-memory-architecture.md) | Raw history and versioned memory Parquets are in the DVC-backed archive. Follow the evidence gates in the pending-capture list; keep native memory, account-global instructions and project context distinct. |
 
 Google Drive remains the active remote while alternatives are researched. This
 is not an active migration or a freeze of the normal capture/publish workflow.
@@ -78,15 +78,16 @@ coverage is bounded, and Antigravity preserves its complete conversation
 `brain/` while keeping the product's unobserved Knowledge feature separate.
 The active web front now includes ChatGPT's complete saved-memory/instruction
 JSON, summary SSE/final JSON/checksum and per-account capture history, validated
-in focused live collections for both configured accounts. These captures remain
-local and unpublished. ChatGPT now projects records, content versions and
+in focused live collections for both configured accounts and published through
+the DVC snapshot `d3e8d5f`. ChatGPT now projects records, content versions and
 temporal evidence into the existing memory tables; dashboard and Quarto expose
 the added coverage. Claude.ai now captures the account and project Melange
 topic collection, with native IDs, per-topic reads, complete-list safeguards
 and versioned projection. Perplexity now captures its paginated account Memory
 GraphQL collection with native IDs and full-response snapshots; one record was
-validated in the available account. These local collections remain unpublished. Other web
-sources remain subject to the capability census.
+validated in the available account. Their raw captures and canonical Parquets
+are included in that snapshot. Other web sources remain subject to the
+capability census.
 Scope must be discovered from captured
 evidence rather than assumed in advance. Native memory, account-global
 instructions and project-scoped prompts are separate surfaces: Gemini

@@ -74,6 +74,8 @@ Automatic recovery from transient timeouts via `python -m src.platforms.claude_a
   exports, 151 content versions and 300 temporal evidence rows. Unify contains
   these in the shared three memory tables. Native `updated_at` is retained;
   creation is first observation because no native creation field was seen.
+  The raw capture and derived Parquets were published in DVC snapshot
+  `d3e8d5f` on 2026-09-25.
 - Topic edit/delete controls are visible in the UI, but no upstream mutation
   was performed. Future complete lists can establish `is_preserved_missing`;
   the current capture has zero missing topics. The three dated

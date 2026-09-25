@@ -78,7 +78,8 @@ cleanup) + user metadata (info, settings, ai_profile).
   in one complete page, projected as one document, one version and two temporal
   evidence rows. No deletion or edit event was observed live. Project Brain,
   Project Memory and project Instructions remain outside this account Memory
-  adapter until their own native payloads are established.
+  adapter until their own native payloads are established. The raw capture and
+  derived Parquets were published in DVC snapshot `d3e8d5f` on 2026-09-25.
 
 Reconciler: full preservation (orphans + ENTRY_DELETED), idempotent.
 Output in `data/merged/Perplexity/perplexity_merged_summary.json` +
