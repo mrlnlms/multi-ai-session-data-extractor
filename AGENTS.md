@@ -20,6 +20,12 @@ antes de alterar um extractor, reconciler ou parser. O guia historico de Claude
 Code foi preservado em `private/CLAUDE.md`; o estado observavel no codigo e nos
 dados prevalece sobre texto historico.
 
+Na frente de memoria/configuracao das plataformas web, registre as superficies
+conhecidas que ainda nao foram capturadas e a evidencia necessaria para retoma-las
+em `docs/extractor-engineering/web-memory-capture-backlog.md`. Atualize esse
+documento ao concluir ou descobrir uma pendencia; detalhes tecnicos observados
+continuam no `state.md` da respectiva plataforma.
+
 ## Principios de preservacao
 
 1. Capturar uma vez, nunca rebaixar: uma entrega ja comprovadamente preservada

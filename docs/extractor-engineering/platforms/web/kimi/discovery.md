@@ -57,6 +57,20 @@ endpoints REST `/api/...` (device register, user usage).
 | `POST /api/device/register` | REST classico, registra device |
 | `POST /api/user/usage` | quota |
 
+### Memory/context read transports (owner session, 2026-09-25)
+
+| Endpoint | Observed request and boundary |
+|---|---|
+| `kimi.gateway.memory.v1.MemoryService/ListMemories` | `{page_size: 50}`; empty response had `nextPageToken: ""`, `memoryLimit: 50`, no `memories` field. Native item shape is not yet known. |
+| `kimi.usersetting.v1.UserSettingService/GetUserSetting` | `{}`; returns `userSetting` with memory toggles and other controls in the observed account, but no demonstrated account instruction value. |
+| `kimi.gateway.memory.v1.VaultService/GetDreamStatus` | `{}`; returned Dream status and `featureAvailable`. `VaultService/GetVaultTree` returned 404 while Dream Memory was disabled. |
+| `kimi.gateway.project.v1.ProjectService/ListProjects` | `{page_size: 100, include_pinned: true}`; one Project was returned in the observed account. |
+| `kimi.gateway.project.v1.ProjectService/GetProject` | `{project_id: <native ID>}`; returned Project identity/metadata, not populated Instructions or Files. |
+
+The normal Kimi sync now stores these successful reads as independent,
+versioned raw snapshots. They are evidence of transport, not a demonstrated
+non-empty memory schema or complete Project context.
+
 ### Auxiliares
 
 - `kimi.gateway.suggest.v1.SuggestService/ListPopups`

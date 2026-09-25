@@ -14,6 +14,7 @@ from src.platforms.kimi.extractor.auth import load_context
 from src.platforms.kimi.extractor.api_client import KimiAPIClient
 from src.platforms.kimi.extractor.discovery import discover, persist_discovery
 from src.platforms.kimi.extractor.fetcher import fetch_conversations
+from src.platforms.kimi.extractor.memory_context import capture_memory_context
 from src.platforms.kimi.extractor.refetch_known import refetch_known_kimi
 from src.accounts import account_data_dir
 
@@ -84,6 +85,8 @@ def _write_last_capture_md(output_dir: Path, log: dict) -> None:
         f"{totals.get('conversations_reused_incremental', 0)} reused\n"
         f"- **Skills:** {totals.get('skills_official', 0)} oficiais, "
         f"{totals.get('skills_installed', 0)} instaladas\n"
+        f"- **Memory/context reads:** "
+        f"{sum(1 for item in log.get('memory_context_capture', {}).get('surfaces', {}).values() if item.get('complete'))}/4 complete\n"
         f"- **Errors:** convs={totals.get('conversations_errors', 0)}\n\n"
         "Ver `capture_log.jsonl` pro historico completo.\n"
     )
@@ -113,6 +116,9 @@ async def run_export(
         page = await context.new_page()
         client = KimiAPIClient(context, page)
         await client.warmup()
+
+        memory_context_capture = await capture_memory_context(client, output_dir)
+        memory_context_capture["snapshot"] = str(memory_context_capture["snapshot"])
 
         chats, skills_official, skills_installed = await discover(client)
 
@@ -147,6 +153,7 @@ async def run_export(
                         "skills_installed": len(skills_installed),
                     },
                     "errors": {"conversations": []},
+                    "memory_context_capture": memory_context_capture,
                 }
                 log_jsonl = output_dir / "capture_log.jsonl"
                 with open(log_jsonl, "a", encoding="utf-8") as f:
@@ -218,6 +225,7 @@ async def run_export(
                 "skills_installed": len(skills_installed),
             },
             "errors": {"conversations": errs[:50]},
+            "memory_context_capture": memory_context_capture,
         }
 
         log_jsonl = output_dir / "capture_log.jsonl"

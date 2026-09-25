@@ -57,7 +57,7 @@ canonical parsing, and descriptive visualization (Quarto):
 | **Gemini** | web | multi-account, reasoning/tool events, generated assets |
 | **NotebookLM** | web | multi-account, historical archives, sources and generated outputs |
 | **Grok** | web | conversations, workspaces, tool events, assets, scheduled tasks |
-| **Kimi** | web | chats, installed skills, tool events, signed asset downloads |
+| **Kimi** | web | chats, installed skills, tool events, signed asset downloads; [native raw Memory/settings/Dream/Project reads, without canonical memory projection yet](docs/extractor-engineering/platforms/web/kimi/state.md) |
 | **Claude Code** | CLI | local sessions (`~/.claude/projects/`), subagents |
 | **Codex** | CLI | local sessions (`~/.codex/sessions/`), exact latency per tool call |
 | **Gemini CLI** | CLI | local sessions plus hierarchical Markdown memory/context |

@@ -134,3 +134,31 @@ class KimiAPIClient:
         return await self._post(
             f"{API_BASE}/kimi.gateway.skill.v1.SkillService/ListInstalledSkills"
         )
+
+    async def list_memory_page(self, page_size: int = 50, page_token: str | None = None) -> dict:
+        """Read the account Memory Instructions collection shown in Chat memory."""
+        body: dict = {"page_size": page_size}
+        if page_token:
+            body["page_token"] = page_token
+        return await self._post(f"{API_BASE}/kimi.gateway.memory.v1.MemoryService/ListMemories", body)
+
+    async def get_user_setting(self) -> dict:
+        """Read account settings; the current empty instruction fields may be omitted."""
+        return await self._post(f"{API_BASE}/kimi.usersetting.v1.UserSettingService/GetUserSetting")
+
+    async def get_dream_status(self) -> dict:
+        return await self._post(f"{API_BASE}/kimi.gateway.memory.v1.VaultService/GetDreamStatus")
+
+    async def list_projects_page(
+        self, page_size: int = 100, page_token: str | None = None,
+    ) -> dict:
+        body: dict = {"page_size": page_size, "include_pinned": True}
+        if page_token:
+            body["page_token"] = page_token
+        return await self._post(f"{API_BASE}/kimi.gateway.project.v1.ProjectService/ListProjects", body)
+
+    async def get_project(self, project_id: str) -> dict:
+        return await self._post(
+            f"{API_BASE}/kimi.gateway.project.v1.ProjectService/GetProject",
+            {"project_id": project_id},
+        )

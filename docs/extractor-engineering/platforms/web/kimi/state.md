@@ -98,9 +98,39 @@ for convs + assets cumulativos.
   shared context across that project's chats. Both were empty in the observed
   sample. This demonstrates project-scoped `project_context`; no independent
   project-memory record or collection was shown.
-- The current extractor captures chats, Skills and assets but none of these
-  observed account-memory, account-instruction, Saved Prompt or actual Project
-  objects/transports.
+- Before the checkpoint below, the extractor captured chats, Skills and assets
+  but none of these observed memory/context read transports.
+
+### Native memory/context read checkpoint — 2026-09-25
+
+- The normal sync now preserves immutable, SHA-256-manifested raw snapshots
+  under each account's `_memory_context/native/<capture>/`. Each read is
+  independently marked complete or incomplete; a failed read cannot make a
+  previous record disappear. The 2026-09-25 focused capture completed all four
+  reads on the bound default account: one empty Memory Instructions page, a
+  settings response, a Dream status response, and one Project list/detail.
+- `POST /apiv2/kimi.gateway.memory.v1.MemoryService/ListMemories` was observed
+  with `{page_size: 50}`. The empty response had `nextPageToken` and
+  `memoryLimit: 50` but omitted `memories`. The capture follows an observed
+  cursor if present; no non-empty memory item's ID, timestamps or lifecycle
+  have been established. Raw transport completeness does **not** imply a
+  canonical `AgentMemory` projection or an empty history across all accounts.
+- `UserSettingService/GetUserSetting` preserves the full native account
+  settings read. In this empty-field account its `userSetting` contained memory
+  toggles and other controls, but no demonstrated payload field for Preferred
+  name, Occupation or Instructions for Kimi. Their UI presence remains
+  distinct from a captured instruction value.
+- `VaultService/GetDreamStatus` returns a Dream status and availability flag;
+  the UI also requested `VaultService/GetVaultTree`, which returned 404 on the
+  disabled observed account. A Dream memory tree or entry is therefore not
+  claimed as captured.
+- `ProjectService/ListProjects` and `GetProject` now preserve native Project
+  catalog/detail responses. The observed Project detail carried identity and
+  metadata but no populated Instructions/Files. Project files and chats are
+  not made complete by this narrow read, and Skills remain a separate object.
+- These new raw reads are not yet parsed into canonical memory/project-context
+  rows. Capture of a non-empty native item, account instruction value or
+  populated Project context is needed before defining those projections.
 
 ### Reference volume (smoke 2026-05-09)
 

@@ -190,6 +190,13 @@ These validations require a Pro Max account and remain open until someone tests:
 
 ### Kimi
 
+- **Memory/context raw-only:** native Memory Instructions, user settings,
+  Dream status and Project catalog/detail reads now have cumulative raw
+  snapshots. The observed Memory Instructions list is empty and the Dream
+  tree is unavailable (404); no non-empty item or account instruction payload
+  has yet established a canonical projection. Project Instructions/Files are
+  not covered by the catalog/detail read. See the
+  [Kimi state](platforms/web/kimi/state.md).
 - **1 manifest record currently has no local binary.** Its metadata stays
   in the canonical asset index with `is_binary_available=False`; an expired or
   failed signed download is not grounds to discard the row.
