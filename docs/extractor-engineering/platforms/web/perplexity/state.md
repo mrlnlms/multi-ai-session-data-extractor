@@ -60,10 +60,25 @@ cleanup) + user metadata (info, settings, ai_profile).
   unavailability of account Brain, not an empty Brain payload. A separate
   Computer → Memory navigation item was visible but its contents were not
   observed and remain unclassified.
-- Current raw `ai_profile.json` and `settings.json` preserve profile/control
-  state but no demonstrated individual Memory collection. Its authenticated
-  read transport, native IDs, exact timestamps and lifecycle fields remain to
-  be captured.
+- The current UI exposes the collection at `/computer/memory`. Its read-only
+  `KnowledgeContextKnowledgeRelayQuery` GraphQL response contains
+  `scopeByKind.memoryCategories[].items.edges[].node`, with a native Relay
+  `id`, `displayValue`, `updatedAt`, `memoryKey`, display labels and
+  `sourceConversations`. Pagination uses `memoriesAfter` and `pageInfo`.
+  These source-conversation references are preserved as native metadata, not
+  assumed canonical conversation foreign keys.
+- Normal headed sync now captures all pages under
+  `raw/<account>/_account_memory/native/<capture>/`, with SHA-256 manifest and
+  complete/incomplete status. GraphQL errors, non-OK category status, duplicate
+  IDs and broken pagination cannot mark prior records absent. The parser
+  projects complete snapshots into the three versioned `AgentMemory` tables;
+  `is_preserved_missing` uses only the latest complete list. The existing
+  `user/ai_profile.json` and `user/settings.json` remain distinct controls.
+- A focused read-only capture on 2026-09-25 yielded one native account memory
+  in one complete page, projected as one document, one version and two temporal
+  evidence rows. No deletion or edit event was observed live. Project Brain,
+  Project Memory and project Instructions remain outside this account Memory
+  adapter until their own native payloads are established.
 
 Reconciler: full preservation (orphans + ENTRY_DELETED), idempotent.
 Output in `data/merged/Perplexity/perplexity_merged_summary.json` +
@@ -93,7 +108,7 @@ timestamp.
 Each account tree resolves its immutable catalog UUID into `account_id`; the
 legacy `account` label and all existing native IDs remain unchanged.
 
-`src/platforms/perplexity/parser.py`:
+`src/platforms/perplexity/parser.py` and `memory_parser.py`:
 
 - Pages have `conversation_id='page:<slug>'`.
 - Search results extracted from `blocks[*].web_result_block.web_results`.
@@ -113,6 +128,9 @@ legacy `account` label and all existing native IDs remain unchanged.
   The asset index and raw pinned
   listing are domain envelopes, not user-facing file outputs.
 - Idempotent (~1s to run).
+- Account Memory records use account UUID + native item ID for identity,
+  `displayValue` for content, native `updatedAt` for update evidence and first
+  observation for creation. Full GraphQL responses remain in raw.
 
 ## Descriptive Quarto
 

@@ -47,7 +47,7 @@ Uma linha por documento logico.
 
 - `memory_id`: identidade estavel baseada em `source` e caminho relativo no
   CLI; no ChatGPT inclui UUID da conta e ID nativo ou superficie observada.
-- `source`: `claude_code`, `codex`, `gemini_cli`, `chatgpt` e `claude_ai`.
+- `source`: `claude_code`, `codex`, `gemini_cli`, `chatgpt`, `claude_ai` e `perplexity`.
 - `relative_path`: caminho CLI ou localizador de captura web relativo ao raw
   da conta; pode incluir um JSON pointer para uma entrada da resposta.
 - `project_path` e `project_key`: escopo de projeto, quando observado.
@@ -55,7 +55,7 @@ Uma linha por documento logico.
 - `current_version_id`: versao mais recente observada.
 - `first_seen_at`, `last_seen_at`: intervalo de observacao pelo extractor.
 - `is_preserved_missing`: o documento nao esta mais na fonte viva.
-- `account_id`: UUID do catalogo para ChatGPT e Claude.ai; permanece nulo sem
+- `account_id`: UUID do catalogo para ChatGPT, Claude.ai e Perplexity; permanece nulo sem
   identidade duravel observavel no CLI. Em Claude.ai, `project_key` registra o
   UUID do projeto quando a memoria pertence a um Project.
 
@@ -128,6 +128,21 @@ As capturas locais de 2026-09-25 cobrem 149 topicos nas duas contas, dos quais
 `data/external/claude-ai-snapshots` continua preservada sem ligacao presumida
 ao UUID do catalogo. Nao foi observada uma exclusao real de topico; a regra
 `is_preserved_missing` sera exercida por listas completas futuras.
+
+## Projecao web do Perplexity
+
+A colecao account Memory usa `KnowledgeContextKnowledgeRelayQuery` com paginas
+`memoryCategories[].items.edges[].node`. Cada pagina GraphQL inteira e
+preservada em raw com hash, cursor e captura datada. So uma paginacao completa,
+sem erro GraphQL, status nao-OK ou ID duplicado, pode estabelecer ausencias.
+`perplexity:<account_id>:<native_id>` identifica o registro; `displayValue`
+fornece o conteudo e `updatedAt` a evidencia nativa de atualizacao. A criacao
+e somente a primeira observacao. `sourceConversations` permanece metadado
+nativo, sem foreign key presumida. Brain, instrucoes de projeto, AI Profile e
+configuracoes de Memory nao sao registros dessa colecao.
+
+A primeira captura local de 2026-09-25 continha um registro e nao demonstrou
+mudanca nem remocao real; versoes e `preserved_missing` tem testes de contrato.
 
 ## Projecao web do ChatGPT
 

@@ -21,6 +21,7 @@ from playwright.async_api import BrowserContext, Page
 API_BASE = "https://www.perplexity.ai"
 HOME_URL = f"{API_BASE}/"
 LIBRARY_URL = f"{API_BASE}/library"
+MEMORY_QUERY_HASH = "2884580667156294c2dfab80de32b737ef7bdf1d2c765a1f37e45e0207afcc50"
 
 
 class PerplexityAPIClient:
@@ -119,6 +120,27 @@ class PerplexityAPIClient:
         path = f"{API_BASE}/rest/user/get_user_ai_profile?version=2.18&source=default"
         data = await self._fetch(path)
         return data if isinstance(data, dict) else {}
+
+    async def list_account_memory_page(self, after: str | None = None, first: int = 100) -> dict:
+        """Read the account Memory collection observed at /computer/memory.
+
+        The persisted-query hash is the UI's observed query identity. A server
+        schema change must fail visibly instead of becoming an empty collection.
+        """
+        body = {
+            "operationName": "KnowledgeContextKnowledgeRelayQuery",
+            "variables": {
+                "knowledgeFirst": None, "knowledgeAfter": None,
+                "memoriesFirst": first, "memoriesAfter": after,
+                "includeKnowledgePage": False, "includeMemoriesPage": True,
+                "includeContent": True, "includeOutboundLinks": True,
+            },
+            "extensions": {"persistedQuery": {"version": 1, "sha256Hash": MEMORY_QUERY_HASH}},
+        }
+        data = await self._fetch(f"{API_BASE}/rest/perplexity_ask/graphql", method="POST", body=body)
+        if not isinstance(data, dict):
+            raise ValueError("Malformed Perplexity memory GraphQL response")
+        return data
 
     async def list_user_pinned_assets(self, limit: int = 50) -> list[dict]:
         """Assets pinados pelo user. Mesmo schema que list_user_assets."""

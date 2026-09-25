@@ -42,6 +42,9 @@ from src.schema.models import (
     Conversation,
     Message,
     ToolEvent,
+    agent_memories_to_df,
+    agent_memory_versions_to_df,
+    agent_memory_temporal_evidence_to_df,
     asset_links_to_df,
     assets_to_df,
     branches_to_df,
@@ -153,6 +156,9 @@ class PerplexityParser(BaseParser):
         self.tool_events: list[ToolEvent] = []
         self.assets: list[Asset] = []
         self.asset_links: list[AssetLink] = []
+        self.agent_memories = []
+        self.agent_memory_versions = []
+        self.agent_memory_temporal_evidence = []
         self._asset_ids: set[str] = set()
         self._asset_link_ids: set[str] = set()
         self._entry_threads: dict[str, str] = {}
@@ -642,6 +648,9 @@ class PerplexityParser(BaseParser):
         branches_to_df(self.branches).to_parquet(out / "perplexity_branches.parquet", index=False)
         assets_to_df(self.assets).to_parquet(out / "perplexity_assets.parquet", index=False)
         asset_links_to_df(self.asset_links).to_parquet(out / "perplexity_asset_links.parquet", index=False)
+        agent_memories_to_df(self.agent_memories).to_parquet(out / "perplexity_agent_memories.parquet", index=False)
+        agent_memory_versions_to_df(self.agent_memory_versions).to_parquet(out / "perplexity_agent_memory_versions.parquet", index=False)
+        agent_memory_temporal_evidence_to_df(self.agent_memory_temporal_evidence).to_parquet(out / "perplexity_agent_memory_temporal_evidence.parquet", index=False)
 
         return {
             "conversations": len(self.conversations),
@@ -650,6 +659,9 @@ class PerplexityParser(BaseParser):
             "branches": len(self.branches),
             "assets": len(self.assets),
             "asset_links": len(self.asset_links),
+            "agent_memories": len(self.agent_memories),
+            "agent_memory_versions": len(self.agent_memory_versions),
+            "agent_memory_temporal_evidence": len(self.agent_memory_temporal_evidence),
             "output_dir": str(out),
         }
 

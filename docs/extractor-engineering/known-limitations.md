@@ -44,6 +44,15 @@ Limitations fall into 3 categories:
 
 ### Perplexity
 
+- **Account Memory:** a complete read-only native GraphQL page was validated
+  and projected into versioned memory tables. The persisted-query hash is an
+  observed internal API detail that may change; GraphQL errors or incomplete
+  pagination fail closed, leaving prior complete snapshots authoritative.
+  Older versions before the first capture cannot be reconstructed. The one
+  currently visible note is not evidence that Concepts, Entities, Workstreams
+  or project memory are empty across other accounts or entitlements. Brain,
+  project Instructions and settings controls are separate surfaces. See
+  [Perplexity state](platforms/web/perplexity/state.md).
 - **Archive — Enterprise-only:** the backend accepts the
   `archive_thread`/`unarchive_thread` requests on Pro accounts (200 success), but
   the archived state **is not exposed** on any listing visible on

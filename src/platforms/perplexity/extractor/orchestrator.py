@@ -13,6 +13,7 @@ from pathlib import Path
 from src.assets.vault import AssetVault
 from src.platforms.perplexity.extractor.auth import load_context
 from src.platforms.perplexity.extractor.api_client import PerplexityAPIClient
+from src.platforms.perplexity.extractor.account_memory import capture_account_memory
 from src.platforms.perplexity.extractor.discovery import discover, persist_discovery
 from src.platforms.perplexity.extractor.fetcher import fetch_threads
 from src.platforms.perplexity.extractor.refetch_known import refetch_known_perplexity
@@ -78,10 +79,23 @@ def _write_last_capture_md(output_dir: Path, log: dict) -> None:
         f"{totals.get('assets_downloaded', 0) + totals.get('assets_download_skipped', 0)} binarios em disco\n"
         f"- **Thread attachments:** {totals.get('thread_attachments_downloaded', 0)} dl, "
         f"{totals.get('thread_attachments_errors', 0)} irrecuperaveis (S3 cleanup upstream)\n"
-        f"- **Errors:** threads={totals.get('threads_errors', 0)}, spaces={totals.get('spaces_errors', 0)}\n\n"
+        f"- **Errors:** threads={totals.get('threads_errors', 0)}, spaces={totals.get('spaces_errors', 0)}\n"
+        f"- **Account Memory:** {log.get('memory_capture', {}).get('items', 0)} items, "
+        f"complete={log.get('memory_capture', {}).get('complete', False)}\n\n"
         "Ver `capture_log.jsonl` pro historico completo.\n"
     )
     (output_dir / "LAST_CAPTURE.md").write_text(md, encoding="utf-8")
+
+
+async def _capture_memory_safe(client: PerplexityAPIClient, output_dir: Path) -> dict:
+    try:
+        result = await capture_account_memory(client, output_dir)
+        return {key: str(value) if key == "snapshot" else value for key, value in result.items()}
+    except Exception as exc:
+        # Memory is a separate preservation domain; its failure must not
+        # invalidate an otherwise healthy conversation sync.
+        print(f"  warn account memory: {type(exc).__name__}")
+        return {"complete": False, "items": 0, "pages": 0, "error_type": type(exc).__name__}
 
 
 async def run_export(
@@ -110,6 +124,8 @@ async def run_export(
         page = await context.new_page()
         client = PerplexityAPIClient(context, page)
         await client.warmup()
+
+        memory_capture = await _capture_memory_safe(client, output_dir)
 
         threads = await discover(client, output_dir)
 
@@ -156,6 +172,7 @@ async def run_export(
                         "thread_attachments_errors": 0,
                     },
                     "errors": {"threads": [], "spaces": []},
+                    "memory_capture": memory_capture,
                     "fallback_reason": (
                         f"discovery_drop {drop:.0%} (curr={curr}, baseline={baseline})"
                     ),
@@ -304,6 +321,7 @@ async def run_export(
                 "thread_attachments_errors": len(att_stats.get("errors", [])),
             },
             "errors": {"threads": errs[:50], "spaces": spaces_errs[:20]},
+            "memory_capture": memory_capture,
         }
 
         # Append em capture_log.jsonl (historico cumulativo)

@@ -5,7 +5,7 @@ Some platforms have auxiliary tables beyond the 4 canonical ones
 
 - **NotebookLM**: sources, notes, outputs, guide_questions, source_guides, assets, asset links
 - **Qwen / Claude.ai**: project_metadata, project_docs
-- **Claude Code / Codex / Gemini CLI / ChatGPT / Claude.ai**: current memory/context records, immutable versions, temporal evidence
+- **Claude Code / Codex / Gemini CLI / ChatGPT / Claude.ai / Perplexity**: current memory/context records, immutable versions, temporal evidence
 - **Grok / Kimi / Qwen / Gemini / ChatGPT / Claude.ai / Perplexity**: assets and asset links (native catalogs and file structures; evidence-based placement)
 
 This section iterates over `AUX_TABLES` configured in the notebook setup.

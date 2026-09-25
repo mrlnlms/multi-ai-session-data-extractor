@@ -154,6 +154,17 @@ def test_claude_ai_memory_export_is_a_domain_record(tmp_path):
     assert {item.representation_kind for item in evidence} == {"memory_export"}
 
 
+def test_perplexity_account_memory_pages_are_domain_records(tmp_path):
+    data = tmp_path / "data"
+    snapshot = data / "raw" / "Perplexity" / "account-test" / "_account_memory" / "native" / "capture"
+    (snapshot / "pages").mkdir(parents=True)
+    (snapshot / "pages" / "0000.json").write_text("{}")
+    (snapshot / "capture.json").write_text("{}")
+    evidence = inventory_preserved_session_assets(data)
+    assert len(evidence) == 2
+    assert {item.representation_kind for item in evidence} == {"memory_export"}
+
+
 def test_notebooklm_note_materialization_is_an_asset_candidate(tmp_path):
     data = tmp_path / "data"
     path = data / "merged" / "NotebookLM" / "account-1" / "assets/notes/notebook_note.md"

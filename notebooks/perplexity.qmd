@@ -32,7 +32,8 @@ SOURCE_COLOR   = "#20808D"  # Perplexity teal
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Perplexity"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
-AUX_TABLES     = ["assets", "asset_links"]
+AUX_TABLES     = ["assets", "asset_links", "agent_memories", "agent_memory_versions",
+                  "agent_memory_temporal_evidence"]
 ACCOUNT_FILTER = None
 
 con = duckdb.connect()
@@ -44,6 +45,9 @@ _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_
 > extracted from `blocks[*].web_result_block.web_results` become tool_events.
 > `is_pinned` on threads, ENTRY_DELETED preserves orphans in spaces. Modes:
 > copilot/concise/research.
+> Account Memory is a separate native collection with complete paginated raw
+> snapshots, versioned records and native update-time evidence. Brain and
+> project instructions are not included in this memory table.
 
 {{< include _template.qmd >}}
 
