@@ -1,5 +1,22 @@
 # Qwen — technical coverage
 
+## Memory and instruction boundary — owner observation 2026-09-23
+
+- The account settings UI exposes a distinct **Memory** section with
+  **Manage**, **Reference saved memories**, and **Reference the chat history**.
+  Advanced controls separately expose **Retrieve historical memory** and
+  **Update memory**. This is direct product evidence of account-level native
+  memory capability; it is no longer classified as inferred personalization.
+- The management collection and its authenticated transport have not yet been
+  inspected or preserved. The toggles and tool capabilities prove the surface,
+  but are not substitutes for the individual memory records.
+- **Customize Qwen** is a separate candidate instruction surface. Its scope and
+  payload are not yet established. Existing project instructions and
+  `memory_span` remain project-scoped `project_context`; they must not be
+  promoted to account-global persistent instructions.
+- Chat history, saved native memories, account instructions and project context
+  remain four distinct representations even when Qwen can use them together.
+
 ## Pipeline
 
 - **Pastas cumulativas por conta:** todas as arvores duraveis raw/merged usam

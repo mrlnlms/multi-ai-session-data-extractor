@@ -10,6 +10,7 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright
 
+from src.platforms.chatgpt.extractor.account_memory import capture_account_memory
 from src.platforms.chatgpt.extractor.api_client import ChatGPTAPIClient
 from src.platforms.chatgpt.extractor.auth import get_profile_dir
 from src.platforms.chatgpt.extractor.discovery import discover_all
@@ -148,6 +149,8 @@ async def run_capture(
                         "stage": "refetch_known_fallback",
                         "count": stats["errors"],
                     })
+                if not options.dry_run:
+                    await capture_account_memory(client, output_dir, report)
                 await context.close()
                 _finalize_report(report, started_at)
                 _append_capture_log(output_dir, report)
@@ -295,20 +298,7 @@ async def run_capture(
             else:
                 report.voice_pass_counts = {"candidates": 0, "captured": 0}
 
-        # Memories + Instructions
-        try:
-            memories = await client.fetch_memories()
-            (output_dir / "chatgpt_memories.md").write_text(memories, encoding="utf-8")
-        except Exception as exc:
-            logger.warning(f"Memories fetch falhou: {exc}")
-
-        try:
-            instructions = await client.fetch_instructions()
-            (output_dir / "chatgpt_instructions.json").write_text(
-                json.dumps(instructions, ensure_ascii=False, indent=2), encoding="utf-8"
-            )
-        except Exception as exc:
-            logger.warning(f"Instructions fetch falhou: {exc}")
+        await capture_account_memory(client, output_dir, report)
 
         try:
             pinned_gizmos = await client.list_pinned_gizmos()

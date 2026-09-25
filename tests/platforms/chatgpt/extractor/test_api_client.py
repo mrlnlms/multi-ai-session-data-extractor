@@ -214,14 +214,22 @@ async def test_list_archived(mock_request_context, mock_api_response):
 
 
 async def test_fetch_memories(mock_request_context, mock_api_response):
+    payload = {"memories": [{"id": "m1", "content": "fact 1", "conversation_id": None,
+                             "created_timestamp": 123, "labels": ["test"],
+                             "unknown_field": {"nested": True}}], "extra": "preserve"}
     mock_request_context.get.return_value = mock_api_response(
         status=200,
-        json_data={"memories": [{"content": "fact 1"}, {"content": "fact 2"}]}
+        json_data=payload,
     )
     client = ChatGPTAPIClient(mock_request_context)
     memories = await client.fetch_memories()
-    assert "fact 1" in memories
-    assert "fact 2" in memories
+    assert memories == payload
+    mock_request_context.get.assert_called_with(
+        "https://chatgpt.com/backend-api/memories",
+        params={"include_memory_entries": "true"},
+        headers={"Authorization": "Bearer test-token"},
+        timeout=60_000,
+    )
 
 
 async def test_fetch_instructions(mock_request_context, mock_api_response):
@@ -232,6 +240,40 @@ async def test_fetch_instructions(mock_request_context, mock_api_response):
     client = ChatGPTAPIClient(mock_request_context)
     instructions = await client.fetch_instructions()
     assert instructions["about_user_message"] == "I'm a researcher"
+
+
+async def test_summary_stream_uses_empty_json_post_and_keeps_sse(mock_request_context, mock_api_response):
+    response = mock_api_response(status=200)
+    stream = 'event: done\ndata: {"sections": []}\n\ndata: [DONE]\n\n'
+    response.text.return_value = stream
+    mock_request_context.post.return_value = response
+    client = ChatGPTAPIClient(mock_request_context)
+    assert await client.fetch_memory_summary() == stream
+    response.json.assert_not_awaited()
+    mock_request_context.post.assert_called_once_with(
+        "https://chatgpt.com/backend-api/memories/about_you/summary/stream",
+        data="{}", headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        timeout=60_000,
+    )
+
+
+async def test_summary_stream_via_browser_page(mock_request_context, mocker):
+    page = mocker.AsyncMock()
+    stream = 'event: done\ndata: {"sections": []}\n\n'
+    page.evaluate.return_value = {"status": 200, "ok": True, "text": stream}
+    client = ChatGPTAPIClient(mock_request_context, page=page)
+    assert await client.fetch_memory_summary() == stream
+    assert page.evaluate.call_args.args[1]["method"] == "POST"
+    assert page.evaluate.call_args.args[1]["body"] == "{}"
+
+
+async def test_summary_checksum_preserves_unknown_fields(mock_request_context, mock_api_response):
+    payload = {"sourceChecksum": "source", "cachedGeneratedAtIso": None,
+               "isStale": True, "unknown": {"extra": True}}
+    mock_request_context.get.return_value = mock_api_response(status=200, json_data=payload)
+    client = ChatGPTAPIClient(mock_request_context)
+    assert await client.fetch_memory_summary_checksum() == payload
+    assert mock_request_context.get.call_args.args[0].endswith("/summary/checksum")
 
 
 async def test_list_projects_via_api_success(mock_request_context, mock_api_response):

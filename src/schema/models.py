@@ -383,16 +383,20 @@ class Branch:
 
 # === AgentMemory (Claude Code per-project, Codex global) ===
 
-VALID_MEMORY_KINDS = ("user", "feedback", "project", "reference", "index", "other")
+VALID_MEMORY_KINDS = (
+    "user", "feedback", "project", "reference", "index", "other",
+    "saved_memory", "project_memory", "memory_summary", "account_instructions", "legacy_export",
+)
 VALID_MEMORY_TIMESTAMP_CONFIDENCE = ("high", "medium", "low", "unknown")
 
 
 @dataclass
 class AgentMemory:
-    """Memory file gerada/lida pelo agente entre sessoes (Claude Code, Codex).
+    """Persistent memory/context document or exposed account-level record.
 
-    Vincula com Conversation via (source, project_path) — Claude Code tem
-    memory per-project; Codex tem memory global (project_path=NULL).
+    CLI scope may be project-local. Web identity includes account_id; project
+    topics also carry their native project UUID in project_key. Web kinds
+    distinguish saved/project entries, summaries, instructions and legacy exports.
     """
     memory_id: str
     source: str

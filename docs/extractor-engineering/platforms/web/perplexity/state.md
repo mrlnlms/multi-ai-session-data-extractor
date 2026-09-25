@@ -21,6 +21,50 @@ space files + assets/artifacts metadata + binary assets + thread
 attachments (with `failed_upstream_deleted` manifest for upstream S3
 cleanup) + user metadata (info, settings, ai_profile).
 
+### Project Brain, instructions and memory boundary — owner observation 2026-09-23
+
+- A Project exposes separate **Overview**, **Files**, **Brain**, and
+  **Settings** tabs. Its Brain can be created immediately or regenerated daily
+  from new **Computer sessions** in that Project. In the observed Project no
+  Brain had been created yet; the UI showed creation controls, not a preserved
+  Brain record.
+- Project Settings → Context exposes **Instructions** explicitly described as
+  custom instructions for the agent **in this project**, plus Files, Links and
+  Computer defaults. These instructions are project-scoped `project_context`,
+  not evidence of account-global persistent instructions.
+- Settings also exposes a distinct **Memory** subsection, but its contents were
+  not included in the observation. Its label alone does not establish record
+  shape, scope or equivalence to Perplexity account Memory.
+- Brain, Project Memory, project Instructions, Files/Links and ordinary
+  sessions remain separate surfaces even when Computer uses them together.
+
+### Account Memory — owner observation 2026-09-23
+
+- **Customize → Memory**, outside any Project, exposes account-global native
+  memory described as useful details remembered automatically across
+  conversations. The UI provides search and organizes records into Concepts,
+  Entities, Workstreams and Notes.
+- An individual Note was observed with a stable-looking label, a last-updated
+  age, a semantic heading and one factual item. This demonstrates a readable
+  record collection, not merely a feature toggle or inferred behavior. Personal
+  values are not reproduced in maintained documentation.
+- The UI presents **Brain** separately as an optional higher-tier mechanism
+  that improves memory daily from sessions and connectors. Brain must not be
+  collapsed into the ordinary account Memory collection.
+- Account **Memory settings** separately exposes **Use search history**, whose
+  description is reuse of previous searches for future questions. This is a
+  history-reuse control, not an individual native-memory record or a substitute
+  for the Memory collection.
+- The same settings view shows Brain behind a Max upgrade for the observed
+  account. It therefore proves the entitlement boundary and current
+  unavailability of account Brain, not an empty Brain payload. A separate
+  Computer → Memory navigation item was visible but its contents were not
+  observed and remain unclassified.
+- Current raw `ai_profile.json` and `settings.json` preserve profile/control
+  state but no demonstrated individual Memory collection. Its authenticated
+  read transport, native IDs, exact timestamps and lifecycle fields remain to
+  be captured.
+
 Reconciler: full preservation (orphans + ENTRY_DELETED), idempotent.
 Output in `data/merged/Perplexity/perplexity_merged_summary.json` +
 `LAST_RECONCILE.md` + `reconcile_log.jsonl`.

@@ -17,7 +17,8 @@ Cobertura:
 - Project metadata em Conversation.project_id + .project (nome)
 
 Output inclui data/processed/Claude.ai/{conversations,messages,tool_events,
-branches,project_metadata,project_docs,assets,asset_links}.parquet
+branches,project_metadata,project_docs,assets,asset_links,agent_memories,
+agent_memory_versions,agent_memory_temporal_evidence}.parquet
 
 A versao anterior (legacy MVP de 159 linhas) foi supersedida na promocao
 validada de 2026-05-01.
@@ -57,6 +58,9 @@ from src.schema.models import (
     Message,
     ProjectDoc,
     ToolEvent,
+    agent_memories_to_df,
+    agent_memory_versions_to_df,
+    agent_memory_temporal_evidence_to_df,
     asset_links_to_df,
     assets_to_df,
     branches_to_df,
@@ -95,6 +99,9 @@ class ClaudeAIParser(BaseParser):
         self.project_docs: list[ProjectDoc] = []
         self.assets: list[Asset] = []
         self.asset_links: list[AssetLink] = []
+        self.agent_memories = []
+        self.agent_memory_versions = []
+        self.agent_memory_temporal_evidence = []
         self._assets_by_id: dict[str, Asset] = {}
         self._asset_usage_types: dict[str, set[str]] = {}
         self._asset_link_ids: set[str] = set()
@@ -725,3 +732,9 @@ class ClaudeAIParser(BaseParser):
         asset_links_to_df(self.asset_links).to_parquet(
             output_dir / f"{self.source_name}_asset_links.parquet"
         )
+        for name, items, convert in (
+            ("agent_memories", self.agent_memories, agent_memories_to_df),
+            ("agent_memory_versions", self.agent_memory_versions, agent_memory_versions_to_df),
+            ("agent_memory_temporal_evidence", self.agent_memory_temporal_evidence, agent_memory_temporal_evidence_to_df),
+        ):
+            convert(items).to_parquet(output_dir / f"{self.source_name}_{name}.parquet", index=False)

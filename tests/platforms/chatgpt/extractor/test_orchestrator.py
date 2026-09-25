@@ -1,13 +1,16 @@
 """Testes do orchestrator — fluxo end-to-end com todos os módulos mockados."""
 
 import pytest
+import json
 from pathlib import Path
 
 from src.platforms.chatgpt.extractor.models import CaptureOptions, ConversationMeta
 from src.platforms.chatgpt.extractor.orchestrator import run_capture
 
 
-async def test_run_capture_produces_raw_file(tmp_path, mocker):
+@pytest.mark.parametrize("fallback", [False, True])
+@pytest.mark.parametrize("dry_run", [False, True])
+async def test_run_capture_produces_raw_file(tmp_path, mocker, fallback, dry_run):
     """Fluxo minimo: discovery retorna 2 convs → fetch baixa → salva raw.json."""
     # Mock do launch_persistent_context
     mock_context = mocker.AsyncMock()
@@ -48,8 +51,10 @@ async def test_run_capture_produces_raw_file(tmp_path, mocker):
 
     # Mock fetch_memories e fetch_instructions
     mock_client_inst = mocker.AsyncMock()
-    mock_client_inst.fetch_memories.return_value = "# Memories\n\n- fact 1"
+    mock_client_inst.fetch_memories.return_value = {"memories": [{"id": "m1", "content": "fact 1"}]}
     mock_client_inst.fetch_instructions.return_value = {"about_user": "dev"}
+    mock_client_inst.fetch_memory_summary_checksum.return_value = {"isStale": False}
+    mock_client_inst.fetch_memory_summary.return_value = 'event: done\ndata: {"sections": []}\n\n'
     mock_client_cls = mocker.patch(
         "src.platforms.chatgpt.extractor.orchestrator.ChatGPTAPIClient",
         return_value=mock_client_inst,
@@ -62,15 +67,36 @@ async def test_run_capture_produces_raw_file(tmp_path, mocker):
     )
 
     output_dir = tmp_path / "ChatGPT Data 2026-04-23"
-    options = CaptureOptions(skip_voice=False)
+    if fallback:
+        output_dir.mkdir()
+        (output_dir / "chatgpt_raw.json").write_text(json.dumps({"conversations": {"a": {"id": "a"}}}))
+        mocker.patch("src.platforms.chatgpt.extractor.orchestrator._get_max_known_discovery", return_value=20)
+        mocker.patch(
+            "src.platforms.chatgpt.extractor.orchestrator.refetch_known_via_page",
+            new_callable=mocker.AsyncMock,
+            return_value={"total": 1, "updated": 0, "errors": 0},
+        )
+    options = CaptureOptions(skip_voice=False, dry_run=dry_run)
     report = await run_capture(output_dir, options)
+
+    if dry_run:
+        mock_client_inst.fetch_memories.assert_not_awaited()
+        mock_client_inst.fetch_instructions.assert_not_awaited()
+        mock_client_inst.fetch_memory_summary.assert_not_awaited()
+        mock_client_inst.fetch_memory_summary_checksum.assert_not_awaited()
+        assert not (output_dir / "_account_memory").exists()
+        return
 
     assert (output_dir / "chatgpt_raw.json").exists()
     assert (output_dir / "chatgpt_memories.md").exists()
+    assert (output_dir / "chatgpt_memories.json").exists()
+    assert len(list((output_dir / "_account_memory").glob("*/*/capture.json"))) == 4
+    assert (output_dir / "chatgpt_memory_summary.json").exists()
     assert (output_dir / "chatgpt_instructions.json").exists()
     assert (output_dir / "capture_log.jsonl").exists()
     assert (output_dir / "LAST_CAPTURE.md").exists()
     assert report.discovery_counts["total"] == 1
+    assert report.mode == ("refetch_known_fallback" if fallback else "incremental")
     mock_page.goto.assert_awaited_once_with(
         "https://chatgpt.com/",
         wait_until="domcontentloaded",

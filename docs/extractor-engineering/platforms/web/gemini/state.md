@@ -81,9 +81,12 @@ their independent conversation JSON and asset manifests.
   its cumulative lifecycle even when the current upstream list becomes empty.
 - Instructions are classified as `persistent_instructions`, not learned
   `native_memory`. Their canonical/Parquet projection is deliberately deferred
-  until the equivalent exposed surfaces from ChatGPT, Claude.ai and other web
-  platforms can define a shared contract for scope, enabled state, native
-  identity, timestamps and deletion history.
+  until genuinely equivalent **account-global** exposed surfaces can define a
+  shared contract for scope, enabled state, native identity, timestamps and
+  deletion history. A project prompt or project-specific instruction from
+  another platform is not an equivalent merely because it influences later
+  answers; it belongs to `project_context` unless that platform demonstrates a
+  separate account-global instruction surface.
 - This deferral does not require another Gemini capture and does not make the
   raw coverage incomplete. The untouched snapshots and observations retain the
   fields needed for later schema design and deterministic reprocessing.

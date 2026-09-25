@@ -129,3 +129,19 @@ def test_drop_flag_ignores_refetch_known_modes():
         _run(datetime(2026, 5, 11, tzinfo=timezone.utc), 1168, mode="refetch_known"),
     ]
     assert discovery_drop_flag(_state("ChatGPT", runs)) is False
+def test_memory_stats_counts_kinds_and_versions_without_content(tmp_path):
+    import pandas as pd
+    from src.application.profiles import compute_memory_stats
+
+    documents = tmp_path / "chatgpt_agent_memories.parquet"
+    versions = tmp_path / "chatgpt_agent_memory_versions.parquet"
+    pd.DataFrame({"kind": ["saved_memory", "saved_memory", "account_instructions"],
+                  "is_preserved_missing": [False, True, False], "content": ["private"] * 3}).to_parquet(documents)
+    pd.DataFrame({"version_id": ["v1", "v2", "v3", "v4"]}).to_parquet(versions)
+    result = compute_memory_stats((documents, versions))
+    assert result["documents"] == 3 and result["versions"] == 4
+    assert result["by_kind"] == [
+        {"Type": "account_instructions", "Documents": 1, "Preserved missing": 0},
+        {"Type": "saved_memory", "Documents": 2, "Preserved missing": 1},
+    ]
+    assert "private" not in str(result)

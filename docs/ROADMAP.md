@@ -24,7 +24,7 @@ conflicts with the entry or the task requires a fresh verification.
 | Prevent asset-copy rematerialization | **Completed and published** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the retention audit as a diagnostic after future capture changes. |
 | Canonical account identity and analytical dimension | **Completed and published** | [Account architecture](product/account-architecture.md) | Preserve the UUID-only contract; treat memory/configuration as a separate front. |
 | CLI memory/configuration coverage | **Completed and published (2026-09-23)** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the demonstrated Claude Code/Codex/Gemini CLI contracts; revisit Antigravity Knowledge only if an inspectable native item or stable payload becomes available, and treat a future owner-created Project separately as project context. |
-| Web memory/configuration capability census | **Next front** | [ChatGPT state](extractor-engineering/platforms/web/chatgpt/state.md) | Inventory explicit product/API/export surfaces across web platforms, then choose one evidenced integration to deepen. |
+| Web memory/configuration capability census | **Active; ChatGPT and Claude.ai capture and canonical projection validated locally 2026-09-25** | [ChatGPT state](extractor-engineering/platforms/web/chatgpt/state.md), [Claude.ai state](extractor-engineering/platforms/web/claude-ai/state.md) | Both sources have raw history and versioned memory Parquets; publication remains pending. Keep native memory, account-global instructions and project context distinct for other sources. |
 
 Google Drive remains the active remote while alternatives are researched. This
 is not an active migration or a freeze of the normal capture/publish workflow.
@@ -76,9 +76,20 @@ CLI/manual identities. The first memory/configuration front is now complete:
 Claude Code and Codex durable representations are versioned, Gemini CLI context
 coverage is bounded, and Antigravity preserves its complete conversation
 `brain/` while keeping the product's unobserved Knowledge feature separate.
-The next front is a web capability census before choosing which account-memory
-integration to deepen. Scope must be discovered from captured evidence rather
-than assumed in advance.
+The active web front now includes ChatGPT's complete saved-memory/instruction
+JSON, summary SSE/final JSON/checksum and per-account capture history, validated
+in focused live collections for both configured accounts. These captures remain
+local and unpublished. ChatGPT now projects records, content versions and
+temporal evidence into the existing memory tables; dashboard and Quarto expose
+the added coverage. Claude.ai now captures the account and project Melange
+topic collection, with native IDs, per-topic reads, complete-list safeguards
+and versioned projection. Both local collections remain unpublished. Other web
+sources remain subject to the capability census.
+Scope must be discovered from captured
+evidence rather than assumed in advance. Native memory, account-global
+instructions and project-scoped prompts are separate surfaces: Gemini
+Instructions cannot be generalized from project definitions elsewhere, and
+NotebookLM sources/chat/generated assets are not memory or instructions.
 The asset front has since
 materialized that central physical home: `data/assets` and its preservation
 index are the published DVC-backed source for bytes, while `assets` and

@@ -4,6 +4,12 @@ NotebookLM is not a pure chat: each notebook is a workspace that produces up
 to 9 types of outputs (audio, blog, video, flashcards, quiz, data table,
 slide deck PDF+PPTX, infographic, mind map).
 
+For memory/configuration classification, a notebook contains sources, chat
+questions and answers, and generated assets. No separate account memory,
+persistent-instruction collection, reusable user profile or independent
+"project memory" object has been observed. Notebook scope organizes those
+native objects; it must not be treated as a memory or instructions surface.
+
 ## Pipeline
 
 - **Multi-account** — three compatibility-default active accounts (acc-1,

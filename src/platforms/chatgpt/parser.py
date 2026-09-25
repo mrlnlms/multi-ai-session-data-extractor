@@ -6,8 +6,10 @@ Cobertura:
   canvas, deep_research, custom_gpt vs project, tools (role=tool -> ToolEvent)
 - Preservation (is_preserved_missing, last_seen_in_server) derivados de
   _last_seen_in_server vs max conhecido no merged
+- Account saved memories, summaries and instructions with versions and temporal evidence
 
-Output: data/processed/ChatGPT/{conversations,messages,tool_events,branches,assets,asset_links}.parquet
+Output: source-prefixed conversation/asset Parquets and the three versioned
+agent-memory tables under data/processed/ChatGPT/.
 
 Historico: veio do parser v3, validado em 2026-04-28. As versoes anteriores
 (chatgpt_v2 MVP e chatgpt legacy GPT2Claude bookmarklet) foram supersedidas
@@ -26,6 +28,7 @@ import pandas as pd
 
 from src.assets.reader import AssetReader
 from src.parsing.base import BaseParser
+from src.platforms.chatgpt.memory_parser import parse_account_memory
 from src.platforms.chatgpt._parser_helpers import (
     classify_event_type,
     detect_canvas_signal,
@@ -47,6 +50,9 @@ from src.schema.models import (
     Conversation,
     Message,
     ToolEvent,
+    agent_memories_to_df,
+    agent_memory_versions_to_df,
+    agent_memory_temporal_evidence_to_df,
     asset_links_to_df,
     assets_to_df,
     branches_to_df,
@@ -73,6 +79,9 @@ class ChatGPTParser(BaseParser):
         self.asset_links: list[AssetLink] = []
         self._assets_by_id: dict[str, Asset] = {}
         self._asset_link_ids: set[str] = set()
+        self.agent_memories = []
+        self.agent_memory_versions = []
+        self.agent_memory_temporal_evidence = []
 
     @property
     def assets_root(self) -> Path:
@@ -95,6 +104,13 @@ class ChatGPTParser(BaseParser):
             self._extract_conv(conv_id, conv_data, last_run_date)
         self._record_preserved_file_assets()
         self.apply_asset_reader()
+        self.parse_account_memory()
+
+    def parse_account_memory(self) -> None:
+        result = parse_account_memory(self.raw_root, self.account_id)
+        self.agent_memories = result.memories
+        self.agent_memory_versions = result.versions
+        self.agent_memory_temporal_evidence = result.temporal_evidence
 
     @staticmethod
     def _compute_last_run_date(convs: dict) -> Optional[str]:
@@ -861,6 +877,9 @@ class ChatGPTParser(BaseParser):
             <output_dir>/chatgpt_branches.parquet
             <output_dir>/chatgpt_assets.parquet
             <output_dir>/chatgpt_asset_links.parquet
+            <output_dir>/chatgpt_agent_memories.parquet
+            <output_dir>/chatgpt_agent_memory_versions.parquet
+            <output_dir>/chatgpt_agent_memory_temporal_evidence.parquet
         """
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -886,3 +905,9 @@ class ChatGPTParser(BaseParser):
         asset_links_to_df(self.asset_links).to_parquet(
             output_dir / "chatgpt_asset_links.parquet", index=False,
         )
+        for name, items, convert in (
+            ("agent_memories", self.agent_memories, agent_memories_to_df),
+            ("agent_memory_versions", self.agent_memory_versions, agent_memory_versions_to_df),
+            ("agent_memory_temporal_evidence", self.agent_memory_temporal_evidence, agent_memory_temporal_evidence_to_df),
+        ):
+            convert(items).to_parquet(output_dir / f"chatgpt_{name}.parquet", index=False)

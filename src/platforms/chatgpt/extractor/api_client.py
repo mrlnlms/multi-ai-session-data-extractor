@@ -36,6 +36,9 @@ class _PageResponse:
     async def json(self) -> dict | list:
         return _json.loads(self._text)
 
+    async def text(self) -> str:
+        return self._text
+
 
 class ChatGPTAPIClient:
     """Client pras APIs internas do ChatGPT via Playwright request context."""
@@ -169,7 +172,8 @@ class ChatGPTAPIClient:
         *,
         json: Any = None,
         params: dict | None = None,
-    ) -> dict | list:
+        raw_text: bool = False,
+    ) -> dict | list | str:
         """Helper interno com retry em 429 + backoff.
 
         Raises:
@@ -226,6 +230,8 @@ class ChatGPTAPIClient:
 
             # NOTA: `response.ok` e property em Playwright APIResponse (confirmado em Task 0.1).
             if response.ok:
+                if raw_text:
+                    return await response.text()
                 return await response.json()
 
             if response.status in (401, 403):
@@ -410,18 +416,12 @@ class ChatGPTAPIClient:
         data = await self._request_with_retry("GET", url)
         return data.get("items") or []
 
-    async def fetch_memories(self) -> str:
-        """Retorna memories como markdown. API retorna JSON, convertemos pra .md."""
+    async def fetch_memories(self) -> dict:
+        """Return the complete native response, including entry metadata."""
         url = f"{BASE_URL}/memories"
-        data = await self._request_with_retry(
+        return await self._request_with_retry(
             "GET", url, params={"include_memory_entries": "true"}
         )
-        entries = data.get("memories") or data.get("memory_entries") or []
-        lines = ["# ChatGPT Memories\n"]
-        for entry in entries:
-            content = entry.get("content", "")
-            lines.append(f"- {content}")
-        return "\n".join(lines)
 
     async def fetch_instructions(self) -> dict:
         """Retorna custom instructions + account settings.
@@ -430,6 +430,19 @@ class ChatGPTAPIClient:
         """
         url = f"{BASE_URL}/user_system_messages"
         return await self._request_with_retry("GET", url)
+
+    async def fetch_memory_summary_checksum(self) -> dict:
+        """Return native summary cache metadata without forcing regeneration."""
+        return await self._request_with_retry(
+            "GET", f"{BASE_URL}/memories/about_you/summary/checksum"
+        )
+
+    async def fetch_memory_summary(self) -> str:
+        """Load the SSE summary using the same empty POST body as the UI."""
+        return await self._request_with_retry(
+            "POST", f"{BASE_URL}/memories/about_you/summary/stream",
+            json={}, raw_text=True,
+        )
 
 
     async def list_projects(self) -> list[ProjectMeta]:

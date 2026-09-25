@@ -37,6 +37,26 @@ the client therefore performs authenticated requests through `page.evaluate`
 when a headed page is available. The implementation uses explicit 60-second
 timeouts and browser-side metadata normalization for conversation listings.
 
+## Account memory summary stream (2026-09-24)
+
+The UI loads its summary with `POST /memories/about_you/summary/stream`
+under `/backend-api`, sending `{}` as JSON. It returns SSE events `started`,
+`section_types`, `section` and a structured `done`, followed by a separate
+`data: [DONE]` marker. The `done` payload supplies the final sections,
+`sourceChecksum`, `generatedAtIso` and `emptyStateMessage`; optional section
+`followUps` carry `preview`, `prompt` and `action`. Seven sections were observed
+in each configured account, not a protocol requirement.
+
+`GET /memories/about_you/summary/checksum` exposes `sourceChecksum`,
+`cachedSourceChecksum`, `cachedGeneratedAtIso` and `isStale`. In one non-stale
+account its response was unchanged before/after opening the summary. The
+effect of loading a stale summary on server cache remains unverified. The
+collector uses the observed empty request without forcing regeneration or
+submitting memory edits. Saved-memory entries remain a separate response at
+`GET /memories?include_memory_entries=true`.
+
+See [the capture contract and validation](state.md) for raw history and limits.
+
 ## `/projects` intermittent 404
 
 Legacy fallback remains `/gizmos/discovery/mine` -> DOM scrape.

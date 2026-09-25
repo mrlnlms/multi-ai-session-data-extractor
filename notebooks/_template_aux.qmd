@@ -5,7 +5,7 @@ Some platforms have auxiliary tables beyond the 4 canonical ones
 
 - **NotebookLM**: sources, notes, outputs, guide_questions, source_guides, assets, asset links
 - **Qwen / Claude.ai**: project_metadata, project_docs
-- **Claude Code / Codex / Gemini CLI**: current agent memories, immutable versions, temporal evidence
+- **Claude Code / Codex / Gemini CLI / ChatGPT / Claude.ai**: current memory/context records, immutable versions, temporal evidence
 - **Grok / Kimi / Qwen / Gemini / ChatGPT / Claude.ai / Perplexity**: assets and asset links (native catalogs and file structures; evidence-based placement)
 
 This section iterates over `AUX_TABLES` configured in the notebook setup.
@@ -116,27 +116,28 @@ AUX_CONFIG = {
         },
     },
     "agent_memories": {
-        "title": "Agent Memory Files",
+        "title": "Agent Memory and Account Context",
         "id_col": "memory_id",
         "desc": "Current projection of derived memory documents. Consult version and temporal-evidence tables before treating historical dates as known.",
         "fields": {
-            "memory_id": "Stable ID (`source:relative_path`)",
-            "relative_path": "Full path relative to the CLI memory root",
+            "memory_id": "Stable source identity; web IDs include account UUID and native record/surface",
+            "relative_path": "CLI relative path or web raw capture locator (optional JSON pointer)",
             "current_version_id": "Current immutable content version",
             "first_seen_at": "First extractor observation, when known",
             "last_seen_at": "Most recent extractor observation",
-            "source": "Source CLI (`claude_code` or `codex`)",
+            "source": "Source platform or CLI",
+            "account_id": "Immutable web account UUID; NULL when unobserved",
             "project_path": "Decoded cwd (NULL for global Codex memories)",
-            "project_key": "Encoded-cwd raw, e.g. `-Users-x-proj`",
-            "file_name": "Markdown file name",
+            "project_key": "CLI encoded cwd or Claude.ai native project UUID for project memories",
+            "file_name": "Native capture or memory file name",
             "name": "Frontmatter `name` field",
             "description": "Frontmatter `description` field",
-            "kind": "user / feedback / project / reference / index / other",
-            "content": "Markdown content (frontmatter included)",
+            "kind": "CLI kind, saved_memory, project_memory, memory_summary, account_instructions or legacy_export",
+            "content": "Native text; complete normalized JSON for web summary/instructions",
             "content_size": "Bytes in content (UTF-8 encoded)",
             "created_at": "Best effective creation date; inspect basis/confidence on the version",
             "updated_at": "Best effective update date",
-            "is_preserved_missing": "True if file was deleted from home but kept in raw",
+            "is_preserved_missing": "Absent from a complete source observation, retained in history",
         },
     },
     "agent_memory_versions": {
@@ -147,8 +148,8 @@ AUX_CONFIG = {
             "version_id": "Memory ID plus content SHA-256",
             "memory_id": "Owning logical document",
             "relative_path": "Full source-relative path",
-            "content_sha256": "SHA-256 of the exact Markdown bytes",
-            "source_modified_at": "Observed source mtime; not a creation date",
+            "content_sha256": "SHA-256 of the exact projected UTF-8 content",
+            "source_modified_at": "Native update timestamp or observed CLI source mtime",
             "source_birth_at": "Observed filesystem birth time when available",
             "first_seen_at": "First observation of this content",
             "last_seen_at": "Latest observation of this content",

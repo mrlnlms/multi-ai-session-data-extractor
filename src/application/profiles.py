@@ -53,6 +53,25 @@ class PlatformMetrics:
     project_sources: Optional[ProjectSourcesStats] = None
 
 
+def compute_memory_stats(parquet_paths: tuple[Path, ...]) -> dict:
+    """Count memory/context kinds and versions without returning personal text."""
+    import pandas as pd
+
+    kinds: Counter = Counter()
+    preserved: Counter = Counter()
+    versions = 0
+    for path in parquet_paths:
+        if path.name.endswith("_agent_memories.parquet"):
+            frame = pd.read_parquet(path, columns=["kind", "is_preserved_missing"])
+            kinds.update(frame["kind"].value_counts().to_dict())
+            preserved.update(frame.loc[frame["is_preserved_missing"].fillna(False), "kind"].value_counts().to_dict())
+        elif path.name.endswith("_agent_memory_versions.parquet"):
+            versions += len(pd.read_parquet(path, columns=["version_id"]))
+    return {"documents": sum(kinds.values()), "versions": versions,
+            "by_kind": [{"Type": kind, "Documents": count, "Preserved missing": preserved[kind]}
+                        for kind, count in sorted(kinds.items())]}
+
+
 def _to_datetime(ts) -> Optional[datetime]:
     """Aceita epoch float ou string ISO (servidor ChatGPT retorna ISO)."""
     if ts is None:

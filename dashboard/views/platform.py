@@ -20,6 +20,7 @@ from src.application.profiles import (
     compute_merged_stats,
     compute_account_summary,
     compute_processed_stats,
+    compute_memory_stats,
     compute_project_sources_stats,
     discovery_drop_flag,
 )
@@ -37,6 +38,11 @@ def _cached_merged_stats(merged_path_str: str, mtime: float):
 @st.cache_data(show_spinner=False)
 def _cached_processed_stats(parquet_path_str: str, mtime: float):
     return compute_processed_stats(Path(parquet_path_str))
+
+
+@st.cache_data(show_spinner=False)
+def _cached_memory_stats(signatures: tuple[tuple[str, int], ...]):
+    return compute_memory_stats(tuple(Path(path) for path, _ in signatures))
 
 
 @st.cache_data(show_spinner=False)
@@ -313,6 +319,14 @@ def _render_qmd_row(state: PlatformState, qmd, label_suffix: str) -> None:
 
 def _render_metrics(state: PlatformState) -> None:
     st.subheader("Captured content")
+    if state.processed_dir is not None:
+        paths = sorted([*state.processed_dir.glob("*_agent_memories.parquet"),
+                        *state.processed_dir.glob("*_agent_memory_versions.parquet")])
+        if paths:
+            memory = _cached_memory_stats(tuple((str(path), path.stat().st_mtime_ns) for path in paths))
+            if memory["documents"]:
+                with st.expander(f"Memory and instructions: {memory['documents']} documents, {memory['versions']} versions"):
+                    st.dataframe(pd.DataFrame(memory["by_kind"]), hide_index=True, width="stretch")
     parquet = state.conversations_parquet_path
     if parquet is not None:
         merged = _cached_processed_stats(str(parquet), parquet.stat().st_mtime)

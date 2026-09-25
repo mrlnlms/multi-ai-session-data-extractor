@@ -49,8 +49,8 @@ canonical parsing, and descriptive visualization (Quarto):
 
 | Source | Type | Coverage |
 |---|---|---|
-| **ChatGPT** | web | branches, voice, DALL-E, projects, custom GPT |
-| **Claude.ai** | web | thinking, tool use+MCP, project_docs with inline content |
+| **ChatGPT** | web | branches, voice, DALL-E, projects, custom GPT; [saved memories, summary and instructions with raw history and versioned Parquets](docs/extractor-engineering/platforms/web/chatgpt/state.md) |
+| **Claude.ai** | web | thinking, tool use+MCP, project_docs with inline content; [account and project memory topics with raw history and versioned Parquets](docs/extractor-engineering/platforms/web/claude-ai/state.md) |
 | **Perplexity** | web | threads + pages + spaces + 9 artifact types |
 | **Qwen** | web | 8 chat types (search, research, dalle, etc.), projects |
 | **DeepSeek** | web | R1 reasoning (thinking in ~31% of msgs), token usage |

@@ -32,7 +32,8 @@ SOURCE_COLOR   = "#CC785C"  # Anthropic burnt orange
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "Claude.ai"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
-AUX_TABLES     = ["project_metadata", "project_docs", "assets", "asset_links"]
+AUX_TABLES     = ["project_metadata", "project_docs", "assets", "asset_links",
+                  "agent_memories", "agent_memory_versions", "agent_memory_temporal_evidence"]
 ACCOUNT_FILTER = None
 
 con = duckdb.connect()
@@ -46,6 +47,9 @@ _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_
 > `attachments_json` with extracted_content inline, `start/stop_timestamp`
 > (~98% latency), projects with `project_metadata` + `project_docs`
 > (546 docs / 23M chars).
+> Native account and project memory topics are preserved separately with
+> content versions and temporal evidence. Historical classic Markdown remains
+> an opaque legacy export.
 
 {{< include _template.qmd >}}
 

@@ -19,6 +19,68 @@
 Conversations + projects discovered and captured via standard discovery.
 Automatic recovery from transient timeouts via `python -m src.platforms.claude_ai.commands.refetch_known`.
 
+### Memory and instruction boundary — owner observation 2026-09-23
+
+- Claude's **Memory** settings expose account memory generated from chats as
+  editable/deletable topic records such as Preferences, Profile and other
+  topical facts, each with an update date. **Preferences** is a memory topic;
+  it is not evidence of a separate account-global instructions surface.
+- The same Memory screen exposes distinct project-scoped memory groups and
+  editable/deletable topic records within each Project. These are native
+  project memories, separate from each project's configured prompt/knowledge.
+- The Project UI confirms that separation directly by rendering three
+  independent sections side by side: **Instructions** (response guidance),
+  **Memory** (what Claude remembers from chats, with its own management entry),
+  and **Context** (uploaded project files/capacity). Conversations remain a
+  fourth project object. These surfaces must retain separate provenance even
+  though Claude combines them while answering inside the Project.
+- The observed Project UI also announced migration to a new memory system and
+  offered a time-limited export of legacy project memory. This establishes a
+  product transition, not permission to replace preserved historical project
+  memory with the new representation.
+- Account and project memory generation can be enabled, sensitive-topic
+  inclusion is controlled separately, and memory import from other AI
+  providers is offered. No separate account-global persistent-instructions
+  editor was observed.
+- The earlier extractor wrote one overwritten `claude_ai_memory.md` string.
+  That representation remains preserved as an opaque legacy export; the current
+  collector uses the native topic collection described below.
+
+### Native Memory capture and canonical projection — validated 2026-09-25
+
+- Both configured accounts expose `memory_mode=melange`. The Memory screen
+  issues `POST /api/organizations/{org}/melange/list` with `{}` and
+  `POST /api/organizations/{org}/melange/read` with `{"path": ...}` for a
+  topic. `GET /api/organizations/{org}/memory/settings` supplies the mode.
+  The older `GET .../memory` still returns one classic Markdown field and is
+  not the native topic list.
+- The list has native `memory_id`, `path`, `category_id`, `display_name`,
+  `description`, `updated_at` and category metadata. Each read has native
+  `content`, `version`, `updated_at` and parsed metadata. List identity remains
+  authoritative: a read response can return an empty `memory_id`.
+- The `projects` category uses `/projects/<project UUID>/...` paths. Other
+  categories are account-scoped topics. Project memory is stored as
+  `project_memory` with that UUID in `project_key`; it is distinct from each
+  project's `prompt_template` and docs. A memory may still be listed for a
+  project no longer in the current project listing.
+- Normal and discovery-fallback syncs now preserve an immutable per-account
+  `_account_memory/melange/<capture>/` snapshot: full list, mode settings,
+  every read response and a SHA-256 manifest. All reads and `melange` mode are
+  required for a complete snapshot. Partial reads or a mode change cannot mark
+  prior topics absent. The previous Markdown file is no longer overwritten.
+- Live focused capture returned 130 topics in the default account and 19 in
+  the second, with zero read errors: 25 account topics and 124 project topics.
+  Canonical parse materialized 149 native topics plus 2 opaque legacy Markdown
+  exports, 151 content versions and 300 temporal evidence rows. Unify contains
+  these in the shared three memory tables. Native `updated_at` is retained;
+  creation is first observation because no native creation field was seen.
+- Topic edit/delete controls are visible in the UI, but no upstream mutation
+  was performed. Future complete lists can establish `is_preserved_missing`;
+  the current capture has zero missing topics. The three dated
+  `data/external/claude-ai-snapshots` are earlier structured/classic states;
+  their native account identifier has not been proven to match a catalog UUID,
+  so they are retained separately rather than attributed to either live account.
+
 Binaries + artifacts (code/markdown/html/react via `tool_use`) extracted
 during asset download.
 
@@ -110,6 +172,8 @@ legacy `account` label and all existing native IDs remain unchanged.
   (`docs_count` + `files_count` + `prompt_template`).
 - **Project docs** in `claude_ai_project_docs.parquet` (inline content,
   queryable).
+- **Memory topics** in three `claude_ai_agent_memory*.parquet` tables, read
+  from verified raw snapshots independently of the merged conversations.
 
 ### v3.1 gap-fill
 

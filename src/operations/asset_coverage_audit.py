@@ -135,6 +135,14 @@ def _kind_for_file(path: Path, source_root: Path, source: str) -> str:
     logical = PurePosixPath(_logical_rel(path, source_root))
     lower_name = logical.name.lower()
     parts = {part.lower() for part in logical.parts}
+    if source in {"ChatGPT", "Claude.ai"} and "_account_memory" in parts:
+        return "memory_export"
+    if source == "ChatGPT" and lower_name in {
+            "chatgpt_memories.json", "chatgpt_instructions.json",
+            "chatgpt_memory_summary.json", "chatgpt_memory_summary.sse",
+            "chatgpt_memory_summary_checksum.json",
+        }:
+        return "memory_export"
     if source in {"ChatGPT", "Claude.ai"} and lower_name in {
         "chatgpt_memories.md", "claude_ai_memory.md",
     }:

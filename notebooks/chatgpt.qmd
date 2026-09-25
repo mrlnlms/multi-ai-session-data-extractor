@@ -32,7 +32,7 @@ SOURCE_COLOR   = "#74AA9C"  # ChatGPT green
 MUTED          = "#D1D5DB"
 PROCESSED      = _project_root / "data" / "processed" / "ChatGPT"
 TABLES         = ["conversations", "messages", "tool_events", "branches"]
-AUX_TABLES     = ["assets", "asset_links"]
+AUX_TABLES     = ["assets", "asset_links", "agent_memories", "agent_memory_versions", "agent_memory_temporal_evidence"]
 ACCOUNT_FILTER = None
 
 con = duckdb.connect()
@@ -43,7 +43,8 @@ _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_
 > tree-walk (preserves off-path branches), voice (with direction in/out),
 > DALL-E (in ToolEvent), uploads (in Message), tether_quote, canvas,
 > deep_research, custom_gpt vs project distinction, preservation
-> (`is_preserved_missing`, `last_seen_in_server`).
+> (`is_preserved_missing`, `last_seen_in_server`), and versioned account
+> memories, summaries and instructions with explicit temporal evidence.
 
 {{< include _template.qmd >}}
 

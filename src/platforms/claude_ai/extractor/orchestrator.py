@@ -17,6 +17,7 @@ from pathlib import Path
 
 from src.platforms.claude_ai.extractor.auth import load_context
 from src.platforms.claude_ai.extractor.api_client import ClaudeAPIClient
+from src.platforms.claude_ai.extractor.account_memory import capture_account_memory
 from src.platforms.claude_ai.extractor.discovery import discover, persist_discovery
 from src.platforms.claude_ai.extractor.fetcher import fetch_conversations, fetch_projects
 from src.platforms.claude_ai.extractor.refetch_known import refetch_known_claude_ai
@@ -103,10 +104,29 @@ def _write_last_capture_md(output_dir: Path, log: dict) -> None:
         f"{totals.get('projects_fetched', 0)} fetched, "
         f"{totals.get('projects_skipped_existing', 0)} skipped\n"
         f"- **Errors:** convs={totals.get('conversations_errors', 0)}, "
-        f"projects={totals.get('projects_errors', 0)}\n\n"
+        f"projects={totals.get('projects_errors', 0)}\n"
+        f"- **Memory:** {log.get('memory_capture', {}).get('status', 'not_attempted')} "
+        f"({log.get('memory_capture', {}).get('topics', 0)} topics)\n\n"
         "Ver `capture_log.jsonl` pro historico completo.\n"
     )
     (output_dir / "LAST_CAPTURE.md").write_text(md, encoding="utf-8")
+
+
+async def _capture_memory_safe(client: ClaudeAPIClient, output_dir: Path) -> dict:
+    """Keep conversation capture independent, but record memory coverage durably."""
+    try:
+        result = await capture_account_memory(client, output_dir)
+        status = "complete" if result["complete"] else "incomplete"
+        summary = {"status": status, "topics": result["topics"],
+                   "failed_reads": result["failed_reads"],
+                   "settings_error": result["settings_error"]}
+        print(f"Memory: {summary['topics']} topics; status={status}")
+        return summary
+    except Exception as exc:
+        error_type = type(exc).__name__
+        logger.warning("Claude memory capture failed (%s)", error_type)
+        return {"status": "error", "topics": 0, "failed_reads": 0,
+                "error_type": error_type}
 
 
 async def run_export(
@@ -166,16 +186,8 @@ async def run_export(
                 )
                 stats = await refetch_known_claude_ai(client, output_dir)
 
-                # Memory tentativa best-effort (igual ao fluxo normal)
-                memory_chars = 0
-                try:
-                    memory_text = await client.get_memory()
-                    memory_chars = len(memory_text)
-                    (output_dir / "claude_ai_memory.md").write_text(
-                        memory_text, encoding="utf-8"
-                    )
-                except Exception as e:
-                    print(f"Memory fetch falhou: {e}")
+                # Memory is independent of conversation discovery.
+                memory_capture = await _capture_memory_safe(client, output_dir)
 
                 finished_at = datetime.now(timezone.utc)
                 log = {
@@ -185,6 +197,7 @@ async def run_export(
                     "mode": "refetch_known_fallback",
                     "smoke_limit": smoke_limit,
                     "headless": headless,
+                    "memory_capture": memory_capture,
                     "totals": {
                         "conversations_discovered": stats["total"],
                         "conversations_fetched": stats["updated"],
@@ -282,15 +295,8 @@ async def run_export(
             client, projs_to_fetch, output_dir, concurrency=3, skip_existing=False
         )
 
-        # Memory (preferences/instructions remembered across sessions)
-        memory_chars = 0
-        try:
-            memory_text = await client.get_memory()
-            memory_chars = len(memory_text)
-            (output_dir / "claude_ai_memory.md").write_text(memory_text, encoding="utf-8")
-            print(f"Memory: {memory_chars} chars")
-        except Exception as e:
-            print(f"Memory fetch falhou: {e}")
+        # Native account and project memories, independent of conversations.
+        memory_capture = await _capture_memory_safe(client, output_dir)
 
         # Build log
         log = {
@@ -300,6 +306,7 @@ async def run_export(
             "mode": "full" if full else "incremental",
             "smoke_limit": smoke_limit,
             "headless": headless,
+            "memory_capture": memory_capture,
             "totals": {
                 "conversations_discovered": len(disc["conversations"]),
                 "conversations_fetched": conv_ok,

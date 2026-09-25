@@ -16,6 +16,141 @@
   rglob, 20% threshold (aborts before save if current discovery is <80% of
   the largest historical value).
 
+## Memory and personalization — capture validated locally (2026-09-24)
+
+User-provided screenshots of Settings > Personalization show separate controls
+for response style and characteristics, custom instructions and profile fields
+(nickname, occupation and "More about you"), and an "Enable memory" switch.
+The interface says memory may use chats, files and connected apps, and shows a
+"Memory summary" with a Manage action plus a separate link to saved memories.
+Settings > Storage lists files and images separately; the screenshots do not
+establish that those storage totals represent memory content.
+
+The opened "Memory summary" is a structured narrative with an update indicator,
+an "Ask or update" input and "Dive Deeper" links. Its About memory explanation
+says ChatGPT automatically remembers information and keeps it up to date, and
+that this page is a brief overview rather than a complete list. The screenshots
+do not show the complete saved-memory list. The destinations and provenance of
+the "Dive Deeper" links are unverified; their appearance alone does not
+establish links to source conversations. Personal content visible in the
+screenshots is intentionally omitted here.
+
+The extractor calls `GET /backend-api/memories` with
+`include_memory_entries=true` and preserves the complete decoded response in
+`chatgpt_memories.json`, including unknown fields and native IDs/timestamps.
+`chatgpt_memories.md` is a derived readable export. The response from
+`GET /backend-api/user_system_messages` remains in `chatgpt_instructions.json`.
+
+Each successful surface capture also writes an immutable snapshot under the
+account's raw directory at
+`_account_memory/<saved_memories|instructions|summary_checksum|summary>/`.
+Each snapshot directory contains the exports and `capture.json`: capture time
+in UTC, completeness, request method/path/parameters or JSON body, and SHA-256
+hashes. The JSON preserves
+the decoded payload, not HTTP wire formatting. Native timestamps remain in
+the payload and are not replaced by the capture time. Repeated observations,
+including unchanged or explicitly empty memory lists, have separate snapshots.
+
+Before refreshing current exports, their previous bytes are preserved by hash
+under `_account_memory/prior_exports/<filename>/<sha256>`. This also protects
+pre-existing exports whose original capture date is unknown; no date or native
+metadata is reconstructed from those files. Each snapshot is published before
+the current exports are individually replaced atomically. Previous snapshots
+are never deleted when upstream entries disappear. This is raw historical
+evidence; the canonical parser derives per-entry `is_preserved_missing` from
+the latest complete saved-memory snapshot.
+
+Surface failures are independent and appear in the capture
+report without response bodies. Failed requests and malformed memory-list
+responses leave previous exports intact. Account captures also run on the
+conversation-discovery fallback, except in dry-run mode. Automated tests cover
+lossless fields, updates/removals/empty lists, legacy exports, account isolation,
+fetch/write failures, incomplete summary streams and both orchestrator paths.
+The parser projects the records into the three existing `AgentMemory` tables,
+with distinct kinds for saved entries, summaries, instructions and legacy
+exports. See [the memory contract](../../../../product/agent-memory-architecture.md).
+
+The collector loads the summary using
+`POST /backend-api/memories/about_you/summary/stream` with an empty JSON body,
+matching the observed UI request. It preserves the decoded SSE text as
+`chatgpt_memory_summary.sse` and the complete native `done` event payload as
+`chatgpt_memory_summary.json`. Unknown fields and `followUps` remain intact;
+there is no fixed section count or inferred link to source conversations.
+`GET /backend-api/memories/about_you/summary/checksum` is captured independently
+before loading the stream, as `chatgpt_memory_summary_checksum.json`; it is an
+observation at that time, not a guarantee about the stream's eventual cache
+state. No force-refresh flag or memory-edit request is submitted.
+
+Returned streams without a valid, delimited `done` event, or with an error
+event, are retained in a summary snapshot with `complete=false`; they produce
+a capture error and do not replace the latest complete summary exports.
+The protocol's trailing `data: [DONE]` marker is distinct from its structured
+`event: done`. SSE comments, CRLF and multiline data are handled.
+
+Focused live collection on 2026-09-24 validated the new writer in both configured
+accounts: 132 and 17 saved entries respectively, with native IDs retained,
+instructions, checksum and seven summary sections per account. All six current
+exports per account matched their snapshot hashes; earlier exports and the
+preceding saved-memory/instruction snapshots remained byte-for-byte intact.
+The summary source checksum matched the preceding checksum response in both
+accounts. This was a memory-only collection; it did not refetch conversations.
+The subsequent parser/unify integration materialized these records locally.
+The captured data and derived Parquets remain unpublished.
+
+### Canonical memory projection (validated 2026-09-25)
+
+Both accounts produce 149 saved-memory documents, two account-instruction
+documents and two summaries. IDs include the immutable account UUID; entry
+identity uses the native memory ID. Repeated captures reuse content versions,
+while retaining separate timestamp/provenance evidence. The parser validates
+snapshot hashes, preserves disappeared entries and refuses malformed complete
+history. Legacy exports with unknown dates remain queryable without inventing
+native IDs or creation dates. The current archive has no distinct-content
+changes between the retained observations; change/removal cases are tested
+with synthetic fixtures.
+
+The three new ChatGPT outputs are `chatgpt_agent_memories.parquet`,
+`chatgpt_agent_memory_versions.parquet` and
+`chatgpt_agent_memory_temporal_evidence.parquet`. Unify includes them in the
+existing cross-platform memory tables. The dashboard displays counts by kind,
+and the ChatGPT Quarto profile includes documents, versions and temporal
+evidence. No existing conversation or asset Parquet content changed during
+this integration.
+
+The three ChatGPT Parquets reproduce byte-for-byte from the same raw inputs;
+their unified rows retain timestamp precision and all raw evidence locators
+resolve. Memory-table unification normalizes temporal columns to UTC
+nanoseconds to avoid truncation when CLI microsecond columns and null columns
+are concatenated with web timestamps.
+
+An authenticated, shape-only browser observation on 2026-09-24 established the
+following for the two configured accounts; counts are point-in-time, not a
+coverage guarantee:
+
+| UI/network surface | Observed contract |
+|---|---|
+| Saved-memory entries | `GET /backend-api/memories?include_memory_entries=true` returned 132 entries in one account and 17 in the other. The first entry in each had `id`, `content`, `conversation_id`, `gizmo_id`, `created_timestamp`, `last_updated`, `updated_at`, `status` and `labels` keys. Field presence does not establish non-null values or a verified conversation link. A plain `GET /backend-api/memories` returned an empty `memories` array in the observed UI flow. |
+| Memory summary | Opening Manage in the second account caused the UI to call `POST /backend-api/memories/about_you/summary/stream` and `GET /backend-api/memories/about_you/summary/checksum`. The checksum response had `sourceChecksum`, `cachedSourceChecksum`, `cachedGeneratedAtIso` and `isStale` keys. No memory-edit control was submitted. |
+| Account instructions | `GET /backend-api/user_system_messages` returned fields for user/about-model messages, name, role, traits and enabled state. Their values were not logged. |
+
+The summary route returned `text/event-stream` in a subsequent observation. Its
+events were `started`, `section_types`, seven `section` events, and `done`.
+Their JSON payloads exposed `generatedAtIso`, `sourceChecksum`, and structured
+`sections` with `id`, `title`, `description`, and optional `followUps` entries
+(`preview`, `prompt`, `action`). Seven sections describe this observed response,
+not a fixed schema requirement. A subsequent UI check observed the same checksum
+response, including its generated timestamp, before and after opening the panel
+in one account; `isStale` was false both times. This does not establish behavior
+for stale caches. The shape-only observations logged event names, field names,
+types and counts, not summary text; later collection preserved the native text
+only in the account's raw data.
+
+This directly separates the saved-entry response from the summary-loading
+requests in the observed account. The extractor now preserves the original
+saved-entry JSON, summary response and checksum separately. The UI's memory
+switch and the "Dive Deeper" destinations remain unverified at the endpoint
+level. No memory text or credentials were copied into public documentation.
+
 ## Validated CRUD scenarios
 
 | Scenario | Result |
@@ -40,7 +175,8 @@ legacy `account` label and all existing native IDs remain unchanged.
 
 `src/platforms/chatgpt/parser.py` (`ChatGPTParser`, `source_name="chatgpt"`).
 Output in `data/processed/ChatGPT/`: conversations, messages, tool_events,
-branches, assets and asset_links Parquets.
+branches, assets, asset_links, agent_memories, agent_memory_versions and
+agent_memory_temporal_evidence Parquets.
 
 ### Coverage
 
@@ -76,8 +212,8 @@ branches, assets and asset_links Parquets.
   links.
 - Project `_files.json` indexes and Canvas operation records remain preserved
   outside the Asset domain; their reconstructable successful Canvas states are
-  Assets. Account memory exports remain preserved for the separately planned
-  memory/configuration domain and are not Assets.
+  Assets. Account memories, summaries and instructions are projected into the
+  separate versioned `AgentMemory` domain and are not Assets.
 - **Tether quote**, **canvas**, **deep_research**.
 - **Custom GPT vs project** distinguished.
 - **Preservation** via `is_preserved_missing` + `last_seen_in_server`.

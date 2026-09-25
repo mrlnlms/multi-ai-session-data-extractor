@@ -2,8 +2,9 @@
 
 ## Objetivo
 
-Preservar as memorias mantidas por agentes CLI como documentos derivados e
-consultaveis, sem confundi-las com as conversas que lhes deram origem. O
+Preservar as memorias mantidas por agentes CLI e as memorias/instrucoes
+explicitamente expostas por plataformas web como registros consultaveis,
+com tipo e proveniencia separados das conversas que lhes deram origem. O
 contrato deve capturar todas as versoes observadas daqui para frente e permitir
 reconstruir o passado quando houver evidencia, sempre registrando a base e a
 confianca de cada inferencia.
@@ -25,7 +26,7 @@ confianca de cada inferencia.
 ## Modelo conceitual
 
 ```text
-fonte viva (~/.codex, ~/.claude ou memoria hierarquica do Gemini CLI)
+fonte viva (arquivos CLI ou respostas nativas de memoria/instrucoes web)
         |
         | observacao de captura
         v
@@ -44,15 +45,19 @@ AgentMemoryTemporalEvidence (observacao ou inferencia auditavel)
 
 Uma linha por documento logico.
 
-- `memory_id`: identidade estavel baseada em `source` e `relative_path`.
-- `source`: `claude_code`, `codex` ou `gemini_cli` no escopo CLI atual.
-- `relative_path`: caminho relativo integral na arvore de memory.
+- `memory_id`: identidade estavel baseada em `source` e caminho relativo no
+  CLI; no ChatGPT inclui UUID da conta e ID nativo ou superficie observada.
+- `source`: `claude_code`, `codex`, `gemini_cli`, `chatgpt` e `claude_ai`.
+- `relative_path`: caminho CLI ou localizador de captura web relativo ao raw
+  da conta; pode incluir um JSON pointer para uma entrada da resposta.
 - `project_path` e `project_key`: escopo de projeto, quando observado.
 - `file_name`, `name`, `description`, `kind`: metadados de consulta.
 - `current_version_id`: versao mais recente observada.
 - `first_seen_at`, `last_seen_at`: intervalo de observacao pelo extractor.
 - `is_preserved_missing`: o documento nao esta mais na fonte viva.
-- `account_id`: permanece nulo sem identidade duravel observavel.
+- `account_id`: UUID do catalogo para ChatGPT e Claude.ai; permanece nulo sem
+  identidade duravel observavel no CLI. Em Claude.ai, `project_key` registra o
+  UUID do projeto quando a memoria pertence a um Project.
 
 ### `agent_memory_versions`
 
@@ -60,8 +65,8 @@ Uma linha por conteudo distinto de um documento.
 
 - `version_id`: `memory_id` mais SHA-256 do conteudo.
 - `memory_id`, `content_sha256`, `content`, `content_size`.
-- `source_modified_at`: `mtime` observado na fonte, nunca renomeado como data
-  de criacao.
+- `source_modified_at`: timestamp nativo de atualizacao ou `mtime` observado
+  na fonte CLI, nunca renomeado como data de criacao.
 - `source_birth_at`: birth time do filesystem quando observavel, com sua
   limitacao de portabilidade explicita.
 - `first_seen_at`, `last_seen_at`, `captured_at`.
@@ -90,6 +95,84 @@ documentos distintos continuam sendo documentos distintos, mas o SHA-256
 permite detectar duplicacao sem elimina-la. Nenhuma deduplicacao semantica
 apaga registros.
 
+No ChatGPT, `chatgpt:<account_id>:saved_memories/<native_id>` identifica cada
+entrada, escapando o ID nativo para nao confundi-lo com segmentos de caminho.
+Resumo e instrucoes usam superficies estaveis por conta. O localizador de
+uma captura nao participa da identidade logica; duas capturas iguais atualizam
+as evidencias de observacao da mesma versao. O SHA-256 usa o texto UTF-8 da
+entrada ou o JSON completo serializado deterministicamente para resumo e
+instrucoes. A resposta original continua preservada no raw.
+
+Os tipos web em `kind` sao `saved_memory`, `project_memory`, `memory_summary`,
+`account_instructions` e `legacy_export`. Eles mantem distintas as memorias
+nativas, a sintese exibida pela plataforma e as instrucoes explicitas da conta.
+As colunas das tres tabelas permanecem compativeis com as fontes CLI; apenas
+esses valores de `kind` foram acrescentados. Unify, dashboard e Quarto consomem
+essas tabelas, sem promover instrucoes a memorias nativas.
+
+## Projecao web do Claude.ai
+
+O sistema Melange expoe uma lista de topicos com `memory_id` nativo e caminho,
+seguida da leitura individual de cada topico. O coletor preserva lista,
+configuracao de modo, respostas individuais e hashes em capturas imutaveis por
+conta. Uma captura so e completa quando o modo e `melange` e todas as leituras
+terminam; capturas parciais nao provam que um topico desapareceu. O parser
+valida os hashes, usa `memory_id` como identidade estavel e o caminho
+`/projects/<UUID>/...` para distinguir memoria de projeto. Conteudo e versoes
+sao deduplicados por SHA-256; `updated_at` nativo e evidencia de atualizacao,
+enquanto a data de criacao fica limitada a primeira observacao. O Markdown
+classico anterior fica como `legacy_export`, sem subdivisao inventada.
+
+As capturas locais de 2026-09-25 cobrem 149 topicos nas duas contas, dos quais
+124 sao de projeto, mais dois Markdown legados. A estrutura historica em
+`data/external/claude-ai-snapshots` continua preservada sem ligacao presumida
+ao UUID do catalogo. Nao foi observada uma exclusao real de topico; a regra
+`is_preserved_missing` sera exercida por listas completas futuras.
+
+## Projecao web do ChatGPT
+
+O parser verifica os hashes de cada snapshot completo e ordena as capturas
+por `captured_at`. Dano em uma captura completa interrompe a projecao, em vez
+de reduzir silenciosamente o acervo. Capturas incompletas e diretorios de
+staging nao substituem o estado corrente. Uma lista de memorias completa e
+vazia marca as entradas conhecidas como `is_preserved_missing`; suas versoes
+continuam consultaveis. A ausencia e avaliada somente para entradas da lista,
+sem inferir exclusao de instrucoes ou de resumo a partir de falha de captura.
+
+`created_timestamp`, `last_updated.timestamp` e `updated_at` sao evidencias
+nativas independentes. Epochs numericos sao lidos em segundos UTC;
+`updated_at`, observado como data sem hora, tem confianca `medium`.
+O timestamp de `last_updated` tem preferencia para atualizacao. Na falta de
+criacao nativa, a primeira observacao e exposta com `basis=first_observed`.
+No resumo, `generatedAtIso` fornece a evidencia de geracao. Instrucoes sem
+timestamp usam observacao; mtimes do checkout nunca completam datas web.
+
+Cada evidencia aponta para o arquivo/entrada raw e preserva os metadados
+nativos em `details_json`, inclusive `conversation_id` quando fornecido.
+A presenca desse campo nao estabelece uma relacao de origem validada; nao
+e criada uma foreign key para conversas. O resumo conserva `followUps` no
+JSON, sem inferir que seus prompts sejam referencias a conversas.
+
+Exports correntes servem de fallback quando nao ha snapshot completo daquela
+superficie, com data de captura desconhecida. Exports estruturados anteriores
+podem acrescentar versoes sem data a identidades nativas ja conhecidas.
+Markdown e representacoes sem identidade demonstravel ficam como
+`legacy_export`, separados por hash e sem dividir bullets em memorias nativas.
+Copias de bytes ja presentes em snapshots validados nao criam novos registros.
+Checksum e stream SSE continuam como evidencia de captura; o documento de
+resumo projetado e o JSON completo do evento `done`.
+
+O comando de parse inclui contas que possuem apenas memorias no raw, mesmo
+sem conversas em merged. A unificacao usa as mesmas tres tabelas e suas chaves
+compostas com `account_id`. Nao ha uma nova tabela ou alteracao nas colunas
+publicadas; consumidores que enumeram valores de `kind` devem aceitar os
+novos tipos.
+
+Na unificacao, as colunas temporais dessas tres tabelas sao normalizadas para
+UTC com precisao de nanossegundos antes do concat. Isso preserva a precisao
+dos timestamps web ao combinar Parquets CLI em microssegundos e colunas
+inteiramente nulas; os valores e as datas desconhecidas permanecem intactos.
+
 ## Regras temporais
 
 Ordem inicial de preferencia para `effective_created_at`:
@@ -109,7 +192,7 @@ na tabela de evidencias e a regra deterministica escolhe a melhor estimativa.
 
 ## Captura futura
 
-Cada sync calcula o hash antes de atualizar o estado corrente. Conteudo ainda
+No CLI, cada sync calcula o hash antes de atualizar o estado corrente. Conteudo ainda
 nao observado e gravado uma unica vez em uma area imutavel de versoes no raw.
 Um sync sem mudanca apenas atualiza `last_seen_at`. Se o arquivo desaparecer, a
 ultima versao e mantida e o documento recebe `is_preserved_missing=True`.

@@ -78,6 +78,30 @@ Conversations + skills (oficiais + instaladas) + assets binaries via
 signUrl inline. Reconciler V1 (FEATURES_VERSION=1): full preservation
 for convs + assets cumulativos.
 
+### Memory, global instructions and Projects — owner observation 2026-09-23
+
+- **Chat memory** exposes two account-level mechanisms. **Dream Memory** can
+  transform recent chats into memories nightly and file them in a memory
+  space; it was disabled. **Memory Instructions** allows explicit creation by
+  saying “remember”, supports up to 50 instructions and was enabled, with zero
+  saved records in the observed account. This is an exposed but empty native
+  memory collection, not inferred behavior.
+- **Chat settings** separately exposes Preferred name, Occupation and
+  **Instructions for Kimi**, explicitly retained across chats and Kimi Work.
+  The instruction field was empty. It is an account-global
+  `persistent_instructions` surface distinct from Memory Instructions despite
+  the overlapping product wording.
+- **Saved Prompts** is a third account surface with Trigger Words and Content.
+  It was empty and is classified as a reusable prompt library, not memory or
+  automatic global instructions.
+- A newly created Project separately exposes **Instructions** and **Files** as
+  shared context across that project's chats. Both were empty in the observed
+  sample. This demonstrates project-scoped `project_context`; no independent
+  project-memory record or collection was shown.
+- The current extractor captures chats, Skills and assets but none of these
+  observed account-memory, account-instruction, Saved Prompt or actual Project
+  objects/transports.
+
 ### Reference volume (smoke 2026-05-09)
 
 - 9 chats / 5 skills instaladas / 46 oficiais.

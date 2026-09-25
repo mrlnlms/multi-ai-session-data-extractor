@@ -117,6 +117,16 @@ def test_chatgpt_canvas_patch_and_memory_export_are_not_generic_binaries(tmp_pat
     canvas.mkdir(parents=True)
     (canvas / "textdoc__patch_message.json").write_text("{}")
     (data / "raw" / "ChatGPT" / "chatgpt_memories.md").write_text("memory")
+    for relative in (
+        "chatgpt_memories.json", "chatgpt_instructions.json",
+        "chatgpt_memory_summary.sse", "chatgpt_memory_summary.json", "chatgpt_memory_summary_checksum.json",
+        "account-test/_account_memory/saved_memories/capture/chatgpt_memories.json",
+        "account-test/_account_memory/saved_memories/capture/capture.json",
+        "account-test/_account_memory/prior_exports/chatgpt_memories.md/content-hash",
+    ):
+        path = data / "raw" / "ChatGPT" / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}")
     evidence = inventory_preserved_session_assets(data)
     assert {item.representation_kind for item in evidence} == {
         "canvas_patch_record", "memory_export",
@@ -134,8 +144,14 @@ def test_claude_ai_memory_export_is_a_domain_record(tmp_path):
     path = data / "raw" / "Claude.ai" / "claude_ai_memory.md"
     path.parent.mkdir(parents=True)
     path.write_text("memory")
-    [item] = inventory_preserved_session_assets(data)
-    assert item.representation_kind == "memory_export"
+    snapshot = data / "raw" / "Claude.ai" / "account-test" / "_account_memory" / "melange" / "capture"
+    (snapshot / "items").mkdir(parents=True)
+    (snapshot / "list.json").write_text("{}")
+    (snapshot / "items" / "topic.json").write_text("{}")
+    (snapshot / "capture.json").write_text("{}")
+    evidence = inventory_preserved_session_assets(data)
+    assert len(evidence) == 4
+    assert {item.representation_kind for item in evidence} == {"memory_export"}
 
 
 def test_notebooklm_note_materialization_is_an_asset_candidate(tmp_path):

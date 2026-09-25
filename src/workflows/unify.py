@@ -64,7 +64,7 @@ TABLE_PKS: dict[str, list[str]] = {
     "project_docs":     ["source", "account_id", "project_id", "doc_id"],
     # Mapping conv -> project (cross-platform tagging)
     "conversation_projects": ["source", "account_id", "conversation_id", "project_tag"],
-    # 1 auxiliar Claude Code/Codex (memorias do agente)
+    # Persistent memory/context across CLI and web sources
     "agent_memories":   ["source", "account_id", "memory_id"],
     "agent_memory_versions": ["source", "account_id", "version_id"],
     "agent_memory_temporal_evidence": ["source", "account_id", "evidence_id"],
@@ -147,6 +147,17 @@ def unify_table(table: str, files: list[Path]) -> pd.DataFrame:
         # synthesize identity from the legacy display `account` column.
         if "account_id" not in df.columns:
             df = df.assign(account_id=pd.NA)
+        if table in {"agent_memories", "agent_memory_versions", "agent_memory_temporal_evidence"}:
+            # Mixed CLI microseconds, web nanoseconds and all-null columns can
+            # make concat fall back to object. Arrow then serializes Python
+            # datetimes as microseconds and silently truncates native evidence.
+            for column in (
+                "created_at", "updated_at", "first_seen_at", "last_seen_at",
+                "captured_at", "source_modified_at", "source_birth_at",
+                "effective_created_at", "effective_updated_at", "timestamp",
+            ):
+                if column in df.columns:
+                    df[column] = pd.to_datetime(df[column], utc=True, format="mixed").astype("datetime64[ns, UTC]")
         dfs.append(df)
 
     merged = pd.concat(dfs, ignore_index=True)

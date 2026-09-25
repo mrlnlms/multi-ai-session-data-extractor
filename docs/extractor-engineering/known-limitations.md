@@ -1,7 +1,7 @@
 # Known limitations
 
 Honest list of what **does not work** or **has not been validated**. Updated
-on 2026-09-23.
+on 2026-09-25.
 
 Limitations fall into 3 categories:
 
@@ -16,6 +16,15 @@ Limitations fall into 3 categories:
 
 ### ChatGPT
 
+- **Account memory:** saved-memory/instruction JSON and summary SSE/final
+  JSON/checksum have per-account raw history, validated live in both configured
+  accounts and projected into the three versioned `AgentMemory` tables with
+  distinct kinds. Earlier Markdown cannot recover discarded native fields.
+  Native conversation IDs remain unverified provenance, not foreign keys.
+  The UI says its summary
+  is not a complete memory list. Summary loading uses the observed empty POST
+  and may interact with server-side cache; forced regeneration and memory-edit
+  controls are not used. See [ChatGPT state](platforms/web/chatgpt/state.md).
 - **Voice — 97% of transcripts already captured via Pass 1.** 127 of 131
   voice messages have transcript text populated (via raw heuristic
   detecting `audio_transcription` in parts). 4 voice messages end up
@@ -290,9 +299,11 @@ These validations require a Pro Max account and remain open until someone tests:
   Fourteen Canvas mutations failed upstream, five update requests have no
   preserved response, five create requests lack usable content evidence and two
   successful regex patches cannot be reproduced exactly; none is fabricated as
-  a file. ChatGPT and Claude.ai account-memory exports remain explicitly queued
-  for a separately planned memory/configuration domain rather than the Asset
-  graph. Claude.ai extracted artifact
+  a file. ChatGPT and Claude.ai memory records use the versioned `AgentMemory`
+  domain. Claude.ai preserves native Melange topics by account and project,
+  while older overwritten Markdown and pre-extractor snapshots cannot recover
+  earlier per-topic versions or dates. Neither belongs in the
+  Asset graph. Claude.ai extracted artifact
   versions are indexed as exact message outputs; Claude inline `attachments`
   remain text-bearing message metadata rather than fake binaries. Perplexity
   third-party featured images remain external references rather than

@@ -1,6 +1,7 @@
 """Roda o parser ChatGPT sobre todas as arvores merged de conta.
 
-Output em data/processed/ChatGPT/{conversations,messages,tool_events,branches,assets,asset_links}.parquet.
+Output em data/processed/ChatGPT/: conversations, messages, tool_events,
+branches, assets, asset_links and the three versioned agent-memory tables.
 
 Uso:
     PYTHONPATH=. .venv/bin/python -m src.platforms.chatgpt.commands.parse
@@ -24,7 +25,7 @@ def main():
     )
     ap.add_argument(
         "--raw-root", type=Path, default=Path("data/raw/ChatGPT"),
-        help="Root dos raws (pra resolver asset_paths via data/raw/ChatGPT/assets/)",
+        help="Root dos raws (assets e historico de memorias/instrucoes por conta)",
     )
     ap.add_argument(
         "--output-dir", type=Path, default=Path("data/processed/ChatGPT"),
@@ -53,10 +54,20 @@ def main():
     for account_dir in sorted(merged_base.glob("account-*")):
         merged = account_dir / "chatgpt_merged.json"
         if merged.is_file():
-            # The directory name is also the technical profile key used by
-            # chatgpt-login/sync and by .storage/accounts.json.
+            # Catalog identity resolves UUID directories and legacy aliases;
+            # a directory name does not imply a local browser profile binding.
             key = account_dir.name
             account_trees.append((key, merged, args.raw_root / account_dir.name))
+    known = {key for key, _, _ in account_trees}
+    for raw_dir in sorted(args.raw_root.glob("account-*")):
+        if raw_dir.is_dir() and raw_dir.name not in known and (
+            (raw_dir / "_account_memory").is_dir()
+            or (raw_dir / "chatgpt_memories.json").is_file()
+            or (raw_dir / "chatgpt_instructions.json").is_file()
+            or (raw_dir / "chatgpt_memory_summary.json").is_file()
+            or (raw_dir / "chatgpt_memories.md").is_file()
+        ):
+            account_trees.append((raw_dir.name, None, raw_dir))
     if not account_trees:
         raise FileNotFoundError(
             f"Nenhuma arvore merged encontrada em {merged_base}"
@@ -71,18 +82,25 @@ def main():
         )
         account_id = resolve_account_id("ChatGPT", profile, args.catalog_path)
         per_account = ChatGPTParser(account=account, account_id=account_id, raw_root=raw_root)
-        per_account.parse(merged)
+        if merged is not None:
+            per_account.parse(merged)
+        else:
+            per_account.parse_account_memory()
         parser.conversations.extend(per_account.conversations)
         parser.messages.extend(per_account.messages)
         parser.events.extend(per_account.events)
         parser.branches.extend(per_account.branches)
         parser.assets.extend(per_account.assets)
         parser.asset_links.extend(per_account.asset_links)
+        parser.agent_memories.extend(per_account.agent_memories)
+        parser.agent_memory_versions.extend(per_account.agent_memory_versions)
+        parser.agent_memory_temporal_evidence.extend(per_account.agent_memory_temporal_evidence)
 
     log.info(
         f"Parseado: {len(parser.conversations)} convs, "
         f"{len(parser.messages)} msgs, {len(parser.events)} tool_events, "
-        f"{len(parser.assets)} assets, {len(parser.asset_links)} asset_links"
+        f"{len(parser.assets)} assets, {len(parser.asset_links)} asset_links, "
+        f"{len(parser.agent_memories)} memory documents, {len(parser.agent_memory_versions)} memory versions"
     )
 
     parser.save(args.output_dir)

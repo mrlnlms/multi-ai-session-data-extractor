@@ -574,3 +574,25 @@ def test_accounts_dimension_is_catalog_derived_and_rejects_orphans(tmp_path):
     }).to_parquet(platform / "chatgpt_conversations.parquet")
     with pytest.raises(ValueError, match="absent from accounts dimension"):
         unify_module.unify(processed, unified, catalog_path=catalog)
+def test_memory_timestamp_precision_survives_mixed_cli_web_and_null_columns(tmp_path):
+    import pandas as pd
+    from src.workflows.unify import unify_table
+
+    paths = []
+    for source, timestamp, dtype in (
+        ("chatgpt", "2026-08-12T19:58:12.433583498Z", "datetime64[ns, UTC]"),
+        ("codex", "2026-08-12T19:58:12.123456Z", "datetime64[us, UTC]"),
+        ("gemini_cli", None, "object"),
+    ):
+        path = tmp_path / f"{source}_agent_memories.parquet"
+        frame = pd.DataFrame({"source": [source], "memory_id": [source],
+                              "created_at": pd.Series([pd.Timestamp(timestamp) if timestamp else None], dtype=dtype)})
+        frame.to_parquet(path, index=False)
+        paths.append(path)
+    merged = unify_table("agent_memories", paths)
+    output = tmp_path / "agent_memories.parquet"
+    merged.to_parquet(output, index=False)
+    restored = pd.read_parquet(output).set_index("source")
+    assert restored.loc["chatgpt", "created_at"] == pd.Timestamp("2026-08-12T19:58:12.433583498Z")
+    assert restored.loc["codex", "created_at"] == pd.Timestamp("2026-08-12T19:58:12.123456Z")
+    assert pd.isna(restored.loc["gemini_cli", "created_at"])

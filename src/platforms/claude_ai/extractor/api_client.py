@@ -118,10 +118,26 @@ class ClaudeAPIClient:
         path = self._org_path(f"projects/{project_uuid}/files")
         return await self._get_json(path)
 
-    # --- Memory (preferences/instructions remembered across sessions) ---
+    # --- Account and project memories ---
+
+    async def _post_json(self, path: str, payload: dict) -> Any:
+        """POST used by Claude's read-only Melange list/read transports."""
+        resp = await self.request.post(f"{BASE_URL}{path}", data=payload)
+        if not resp.ok:
+            raise RuntimeError(f"HTTP {resp.status} on {path}")
+        return await resp.json()
+
+    async def list_memory_topics(self) -> dict:
+        return await self._post_json(self._org_path("melange/list"), {})
+
+    async def read_memory_topic(self, path: str) -> dict:
+        return await self._post_json(self._org_path("melange/read"), {"path": path})
+
+    async def get_memory_settings(self) -> dict:
+        return await self._get_json(self._org_path("memory/settings"))
 
     async def get_memory(self) -> str:
-        """Retorna texto da memory do org (campo unico em markdown).
+        """Legacy classic Markdown adapter; not the topic collection.
 
         Endpoint: GET /api/organizations/{org}/memory → {"memory": "<markdown>"}.
         Vazio (memory desabilitada / sem conteudo): {"memory": ""}.
