@@ -54,6 +54,9 @@ from src.schema.models import (
     ToolEvent,
     asset_links_to_df,
     assets_to_df,
+    agent_memories_to_df,
+    agent_memory_versions_to_df,
+    agent_memory_temporal_evidence_to_df,
     branches_to_df,
     conversations_to_df,
     messages_to_df,
@@ -105,6 +108,9 @@ class QwenParser(BaseParser):
         self._url_to_relpath: dict[str, str] = {}
         self._asset_entries: list[dict] = []
         self._asset_uses: list[dict] = []
+        self.agent_memories = []
+        self.agent_memory_versions = []
+        self.agent_memory_temporal_evidence = []
 
     def reset(self):
         super().reset()
@@ -114,6 +120,9 @@ class QwenParser(BaseParser):
         self._url_to_relpath = {}
         self._asset_entries = []
         self._asset_uses = []
+        self.agent_memories = []
+        self.agent_memory_versions = []
+        self.agent_memory_temporal_evidence = []
 
     @property
     def conversations_dir(self) -> Path:
@@ -655,3 +664,6 @@ class QwenParser(BaseParser):
 
         self.assets_df().to_parquet(output_dir / f"{self.source_name}_assets.parquet")
         self.asset_links_df().to_parquet(output_dir / f"{self.source_name}_asset_links.parquet")
+        agent_memories_to_df(self.agent_memories).to_parquet(output_dir / f"{self.source_name}_agent_memories.parquet", index=False)
+        agent_memory_versions_to_df(self.agent_memory_versions).to_parquet(output_dir / f"{self.source_name}_agent_memory_versions.parquet", index=False)
+        agent_memory_temporal_evidence_to_df(self.agent_memory_temporal_evidence).to_parquet(output_dir / f"{self.source_name}_agent_memory_temporal_evidence.parquet", index=False)

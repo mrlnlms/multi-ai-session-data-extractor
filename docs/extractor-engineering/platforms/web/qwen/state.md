@@ -1,19 +1,35 @@
 # Qwen — technical coverage
 
-## Memory and instruction boundary — owner observation 2026-09-23
+## Account memory and instructions — captured 2026-09-25
 
 - The account settings UI exposes a distinct **Memory** section with
   **Manage**, **Reference saved memories**, and **Reference the chat history**.
   Advanced controls separately expose **Retrieve historical memory** and
   **Update memory**. This is direct product evidence of account-level native
   memory capability; it is no longer classified as inferred personalization.
-- The management collection and its authenticated transport have not yet been
-  inspected or preserved. The toggles and tool capabilities prove the surface,
-  but are not substitutes for the individual memory records.
-- **Customize Qwen** is a separate candidate instruction surface. Its scope and
-  payload are not yet established. Existing project instructions and
-  `memory_span` remain project-scoped `project_context`; they must not be
-  promoted to account-global persistent instructions.
+- **Saved Memory** is read from `GET /api/v2/memories/?page_size=50&page_num=N`.
+  The complete response has `data.memory_nodes`, `data.total`; each observed
+  node has `memory_node_id`, `content`, `chat_id`, `created_at` and `updated_at`
+  (epoch seconds). Capture verifies stable totals, unique IDs, consecutive
+  pages and exact item count before treating a listing as complete. Complete
+  and partial reads are immutable, SHA-256-verified snapshots under each
+  account's `data/raw/Qwen/account-<uuid>/_account_memory/native/`.
+- **Customize Qwen** is account-global personalization, read separately from
+  `GET /api/v2/users/user/settings` at `data.personalization`. The observed
+  fields are `name`, `description`, `style`, `instruction` and
+  `enable_for_new_chat`; the second account returns explicit `null` for an
+  unconfigured state. The same response contains memory toggles, but those
+  toggles are not memory items. No native personalization timestamp was
+  observed, so its canonical version uses capture observation time.
+- The focused owner capture found 114 saved memories and one nonempty
+  personalization record in the primary account; the second account had zero
+  memories and `personalization: null`. The parser publishes 115
+  `AgentMemory` records plus content versions and temporal evidence, preserving
+  missing records only after a later *complete* read. Existing Project
+  instructions and `memory_span` remain project-scoped `project_context`.
+- The UI says Memory storage can hold up to 50 items, while the authenticated
+  paginated API returned 114. Do not truncate capture to the UI-stated limit
+  or infer which records count against it.
 - Chat history, saved native memories, account instructions and project context
   remain four distinct representations even when Qwen can use them together.
 
@@ -33,6 +49,9 @@
 
 Chats + projects + project files captured. Reconciler v3
 (FEATURES_VERSION=2): full preservation for convs + projects.
+Normal account sync also captures the two independent memory/instruction raw
+surfaces before chat discovery; the Qwen parser reads them from raw, then
+publishes the memory tables alongside the existing conversation/project tables.
 
 ### Latest validated collection — 2026-09-20
 

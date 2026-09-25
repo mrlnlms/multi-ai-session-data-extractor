@@ -100,6 +100,14 @@ These validations require a Pro Max account and remain open until someone tests:
 
 ### Qwen
 
+- **Saved Memory retention semantics:** the UI states a 50-item storage
+  limit, but the authenticated paginated API returned 114 records. Their
+  count/lifecycle relative to the UI limit is not established. Capture keeps
+  every complete native page; it never discards records based on that label.
+- **Personalization dates:** Customize Qwen has no native created/updated
+  timestamps in the observed settings response. Canonical versions use
+  first/last observed capture times, not invented source dates. Partial reads
+  cannot mark a memory or instruction as missing.
 - **Archive — upstream no-op:** the server accepts the request but the
   `archived` flag never persists; `archived=True` never appears in listings.
   Same pattern as Perplexity — not an extractor gap.
@@ -123,6 +131,14 @@ These validations require a Pro Max account and remain open until someone tests:
 
 ### Gemini
 
+- **Account Instructions:** native item IDs and full list envelopes have
+  cumulative raw history and versioned canonical projection. The account-1
+  controlled item is retained as `preserved_missing` after a verified empty
+  list; accounts 2 and 3 currently returned explicit empty lists. Positional
+  timestamp fields remain raw temporal evidence without assumed
+  creation/update semantics. Conversation-derived Memory remains unprojected:
+  its enabled control did not expose an inspectable item collection in the
+  bounded probe. See [Gemini state](platforms/web/gemini/state.md).
 - **Asset placement:** hosted images expose no stable native file UUID, so the
   canonical identity is content-based within each account. Uses resolve to a
   message and observed ordinal, but the positional payload does not expose a

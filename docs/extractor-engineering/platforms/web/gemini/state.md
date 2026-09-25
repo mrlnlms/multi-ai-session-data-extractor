@@ -38,12 +38,15 @@ their independent conversation JSON and asset manifests.
   payloads reuse their content-addressed snapshot, and a later empty state
   cannot remove a prior non-empty one.
 - A live account-1 capture on `2026-09-23` durably retained the controlled
-  item and verified the snapshot filename against its payload hash. This raw
-  surface is not reconciled or canonically parsed yet.
+  item and verified the snapshot filename against its payload hash.
 - After the owner deleted that controlled item upstream, a second live capture
   stored the empty native envelope as a distinct snapshot and retained the
   original non-empty snapshot byte-for-byte. The two append-only observations
   validate the intended Instructions lifecycle preservation.
+- On `2026-09-25`, isolated read-only captures of all three accounts returned
+  explicit empty lists. They added account-2 and account-3 observations without
+  changing conversation captures; account-1's earlier non-empty snapshot was
+  retained.
 - This surface is distinct from conversation-derived **Memory**, whose
   readable transport remains unresolved.
 
@@ -74,22 +77,26 @@ their independent conversation JSON and asset manifests.
   local runtime diagnostics under `.runtime/probes/`, outside the preserved
   raw archive.
 
-### Canonical projection boundary — 2026-09-23
+### Canonical Instructions projection — 2026-09-25
 
 - Instructions are an approved routine raw-capture surface, not a pending
   experiment. Normal account capture reads the native envelope and preserves
   its cumulative lifecycle even when the current upstream list becomes empty.
-- Instructions are classified as `persistent_instructions`, not learned
-  `native_memory`. Their canonical/Parquet projection is deliberately deferred
-  until genuinely equivalent **account-global** exposed surfaces can define a
-  shared contract for scope, enabled state, native identity, timestamps and
-  deletion history. A project prompt or project-specific instruction from
-  another platform is not an equivalent merely because it influences later
-  answers; it belongs to `project_context` unless that platform demonstrates a
-  separate account-global instruction surface.
-- This deferral does not require another Gemini capture and does not make the
-  raw coverage incomplete. The untouched snapshots and observations retain the
-  fields needed for later schema design and deterministic reprocessing.
+- Instructions are `persistent_instructions`, not learned `native_memory`.
+  ChatGPT and Qwen now establish equivalent account-global instruction scope;
+  the existing `account_instructions` kind projects each Gemini item separately
+  by native ID into the three versioned `AgentMemory` tables. Project prompts
+  remain `project_context`.
+- The parser verifies every snapshot hash and the observed positional list
+  shape before interpreting it. Only a verified complete empty list marks a
+  previously seen item `is_preserved_missing`; invalid or partial responses
+  fail closed. The account-1 controlled item is currently preserved-missing,
+  with one immutable version. Accounts 2 and 3 have no materialized items.
+- The two native timestamp pairs are retained as positional temporal evidence
+  (`field_2` and `field_4`); their creation/update semantics have not been
+  independently established. Canonical effective dates therefore use capture
+  observations, not guessed native semantics. The native response, including
+  other state/type fields, stays untouched in raw.
 
 ### Latest validated collection — 2026-08-30
 

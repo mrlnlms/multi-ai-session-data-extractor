@@ -13,6 +13,8 @@ e CRUD/comportamento upstream em [server-behavior.md](server-behavior.md).
 | `GET /api/v2/chats/pinned` | listar pinados |
 | `GET /api/v2/chats/{id}` | buscar chat completo |
 | `GET /api/v2/projects/` e `/projects/{id}/files` | projetos e arquivos |
+| `GET /api/v2/memories/?page_size=50&page_num=N` | memórias salvas da conta; `memory_nodes` e `total` |
+| `GET /api/v2/users/user/settings` | personalização global e controles de memória |
 
 A autenticacao usa o token da sessao web. Os headers e a estrutura devem ser
 revalidados por probe quando uma mudanca upstream afetar a captura.
@@ -27,6 +29,13 @@ em `info`, configuracao de feature, anotacoes e estado de conclusao.
 Projetos carregam nome, instrucao personalizada e a lista `_files` enriquecida
 pelo extractor. URLs de arquivo sao preassinadas e devem ser baixadas de forma
 idempotente pelo manifest.
+
+Na observação autenticada de 2026-09-25, Memory Manage acionou a lista
+paginada de nós, cada um com ID nativo, conteúdo, chat de origem e timestamps
+epoch. Customize Qwen abriu o editor de nome, descrição e instrução, cujos
+valores vêm de `data.personalization` no endpoint de settings. A conta sem
+personalização devolveu `null`, não uma instrução vazia. `memory_span` dos
+Projects não é essa coleção de memória da conta.
 
 ## Amostras e limites
 

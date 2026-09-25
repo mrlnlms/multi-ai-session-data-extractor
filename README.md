@@ -52,9 +52,9 @@ canonical parsing, and descriptive visualization (Quarto):
 | **ChatGPT** | web | branches, voice, DALL-E, projects, custom GPT; [saved memories, summary and instructions with raw history and versioned Parquets](docs/extractor-engineering/platforms/web/chatgpt/state.md) |
 | **Claude.ai** | web | thinking, tool use+MCP, project_docs with inline content; [account and project memory topics with raw history and versioned Parquets](docs/extractor-engineering/platforms/web/claude-ai/state.md) |
 | **Perplexity** | web | threads + pages + spaces + 9 artifact types; [account Memory with raw paginated snapshots and versioned Parquets](docs/extractor-engineering/platforms/web/perplexity/state.md) |
-| **Qwen** | web | 8 chat types (search, research, dalle, etc.), projects |
+| **Qwen** | web | 8 chat types (search, research, dalle, etc.), projects; [account saved memories and Customize Qwen instructions with raw history and versioned Parquets](docs/extractor-engineering/platforms/web/qwen/state.md) |
 | **DeepSeek** | web | R1 reasoning (thinking in ~31% of msgs), token usage |
-| **Gemini** | web | multi-account, reasoning/tool events, generated assets |
+| **Gemini** | web | multi-account, reasoning/tool events, generated assets; [account Instructions with native raw history and versioned Parquets](docs/extractor-engineering/platforms/web/gemini/state.md) |
 | **NotebookLM** | web | multi-account, historical archives, sources and generated outputs |
 | **Grok** | web | conversations, workspaces, tool events, assets, scheduled tasks |
 | **Kimi** | web | chats, installed skills, tool events, signed asset downloads; [native raw Memory/settings/Dream/Project reads, without canonical memory projection yet](docs/extractor-engineering/platforms/web/kimi/state.md) |

@@ -47,7 +47,8 @@ Uma linha por documento logico.
 
 - `memory_id`: identidade estavel baseada em `source` e caminho relativo no
   CLI; no ChatGPT inclui UUID da conta e ID nativo ou superficie observada.
-- `source`: `claude_code`, `codex`, `gemini_cli`, `chatgpt`, `claude_ai` e `perplexity`.
+- `source`: as fontes CLI com memoria demonstrada e as plataformas web
+  `chatgpt`, `claude_ai`, `perplexity`, `qwen` e `gemini`.
 - `relative_path`: caminho CLI ou localizador de captura web relativo ao raw
   da conta; pode incluir um JSON pointer para uma entrada da resposta.
 - `project_path` e `project_key`: escopo de projeto, quando observado.
@@ -55,7 +56,7 @@ Uma linha por documento logico.
 - `current_version_id`: versao mais recente observada.
 - `first_seen_at`, `last_seen_at`: intervalo de observacao pelo extractor.
 - `is_preserved_missing`: o documento nao esta mais na fonte viva.
-- `account_id`: UUID do catalogo para ChatGPT, Claude.ai e Perplexity; permanece nulo sem
+- `account_id`: UUID do catalogo para plataformas web; permanece nulo sem
   identidade duravel observavel no CLI. Em Claude.ai, `project_key` registra o
   UUID do projeto quando a memoria pertence a um Project.
 
@@ -143,6 +144,25 @@ configuracoes de Memory nao sao registros dessa colecao.
 
 A primeira captura local de 2026-09-25 continha um registro e nao demonstrou
 mudanca nem remocao real; versoes e `preserved_missing` tem testes de contrato.
+
+## Projecao web do Gemini
+
+`ZKcapf` expoe Instructions for Gemini como lista de itens com ID nativo,
+conteudo, pares temporais posicionais e campos de estado/tipo. Capturas
+imutaveis sao referenciadas por hash em `instructions/observations.jsonl` por
+conta. O parser valida hash e formato, identifica cada item por
+`gemini:<account_id>:instructions/<native_id>` e projeta `account_instructions`.
+So uma lista completa e validada pode marcar um item conhecido como
+`is_preserved_missing`; resposta ausente ou com formato alterado nao vira
+lista vazia. A primeira versao preservada da conta 1 foi seguida por uma
+lista vazia apos exclusao pelo proprietario; as contas 2 e 3 foram observadas
+vazias em 2026-09-25.
+
+Os pares de tempo nativos sao evidencias `native_timestamp_field_2` e
+`native_timestamp_field_4`. Como a semantica de criacao/atualizacao nao foi
+comprovada, datas efetivas usam `first_observed` e `last_observed`. A Memory
+aprendida de conversas continua distinta: seu controle habilitado nao expoe
+uma lista de registros inspecionaveis no probe delimitado.
 
 ## Projecao web do ChatGPT
 

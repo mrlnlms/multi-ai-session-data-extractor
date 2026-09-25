@@ -175,6 +175,16 @@ class QwenAPIClient:
         except Exception:
             return []
 
+    async def list_memory_page(self, page_num: int, page_size: int = 50) -> dict:
+        """Read account saved memories; retain the native response envelope."""
+        return await self._fetch(
+            f"{API_BASE}/v2/memories/?page_size={page_size}&page_num={page_num}"
+        )
+
+    async def get_user_settings(self) -> dict:
+        """Read account personalization and memory controls."""
+        return await self._fetch(f"{API_BASE}/v2/users/user/settings")
+
     async def warmup(self):
         await self.page.goto(HOME_URL, wait_until="domcontentloaded", timeout=60000)
         await self.page.wait_for_timeout(3000)

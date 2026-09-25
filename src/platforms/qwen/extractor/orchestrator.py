@@ -15,6 +15,7 @@ from pathlib import Path
 
 from src.platforms.qwen.extractor.auth import load_context
 from src.platforms.qwen.extractor.api_client import QwenAPIClient
+from src.platforms.qwen.extractor.account_memory import capture_account_memory
 from src.platforms.qwen.extractor.discovery import discover, persist_discovery
 from src.platforms.qwen.extractor.fetcher import fetch_conversations
 from src.platforms.qwen.extractor.refetch_known import refetch_known_qwen
@@ -121,6 +122,15 @@ async def run_export(
         client = QwenAPIClient(context, page)
         await client.warmup()
 
+        # Account memory is independent of chat discovery and is never cleared
+        # by a partial listing or the refetch-known fallback.
+        memory_status = await capture_account_memory(client, output_dir)
+        memory_summary = {
+            surface: {key: info[key] for key in ("complete", "items", "error_type")}
+            for surface, info in memory_status.items()
+        }
+        print("Account memory:", memory_summary)
+
         chats, projects_disc = await discover(client, output_dir)
 
         # Discovery parcial vira fallback automatico pra refetch_known.
@@ -152,6 +162,7 @@ async def run_export(
                         "projects_discovered": len(projects_disc) if projects_disc else 0,
                     },
                     "errors": {"conversations": []},
+                    "account_memory": memory_summary,
                 }
                 log_jsonl = output_dir / "capture_log.jsonl"
                 with open(log_jsonl, "a", encoding="utf-8") as f:
@@ -228,6 +239,7 @@ async def run_export(
                 "projects_discovered": len(projects) if projects else 0,
             },
             "errors": {"conversations": errs[:50]},
+            "account_memory": memory_summary,
         }
 
         # Append em capture_log.jsonl

@@ -1,5 +1,6 @@
 import asyncio
 from unittest.mock import AsyncMock
+import pytest
 
 from src.platforms.gemini.extractor import api_client
 
@@ -34,8 +35,16 @@ def test_list_instructions_preserves_native_response(monkeypatch):
     )
 
 
-def test_list_instructions_normalizes_missing_response(monkeypatch):
+def test_list_instructions_rejects_missing_response(monkeypatch):
     monkeypatch.setattr(api_client, "call_rpc", AsyncMock(return_value=None))
+    client = api_client.GeminiAPIClient(context=object(), session={"at": "token"})
+
+    with pytest.raises(ValueError, match="response shape"):
+        asyncio.run(client.list_instructions())
+
+
+def test_list_instructions_accepts_explicit_empty_response(monkeypatch):
+    monkeypatch.setattr(api_client, "call_rpc", AsyncMock(return_value=[]))
     client = api_client.GeminiAPIClient(context=object(), session={"at": "token"})
 
     assert asyncio.run(client.list_instructions()) == []

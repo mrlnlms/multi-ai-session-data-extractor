@@ -95,7 +95,9 @@ class GeminiAPIClient:
             [100],
             reqid=self._next_reqid(),
         )
-        return data if isinstance(data, list) else []
+        validate_instructions_envelope(data)
+        return data
+
 
     async def download_asset(self, url: str) -> bytes | None:
         """Baixa binario de uma URL (lh3.googleusercontent.com / gstatic).
@@ -108,6 +110,35 @@ class GeminiAPIClient:
         if not resp.ok:
             return None
         return await resp.body()
+
+
+def validate_instructions_envelope(data: object) -> list[list]:
+    """Accept only an observed, complete Instructions list shape.
+
+    ``None`` or a changed RPC shape must not become an empty observation: that
+    would incorrectly mark previously captured instructions as removed.
+    """
+    if data == []:
+        return []
+    if not isinstance(data, list) or len(data) != 2 or not isinstance(data[0], list):
+        raise ValueError("Unexpected Gemini Instructions response shape")
+    items = data[0]
+    if not items or len(items) >= 100 or not isinstance(data[1], str):
+        raise ValueError("Incomplete Gemini Instructions response")
+    seen: set[str] = set()
+    for item in items:
+        if (not isinstance(item, list) or len(item) < 11
+                or not isinstance(item[0], str) or not item[0]
+                or not isinstance(item[1], str)
+                or item[0] in seen):
+            raise ValueError("Malformed Gemini Instructions item")
+        for index in (2, 4):
+            value = item[index]
+            if (not isinstance(value, list) or len(value) != 2
+                    or any(not isinstance(part, int) or isinstance(part, bool) for part in value)):
+                raise ValueError("Malformed Gemini Instructions timestamp")
+        seen.add(item[0])
+    return items
 
 
 IMAGE_URL_RE = re.compile(

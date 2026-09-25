@@ -26,7 +26,8 @@ Limitacoes conhecidas:
   snippet, ...] no schema posicional. Populadas em Message.citations_json
   + ToolEvents tipo 'search_result' (1 por citation, dedup por url).
 
-Output: data/processed/Gemini/{conversations,messages,tool_events,assets,asset_links}.parquet
+Output: data/processed/Gemini/{conversations,messages,tool_events,assets,asset_links,
+agent_memories,agent_memory_versions,agent_memory_temporal_evidence}.parquet
 """
 
 from __future__ import annotations
@@ -63,6 +64,9 @@ from src.schema.models import (
     Conversation,
     Message,
     ToolEvent,
+    agent_memories_to_df,
+    agent_memory_versions_to_df,
+    agent_memory_temporal_evidence_to_df,
     asset_links_to_df,
     assets_to_df,
     make_asset_link_id,
@@ -142,6 +146,9 @@ class GeminiParser(BaseParser):
         self.account_ids = dict(account_ids or {})
         self.assets: list[Asset] = []
         self.asset_links: list[AssetLink] = []
+        self.agent_memories = []
+        self.agent_memory_versions = []
+        self.agent_memory_temporal_evidence = []
 
     def parse(self, input_path: Path | None = None) -> None:
         """Itera merged/Gemini/account-{N}/conversations/.
@@ -640,6 +647,15 @@ class GeminiParser(BaseParser):
         assets_to_df(self.assets).to_parquet(output_dir / f"{SOURCE}_assets.parquet")
         asset_links_to_df(self.asset_links).to_parquet(
             output_dir / f"{SOURCE}_asset_links.parquet"
+        )
+        agent_memories_to_df(self.agent_memories).to_parquet(
+            output_dir / f"{SOURCE}_agent_memories.parquet", index=False
+        )
+        agent_memory_versions_to_df(self.agent_memory_versions).to_parquet(
+            output_dir / f"{SOURCE}_agent_memory_versions.parquet", index=False
+        )
+        agent_memory_temporal_evidence_to_df(self.agent_memory_temporal_evidence).to_parquet(
+            output_dir / f"{SOURCE}_agent_memory_temporal_evidence.parquet", index=False
         )
 
         logger.info(

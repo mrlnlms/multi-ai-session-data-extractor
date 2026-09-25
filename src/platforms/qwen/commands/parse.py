@@ -17,12 +17,14 @@ from pathlib import Path
 
 from src.accounts import account_presentation, uses_legacy_account_layout
 from src.account_identity import resolve_account_id, stamp_account_id_rows
+from src.platforms.qwen.memory_parser import parse_account_memory
 from src.platforms.qwen.parser import QwenParser
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--merged-root", type=Path, default=Path("data/merged/Qwen"))
+    ap.add_argument("--raw-root", type=Path, default=Path("data/raw/Qwen"))
     ap.add_argument("--output-dir", type=Path, default=Path("data/processed/Qwen"))
     ap.add_argument("--account", default=None)
     ap.add_argument("--accounts-file", type=Path, default=Path(".storage/accounts.json"))
@@ -66,6 +68,11 @@ def main():
         parser.project_docs.extend(per_account.project_docs)
         parser._asset_entries.extend(per_account._asset_entries)
         parser._asset_uses.extend(per_account._asset_uses)
+        raw_tree = args.raw_root if tree == args.merged_root else args.raw_root / tree.name
+        memory = parse_account_memory(raw_tree, account_id)
+        parser.agent_memories.extend(memory.memories)
+        parser.agent_memory_versions.extend(memory.versions)
+        parser.agent_memory_temporal_evidence.extend(memory.temporal_evidence)
 
     log.info(
         f"Parseado: {len(parser.conversations)} convs, "

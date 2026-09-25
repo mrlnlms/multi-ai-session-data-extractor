@@ -24,7 +24,7 @@ conflicts with the entry or the task requires a fresh verification.
 | Prevent asset-copy rematerialization | **Completed and published** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the retention audit as a diagnostic after future capture changes. |
 | Canonical account identity and analytical dimension | **Completed and published** | [Account architecture](product/account-architecture.md) | Preserve the UUID-only contract; treat memory/configuration as a separate front. |
 | CLI memory/configuration coverage | **Completed and published (2026-09-23)** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the demonstrated Claude Code/Codex/Gemini CLI contracts; revisit Antigravity Knowledge only if an inspectable native item or stable payload becomes available, and treat a future owner-created Project separately as project context. |
-| Web memory/configuration capability census | **Active; ChatGPT, Claude.ai and Perplexity memory capture published 2026-09-25; Kimi raw reads published 2026-09-25** | [Pending capture](extractor-engineering/web-memory-capture-backlog.md), [memory architecture](product/agent-memory-architecture.md) | Published memory Parquets cover the first three web sources. Kimi's native Memory/settings/Dream/Project raw reads are in DVC snapshot `11afb7f`, but have no canonical memory projection yet; follow the remaining evidence gates. |
+| Web memory/configuration capability census | **Active; Qwen and Gemini Instructions committed locally with DVC remote synchronized; Git push pending** | [Pending capture](extractor-engineering/web-memory-capture-backlog.md), [memory architecture](product/agent-memory-architecture.md) | ChatGPT, Claude.ai and Perplexity are already published. Qwen's 114 saved memories and one account instruction, plus Gemini's one historically preserved account instruction, have versioned canonical projections in the current local commit. Kimi's native Memory/settings/Dream/Project raw reads are in DVC snapshot `11afb7f`, without canonical memory projection. |
 
 Google Drive remains the active remote while alternatives are researched. This
 is not an active migration or a freeze of the normal capture/publish workflow.
@@ -87,11 +87,19 @@ and versioned projection. Perplexity now captures its paginated account Memory
 GraphQL collection with native IDs and full-response snapshots; one record was
 validated in the available account. Their raw captures and canonical Parquets
 are included in that snapshot. Other web sources remain subject to the
-capability census.
+capability census. Qwen now has complete paginated account Memory snapshots
+and a separate Customize Qwen settings read for both active accounts; the
+focused local projection adds 114 saved memories and one account instruction.
+This Qwen checkpoint is synchronized to DVC and committed locally; Git push is pending.
+Gemini now projects its native Instructions list as account-scoped, versioned
+records. The historical account-1 item remains queryable as
+`preserved_missing`; fresh isolated reads of all three accounts returned
+explicit empty lists. The Gemini checkpoint is synchronized to DVC and
+committed locally in the same update; Git push is pending.
 Scope must be discovered from captured
 evidence rather than assumed in advance. Native memory, account-global
 instructions and project-scoped prompts are separate surfaces: Gemini
-Instructions cannot be generalized from project definitions elsewhere, and
+Instructions were compared with account-global surfaces, not project prompts, and
 NotebookLM sources/chat/generated assets are not memory or instructions.
 The asset front has since
 materialized that central physical home: `data/assets` and its preservation
