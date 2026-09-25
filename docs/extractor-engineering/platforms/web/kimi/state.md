@@ -130,7 +130,9 @@ for convs + assets cumulativos.
   not made complete by this narrow read, and Skills remain a separate object.
 - These new raw reads are not yet parsed into canonical memory/project-context
   rows. Capture of a non-empty native item, account instruction value or
-  populated Project context is needed before defining those projections.
+  populated Project context is needed before defining those projections. The
+  focused raw snapshot was published through DVC pointer commit `11afb7f` on
+  2026-09-25.
 
 ### Reference volume (smoke 2026-05-09)
 
