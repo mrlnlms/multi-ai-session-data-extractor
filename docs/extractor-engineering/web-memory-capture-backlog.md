@@ -53,8 +53,9 @@ values in 88 local rows), and Project Context remains distinct from memory.
 The Parquets and DVC pointers were published with Git/DVC commit `f4e2559`;
 archive assurance passed after publication.
 
-ChatGPT Project **settings/detail capture is implemented and locally
-materialized**, separate from the already-published account-memory round.
+ChatGPT Project **settings/detail capture is implemented, projected and
+published** in Git and DVC commit `c875ccc`, separate from the earlier
+account-memory round.
 Immutable per-account detail snapshots preserve the complete native response;
 nonempty Project instructions project as scoped `project_instructions`, while
 memory mode/enabled are raw settings, not memory items. The first read-only
@@ -85,7 +86,7 @@ instructions, native memories, Brain and history reuse are distinct objects.
 An existing Project, chat or file can guide investigation but does not prove a
 separate Project-memory record.
 
-### Needs a materialized owner item or entitlement to establish a baseline
+### Standby — resume only if owner evidence becomes available
 
 | Surface | Current boundary | Owner input that would unlock the next capture |
 |---|---|---|
@@ -100,7 +101,7 @@ separate Project-memory record.
 | [Gemini](platforms/web/gemini/state.md) | Instructions collection is implemented and tested, including empty-state and removal preservation. The separate learned-Memory UI was explored; no user-readable items were available to capture. | **Closed.** No more probing, monitoring, sample creation or inference from model answers is part of this work. |
 | [Grok](platforms/web/grok/state.md) | The bounded assessment found Project `customPersonality` context, not an account-global memory/instruction collection. | **Closed for current evidence.** No account-memory collection task is established. |
 
-### Owner samples to bring later, one at a time
+### Resume triggers (no action while these remain unavailable)
 
 - **Perplexity:** an existing Project with a nonempty Project Memory item or
   Project Brain record; account Brain only if the entitlement is available.

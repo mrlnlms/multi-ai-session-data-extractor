@@ -54,7 +54,7 @@ com os relatorios antes que suas funcoes tenham substitutos validados.
 | O que vem primeiro e qual trabalho esta pendente? | [../ROADMAP.md](../ROADMAP.md) | Prioridade operacional e sequencia corrente. |
 | Como o leitor deve interpretar identidades, branches e eventos? | [reader-and-identity-contract.md](reader-and-identity-contract.md) | Contrato tecnico mantido para identidade e fidelidade. |
 | Como funcionam hoje identidade, lifecycle, login local e sync por conta, e o que ainda depende da futura aplicacao? | [account-architecture.md](account-architecture.md) | Contrato atual do backend de contas e fronteira das decisoes futuras de produto/distribuicao. |
-| Quais hipoteses sobre login headless e compartilhamento de profiles precisam ser verificadas? | [browser-auth-investigation.md](browser-auth-investigation.md) | Investigacao futura; nao altera o contrato vigente de contas e autenticacao. |
+| O que ainda precisamos verificar sobre espaço e compartilhamento de profiles Chrome? | [chrome-profile-investigation.md](chrome-profile-investigation.md) | Hipótese em aberto; o contrato atual de contas e bindings continua vigente. |
 | Como o dashboard atual e operado? | [../operations/dashboard.md](../operations/dashboard.md) | Manual da superficie existente, nao arquitetura-alvo. |
 
 Quando existirem, planos temporarios, probes de decisao e handoffs de

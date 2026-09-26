@@ -24,7 +24,7 @@ conflicts with the entry or the task requires a fresh verification.
 | Prevent asset-copy rematerialization | **Completed and published** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the retention audit as a diagnostic after future capture changes. |
 | Canonical account identity and analytical dimension | **Completed and published** | [Account architecture](product/account-architecture.md) | Preserve the UUID-only contract; treat memory/configuration as a separate front. |
 | CLI memory/configuration coverage | **Completed and published (2026-09-23)** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the demonstrated Claude Code/Codex/Gemini CLI contracts; revisit Antigravity Knowledge only if an inspectable native item or stable payload becomes available, and treat a future owner-created Project separately as project context. |
-| Web memory/configuration front | **Practical round handled six platforms; three others have bounded capability assessment; follow-ups remain separate** | [Practical round and follow-ups](extractor-engineering/web-memory-capture-backlog.md), [memory architecture](product/agent-memory-architecture.md) | ChatGPT, Claude.ai, Perplexity, Qwen and Gemini have projected demonstrated surfaces. Kimi's observed empty surfaces have native raw reads but no memory projection. Grok, DeepSeek and NotebookLM have no separate materialized account-memory collection demonstrated in the maintained assessment; do not confuse their census with a vertical capture integration. |
+| Web memory/configuration front | **First round complete; evidence-gated follow-ups on standby** | [First round and standby items](extractor-engineering/web-memory-capture-backlog.md), [memory architecture](product/agent-memory-architecture.md) | Resume only if a concrete Perplexity Brain/Project Memory surface or nonempty Kimi memory/context value becomes available. Gemini and Grok are closed for this scope; DeepSeek and NotebookLM have no separate memory task without a concrete native surface. |
 
 Google Drive remains the active remote while alternatives are researched. This
 is not an active migration or a freeze of the normal capture/publish workflow.
@@ -76,7 +76,7 @@ CLI/manual identities. The first memory/configuration front is now complete:
 Claude Code and Codex durable representations are versioned, Gemini CLI context
 coverage is bounded, and Antigravity preserves its complete conversation
 `brain/` while keeping the product's unobserved Knowledge feature separate.
-The active web front now includes ChatGPT's complete saved-memory/instruction
+The completed web capture round includes ChatGPT's complete saved-memory/instruction
 JSON, summary SSE/final JSON/checksum and per-account capture history, validated
 in focused live collections for both configured accounts and published through
 the DVC snapshot `d3e8d5f`. ChatGPT now projects records, content versions and
@@ -87,12 +87,13 @@ and versioned projection. Perplexity now captures its paginated account Memory
 GraphQL collection with native IDs and full-response snapshots, plus scoped
 Project Instructions with immutable detail snapshots and versioned projection.
 One account-memory record and two Project instruction records were validated
-in the available account. The account-memory capture is in DVC snapshot
-`d3e8d5f`; the new Project settings and canonical projection are materialized
-locally and await an authorized publication. The practical round handled six platforms at
-their documented evidence boundaries; the three other web platforms have only
-a bounded capability assessment. Narrower follow-ups are listed separately in
-the [web memory record](extractor-engineering/web-memory-capture-backlog.md).
+in the available account. The account-memory capture and the Project settings
+and canonical projection are published through Git and DVC in commit
+`c875ccc`. The practical round handled six platforms at their documented
+evidence boundaries; the three other web platforms have only a bounded
+capability assessment. The first round is complete. Evidence-gated follow-ups
+are on standby and are listed in the
+[web memory record](extractor-engineering/web-memory-capture-backlog.md).
 Qwen now has complete paginated account Memory snapshots
 and a separate Customize Qwen settings read for both active accounts; the
 focused projection adds 114 saved memories and one account instruction.
@@ -306,18 +307,15 @@ Parser and schema refinements should be made incrementally when the reader
 provides concrete evidence. A full anticipatory rewrite of all sources is not a
 prerequisite.
 
-### Authentication and browser profile model
+### Chrome profile storage and reuse
 
-**Status:** future internal investigation; hypotheses not yet verified.
+**Status:** future internal investigation; hypothesis not yet verified.
 
-Disk-use investigation raised two related questions: whether sources that
-support it can use a persisted session headlessly after interactive login,
-and whether accounts on different platforms can safely share a local browser
-profile by authentication identity while accounts on the same platform stay
-isolated. The existing account contract already states that Google/Chrome Sync
-is optional and is not evidence of upstream authentication; verify that
-onboarding makes this clear in practice. Per-source validation and risks are
-recorded in the [browser authentication investigation](product/browser-auth-investigation.md).
+Disk-use investigation raised the hypothesis that multiple platform accounts
+using the same Google identity might share a local Chrome profile and reduce
+duplicated storage. This remains unverified. Google/Chrome Sync is optional
+and is not evidence of upstream authentication. Scope and evidence needs are
+recorded in the [Chrome profile investigation](product/chrome-profile-investigation.md).
 
 ## Decisions requiring explicit direction
 
