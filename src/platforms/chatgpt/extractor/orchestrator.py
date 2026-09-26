@@ -11,6 +11,7 @@ from pathlib import Path
 from playwright.async_api import async_playwright
 
 from src.platforms.chatgpt.extractor.account_memory import capture_account_memory
+from src.platforms.chatgpt.extractor.project_settings import capture_project_settings
 from src.platforms.chatgpt.extractor.api_client import ChatGPTAPIClient
 from src.platforms.chatgpt.extractor.auth import get_profile_dir
 from src.platforms.chatgpt.extractor.discovery import discover_all
@@ -151,6 +152,8 @@ async def run_capture(
                     })
                 if not options.dry_run:
                     await capture_account_memory(client, output_dir, report)
+                    settings = await capture_project_settings(client, output_dir)
+                    report.errors.extend(settings["errors"])
                 await context.close()
                 _finalize_report(report, started_at)
                 _append_capture_log(output_dir, report)
@@ -299,6 +302,8 @@ async def run_capture(
                 report.voice_pass_counts = {"candidates": 0, "captured": 0}
 
         await capture_account_memory(client, output_dir, report)
+        settings = await capture_project_settings(client, output_dir)
+        report.errors.extend(settings["errors"])
 
         try:
             pinned_gizmos = await client.list_pinned_gizmos()

@@ -105,11 +105,20 @@ entrada ou o JSON completo serializado deterministicamente para resumo e
 instrucoes. A resposta original continua preservada no raw.
 
 Os tipos web em `kind` sao `saved_memory`, `project_memory`, `memory_summary`,
-`account_instructions` e `legacy_export`. Eles mantem distintas as memorias
+`account_instructions`, `project_instructions` e `legacy_export`. Eles mantem distintas as memorias
 nativas, a sintese exibida pela plataforma e as instrucoes explicitas da conta.
 As colunas das tres tabelas permanecem compativeis com as fontes CLI; apenas
 esses valores de `kind` foram acrescentados. Unify, dashboard e Quarto consomem
 essas tabelas, sem promover instrucoes a memorias nativas.
+
+No ChatGPT, `project_instructions` usa o ID nativo do Project em `project_key`
+e identidade `chatgpt:<account_id>:project_instructions/<project_id>`. O texto
+vem somente de `gizmo.instructions` em snapshots completos e verificados de
+`GET /backend-api/gizmos/{project_id}`. A data de criacao/atualizacao da
+projecao e de observacao da captura, nao um timestamp nativo das instrucoes.
+`memory_scope` e `memory_enabled` permanecem no raw nativo e na evidencia da
+observacao; nao produzem documentos `AgentMemory` nem itens de memoria de
+Project. Uma lista parcial de Projects nao estabelece ausencias.
 
 ## Projecao web do Claude.ai
 

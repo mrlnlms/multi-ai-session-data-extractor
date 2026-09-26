@@ -385,7 +385,8 @@ class Branch:
 
 VALID_MEMORY_KINDS = (
     "user", "feedback", "project", "reference", "index", "other",
-    "saved_memory", "project_memory", "memory_summary", "account_instructions", "legacy_export",
+    "saved_memory", "project_memory", "memory_summary", "account_instructions",
+    "project_instructions", "legacy_export",
 )
 VALID_MEMORY_TIMESTAMP_CONFIDENCE = ("high", "medium", "low", "unknown")
 

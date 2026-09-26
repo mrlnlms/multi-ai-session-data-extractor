@@ -7,7 +7,8 @@
   binding under `.storage/`; selective sync uses
   `python -m src.workflows.account_sync <account_id> --apply`.
 - **Sync orchestrator (4 steps):** `python -m src.platforms.chatgpt.commands.sync` — capture +
-  assets + project_sources + reconcile.
+  assets + project_sources + reconcile. The capture stage also reads Project
+  settings, including on its conversation-discovery fallback.
 - **Capture:** **headed** (Cloudflare detects headless). Project discovery is
   API-first via the sidebar index; DOM is a compatibility fallback only.
 - **Auth:** persistent profile in `.storage/chatgpt-profile-<account>/`
@@ -78,14 +79,47 @@ items was observed. No Project mutation, sync or raw capture was performed.
 The prior failure was a profile/Project access mismatch, not evidence of an
 expired ChatGPT login or a generally broken detail endpoint.
 
-Next implementation boundary: preserve Project detail/settings cumulatively
-under the correct account, and treat Project instructions as scoped response
-guidance while `memory_scope` and `memory_enabled` remain settings metadata.
-Do not create/change a Project or promote chats/files to memory to fill the
-missing item-list evidence. A Project-only payload value and any independently
-inspectable Project-memory item surface remain unobserved. Account saved
-memories, summary and Custom Instructions are already captured and projected
-as described below.
+### Project detail preservation and instructions projection (2026-09-26)
+
+The extractor now preserves the **complete decoded** response of
+`GET /backend-api/gizmos/{project_id}` in immutable, hashed per-account
+snapshots at `_project_settings/<project_id>/<capture>/`. Each `capture.json`
+records UTC observation time, request path, Project ID, complete read and
+whether the expected settings fields were present. A response with a new
+settings shape remains preserved but cannot imply cleared instructions. The
+payload remains in DVC-managed raw, including unknown native fields; no
+personal Project content enters Git. Project IDs come from current sidebar
+discovery plus already preserved raw/source/snapshot evidence, so an empty or
+partial discovery cannot imply deletion. An individual read failure leaves
+all previous snapshots intact and does not mark that Project missing.
+
+The narrow command
+`python -m src.platforms.chatgpt.commands.capture_project_settings --account <profile>`
+uses the local profile-to-catalog UUID binding and does **not** recapture
+conversations or account memories. Normal ChatGPT sync also runs this read.
+The parser verifies snapshot hashes and identity, then projects only **nonempty
+`gizmo.instructions`** into `AgentMemory` as `project_instructions`, with native
+Project ID in `project_key` and observation-based versions/evidence. Empty
+instructions remain in raw; clearing previously observed instructions retains
+the last version as `is_preserved_missing`. `memory_scope` and
+`memory_enabled` remain native settings metadata, not memory documents.
+Project chats, files and Sources are not promoted to memories.
+
+A focused read-only collection in both configured accounts saved **59**
+Project details; **12** had nonempty instructions. All 59 observed
+`memory_scope` values were `global` (the Default mode observed in the UI).
+One additional historical ID in the default account failed its detail read;
+it was reported without an absence inference. The current Parquet projection
+has 12 `project_instructions` rows in addition to the previously captured
+account records. This is an observed snapshot, not proof that Project-only
+does not exist or that all historical Projects remain accessible. A
+Project-only native value is still unobserved in this archive.
+
+[OpenAI's Projects documentation](https://help.openai.com/en/articles/10169521-projects-in-chatgpt)
+currently says Project memory has no personal-memory-like item list, and
+describes changing the mode in Project settings. We therefore do not claim
+an independently inspectable Project-memory item collection. No Project was
+created, changed or deleted during this work.
 
 The extractor calls `GET /backend-api/memories` with
 `include_memory_entries=true` and preserves the complete decoded response in

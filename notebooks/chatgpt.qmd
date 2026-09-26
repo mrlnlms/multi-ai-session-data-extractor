@@ -44,7 +44,9 @@ _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_
 > DALL-E (in ToolEvent), uploads (in Message), tether_quote, canvas,
 > deep_research, custom_gpt vs project distinction, preservation
 > (`is_preserved_missing`, `last_seen_in_server`), and versioned account
-> memories, summaries and instructions with explicit temporal evidence.
+> memories, summaries, account instructions and Project-scoped instructions
+> with explicit temporal evidence. Project memory mode is raw settings metadata,
+> not an item-level memory document.
 
 {{< include _template.qmd >}}
 

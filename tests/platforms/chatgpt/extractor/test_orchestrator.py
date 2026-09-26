@@ -4,7 +4,7 @@ import pytest
 import json
 from pathlib import Path
 
-from src.platforms.chatgpt.extractor.models import CaptureOptions, ConversationMeta
+from src.platforms.chatgpt.extractor.models import CaptureOptions, ConversationMeta, ProjectMeta
 from src.platforms.chatgpt.extractor.orchestrator import run_capture
 
 
@@ -55,6 +55,13 @@ async def test_run_capture_produces_raw_file(tmp_path, mocker, fallback, dry_run
     mock_client_inst.fetch_instructions.return_value = {"about_user": "dev"}
     mock_client_inst.fetch_memory_summary_checksum.return_value = {"isStale": False}
     mock_client_inst.fetch_memory_summary.return_value = 'event: done\ndata: {"sections": []}\n\n'
+    mock_client_inst.list_projects.return_value = [ProjectMeta(
+        id="g-p-test", name="Test", discovered_via="sidebar",
+    )]
+    mock_client_inst.fetch_project_detail.return_value = {
+        "gizmo": {"id": "g-p-test", "instructions": "Test", "memory_scope": "global",
+                  "memory_enabled": True}, "files": [],
+    }
     mock_client_cls = mocker.patch(
         "src.platforms.chatgpt.extractor.orchestrator.ChatGPTAPIClient",
         return_value=mock_client_inst,
@@ -84,6 +91,7 @@ async def test_run_capture_produces_raw_file(tmp_path, mocker, fallback, dry_run
         mock_client_inst.fetch_instructions.assert_not_awaited()
         mock_client_inst.fetch_memory_summary.assert_not_awaited()
         mock_client_inst.fetch_memory_summary_checksum.assert_not_awaited()
+        mock_client_inst.fetch_project_detail.assert_not_awaited()
         assert not (output_dir / "_account_memory").exists()
         return
 
@@ -91,6 +99,7 @@ async def test_run_capture_produces_raw_file(tmp_path, mocker, fallback, dry_run
     assert (output_dir / "chatgpt_memories.md").exists()
     assert (output_dir / "chatgpt_memories.json").exists()
     assert len(list((output_dir / "_account_memory").glob("*/*/capture.json"))) == 4
+    assert len(list((output_dir / "_project_settings" / "g-p-test").glob("*/capture.json"))) == 1
     assert (output_dir / "chatgpt_memory_summary.json").exists()
     assert (output_dir / "chatgpt_instructions.json").exists()
     assert (output_dir / "capture_log.jsonl").exists()

@@ -537,6 +537,15 @@ class ChatGPTAPIClient:
         next_cursor = data.get("cursor")
         return metas, next_cursor
 
+    async def fetch_project_detail(self, project_id: str) -> dict:
+        """Return the complete decoded Project detail, including settings."""
+        data = await self._request_with_retry(
+            "GET", f"{BASE_URL}/gizmos/{project_id}"
+        )
+        if not isinstance(data, dict):
+            raise ValueError("Unexpected Project detail response")
+        return data
+
     async def fetch_project_files(self, project_id: str) -> list[dict]:
         """Lista os knowledge files (sources) de um project.
 
@@ -545,9 +554,7 @@ class ChatGPTAPIClient:
         Cada file tem: id, file_id, name, type (MIME), size, created_at.
         Retorna [] se o project nao tem files uploaded.
         """
-        data = await self._request_with_retry(
-            "GET", f"{BASE_URL}/gizmos/{project_id}"
-        )
+        data = await self.fetch_project_detail(project_id)
         return data.get("files", []) or []
 
     async def get_project_file_download_url(

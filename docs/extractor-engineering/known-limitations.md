@@ -1,7 +1,7 @@
 # Known limitations
 
 Honest list of what **does not work** or **has not been validated**. Updated
-on 2026-09-25.
+on 2026-09-26.
 
 Limitations fall into 3 categories:
 
@@ -25,6 +25,13 @@ Limitations fall into 3 categories:
   is not a complete memory list. Summary loading uses the observed empty POST
   and may interact with server-side cache; forced regeneration and memory-edit
   controls are not used. See [ChatGPT state](platforms/web/chatgpt/state.md).
+- **Project settings:** complete Project detail responses now have per-account
+  raw history; nonempty Project instructions are versioned as scoped guidance.
+  Mode/enabled values remain settings metadata, not Project-memory items. All
+  59 locally observed modes are Default/`global`; a Project-only native value
+  has not been sampled. One historical Project detail read failed without an
+  absence inference. No separate inspectable Project-memory item list is
+  available in the documented product UI.
 - **Voice — 97% of transcripts already captured via Pass 1.** 127 of 131
   voice messages have transcript text populated (via raw heuristic
   detecting `audio_transcription` in parts). 4 voice messages end up

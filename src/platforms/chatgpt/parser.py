@@ -29,6 +29,7 @@ import pandas as pd
 from src.assets.reader import AssetReader
 from src.parsing.base import BaseParser
 from src.platforms.chatgpt.memory_parser import parse_account_memory
+from src.platforms.chatgpt.project_settings_parser import parse_project_instructions
 from src.platforms.chatgpt._parser_helpers import (
     classify_event_type,
     detect_canvas_signal,
@@ -108,9 +109,10 @@ class ChatGPTParser(BaseParser):
 
     def parse_account_memory(self) -> None:
         result = parse_account_memory(self.raw_root, self.account_id)
-        self.agent_memories = result.memories
-        self.agent_memory_versions = result.versions
-        self.agent_memory_temporal_evidence = result.temporal_evidence
+        projects = parse_project_instructions(self.raw_root, self.account_id)
+        self.agent_memories = result.memories + projects.memories
+        self.agent_memory_versions = result.versions + projects.versions
+        self.agent_memory_temporal_evidence = result.temporal_evidence + projects.temporal_evidence
 
     @staticmethod
     def _compute_last_run_date(convs: dict) -> Optional[str]:

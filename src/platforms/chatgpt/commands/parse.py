@@ -62,6 +62,7 @@ def main():
     for raw_dir in sorted(args.raw_root.glob("account-*")):
         if raw_dir.is_dir() and raw_dir.name not in known and (
             (raw_dir / "_account_memory").is_dir()
+            or (raw_dir / "_project_settings").is_dir()
             or (raw_dir / "chatgpt_memories.json").is_file()
             or (raw_dir / "chatgpt_instructions.json").is_file()
             or (raw_dir / "chatgpt_memory_summary.json").is_file()

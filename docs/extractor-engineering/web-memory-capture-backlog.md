@@ -53,6 +53,16 @@ values in 88 local rows), and Project Context remains distinct from memory.
 The Parquets and DVC pointers were published with Git/DVC commit `f4e2559`;
 archive assurance passed after publication.
 
+ChatGPT Project **settings/detail capture is implemented and locally
+materialized**, separate from the already-published account-memory round.
+Immutable per-account detail snapshots preserve the complete native response;
+nonempty Project instructions project as scoped `project_instructions`, while
+memory mode/enabled are raw settings, not memory items. The read-only run
+captured 59 Project details and projected 12 instruction documents. One
+historical ID failed a detail read without any missing/deletion inference.
+The Project-only native mode value remains unobserved; OpenAI does not expose
+a Project-memory item list analogous to saved personal memories.
+
 ## Follow-ups — separate surfaces, grouped by evidence gate
 
 These are **not unfinished six-platform-round work**. Project files,
@@ -64,7 +74,6 @@ separate Project-memory record.
 
 | Surface | Existing evidence | Next read-only check / possible later gate |
 |---|---|---|
-| [ChatGPT](platforms/web/chatgpt/state.md) Project settings and possible Project memory items | Account memory surfaces are covered. The UI and direct reads of `GET /backend-api/gizmos/{project_id}` return Project detail with `gizmo.instructions`, `memory_scope` and `memory_enabled`; the pictured Default Project has native scope `global`. The earlier generic "session expired" error was an HTTP 403 from using the wrong account profile for that Project; the correct profile returned 200. Current capture retains only files, and no separate Project-memory item list was observed. | Preserve Project detail/settings cumulatively under the correct account; keep instructions as Project-scoped guidance and memory mode as metadata, not as native memory items. Check a Project-only payload or independent memory-item collection only when observable; no more owner screenshots or re-login needed now. |
 | [Perplexity](platforms/web/perplexity/state.md) Project Instructions | Existing Project Settings exposes explicitly Project-scoped instructions, but their native read payload is not mapped. | Inspect the settings read without changing the Project. A non-empty owner sample may be needed only if the available settings are empty; keep instructions separate from Memory, Brain and Files/Links. |
 
 ### Needs a materialized owner item or entitlement to establish a baseline
@@ -90,8 +99,8 @@ separate Project-memory record.
 - **Kimi:** a nonempty Memory Instruction, or a Project with an instruction or
   other populated context; Dream Memory only if it becomes enabled/available.
 - **ChatGPT:** a Project-only mode example would confirm that mode's native
-  value. Do not change an existing Project solely for this investigation;
-  Project-detail capture can proceed from the current Default example.
+  value. Default Project-detail capture is already done. Do not change an
+  existing Project solely for this investigation.
 
 No artificial sample is requested for Gemini or Grok until the product shows
 an inspectable native record/surface. The owner need not collect all examples
@@ -107,12 +116,13 @@ current code, raw data and platform states before reuse.
 
 Claude Project memory is closed for the current native Melange topics and the
 preserved classic snapshots; do not recapture or reproject them to restart this
-front. The ChatGPT Project **read-only transport diagnosis is done**. The
-pictured Project is accessible through `account-2`, not `default`; its detail
-GET exposes instructions and memory-scope settings but no observed item-level
-Project memory. The next engineering step without owner input is cumulative
-Project-detail preservation under the correct account. Perplexity Project
-Instructions can also be inspected without a new item. The owner-item gates
+front. ChatGPT Project read-only transport diagnosis and detail preservation
+are done; the two-account capture and instruction projection are locally
+materialized. Do not redo account memory or call Project settings an item-level
+memory list. The remaining ChatGPT evidence gate is a naturally available
+Project-only mode example; do not change an existing Project solely to obtain
+it. Perplexity Project Instructions can also be inspected without a new item.
+The owner-item gates
 for Perplexity and Kimi, plus the unobserved native surfaces for Gemini and
 Grok, remain separate below. Ask only for the specific item or entitlement
 that unlocks a chosen gap.
