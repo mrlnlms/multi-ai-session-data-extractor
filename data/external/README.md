@@ -50,6 +50,7 @@ fazem UNION via `setup_views_with_manual()` em `src/reporting/quarto_helpers.py`
 | Conjunto | Consumo atual | Limite |
 |---|---|---|
 | `notebooklm-snapshots/` | O parser oficial do NotebookLM inclui o acervo historico, salvo uso deliberado de `--without-historical`. | O parser le o snapshot; o sync nao o recaptura. |
+| `claude-ai-snapshots/` | O parser oficial do Claude.ai le `users.json` e `memories.json` dos tres snapshots para projetar memoria classica de conta e Project, salvo `--without-historical`. | Os exports inteiros continuam imutaveis; conversas, Projects e demais campos nao sao importados por esse adaptador de memoria. |
 | `deepseek-snapshots/` | Evidencia historica e input conhecido da projecao de assets. | Nao substitui a captura atual nem autoriza descarte. |
 | `perplexity-orphan-threads/` | Evidencia historica para threads orfas e projecao de assets. | Continua fora da discovery regular. |
 | `*-config-snapshots/` | Criados apenas pela operacao explicita `python -m src.capture.cli.snapshot`. | Nao sao profiles ativos nem credenciais de runtime. |
@@ -105,7 +106,7 @@ Snapshot via extensão Chrome (3rd-party tool). Contém:
 51MB. Preservado pra recuperação. Possível parser futuro pra cross-validar
 com `chatgpt_conversations.parquet` do extractor.
 
-### claude-ai-snapshots/ ⏸ preservado (sem parser)
+### claude-ai-snapshots/ ✅ memoria historica parsavel
 
 Snapshots brutos Claude.ai pré-extractor — formato simples
 (conversations.json + memories.json + projects.json + users.json). Vindos
@@ -115,8 +116,12 @@ do projeto pai antes do extractor automatizado existir.
 - `2026-03-30/` — 26MB
 - `2026-04-18/` — 30MB
 
-Total 360MB. Possível parser futuro pra cross-validar com extractor atual
-(equivalente Claude.ai do que `chatgpt-extension-snapshot/` é pro ChatGPT).
+Total 360MB. O adaptador de memoria do parser oficial valida a identidade da
+conta e projeta 38 strings classicas de Project (com UUID de escopo) e uma
+string da conta, com versões de conteúdo e evidência datada por snapshot. Não
+inventa IDs de tópicos Melange nem horários nativos. Conversas e demais
+objetos permanecem apenas preservados; uma eventual análise de paridade desses
+objetos com o extractor atual é trabalho separado.
 
 ### deep-research-md/ ⏸ preservado (sem parser)
 

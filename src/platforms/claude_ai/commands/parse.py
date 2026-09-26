@@ -16,6 +16,7 @@ Output em data/processed/Claude.ai/:
 Uso:
     PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.parse
     PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.parse --merged-root <path> --output-dir <dir>
+    PYTHONPATH=. .venv/bin/python -m src.platforms.claude_ai.commands.parse --without-historical
 """
 
 import argparse
@@ -25,6 +26,7 @@ from pathlib import Path
 from src.accounts import account_presentation, uses_legacy_account_layout
 from src.account_identity import resolve_account_id, stamp_account_id_rows
 from src.platforms.claude_ai.parser import ClaudeAIParser
+from src.platforms.claude_ai.historical_memory import parse_historical_memory
 from src.platforms.claude_ai.memory_parser import parse_account_memory
 
 
@@ -37,6 +39,15 @@ def main():
     ap.add_argument(
         "--raw-root", type=Path, default=Path("data/raw/Claude.ai"),
         help="Pasta raw com historico de memorias por conta",
+    )
+    ap.add_argument(
+        "--external-root", type=Path,
+        default=Path("data/external/claude-ai-snapshots"),
+        help="Snapshots estruturados historicos de Claude.ai",
+    )
+    ap.add_argument(
+        "--without-historical", action="store_true",
+        help="Excluir deliberadamente os snapshots historicos desta projecao",
     )
     ap.add_argument(
         "--output-dir", type=Path, default=Path("data/processed/Claude.ai"),
@@ -103,6 +114,16 @@ def main():
         parser.agent_memories.extend(per_account.agent_memories)
         parser.agent_memory_versions.extend(per_account.agent_memory_versions)
         parser.agent_memory_temporal_evidence.extend(per_account.agent_memory_temporal_evidence)
+
+    if not args.without_historical:
+        historical = parse_historical_memory(args.external_root, args.catalog_path)
+        current_ids = {item.memory_id for item in parser.agent_memories}
+        repeated_ids = current_ids.intersection(item.memory_id for item in historical.memories)
+        if repeated_ids:
+            raise ValueError("Claude historical memory identity collides with current capture")
+        parser.agent_memories.extend(historical.memories)
+        parser.agent_memory_versions.extend(historical.versions)
+        parser.agent_memory_temporal_evidence.extend(historical.temporal_evidence)
 
     log.info(
         f"Parseado: {len(parser.conversations)} convs, "

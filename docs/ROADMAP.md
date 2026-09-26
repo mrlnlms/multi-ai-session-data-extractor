@@ -24,7 +24,7 @@ conflicts with the entry or the task requires a fresh verification.
 | Prevent asset-copy rematerialization | **Completed and published** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the retention audit as a diagnostic after future capture changes. |
 | Canonical account identity and analytical dimension | **Completed and published** | [Account architecture](product/account-architecture.md) | Preserve the UUID-only contract; treat memory/configuration as a separate front. |
 | CLI memory/configuration coverage | **Completed and published (2026-09-23)** | [Known limitations](extractor-engineering/known-limitations.md) | Keep the demonstrated Claude Code/Codex/Gemini CLI contracts; revisit Antigravity Knowledge only if an inspectable native item or stable payload becomes available, and treat a future owner-created Project separately as project context. |
-| Web memory/configuration capability census | **Active; ChatGPT, Claude.ai, Perplexity, Qwen and Gemini Instructions published** | [Pending capture](extractor-engineering/web-memory-capture-backlog.md), [memory architecture](product/agent-memory-architecture.md) | Qwen's 114 saved memories and one account instruction, plus Gemini's one historically preserved account instruction, have versioned canonical projections. Kimi's native Memory/settings/Dream/Project raw reads are in DVC snapshot `11afb7f`, without canonical memory projection. |
+| Web memory/configuration front | **Practical round handled six platforms; three others have bounded capability assessment; follow-ups remain separate** | [Practical round and follow-ups](extractor-engineering/web-memory-capture-backlog.md), [memory architecture](product/agent-memory-architecture.md) | ChatGPT, Claude.ai, Perplexity, Qwen and Gemini have projected demonstrated surfaces. Kimi's observed empty surfaces have native raw reads but no memory projection. Grok, DeepSeek and NotebookLM have no separate materialized account-memory collection demonstrated in the maintained assessment; do not confuse their census with a vertical capture integration. |
 
 Google Drive remains the active remote while alternatives are researched. This
 is not an active migration or a freeze of the normal capture/publish workflow.
@@ -86,10 +86,13 @@ topic collection, with native IDs, per-topic reads, complete-list safeguards
 and versioned projection. Perplexity now captures its paginated account Memory
 GraphQL collection with native IDs and full-response snapshots; one record was
 validated in the available account. Their raw captures and canonical Parquets
-are included in that snapshot. Other web sources remain subject to the
-capability census. Qwen now has complete paginated account Memory snapshots
+are included in that snapshot. The practical round handled six platforms at
+their documented evidence boundaries; the three other web platforms have only
+a bounded capability assessment. Narrower follow-ups are listed separately in
+the [web memory record](extractor-engineering/web-memory-capture-backlog.md).
+Qwen now has complete paginated account Memory snapshots
 and a separate Customize Qwen settings read for both active accounts; the
-focused local projection adds 114 saved memories and one account instruction.
+focused projection adds 114 saved memories and one account instruction.
 This Qwen checkpoint is published through Git and DVC.
 Gemini now projects its native Instructions list as account-scoped, versioned
 records. The historical account-1 item remains queryable as
@@ -128,11 +131,10 @@ CLI memory/configuration front is recorded in
 [Claude Code](extractor-engineering/platforms/cli/claude-code/state.md),
 [Codex](extractor-engineering/platforms/cli/codex/state.md) and
 [Antigravity](extractor-engineering/platforms/cli/antigravity-cli/state.md)
-state records. The next web census uses each platform state before deeper
-investigation of the already preserved
-[ChatGPT](extractor-engineering/platforms/web/chatgpt/state.md) and
-[Claude.ai](extractor-engineering/platforms/web/claude-ai/state.md)
-representations.
+state records. The practical web round and its evidence-dependent follow-ups are
+separated in the [web memory record](extractor-engineering/web-memory-capture-backlog.md);
+existing ChatGPT and Claude.ai account/Project memory coverage is not an
+unfinished platform pass.
 The completed rematerialization correction is grounded in the
 [current physical layout](#physical-asset-layout) and the
 [published coverage contract](extractor-engineering/asset-coverage.md).

@@ -35,6 +35,58 @@ the "Dive Deeper" links are unverified; their appearance alone does not
 establish links to source conversations. Personal content visible in the
 screenshots is intentionally omitted here.
 
+### Project settings follow-up — owner screenshots and read-only probe (2026-09-25)
+
+The owner showed a new-Project dialog with **Default memory** (the Project can
+access memory from outside chats, and vice versa) and **Project-only memory**
+(the Project can access only its own memory, hidden from outside chats; the UI
+also says Work in the cloud is unavailable for that mode). Later screenshots
+of an existing Project showed separate **Instructions**, **Memory** and
+**Library access** fields. Its Instructions field was empty, Memory displayed
+Default, and opening that field offered both Default and Project-only. This
+corrects the initial hypothesis that Project-only was selectable only during
+creation. No change was submitted or saved, so persistence of a mode switch
+was not tested. The owner noted that the interface had changed that day; these
+are observations of that UI, not a timeless product contract.
+
+The Memory selector demonstrates Project memory *scope*, not a list of
+individually inspectable Project memories. Project instructions are scoped
+response guidance; Library access, Sources/files and chats are distinct
+context. The screenshots do not establish a separate native Project-memory
+collection, item ID or lifecycle. Personal Project names and contents are
+omitted from this maintained record.
+
+The current `fetch_project_files()` already requests
+`GET /backend-api/gizmos/{project_id}` but returns only its `files` array;
+the rest of the detail response is not preserved by that path. The first
+read-only probe used the `default` Playwright profile and received the generic
+"Sessao ChatGPT expirou" error for the Project shown by the owner. The client
+maps both HTTP 401 and 403 to that message, so the error did not establish a
+logout. Chrome browser sign-in and ChatGPT website sign-in are separate.
+
+A follow-up read-only transport check resolved that ambiguity. The UI loaded
+seven other Project details through this same GET with HTTP 200 in the
+`default` profile; direct browser-page and request-context GETs for one of
+those Projects also returned 200. The owner's pictured Project returned **403
+under `default`, but 200 under the existing `account-2` profile**. Its
+authorized detail response contained `gizmo.memory_scope="global"`,
+`gizmo.memory_enabled=true` and an empty string in `gizmo.instructions`; the
+same Project displayed Default in the owner's UI. Other observed Project
+details used `memory_scope="global"`, and one had nonempty instructions.
+The response also contained `files`, but no separate list of Project-memory
+items was observed. No Project mutation, sync or raw capture was performed.
+The prior failure was a profile/Project access mismatch, not evidence of an
+expired ChatGPT login or a generally broken detail endpoint.
+
+Next implementation boundary: preserve Project detail/settings cumulatively
+under the correct account, and treat Project instructions as scoped response
+guidance while `memory_scope` and `memory_enabled` remain settings metadata.
+Do not create/change a Project or promote chats/files to memory to fill the
+missing item-list evidence. A Project-only payload value and any independently
+inspectable Project-memory item surface remain unobserved. Account saved
+memories, summary and Custom Instructions are already captured and projected
+as described below.
+
 The extractor calls `GET /backend-api/memories` with
 `include_memory_entries=true` and preserves the complete decoded response in
 `chatgpt_memories.json`, including unknown fields and native IDs/timestamps.

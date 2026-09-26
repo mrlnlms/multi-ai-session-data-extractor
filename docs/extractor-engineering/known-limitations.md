@@ -332,9 +332,11 @@ These validations require a Pro Max account and remain open until someone tests:
   preserved response, five create requests lack usable content evidence and two
   successful regex patches cannot be reproduced exactly; none is fabricated as
   a file. ChatGPT and Claude.ai memory records use the versioned `AgentMemory`
-  domain. Claude.ai preserves native Melange topics by account and project,
-  while older overwritten Markdown and pre-extractor snapshots cannot recover
-  earlier per-topic versions or dates. Neither belongs in the
+  domain. Claude.ai preserves native Melange topics by account and project;
+  three pre-extractor snapshots additionally project whole classic account
+  and Project strings with dated-snapshot provenance. They do not supply
+  native per-topic Melange IDs or creation/update times, and the older
+  overwritten Markdown cannot recover earlier versions. Neither belongs in the
   Asset graph. Claude.ai extracted artifact
   versions are indexed as exact message outputs; Claude inline `attachments`
   remain text-bearing message metadata rather than fake binaries. Perplexity

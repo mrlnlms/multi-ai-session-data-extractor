@@ -125,9 +125,16 @@ enquanto a data de criacao fica limitada a primeira observacao. O Markdown
 classico anterior fica como `legacy_export`, sem subdivisao inventada.
 
 As capturas locais de 2026-09-25 cobrem 149 topicos nas duas contas, dos quais
-124 sao de projeto, mais dois Markdown legados. A estrutura historica em
-`data/external/claude-ai-snapshots` continua preservada sem ligacao presumida
-ao UUID do catalogo. Nao foi observada uma exclusao real de topico; a regra
+124 sao de projeto, mais dois Markdown legados. Os tres exports estruturados
+datados em `data/external/claude-ai-snapshots` foram atribuidos a segunda
+conta Claude.ai catalogada por identidade exportada e sobreposicao de UUIDs
+de Project. O parser oficial agora projeta suas 38 strings classicas de
+Project e uma string de conversa da conta como `legacy_export`, com UUID de
+Project em `project_key` quando aplicavel: 39 documentos, 41 versoes e 117
+evidencias de data de snapshot. O conteudo classico nao se mistura aos topicos
+Melange, e a data do diretorio e evidencia de precisao diaria, nao timestamp
+nativo de criacao/edicao. O Parquet Claude.ai passou a 190 documentos de
+memoria. Nao foi observada uma exclusao real de topico Melange; a regra
 `is_preserved_missing` sera exercida por listas completas futuras.
 
 ## Projecao web do Perplexity

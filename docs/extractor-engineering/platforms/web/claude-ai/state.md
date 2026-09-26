@@ -79,9 +79,49 @@ Automatic recovery from transient timeouts via `python -m src.platforms.claude_a
 - Topic edit/delete controls are visible in the UI, but no upstream mutation
   was performed. Future complete lists can establish `is_preserved_missing`;
   the current capture has zero missing topics. The three dated
-  `data/external/claude-ai-snapshots` are earlier structured/classic states;
-  their native account identifier has not been proven to match a catalog UUID,
-  so they are retained separately rather than attributed to either live account.
+  `data/external/claude-ai-snapshots` are earlier structured/classic states,
+  retained separately from current Melange topics.
+
+### Historical structured snapshots — identity audit (2026-09-25)
+
+The 2026-03-26, 2026-03-30 and 2026-04-18 snapshots can now be attributed to
+the **second catalogued Claude.ai account** without owner input. In each
+snapshot, `memories.json[0].account_uuid` equals the exported `users.json`
+user UUID, and that user's email matches exactly one Claude.ai catalog entry.
+The exported Project IDs overlap the raw Project IDs of that account by
+82/85, 82/82 and 83/83 respectively, with zero overlap against the other
+account. Each `memories.json` contains 38 nonempty Project-memory strings;
+all 38 Project scopes also occur in the second account's current Melange
+Project-topic listing. Scope/identity overlap does **not** mean that classic
+and Melange content are equivalent. The Project strings were unchanged across
+these three exports, while the account conversation-memory string changed.
+
+The official Claude parser now reads only their `users.json` and
+`memories.json` as a separate historical adapter. It validates exported user
+identity against the catalog and projects 39 classic `legacy_export` documents:
+38 with their native Project UUID in `project_key` and one account conversation
+memory. The three dates produce 41 distinct content versions (the 38 Project
+strings did not change; the account string did) and 117 temporal-evidence rows.
+The date in each directory is recorded as **day-precision snapshot evidence**,
+not as native creation/update time. The adapter does not split classic strings
+into invented Melange topics, mark them `preserved_missing`, or overwrite the
+current 124 Project topics. The locally materialized Claude result now has 190
+memory documents, including the 149 current Melange topics and two older
+opaque Markdown exports; local unify includes the 39 structured historical
+documents.
+
+The regular `python -m src.platforms.claude_ai.commands.parse` includes these
+snapshots when materialized. `--without-historical` is an explicit opt-out;
+missing dated snapshots otherwise fail the parse instead of silently dropping
+preserved history. The original exports remain immutable in `data/external/`.
+No new owner export or account confirmation is needed. Their other exported
+objects, including conversations and Project metadata, are not imported by
+this memory adapter and remain preserved as historical source material.
+Project Instructions are already retained separately as `prompt_template` in
+`claude_ai_project_metadata.parquet` (32 nonempty values among 88 current
+Project rows); Project docs/context are separate again. Neither is relabeled
+as native Project memory. This local projection is validated but not yet
+committed or pushed to Git/DVC remotes.
 
 Binaries + artifacts (code/markdown/html/react via `tool_use`) extracted
 during asset download.
