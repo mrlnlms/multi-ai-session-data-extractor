@@ -105,9 +105,9 @@ strings did not change; the account string did) and 117 temporal-evidence rows.
 The date in each directory is recorded as **day-precision snapshot evidence**,
 not as native creation/update time. The adapter does not split classic strings
 into invented Melange topics, mark them `preserved_missing`, or overwrite the
-current 124 Project topics. The locally materialized Claude result now has 190
+current 124 Project topics. The published Claude result now has 190
 memory documents, including the 149 current Melange topics and two older
-opaque Markdown exports; local unify includes the 39 structured historical
+opaque Markdown exports; unify includes the 39 structured historical
 documents.
 
 The regular `python -m src.platforms.claude_ai.commands.parse` includes these
@@ -120,8 +120,8 @@ this memory adapter and remain preserved as historical source material.
 Project Instructions are already retained separately as `prompt_template` in
 `claude_ai_project_metadata.parquet` (32 nonempty values among 88 current
 Project rows); Project docs/context are separate again. Neither is relabeled
-as native Project memory. This local projection is validated but not yet
-committed or pushed to Git/DVC remotes.
+as native Project memory. This projection was published in Git and DVC with
+commit `f4e2559`; archive assurance passed after publication.
 
 Binaries + artifacts (code/markdown/html/react via `tool_use`) extracted
 during asset download.

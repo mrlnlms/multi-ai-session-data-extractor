@@ -50,8 +50,8 @@ retained as scope, not treated as a Melange topic ID. No new owner input or
 platform mutation is needed for this Claude memory work. Project Instructions
 already live separately in Project metadata (`prompt_template`; 32 nonempty
 values in 88 local rows), and Project Context remains distinct from memory.
-The new local Parquets and DVC pointers are validated; remote publication has
-not been requested in this turn.
+The Parquets and DVC pointers were published with Git/DVC commit `f4e2559`;
+archive assurance passed after publication.
 
 ## Follow-ups — separate surfaces, grouped by evidence gate
 
