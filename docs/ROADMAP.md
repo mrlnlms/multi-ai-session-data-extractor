@@ -6,7 +6,7 @@ than duplicating it here. Completed work is marked here so its status can be
 read without searching Git history; implementation detail belongs in `git log`,
 and platform-specific behavior belongs in its own documentation.
 
-**Last reviewed:** 2026-09-25.
+**Last reviewed:** 2026-09-26.
 
 For one-time work, use **planned**, **active**, or **completed**. Mark completion
 when closing the work, with its date and an evidence pointer when available.
@@ -84,9 +84,12 @@ temporal evidence into the existing memory tables; dashboard and Quarto expose
 the added coverage. Claude.ai now captures the account and project Melange
 topic collection, with native IDs, per-topic reads, complete-list safeguards
 and versioned projection. Perplexity now captures its paginated account Memory
-GraphQL collection with native IDs and full-response snapshots; one record was
-validated in the available account. Their raw captures and canonical Parquets
-are included in that snapshot. The practical round handled six platforms at
+GraphQL collection with native IDs and full-response snapshots, plus scoped
+Project Instructions with immutable detail snapshots and versioned projection.
+One account-memory record and two Project instruction records were validated
+in the available account. The account-memory capture is in DVC snapshot
+`d3e8d5f`; the new Project settings and canonical projection are materialized
+locally and await an authorized publication. The practical round handled six platforms at
 their documented evidence boundaries; the three other web platforms have only
 a bounded capability assessment. Narrower follow-ups are listed separately in
 the [web memory record](extractor-engineering/web-memory-capture-backlog.md).
@@ -303,6 +306,19 @@ Parser and schema refinements should be made incrementally when the reader
 provides concrete evidence. A full anticipatory rewrite of all sources is not a
 prerequisite.
 
+### Authentication and browser profile model
+
+**Status:** future internal investigation; hypotheses not yet verified.
+
+Disk-use investigation raised two related questions: whether sources that
+support it can use a persisted session headlessly after interactive login,
+and whether accounts on different platforms can safely share a local browser
+profile by authentication identity while accounts on the same platform stay
+isolated. The existing account contract already states that Google/Chrome Sync
+is optional and is not evidence of upstream authentication; verify that
+onboarding makes this clear in practice. Per-source validation and risks are
+recorded in the [browser authentication investigation](product/browser-auth-investigation.md).
+
 ## Decisions requiring explicit direction
 
 | Decision | Why it is not automatic | Evidence | First step once chosen |
@@ -340,3 +356,31 @@ does not retain the ability to fetch a later server-side revision.
 
 None currently prioritized. The unified set covers 13 sources: the original
 platform expansion through Grok and Kimi plus the later Antigravity CLI source.
+
+### Local agent and computer-use session sources
+
+**Status:** future source-modeling investigation; no ingestion commitment.
+
+A macOS disk-space investigation surfaced a possible Claude Desktop/Cowork
+source at
+`~/Library/Application Support/Claude/local-agent-mode-sessions/`. It appears
+to contain local agent execution traces, including comparatively large
+`audit.jsonl` files, `local_<uuid>.json` session records, session uploads,
+Cowork/plugin configuration, debug logs and local execution metadata. This is
+an initial filesystem observation, not yet a validated capture contract or a
+complete inventory of the source.
+
+When source modeling resumes, assess local agent/computer-use sessions as a
+distinct interaction class alongside conversation-oriented web chat and CLI
+agent sessions. The potential value is preserving tool/action traces, files
+and execution context, and determining whether and how they relate to a
+conversation. Keep provenance distinct from Claude Code CLI and Claude web.
+Investigate comparable agentic or computer-use modes in other products,
+including ChatGPT Work, rather than assuming their activity is represented in
+ordinary chat exports.
+
+Do not ingest the tree indiscriminately. The observed tree also includes files
+such as `.credentials.json`; any future collection needs explicit exclusions
+for credentials, tokens, cookies and other secrets. Treat `audit.jsonl` as a
+candidate execution log, then establish its meaning and completeness against
+session metadata and upload relationships before defining a parser or schema.

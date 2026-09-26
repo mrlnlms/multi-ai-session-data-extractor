@@ -32,6 +32,12 @@ O comando resolve o UUID pelo binding local e grava snapshots imutaveis em
 `data/raw/ChatGPT/`; depois, execute o parse ChatGPT e unify para atualizar as
 tabelas canonicas. Ele nao publica DVC ou Git.
 
+Para ler somente configuracoes dos Projects do Perplexity, use
+`python -m src.platforms.perplexity.commands.capture_project_settings --account PROFILE_KEY`.
+O comando grava snapshots locais de `get_collection`, sem capturar conversas,
+memoria da conta ou assets. Depois execute o parse Perplexity e unify para
+materializar instrucoes de Project; ele nao publica DVC ou Git.
+
 O inventario tecnico de contas e lido por `src/accounts.py` a partir dos
 defaults compativeis, do registro privado, dos profiles e das arvores
 raw/merged preservadas. Essas evidencias nao validam autenticacao. O workflow

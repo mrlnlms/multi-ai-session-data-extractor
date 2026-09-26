@@ -109,11 +109,29 @@ A focused read-only collection in both configured accounts saved **59**
 Project details; **12** had nonempty instructions. All 59 observed
 `memory_scope` values were `global` (the Default mode observed in the UI).
 One additional historical ID in the default account failed its detail read;
-it was reported without an absence inference. The current Parquet projection
-has 12 `project_instructions` rows in addition to the previously captured
-account records. This is an observed snapshot, not proof that Project-only
-does not exist or that all historical Projects remain accessible. A
-Project-only native value is still unobserved in this archive.
+it was reported without an absence inference. The first Parquet projection
+had 12 `project_instructions` rows in addition to the previously captured
+account records. This is an observed snapshot, not proof that all historical
+Projects remain accessible.
+
+### Project-only mode sample (captured 2026-09-26)
+
+The owner created **Projeto Memoria interna** in the `account-2` ChatGPT
+profile, selected **Project-only memory** in the UI, created two chats and
+added Project instructions. A read-only settings capture discovered and read
+all 11 Projects in that profile with no errors. The complete immutable detail
+snapshot for this Project records `gizmo.memory_scope="project_v2"`,
+`gizmo.memory_enabled=false`, and nonempty `gizmo.instructions`. This confirms
+`project_v2` as the native `memory_scope` value for the UI's Project-only
+choice. The `memory_enabled` field is retained literally; its meaning is not
+inferred from the UI label. The parser now projects the instructions as a
+scoped `project_instructions` document. ChatGPT now has 13 projected
+`project_instructions` documents. The two chats remain ordinary Project
+conversations and are not Project-memory records.
+
+The earlier failed historical Project detail read remains an isolated access
+failure with no missing/deletion inference. It does not block this sample or
+the Project-only mode mapping.
 
 [OpenAI's Projects documentation](https://help.openai.com/en/articles/10169521-projects-in-chatgpt)
 currently says Project memory has no personal-memory-like item list, and

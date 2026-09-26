@@ -120,6 +120,18 @@ projecao e de observacao da captura, nao um timestamp nativo das instrucoes.
 observacao; nao produzem documentos `AgentMemory` nem itens de memoria de
 Project. Uma lista parcial de Projects nao estabelece ausencias.
 
+No Perplexity, `project_instructions` usa o UUID nativo do Space em
+`project_key` e identidade
+`perplexity:<account_id>:project_instructions/<space_uuid>`. O texto vem do
+campo `instructions` em respostas completas de
+`GET /rest/collections/get_collection`, preservadas em snapshots imutaveis e
+verificados. Como a resposta nao estabelece timestamps proprios das
+instrucoes, as datas canonicas representam observacoes da captura. Uma
+instrucao vazia observada depois de uma versao nao vazia preserva o conteudo
+anterior como `is_preserved_missing`; payload ausente ou incompleto nao
+estabelece limpeza. Valores de `metadata.json` legado sem hora de captura
+continuam consultaveis com datas desconhecidas.
+
 ## Projecao web do Claude.ai
 
 O sistema Melange expoe uma lista de topicos com `memory_id` nativo e caminho,

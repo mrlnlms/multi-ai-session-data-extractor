@@ -13,7 +13,7 @@ from pathlib import Path
 from src.accounts import account_presentation, uses_legacy_account_layout
 from src.account_identity import resolve_account_id
 from src.platforms.perplexity.parser import PerplexityParser
-from src.platforms.perplexity.memory_parser import parse_account_memory
+from src.platforms.perplexity.memory_parser import parse_account_memory, parse_project_instructions
 
 
 def main():
@@ -33,7 +33,8 @@ def main():
     known_accounts = {key for key, _, _ in account_trees}
     for raw_dir in sorted(args.raw_root.glob("account-*")):
         if (raw_dir.is_dir() and raw_dir.name not in known_accounts
-                and (raw_dir / "_account_memory").is_dir()):
+                and ((raw_dir / "_account_memory").is_dir()
+                     or (raw_dir / "_project_settings").is_dir())):
             account_trees.append((raw_dir.name, None, raw_dir))
 
     parser = PerplexityParser(merged_root=args.merged_root, raw_root=args.raw_root)
@@ -54,6 +55,10 @@ def main():
         per_account.agent_memories.extend(memory_result.memories)
         per_account.agent_memory_versions.extend(memory_result.versions)
         per_account.agent_memory_temporal_evidence.extend(memory_result.temporal_evidence)
+        project_result = parse_project_instructions(raw_tree, account_id)
+        per_account.agent_memories.extend(project_result.memories)
+        per_account.agent_memory_versions.extend(project_result.versions)
+        per_account.agent_memory_temporal_evidence.extend(project_result.temporal_evidence)
         parser.conversations.extend(per_account.conversations)
         parser.messages.extend(per_account.messages)
         parser.tool_events.extend(per_account.tool_events)

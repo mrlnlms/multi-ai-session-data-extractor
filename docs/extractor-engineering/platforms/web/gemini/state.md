@@ -48,9 +48,11 @@ their independent conversation JSON and asset manifests.
   changing conversation captures; account-1's earlier non-empty snapshot was
   retained.
 - This surface is distinct from conversation-derived **Memory**, whose
-  readable transport remains unresolved.
+  capture status is separate below. No Gemini account instructions are
+  currently present in accounts 2 and 3; account 1's controlled item was
+  removed upstream and remains preserved locally as historical evidence.
 
-### Conversation-derived Memory transport checkpoint — 2026-09-23
+### Conversation-derived Memory — closed for this capture scope
 
 - A read-only account-1 probe compared the network activity of
   `/personalization-settings` and `/saved-info` without sending a message or
@@ -66,16 +68,13 @@ their independent conversation JSON and asset manifests.
   still rendered the enabled Memory control, so the control can be delivered
   through page/bootstrap state without exposing a readable list of learned
   memory items.
-- This observation does **not** prove that Gemini stores no conversation-
-  derived memory. It establishes only that no separate readable memory-item
-  envelope was observed on either account-management surface. Conversation-
-  derived personalization without a user-inspectable record or stable native
-  payload is outside the extractor's preservation scope; do not reconstruct
-  inferred memories from answers or continue behavioral transport probing.
-- The reproducible structural probe is
-  `src/platforms/gemini/probes/personalization_transport.py`. Its reports are
-  local runtime diagnostics under `.runtime/probes/`, outside the preserved
-  raw archive.
+- Exploration of the available account-management surfaces is complete.
+  There were no user-readable learned-memory items to preserve. This outcome
+  is closed; no further probing, monitoring or owner-created sample is planned.
+  Do not inspect hidden transport or reconstruct memory from model answers.
+- `src/platforms/gemini/probes/personalization_transport.py` and its local
+  reports are historical evidence of the completed probe, not an ongoing
+  operation.
 
 ### Canonical Instructions projection — 2026-09-25
 

@@ -13,6 +13,7 @@ from playwright.async_api import Page as PlaywrightPage
 
 from src.platforms.perplexity.extractor.api_client import PerplexityAPIClient
 from src.platforms.perplexity.extractor.pages import discover_pages_in_space, fetch_pages_in_space
+from src.platforms.perplexity.extractor.project_settings import save_project_settings
 
 
 async def discover_spaces(client: PerplexityAPIClient, output_dir: Path) -> list[dict]:
@@ -80,6 +81,13 @@ async def fetch_spaces(
             metadata = await client.get_collection(slug)
             with open(space_dir / "metadata.json", "w", encoding="utf-8") as f:
                 json.dump(metadata, f, ensure_ascii=False, indent=2)
+
+            try:
+                save_project_settings(output_dir, uuid, slug, metadata)
+            except Exception as e:
+                # Full current metadata stays available; old immutable snapshots
+                # remain intact if this observation cannot be attested.
+                errors.append((uuid, f"project settings snapshot: {type(e).__name__}"))
 
             threads_in_space = await client.list_all_collection_threads(slug)
             threads_summary = [

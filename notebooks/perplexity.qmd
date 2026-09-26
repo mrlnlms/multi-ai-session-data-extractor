@@ -46,8 +46,10 @@ _setup = setup_notebook(con, SOURCE_KEY, PROCESSED, TABLES, AUX_TABLES, ACCOUNT_
 > `is_pinned` on threads, ENTRY_DELETED preserves orphans in spaces. Modes:
 > copilot/concise/research.
 > Account Memory is a separate native collection with complete paginated raw
-> snapshots, versioned records and native update-time evidence. Brain and
-> project instructions are not included in this memory table.
+> snapshots, versioned records and native update-time evidence. Project
+> Instructions are separate scoped `project_instructions`, preserved in
+> immutable settings snapshots. Project Memory and Brain remain distinct
+> surfaces and are not included in these records.
 
 {{< include _template.qmd >}}
 

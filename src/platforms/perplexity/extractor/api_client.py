@@ -73,7 +73,9 @@ class PerplexityAPIClient:
         """Lista todas as collections (Spaces na UI) do user."""
         path = f"{API_BASE}/rest/collections/list_user_collections?version=2.18&source=default"
         data = await self._fetch(path)
-        return data if isinstance(data, list) else []
+        if not isinstance(data, list) or any(not isinstance(item, dict) for item in data):
+            raise ValueError("Malformed Perplexity Space discovery response")
+        return data
 
     async def list_user_pinned_spaces(self) -> list[dict]:
         """Spaces pinados pelo user (sidebar). Retorna o mesmo schema de collection."""

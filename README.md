@@ -51,7 +51,7 @@ canonical parsing, and descriptive visualization (Quarto):
 |---|---|---|
 | **ChatGPT** | web | branches, voice, DALL-E, projects, custom GPT; [account memories/summary/instructions and Project-scoped instructions with raw history and versioned Parquets](docs/extractor-engineering/platforms/web/chatgpt/state.md) |
 | **Claude.ai** | web | thinking, tool use+MCP, project_docs with inline content; [current account/Project memory topics and historical classic Project memory in versioned Parquets](docs/extractor-engineering/platforms/web/claude-ai/state.md) |
-| **Perplexity** | web | threads + pages + spaces + 9 artifact types; [account Memory with raw paginated snapshots and versioned Parquets](docs/extractor-engineering/platforms/web/perplexity/state.md) |
+| **Perplexity** | web | threads + pages + spaces + 9 artifact types; [account Memory and Project Instructions with raw history and versioned Parquets](docs/extractor-engineering/platforms/web/perplexity/state.md) |
 | **Qwen** | web | 8 chat types (search, research, dalle, etc.), projects; [account saved memories and Customize Qwen instructions with raw history and versioned Parquets](docs/extractor-engineering/platforms/web/qwen/state.md) |
 | **DeepSeek** | web | R1 reasoning (thinking in ~31% of msgs), token usage |
 | **Gemini** | web | multi-account, reasoning/tool events, generated assets; [account Instructions with native raw history and versioned Parquets](docs/extractor-engineering/platforms/web/gemini/state.md) |

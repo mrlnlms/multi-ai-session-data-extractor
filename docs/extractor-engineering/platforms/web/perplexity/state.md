@@ -38,6 +38,34 @@ cleanup) + user metadata (info, settings, ai_profile).
 - Brain, Project Memory, project Instructions, Files/Links and ordinary
   sessions remain separate surfaces even when Computer uses them together.
 
+### Project Instructions capture and projection — validated 2026-09-26
+
+- The normal Space capture already reads
+  `GET /rest/collections/get_collection?collection_slug=...` and stores the
+  complete decoded response in `spaces/<uuid>/metadata.json`. Its native
+  top-level `instructions` field is project-scoped agent guidance, distinct
+  from account Memory, Project Memory and Brain.
+- Every normal Space detail read now also writes the complete response to an
+  immutable, hashed snapshot under
+  `_project_settings/<uuid>/<capture>/project_settings.json`. Failed or
+  malformed detail reads leave earlier snapshots intact. The focused command
+  `python -m src.platforms.perplexity.commands.capture_project_settings
+  --account <profile>` reads only the Space list and those detail responses;
+  it does not sync conversations, account Memory or assets and does not change
+  a Project.
+- `parse_project_instructions()` verifies snapshot identity, completeness and
+  SHA-256, then projects nonempty instructions as versioned
+  `project_instructions`, with the native Space UUID in `project_key`. Content
+  versions use hashes; temporal dates come from capture observations because
+  the response does not establish an instruction-specific timestamp. A later
+  verified empty string preserves the last content version as
+  `is_preserved_missing`. Unknown legacy `metadata.json` values remain
+  queryable without invented dates; they cannot imply deletion.
+- The focused read-only capture on 2026-09-26 read all **3/3** discovered
+  Projects with no errors; **2** had nonempty instructions. The parser
+  materialized two Project instruction documents, separate from one account
+  Memory document. Project Memory and Brain remain separate surfaces.
+
 ### Account Memory — owner observation 2026-09-23
 
 - **Customize → Memory**, outside any Project, exposes account-global native
@@ -167,9 +195,14 @@ legacy `account` label and all existing native IDs remain unchanged.
 
 ```bash
 PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.sync
+PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.capture_project_settings --account default
 PYTHONPATH=. .venv/bin/python -m src.platforms.perplexity.commands.parse
 QUARTO_PYTHON="$(pwd)/.venv/bin/python" quarto render notebooks/perplexity.qmd
 ```
+
+The focused settings command writes local raw snapshots only. Follow it with
+the Perplexity parser and unify to update canonical memory tables; it does not
+publish DVC or Git.
 
 Para uma conta adicional, use um perfil e uma arvore isolados. O parser reune
 as arvores e grava o e-mail configurado em `.storage/accounts.json` no campo

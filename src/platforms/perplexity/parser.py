@@ -15,7 +15,8 @@ Cobertura:
 - Branches: 1 por thread (Perplexity e linear)
 
 Output: data/processed/Perplexity/{conversations,messages,tool_events,branches,
-assets,asset_links}.parquet
+assets,asset_links,agent_memories,agent_memory_versions,
+agent_memory_temporal_evidence}.parquet
 
 O parser v2 (formato extracted_messages legado) foi supersedido na promocao
 validada de 2026-05-01.
