@@ -17,6 +17,8 @@ from datetime import datetime
 from pathlib import Path
 
 from playwright.async_api import async_playwright
+from src.browser_profile_runtime import launch_persistent_profile
+from src.platforms.gemini.extractor.auth import get_profile_dir
 
 
 GEMINI_URL = "https://gemini.google.com/app"
@@ -144,8 +146,8 @@ async def _call_rpc(request_ctx, rpcid: str, payload: list, session: dict) -> tu
 
 async def main():
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
-            ".storage/gemini-profile-1",
+        context = await launch_persistent_profile(p,
+            get_profile_dir("1"),
             headless=True,
             args=["--disable-blink-features=AutomationControlled"],
         )

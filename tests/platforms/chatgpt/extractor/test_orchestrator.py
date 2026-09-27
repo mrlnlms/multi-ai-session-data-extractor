@@ -12,7 +12,7 @@ from src.platforms.chatgpt.extractor.orchestrator import run_capture
 @pytest.mark.parametrize("dry_run", [False, True])
 async def test_run_capture_produces_raw_file(tmp_path, mocker, fallback, dry_run):
     """Fluxo minimo: discovery retorna 2 convs → fetch baixa → salva raw.json."""
-    # Mock do launch_persistent_context
+    # Keep the capture unit test independent of this machine's browser groups.
     mock_context = mocker.AsyncMock()
     mock_page = mocker.AsyncMock()
     mock_context.new_page.return_value = mock_page
@@ -20,7 +20,15 @@ async def test_run_capture_produces_raw_file(tmp_path, mocker, fallback, dry_run
 
     # Mock do async_playwright — forma simplificada
     mock_p = mocker.MagicMock()
-    mock_p.chromium.launch_persistent_context = mocker.AsyncMock(return_value=mock_context)
+    mocker.patch(
+        "src.platforms.chatgpt.extractor.orchestrator.launch_persistent_profile",
+        new_callable=mocker.AsyncMock,
+        return_value=mock_context,
+    )
+    mocker.patch(
+        "src.platforms.chatgpt.extractor.orchestrator.get_profile_dir",
+        return_value=tmp_path / "browser-profile",
+    )
     mock_playwright_context = mocker.MagicMock()
     mock_playwright_context.__aenter__ = mocker.AsyncMock(return_value=mock_p)
     mock_playwright_context.__aexit__ = mocker.AsyncMock(return_value=None)

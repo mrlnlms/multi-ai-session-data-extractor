@@ -7,6 +7,7 @@ import asyncio
 from pathlib import Path
 
 from playwright.async_api import async_playwright
+from src.browser_profile_runtime import launch_persistent_profile
 
 from src.account_bindings import load_account_bindings
 from src.account_catalog import LifecycleStatus, load_account_catalog
@@ -30,7 +31,7 @@ async def _capture(account: str, raw_base: Path) -> dict:
         raise FileNotFoundError(f"Perplexity profile missing: {profile}")
 
     async with async_playwright() as playwright:
-        context = await playwright.chromium.launch_persistent_context(
+        context = await launch_persistent_profile(playwright,
             str(profile), headless=False, channel="chrome",
             args=["--disable-blink-features=AutomationControlled"],
             ignore_https_errors=True, bypass_csp=True,

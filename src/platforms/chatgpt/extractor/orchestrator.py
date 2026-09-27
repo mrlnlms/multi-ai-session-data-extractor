@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from playwright.async_api import async_playwright
+from src.browser_profile_runtime import launch_persistent_profile
 
 from src.platforms.chatgpt.extractor.account_memory import capture_account_memory
 from src.platforms.chatgpt.extractor.project_settings import capture_project_settings
@@ -96,7 +97,7 @@ async def run_capture(
     profile_dir = get_profile_dir(profile_name)
 
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
+        context = await launch_persistent_profile(p,
             str(profile_dir),
             # headless=False eh necessario empiricamente (re-validado 2026-05-11):
             # 1. DOM scrape headless: nav "More" menu nao responde a click

@@ -35,14 +35,19 @@
 
 ## Pipeline
 
+For a browser-group member, the local group binding selects the persistent
+browser directory. Other accounts keep the legacy platform directory. The
+account binding key still selects the command and the UUID still selects raw/merged.
+
 - **Pastas cumulativas por conta:** todas as arvores duraveis raw/merged usam
   `account-<account_id>/`. O profile local e resolvido pelo binding do UUID;
   sync seletivo usa `python -m src.workflows.account_sync <account_id> --apply`.
 - **Sync orchestrator (2 steps):** `python -m src.platforms.qwen.commands.sync` (capture +
   reconcile).
 - **Headless capture.**
-- **Auth:** perfis persistentes em `.storage/qwen-profile-<account>/`
-  (gerados via `python -m src.platforms.qwen.commands.login --account <account>`). The token may expire even when the
+- **Auth:** contas atuais usam o diretório do grupo em
+  `.storage/browser-profiles/<profile_id>/`; `.storage/qwen-profile-<account>/`
+  é fallback para contas sem grupo. The token may expire even when the
   profile still opens; validate a minimal API list request before a sync.
 
 ## Coverage

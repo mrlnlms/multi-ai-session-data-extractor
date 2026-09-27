@@ -370,6 +370,38 @@ CLI e dashboard chamam os mesmos servicos de dominio. Nome livre, progresso
 detalhado, fila, retry e uma experiencia integrada de login permanecem temas da
 futura aplicacao. Sua tecnologia continua deliberadamente aberta.
 
+### Direcao aprovada para compartilhamento de profiles
+
+O compartilhamento de profiles usa uma camada logica anterior ao login: o usuario cria um grupo
+de navegador com nome/e-mail opcionais e associa a ele contas de plataforma.
+O prototipo em `src/browser_profile_catalog.py` e
+`src/local_browser_profiles.py` separa esses metadados: grupos e associacoes
+ficam em `data/accounts/`, gerido por DVC quando publicado; diretorio de
+navegador, canal e cookies continuam locais em `.storage/`. Assim, uma
+restauracao futura trara a organizacao das contas, mas exigira novos logins
+para capturas. Um clone temporario do commit da migracao restaurou os tres
+grupos e 18 associacoes pelo DVC sem `.storage/`. Cada grupo aceita no maximo
+uma conta por plataforma. O binding local tambem pode apontar explicitamente para um
+diretorio existente sob `.storage/`, sem copiar cookies. O refactor de caminhos
+em codigo faz login, auth-check, sync e comandos auxiliares escolherem o
+diretorio do grupo para contas associadas; contas nao associadas conservam o
+diretorio legado. A chave do binding da conta continua selecionando o comando
+da plataforma e o UUID continua determinando `raw`/`merged`. A migracao local das
+18 contas atuais para tres grupos foi concluida em 2026-09-27, com confirmacao
+visual dos logins e checagem das rotas; syncs seletivos de Gemini e NotebookLM
+no terceiro profile confirmaram captura e parse por UUID em duas fontes. A
+pagina Accounts ja apresenta criacao
+e associacao dos grupos, alem da preparacao do diretorio local, usando
+servicos em `src/`; o Streamlit e apenas uma interface transitoria para esse
+fluxo.
+
+A migracao criou um diretorio canonico limpo por identidade atual,
+concluindo uma identidade antes de iniciar a proxima. Cada conta foi aberta no
+site correspondente dentro desse diretorio e deixou de usar seu profile antigo;
+os 18 antigos foram retirados apos a passagem das contas. Restaram tres profiles
+fisicos, sem a PoC Foton, que nao foi incorporada. A conta historica inacessivel
+de NotebookLM continua no acervo preservado e nao precisa de profile de login.
+
 ## 8. Web local, Electron, Tauri ou hibrido
 
 ### 8.1 O que um app desktop pode melhorar

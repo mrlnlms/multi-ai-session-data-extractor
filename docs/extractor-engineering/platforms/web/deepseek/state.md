@@ -2,14 +2,19 @@
 
 ## Pipeline
 
+For a browser-group member, the local group binding selects the persistent
+browser directory. Other accounts keep the legacy platform directory. The
+account binding key still selects the command and the UUID still selects raw/merged.
+
 - **Pastas cumulativas por conta:** todas as arvores duraveis raw/merged usam
   `account-<account_id>/`. O profile local e resolvido pelo binding do UUID;
   sync seletivo usa `python -m src.workflows.account_sync <account_id> --apply`.
 - **Sync orchestrator (2 steps):** `python -m src.platforms.deepseek.commands.sync` (capture +
   reconcile).
 - **Headless capture.**
-- **Auth:** perfis persistentes em `.storage/deepseek-profile-<account>/`
-  (gerados via `python -m src.platforms.deepseek.commands.login --account <account>`). A profile can remain present
+- **Auth:** contas atuais usam o diretório do grupo em
+  `.storage/browser-profiles/<profile_id>/`; `.storage/deepseek-profile-<account>/`
+  é fallback para contas sem grupo. A profile can remain present
   after its `userToken` expires, so validate a minimal API request first.
 
 ## Coverage

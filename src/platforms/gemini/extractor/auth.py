@@ -2,7 +2,8 @@
 
 Pattern espelha chatgpt/claude_ai auth — launch_persistent_context mantem cookies.
 
-Multi-account: profile por conta em .storage/gemini-profile-{N}/.
+Multi-account: cada chave usa seu diretorio legado ate ser associada a um
+grupo de navegador compartilhado.
 """
 
 from pathlib import Path
@@ -11,6 +12,7 @@ from playwright.async_api import async_playwright, BrowserContext
 
 from src.account_catalog import validate_technical_key
 from src.accounts import account_keys
+from src.browser_profile_runtime import launch_persistent_profile, resolve_platform_browser_target
 
 
 VALID_ACCOUNTS = account_keys("Gemini")
@@ -18,7 +20,9 @@ VALID_ACCOUNTS = account_keys("Gemini")
 
 def get_profile_dir(account: str = "1") -> Path:
     account = validate_technical_key(str(account), allow_archive=False)
-    return Path(f".storage/gemini-profile-{account}")
+    return resolve_platform_browser_target(
+        "Gemini", account, legacy_path=Path(f".storage/gemini-profile-{account}"),
+    ).path
 
 
 async def login(account: str = "1") -> None:
@@ -30,7 +34,7 @@ async def login(account: str = "1") -> None:
     print("Faca login no Gemini e feche o browser quando terminar.")
 
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
+        context = await launch_persistent_profile(p,
             str(profile_dir),
             headless=False,
             args=["--disable-blink-features=AutomationControlled"],
@@ -51,7 +55,7 @@ async def load_context(account: str = "1", headless: bool = True) -> BrowserCont
             f"Profile nao existe: {profile_dir}. Rode python -m src.platforms.gemini.commands.login --account {account}"
         )
     pw = await async_playwright().start()
-    context = await pw.chromium.launch_persistent_context(
+    context = await launch_persistent_profile(pw,
         str(profile_dir),
         headless=headless,
         args=["--disable-blink-features=AutomationControlled"],

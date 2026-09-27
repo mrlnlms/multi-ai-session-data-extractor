@@ -18,14 +18,16 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from playwright.async_api import async_playwright
+from src.browser_profile_runtime import launch_persistent_profile
+from src.platforms.gemini.extractor.auth import get_profile_dir
 
 
 RPC_RE = re.compile(r"rpcids=([^&]+)")
 
 
 async def probe(account: int, hold_seconds: int = 20):
-    profile_dir = f".storage/gemini-profile-{account}"
-    if not Path(profile_dir).exists():
+    profile_dir = get_profile_dir(str(account))
+    if not profile_dir.exists():
         print(f"Profile nao existe: {profile_dir}")
         print("Rode python -m src.platforms.gemini.commands.login --account", account)
         return
@@ -37,7 +39,7 @@ async def probe(account: int, hold_seconds: int = 20):
     all_batchexecute: list[dict] = []
 
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
+        context = await launch_persistent_profile(p,
             profile_dir,
             headless=False,
             args=["--disable-blink-features=AutomationControlled"],

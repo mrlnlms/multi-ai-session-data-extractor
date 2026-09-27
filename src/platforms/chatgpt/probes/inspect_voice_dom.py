@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 from playwright.async_api import async_playwright
+from src.browser_profile_runtime import launch_persistent_profile
 
 from src.platforms.chatgpt.extractor.auth import get_profile_dir
 
@@ -32,7 +33,7 @@ async def inspect(conv_id: str):
         sys.exit(1)
 
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
+        context = await launch_persistent_profile(p,
             str(profile_dir),
             headless=False,
         )

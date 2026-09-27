@@ -12,6 +12,8 @@ from pathlib import Path
 from src.account_bindings import AccountBindings
 from src.account_catalog import AccountCatalog, LifecycleStatus
 from src.auth_health import AuthEvidenceMethod, AuthObservation, AuthStatus
+from src.browser_profile_catalog import DEFAULT_CATALOG_PATH, load_browser_profile_catalog
+from src.local_browser_profiles import browser_profile_path, load_local_browser_profiles
 from src.platforms.registry import PLATFORM_ACCOUNT_METADATA
 
 
@@ -46,6 +48,7 @@ def check_account_auth(
     catalog: AccountCatalog,
     bindings: AccountBindings,
     storage_root: Path = Path(".storage"),
+    groups_path: Path = DEFAULT_CATALOG_PATH,
 ) -> AuthObservation:
     record = next((item for item in catalog.records if item.account_id == account_id), None)
     if record is None:
@@ -61,6 +64,13 @@ def check_account_auth(
         legacy = storage_root / "perplexity-profile"
         if legacy.is_dir():
             profile = legacy
+    groups = load_browser_profile_catalog(groups_path)
+    group = next((item for item in groups.records if account_id in item.account_ids), None)
+    if group is not None:
+        local = load_local_browser_profiles(storage_root / "browser-profile-config.json")
+        if local.get(group.profile_id) is None:
+            return AuthObservation(account_id, AuthStatus.MISSING, None, "Browser group has no local profile")
+        profile = browser_profile_path(storage_root, group.profile_id, local)
     if not profile.is_dir():
         return AuthObservation(account_id, AuthStatus.MISSING, None, "Bound profile is missing")
     source = metadata.registry_key

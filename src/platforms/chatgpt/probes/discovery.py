@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from playwright.async_api import async_playwright
+from src.browser_profile_runtime import launch_persistent_profile
 
 from src.platforms.chatgpt.extractor.api_client import ChatGPTAPIClient
 from src.platforms.chatgpt.extractor.auth import get_profile_dir
@@ -23,7 +24,7 @@ async def main() -> None:
     result: dict = {"started_at": datetime.now(timezone.utc).isoformat()}
     try:
         async with async_playwright() as playwright:
-            context = await playwright.chromium.launch_persistent_context(
+            context = await launch_persistent_profile(playwright,
                 str(get_profile_dir()),
                 headless=False,
                 args=["--disable-blink-features=AutomationControlled"],

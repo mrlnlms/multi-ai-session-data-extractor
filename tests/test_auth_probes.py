@@ -1,4 +1,5 @@
 import inspect
+import json
 from datetime import datetime, timezone
 
 import pytest
@@ -40,6 +41,39 @@ def test_adapter_result_is_used_only_after_explicit_call(tmp_path, monkeypatch):
                                 storage_root=tmp_path)
     assert result.status is AuthStatus.VALID
     assert result.checked_at is not None
+
+
+def test_auth_probe_accepts_shared_directory_without_legacy_profile(tmp_path, monkeypatch):
+    storage = tmp_path / ".storage"
+    shared = storage / "browser-profiles" / "personal"
+    shared.mkdir(parents=True)
+    group_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    groups_path = tmp_path / "browser_profiles.json"
+    groups_path.write_text(json.dumps({
+        "version": 1, "profiles": [{
+            "profile_id": group_id, "display_name": "Personal", "email": None,
+            "account_ids": [ACCOUNT_ID],
+            "created_at": "2026-09-27T00:00:00Z", "updated_at": "2026-09-27T00:00:00Z",
+        }],
+    }))
+    (storage / "browser-profile-config.json").write_text(json.dumps({
+        "version": 1, "profiles": [{
+            "profile_id": group_id, "channel": "chrome", "directory": "browser-profiles/personal",
+        }],
+    }))
+    bindings = AccountBindings(records=(AccountBinding(ACCOUNT_ID, "work", NOW),))
+
+    async def fake_probe(key):
+        assert key == "work"
+        return ProbeResult(AuthStatus.VALID, "Authenticated read succeeded")
+
+    import src.platforms.qwen.probes.auth_health as adapter
+    monkeypatch.setattr(adapter, "probe", fake_probe)
+    result = check_account_auth(
+        ACCOUNT_ID, catalog=_catalog(), bindings=bindings,
+        storage_root=storage, groups_path=groups_path,
+    )
+    assert result.status is AuthStatus.VALID
 
 
 def test_historical_unknown_and_redaction_boundaries(tmp_path):

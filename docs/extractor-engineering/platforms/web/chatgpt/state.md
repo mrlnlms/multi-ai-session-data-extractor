@@ -2,6 +2,10 @@
 
 ## Pipeline
 
+For a browser-group member, the local group binding selects the persistent
+browser directory. Other accounts keep the legacy platform directory. The
+account binding key still selects the command and the UUID still selects raw/merged.
+
 - **Per-account cumulative folders:** every durable raw/merged tree uses
   `account-<account_id>/`. Local browser profile keys remain only in the UUID
   binding under `.storage/`; selective sync uses
@@ -11,8 +15,10 @@
   settings, including on its conversation-discovery fallback.
 - **Capture:** **headed** (Cloudflare detects headless). Project discovery is
   API-first via the sidebar index; DOM is a compatibility fallback only.
-- **Auth:** persistent profile in `.storage/chatgpt-profile-<account>/`
-  (generated via `python -m src.platforms.chatgpt.commands.login`).
+- **Auth:** current accounts use their group directory under
+  `.storage/browser-profiles/<profile_id>/`; the login command uses that
+  directory through the account binding. `.storage/chatgpt-profile-<account>/`
+  remains the fallback for unassigned accounts.
 - **Fail-fast against flakey discovery** — `_get_max_known_discovery` recursive
   rglob, 20% threshold (aborts before save if current discovery is <80% of
   the largest historical value).

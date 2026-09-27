@@ -2,6 +2,10 @@
 
 ## Pipeline
 
+For a browser-group member, the local group binding selects the persistent
+browser directory. Other accounts keep the legacy platform directory. The
+account binding key still selects the command and the UUID still selects raw/merged.
+
 - **Pastas cumulativas por conta:** todas as arvores duraveis raw/merged usam
   `account-<account_id>/`. O profile local e resolvido pelo binding do UUID;
   sync seletivo usa `python -m src.workflows.account_sync <account_id> --apply`.
@@ -11,8 +15,10 @@
   asset step).
 - **Capture:** **headed** (Cloudflare 403 in headless — documented by
   design in `perplexity/api_client.py:12-13`).
-- **Auth:** persistent profile in `.storage/perplexity-profile-<account>/`
-  (generated via `python -m src.platforms.perplexity.commands.login`).
+- **Auth:** the current account uses its group directory under
+  `.storage/browser-profiles/<profile_id>/`; the login command resolves it
+  through the binding. `.storage/perplexity-profile` remains the legacy
+  fallback for an unassigned default account.
 
 ## Coverage
 

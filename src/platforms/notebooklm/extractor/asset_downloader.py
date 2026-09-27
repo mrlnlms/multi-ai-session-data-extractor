@@ -11,11 +11,13 @@ Tambem: mind map (via cFji9 UUID + CYK0Xb fetch), page images de sources (hizoJc
 """
 
 import asyncio
+import hashlib
 import json
 import re
 from pathlib import Path
 
-from src.assets.incremental import AssetObservation, WebAssetCaptureSession
+from src.assets.incremental import AssetObservation, WebAssetCaptureSession, _known_deliveries
+from src.assets.models import AssetScope
 from src.assets.vault import AssetVault
 from src.platforms.notebooklm.extractor.api_client import NotebookLMClient
 
@@ -601,16 +603,44 @@ async def fetch_text_artifacts(
         capture_method="web_asset_download:text_artifacts",
         staging_root=assets_dir,
     )
+    known = (
+        _known_deliveries(asset_vault, AssetScope("notebooklm", account_id))
+        if asset_vault is not None else {}
+    )
+
+    def delivery_id_for(art_id: str, payload: bytes) -> str:
+        """Keep an existing delivery, or give changed content a new identity."""
+        base = f"text-artifact:{art_id}"
+        digest = hashlib.sha256(payload).hexdigest()
+        for delivery_id, record in known.items():
+            if (
+                record.get("object_id") == art_id
+                and record.get("representation_kind") == "text_artifact_envelope"
+                and record.get("sha256") == digest
+            ):
+                return delivery_id
+        previous = known.get(base)
+        delivery_id = (
+            base if previous is None or previous.get("sha256") in (None, digest)
+            else f"{base}:sha256:{digest}"
+        )
+        known[delivery_id] = {
+            "object_id": art_id,
+            "representation_kind": "text_artifact_envelope",
+            "sha256": digest,
+        }
+        return delivery_id
 
     async def _one(nb_uuid: str, art_id: str, art_type: int, out: Path):
         out.parent.mkdir(parents=True, exist_ok=True)
         if skip_existing and out.exists() and out.stat().st_size > 0:
-            delivery_id = f"text-artifact:{art_id}"
+            payload = out.read_bytes()
+            delivery_id = delivery_id_for(art_id, payload)
             capture.observe(AssetObservation(
                 delivery_id=delivery_id,
                 object_id=art_id,
                 representation_kind="text_artifact_envelope",
-                payload=(out.read_bytes() if asset_vault is not None else None),
+                payload=(payload if asset_vault is not None else None),
                 file_name=out.name,
                 mime_type="application/json",
                 upstream_locator=art_id,
@@ -638,12 +668,13 @@ async def fetch_text_artifacts(
                                ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
-                delivery_id = f"text-artifact:{art_id}"
+                payload = out.read_bytes()
+                delivery_id = delivery_id_for(art_id, payload)
                 capture.observe(AssetObservation(
                     delivery_id=delivery_id,
                     object_id=art_id,
                     representation_kind="text_artifact_envelope",
-                    payload=out.read_bytes(),
+                    payload=payload,
                     file_name=out.name,
                     mime_type="application/json",
                     upstream_locator=art_id,

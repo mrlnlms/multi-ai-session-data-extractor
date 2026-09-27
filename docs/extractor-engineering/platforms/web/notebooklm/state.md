@@ -12,9 +12,15 @@ native objects; it must not be treated as a memory or instructions surface.
 
 ## Pipeline
 
+For a browser-group member, the local group binding selects the persistent
+browser directory. Other accounts keep the legacy platform directory. The
+account binding key still selects the command and the UUID still selects raw/merged.
+
 - **Multi-account** — three compatibility-default active accounts (acc-1,
-  acc-2, acc-3). Profiles in `.storage/notebooklm-profile-<key>/` (generated via
-  `python -m src.platforms.notebooklm.commands.login`).
+  acc-2, acc-3) now use their respective group directories under
+  `.storage/browser-profiles/<profile_id>/`. The login command resolves the
+  group; `.storage/notebooklm-profile-<key>/` remains a fallback for
+  unassigned accounts.
 - **Single cumulative folder per-account:** durable trees use
   `data/raw/NotebookLM/account-<account_id>/` and
   `data/merged/NotebookLM/account-<account_id>/`. The local profile key is
@@ -30,6 +36,22 @@ native objects; it must not be treated as a memory or instructions surface.
   `data/external/notebooklm-snapshots/<archive>-YYYY-MM-DD/`. The official
   `parse.py` converts them alongside all current merged accounts; they are not
   manual saves and require no live login.
+
+### Shared-profile validation — 2026-09-27
+
+The selective sync for local account `2` used the same physical browser group
+as Gemini account `2`. Discovery found 53 notebooks; all 53 captures completed
+without errors. Asset capture exposed a mutable `v9rmvd` text envelope: the
+native artifact ID stayed constant while its bytes changed. The vault refused
+to overwrite the old immutable delivery. Text artifact delivery identity now
+reuses the existing ID for identical bytes and adds a content digest only for
+changed bytes. The old and new versions both passed vault verification.
+After resuming assets from the captured raw, reconciliation updated 53
+notebooks and retained two absent from the current listing. Parse and unify
+completed. Binary links produced 387 HTTP/download failures, mainly rendered
+source pages; previously available vault deliveries were retained. This is
+not evidence of lost browser authentication, but these upstream links remain
+unavailable in this run.
 
 ## Outputs e tabelas auxiliares
 

@@ -1,8 +1,8 @@
 """Playwright login persistente pra NotebookLM.
 
-Suporta multiplas contas via sufixo (account-1, account-2, etc). Cada conta
-tem profile persistente em .storage/notebooklm-profile-<N>/ gerado via
-``python -m src.platforms.notebooklm.commands.login``.
+Suporta multiplas contas via sufixo (account-1, account-2, etc). A conta
+usa o diretorio legado .storage/notebooklm-profile-<N>/ ate ser associada
+a um grupo de navegador compartilhado.
 """
 
 from pathlib import Path
@@ -11,6 +11,7 @@ from playwright.async_api import async_playwright, BrowserContext
 
 from src.account_catalog import validate_technical_key
 from src.accounts import account_keys
+from src.browser_profile_runtime import launch_persistent_profile, resolve_platform_browser_target
 
 
 VALID_ACCOUNTS = account_keys("NotebookLM")
@@ -26,7 +27,10 @@ ACCOUNT_LANG = {
 
 def get_profile_dir(account: str) -> Path:
     account = validate_technical_key(account, allow_archive=False)
-    return Path(f".storage/notebooklm-profile-{account}")
+    return resolve_platform_browser_target(
+        "NotebookLM", account, legacy_path=Path(f".storage/notebooklm-profile-{account}"),
+        legacy_channel="chrome",
+    ).path
 
 
 async def login(account: str) -> None:
@@ -36,7 +40,7 @@ async def login(account: str) -> None:
     print("Faca login no NotebookLM e feche o browser quando terminar.")
 
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
+        context = await launch_persistent_profile(p,
             str(profile_dir),
             headless=False,
             channel="chrome",  # Chrome real, evita bloqueio Google
@@ -57,7 +61,7 @@ async def load_context(account: str, headless: bool = True) -> BrowserContext:
             f"Rode python -m src.platforms.notebooklm.commands.login --account {account}"
         )
     pw = await async_playwright().start()
-    context = await pw.chromium.launch_persistent_context(
+    context = await launch_persistent_profile(pw,
         str(profile_dir),
         headless=headless,
         channel="chrome",

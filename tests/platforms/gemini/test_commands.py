@@ -28,8 +28,15 @@ def test_sync_requires_explicit_account_even_for_programmatic_calls():
         asyncio.run(sync.main(args))
 
 
-def test_gemini_profile_and_data_paths_are_unchanged():
-    assert get_profile_dir("2").as_posix() == ".storage/gemini-profile-2"
+def test_gemini_profile_uses_resolved_target_and_keeps_data_path(mocker):
+    resolved = mocker.patch(
+        "src.platforms.gemini.extractor.auth.resolve_platform_browser_target",
+        return_value=mocker.Mock(path=Path(".storage/shared-gemini")),
+    )
+    assert get_profile_dir("2") == Path(".storage/shared-gemini")
+    resolved.assert_called_once_with(
+        "Gemini", "2", legacy_path=Path(".storage/gemini-profile-2"),
+    )
     assert (sync.MERGED_BASE / "account-2").as_posix() == "data/merged/Gemini/account-2"
 
 

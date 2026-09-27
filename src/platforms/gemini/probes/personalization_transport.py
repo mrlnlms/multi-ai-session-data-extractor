@@ -23,6 +23,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from playwright.async_api import Response, async_playwright
+from src.browser_profile_runtime import launch_persistent_profile
+from src.platforms.gemini.extractor.auth import get_profile_dir
 
 from src.platforms.gemini.extractor.batchexecute import parse_response
 
@@ -57,7 +59,7 @@ def _shape(value, depth: int = 0):
 
 
 async def probe(account: str, wait_ms: int) -> Path:
-    profile_dir = Path(f".storage/gemini-profile-{account}")
+    profile_dir = get_profile_dir(account)
     if not profile_dir.exists():
         raise RuntimeError(f"Gemini profile does not exist: {profile_dir}")
 
@@ -91,7 +93,7 @@ async def probe(account: str, wait_ms: int) -> Path:
                 )
 
     async with async_playwright() as playwright:
-        context = await playwright.chromium.launch_persistent_context(
+        context = await launch_persistent_profile(playwright,
             str(profile_dir),
             headless=True,
             args=["--disable-blink-features=AutomationControlled"],

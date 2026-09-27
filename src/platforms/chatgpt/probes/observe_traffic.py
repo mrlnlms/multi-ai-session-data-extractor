@@ -19,6 +19,7 @@ from pathlib import Path
 from urllib.parse import parse_qsl, urlparse
 
 from playwright.async_api import Response, async_playwright
+from src.browser_profile_runtime import launch_persistent_profile
 
 from src.platforms.chatgpt.extractor.auth import get_profile_dir
 
@@ -100,7 +101,7 @@ async def main() -> None:
     route_events: list[dict] = []
     started_at = time.monotonic()
     async with async_playwright() as playwright:
-        context = await playwright.chromium.launch_persistent_context(
+        context = await launch_persistent_profile(playwright,
             str(get_profile_dir()),
             headless=False,
             args=["--disable-blink-features=AutomationControlled"],

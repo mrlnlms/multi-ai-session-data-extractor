@@ -20,6 +20,7 @@ from src.accounts import (
 )
 from src.account_catalog import LifecycleStatus, legacy_account_id
 from src.auth_health import AuthEvidenceMethod, AuthHealth, AuthObservation, AuthStatus, write_auth_health_atomic
+from src.workflows.account_sync import plan_account_sync
 
 
 def _catalog_record(platform, key, lifecycle):
@@ -68,6 +69,48 @@ def _write_bindings(path: Path, *bindings: tuple[str, str]) -> None:
             for account_id, profile_key in bindings
         ],
     }))
+
+
+def test_shared_browser_keeps_each_platform_command_key(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    accounts = Path("data/accounts")
+    storage = Path(".storage")
+    accounts.mkdir(parents=True)
+    storage.mkdir()
+    gemini_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    chatgpt_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    group_id = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+    _write_v2_catalog(
+        accounts / "catalog.json",
+        _v2_catalog_record("Gemini", gemini_id),
+        _v2_catalog_record("ChatGPT", chatgpt_id),
+    )
+    _write_bindings(storage / "account-bindings.json", (gemini_id, "2"), (chatgpt_id, "account-2"))
+    (accounts / "browser_profiles.json").write_text(json.dumps({
+        "version": 1, "profiles": [{
+            "profile_id": group_id, "display_name": "Personal", "email": None,
+            "account_ids": [gemini_id, chatgpt_id],
+            "created_at": "2026-09-27T00:00:00Z", "updated_at": "2026-09-27T00:00:00Z",
+        }],
+    }))
+    (storage / "browser-profile-config.json").write_text(json.dumps({
+        "version": 1, "profiles": [{
+            "profile_id": group_id, "channel": "chromium", "directory": "browser-profiles/personal",
+        }],
+    }))
+    shared = storage / "browser-profiles" / "personal"
+    shared.mkdir(parents=True)
+
+    assert discover_accounts("Gemini")[0].evidence.profile_path == shared
+    assert discover_accounts("ChatGPT")[0].evidence.profile_path == shared
+    assert [(item.account_id, item.profile_key) for item in runnable_accounts("Gemini")] == [
+        (gemini_id, "2"),
+    ]
+    assert [(item.account_id, item.profile_key) for item in runnable_accounts("ChatGPT")] == [
+        (chatgpt_id, "account-2"),
+    ]
+    assert plan_account_sync(gemini_id).commands[0][-2:] == ("--account", "2")
+    assert plan_account_sync(chatgpt_id).commands[0][-3:-1] == ("--account", "account-2")
 
 
 def test_load_account_registry_returns_profile_email_mapping(tmp_path):

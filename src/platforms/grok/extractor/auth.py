@@ -1,19 +1,23 @@
 """Playwright login persistente pra Grok.
 
-Cada conta usa um perfil persistente proprio em `.storage/`.
+Cada conta usa o diretorio legado em `.storage/` ate ser associada a um grupo.
 Login via grok.com (pode pedir SSO da conta X — fluxo headed cobre).
 """
 
 from pathlib import Path
 
 from playwright.async_api import async_playwright, BrowserContext
+from src.browser_profile_runtime import launch_persistent_profile, resolve_platform_browser_target
 
 
 HOME_URL = "https://grok.com/"
 
 
 def get_profile_dir(account: str = "default") -> Path:
-    return Path(f".storage/grok-profile-{account}")
+    return resolve_platform_browser_target(
+        "Grok", account, legacy_path=Path(f".storage/grok-profile-{account}"),
+        legacy_channel="chrome",
+    ).path
 
 
 async def login(account: str = "default") -> None:
@@ -24,7 +28,7 @@ async def login(account: str = "default") -> None:
     print("Faca login em grok.com e feche o browser quando terminar.")
 
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
+        context = await launch_persistent_profile(p,
             str(profile_dir),
             headless=False,
             channel="chrome",
@@ -46,7 +50,7 @@ async def load_context(account: str = "default", headless: bool = True) -> Brows
             f"Profile nao existe: {profile_dir}. Rode python -m src.platforms.grok.commands.login"
         )
     pw = await async_playwright().start()
-    context = await pw.chromium.launch_persistent_context(
+    context = await launch_persistent_profile(pw,
         str(profile_dir),
         headless=headless,
         channel="chrome",

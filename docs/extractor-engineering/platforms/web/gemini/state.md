@@ -2,9 +2,15 @@
 
 ## Pipeline
 
-- **Multi-account** — three compatibility-default Google accounts. Profiles in
-  `.storage/gemini-profile-<key>/` (generated via
-  `python -m src.platforms.gemini.commands.login`).
+For a browser-group member, the local group binding selects the persistent
+browser directory. Other accounts keep the legacy platform directory. The
+account binding key still selects the command and the UUID still selects raw/merged.
+
+- **Multi-account** — three compatibility-default Google accounts now use
+  their respective group directories under
+  `.storage/browser-profiles/<profile_id>/`. The login command resolves the
+  group; `.storage/gemini-profile-<key>/` remains a fallback for unassigned
+  accounts.
 - **Single cumulative folder per-account:** durable trees use
   `data/raw/Gemini/account-<account_id>/` and
   `data/merged/Gemini/account-<account_id>/`. The compatibility profile key is
@@ -22,6 +28,16 @@ Conversations + assistant messages + tool events + images
 (lh3.googleusercontent.com) + extracted Deep Research markdown reports.
 Immutable asset bytes are written to the central vault. Raw and merged retain
 their independent conversation JSON and asset manifests.
+
+### Shared-profile validation — 2026-09-27
+
+The selective sync for local account `2` used its assigned browser group. It
+discovered 34 conversations, reused all 34, and wrote only that UUID's
+`raw`/`merged` tree; reconciliation and the combined Gemini parser completed.
+All 106 attempted image URLs already present in raw returned HTTP 403. The
+previously preserved binaries remained available in the vault, which passed
+scope verification. This is a partial upstream asset result, not an auth or
+conversation-discovery failure.
 
 ### Instructions discovery checkpoint — 2026-09-23
 

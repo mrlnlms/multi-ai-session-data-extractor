@@ -1,7 +1,8 @@
 """Abre browser com perfil persistente pra login no Gemini.
 
 Uso: PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login [--account 2]
-Faz login, fecha o browser. Perfil salvo em .storage/gemini-profile-{N}/.
+Faz login e fecha o browser. Usa o diretorio do grupo quando associado;
+caso contrario, usa .storage/gemini-profile-{N}/.
 
 Para cada conta Google, rode uma vez com seu numero:
   PYTHONPATH=. .venv/bin/python -m src.platforms.gemini.commands.login --account 1

@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from playwright.async_api import async_playwright
+from src.browser_profile_runtime import launch_persistent_profile
 
 from src.platforms.chatgpt.extractor.auth import get_profile_dir
 from src.platforms.chatgpt.extractor.refetch_known import (
@@ -45,7 +46,7 @@ async def refetch(account: str, batch_size: int = DEFAULT_BATCH_SIZE) -> None:
 
     profile_dir = get_profile_dir(account)
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
+        context = await launch_persistent_profile(p,
             str(profile_dir),
             headless=False,
             args=["--disable-blink-features=AutomationControlled"],

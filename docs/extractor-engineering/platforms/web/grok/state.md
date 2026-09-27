@@ -2,14 +2,19 @@
 
 ## Pipeline
 
+For a browser-group member, the local group binding selects the persistent
+browser directory. Other accounts keep the legacy platform directory. The
+account binding key still selects the command and the UUID still selects raw/merged.
+
 - **Pastas cumulativas por conta:** todas as arvores duraveis raw/merged usam
   `account-<account_id>/`. O profile local e resolvido pelo binding do UUID;
   sync seletivo usa `python -m src.workflows.account_sync <account_id> --apply`.
 - **Sync orchestrator (3 steps):** `python -m src.platforms.grok.commands.sync` (capture +
   assets + reconcile).
 - **Headless capture** (Cloudflare did not block on smoke 2026-05-09).
-- **Auth:** persistent profile in `.storage/grok-profile-<account>/`
-  (generated via `python -m src.platforms.grok.commands.login`). Login via grok.com (SSO da
+- **Auth:** the current account uses its group directory under
+  `.storage/browser-profiles/<profile_id>/`; `.storage/grok-profile-<account>/`
+  remains the fallback for unassigned accounts. Login via grok.com (SSO da
   conta X). Cookies bastam — sem token em localStorage.
 
 ## Coverage

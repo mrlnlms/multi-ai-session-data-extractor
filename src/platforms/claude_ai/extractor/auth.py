@@ -10,11 +10,14 @@ precisar, e cached em {profile}/org_id.txt.
 from pathlib import Path
 
 from playwright.async_api import async_playwright, BrowserContext
+from src.browser_profile_runtime import launch_persistent_profile, resolve_platform_browser_target
 
 
 def get_profile_dir(profile_name: str = "default") -> Path:
     """Path do diretorio de profile pra esse account."""
-    return Path(f".storage/claude-ai-profile-{profile_name}")
+    return resolve_platform_browser_target(
+        "Claude.ai", profile_name, legacy_path=Path(f".storage/claude-ai-profile-{profile_name}"),
+    ).path
 
 
 async def _extract_org_id(context: BrowserContext) -> str | None:
@@ -35,7 +38,7 @@ async def login(profile_name: str = "default") -> None:
     print("Faca login no Claude.ai e feche o browser quando terminar.")
 
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
+        context = await launch_persistent_profile(p,
             str(profile_dir),
             headless=False,
             args=["--disable-blink-features=AutomationControlled"],
@@ -62,7 +65,7 @@ async def load_context(profile_name: str = "default", headless: bool = True) -> 
         )
 
     pw = await async_playwright().start()
-    context = await pw.chromium.launch_persistent_context(
+    context = await launch_persistent_profile(pw,
         str(profile_dir),
         headless=headless,
         args=["--disable-blink-features=AutomationControlled"],

@@ -16,6 +16,8 @@ from src.account_catalog import (
 from src.account_bindings import DEFAULT_BINDINGS_PATH, load_account_bindings
 from src.platforms.registry import PLATFORM_ACCOUNT_CAPABILITIES, PLATFORM_ACCOUNT_METADATA
 from src.auth_health import DEFAULT_HEALTH_PATH, load_auth_health
+from src.browser_profile_catalog import load_browser_profile_catalog
+from src.local_browser_profiles import browser_profile_path, load_local_browser_profiles
 
 
 DEFAULT_ACCOUNTS_FILE = Path(".storage/accounts.json")
@@ -117,6 +119,7 @@ def runnable_accounts(platform: str) -> tuple[RunnableAccount, ...]:
     metadata = PLATFORM_ACCOUNT_METADATA.get(platform)
     if metadata is None:
         return ()
+    bindings = load_account_bindings()
     for state in discover_accounts(platform):
         if state.account_id is None:
             continue
@@ -124,8 +127,9 @@ def runnable_accounts(platform: str) -> tuple[RunnableAccount, ...]:
             continue
         if state.evidence.profile_path is None:
             continue
+        binding = bindings.get(state.account_id)
         name = state.evidence.profile_path.name
-        profile_key = (
+        profile_key = binding.profile_key if binding is not None else (
             name[len(metadata.profile_prefix):]
             if name.startswith(metadata.profile_prefix) else "default"
         )
@@ -135,6 +139,10 @@ def runnable_accounts(platform: str) -> tuple[RunnableAccount, ...]:
 
 def _observed_execution_key(state: AccountState) -> str:
     """Preserve the exact profile/data suffix expected by legacy sync CLIs."""
+    if state.account_id is not None:
+        binding = load_account_bindings().get(state.account_id)
+        if binding is not None:
+            return binding.profile_key
     metadata = PLATFORM_ACCOUNT_METADATA[state.platform]
     if state.evidence.profile_path is not None:
         name = state.evidence.profile_path.name
@@ -297,6 +305,8 @@ def _discover_v2_accounts(
     registry: dict[str, str],
     bindings,
     health,
+    browser_groups,
+    local_browser_profiles,
     storage_root: Path,
     raw_root: Path,
     merged_root: Path,
@@ -339,7 +349,16 @@ def _discover_v2_accounts(
     for profile_key, account_id in bound_id_by_profile_key.items():
         bucket = uuid_bucket(account_id)
         bound_path = storage_root / f"{metadata.profile_prefix}{profile_key}"
-        if platform == "Perplexity" and profile_key == "default":
+        group = next((item for item in browser_groups.records
+                      if account_id in item.account_ids), None)
+        if group is not None:
+            if local_browser_profiles.get(group.profile_id) is not None:
+                bound_path = browser_profile_path(
+                    storage_root, group.profile_id, local_browser_profiles,
+                )
+            else:
+                bound_path = storage_root / "browser-profiles" / group.profile_id
+        elif platform == "Perplexity" and profile_key == "default":
             legacy_path = storage_root / "perplexity-profile"
             if legacy_path.is_dir():
                 bound_path = legacy_path
@@ -493,6 +512,8 @@ def discover_accounts(
     health = load_auth_health(health_path or storage_root / DEFAULT_HEALTH_PATH.name)
     bindings = load_account_bindings(bindings_path or storage_root / DEFAULT_BINDINGS_PATH.name)
     if not legacy_inventory:
+        browser_groups = load_browser_profile_catalog(catalog_path.with_name("browser_profiles.json"))
+        local_browser_profiles = load_local_browser_profiles(storage_root / "browser-profile-config.json")
         return _discover_v2_accounts(
             platform,
             metadata=metadata,
@@ -500,6 +521,8 @@ def discover_accounts(
             registry=registry,
             bindings=bindings,
             health=health,
+            browser_groups=browser_groups,
+            local_browser_profiles=local_browser_profiles,
             storage_root=storage_root,
             raw_root=raw_root,
             merged_root=merged_root,

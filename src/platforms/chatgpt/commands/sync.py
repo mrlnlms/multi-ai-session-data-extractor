@@ -31,6 +31,7 @@ import sys
 from pathlib import Path
 
 from playwright.async_api import async_playwright
+from src.browser_profile_runtime import launch_persistent_profile
 
 from src.assets.vault import AssetVault
 from src.assets.runtime import load_asset_runtime, runtime_account_id
@@ -80,7 +81,7 @@ async def _download_project_sources_for(
 
     profile_dir = get_profile_dir(account)
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
+        context = await launch_persistent_profile(p,
             str(profile_dir), headless=True,
             args=["--disable-blink-features=AutomationControlled"],
         )

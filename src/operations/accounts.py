@@ -27,7 +27,8 @@ PRESERVATION_NOTICE = "Identity and preserved data will not be deleted."
 def check_and_optionally_persist_auth(account_id: str, *, catalog_path: Path, bindings_path: Path,
                                       health_path: Path, storage_root: Path, apply: bool):
     observation = check_account_auth(account_id, catalog=load_account_catalog(catalog_path),
-                                     bindings=load_account_bindings(bindings_path), storage_root=storage_root)
+                                     bindings=load_account_bindings(bindings_path), storage_root=storage_root,
+                                     groups_path=catalog_path.with_name("browser_profiles.json"))
     if apply:
         before = load_auth_health(health_path)
         write_auth_health_atomic(health_path, set_auth_observation(before, observation), expected_before=before)

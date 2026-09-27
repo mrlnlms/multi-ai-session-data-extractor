@@ -3,6 +3,8 @@ from src.accounts import AccountEvidence, AccountState
 from pathlib import Path
 from src.application.accounts import account_actions, add_account_action, auth_check_action, auth_confirm_action, sync_action
 from src.workflows.account_sync import AccountSyncPlan
+from src.account_bindings import AccountBinding, AccountBindings, write_account_bindings_atomic
+from datetime import datetime, timezone
 
 def _account(status):
     return AccountState("Qwen", "work", None, AccountEvidence(), "unknown", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", status)
@@ -48,3 +50,35 @@ def test_login_command_uses_the_observed_profile_key():
                            "valid", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", LifecycleStatus.ACTIVE)
     login = next(action for action in account_actions(account) if action.action == "login")
     assert login.command.endswith("--profile account-2")
+
+
+def test_login_command_uses_account_binding_with_shared_browser(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".storage").mkdir()
+    account_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    bindings = AccountBindings(records=(AccountBinding(
+        account_id, "account-2", datetime(2026, 9, 27, tzinfo=timezone.utc),
+    ),))
+    write_account_bindings_atomic(
+        tmp_path / ".storage" / "account-bindings.json", bindings,
+        expected_before=AccountBindings(),
+    )
+    account = AccountState(
+        "ChatGPT", account_id, None,
+        AccountEvidence(profile_path=Path(".storage/browser-profiles/shared")),
+        "unknown", account_id, LifecycleStatus.ACTIVE,
+    )
+    login = next(action for action in account_actions(account) if action.action == "login")
+    assert login.command.endswith("--profile account-2")
+
+
+def test_restored_group_without_local_account_binding_does_not_offer_uuid_login(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    account_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    account = AccountState(
+        "ChatGPT", account_id, None, AccountEvidence(), "not_configured",
+        account_id, LifecycleStatus.ACTIVE,
+    )
+    login = next(action for action in account_actions(account) if action.action == "login")
+    assert not login.enabled
+    assert login.command is None

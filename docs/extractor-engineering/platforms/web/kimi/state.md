@@ -2,6 +2,10 @@
 
 ## Pipeline
 
+For a browser-group member, the local group binding selects the persistent
+browser directory. Other accounts keep the legacy platform directory. The
+account binding key still selects the command and the UUID still selects raw/merged.
+
 - **Per-account cumulative folders:** every durable raw/merged tree uses
   `account-<account_id>/`. The local profile key is resolved from the UUID
   binding; selective sync uses `python -m src.workflows.account_sync
@@ -9,8 +13,9 @@
 - **Sync orchestrator (3 steps):** `python -m src.platforms.kimi.commands.sync` (capture +
   assets + reconcile).
 - **Headless capture** (Cloudflare did not block on smoke 2026-05-09).
-- **Auth:** persistent profile in `.storage/kimi-profile-<account>/`
-  (generated via `python -m src.platforms.kimi.commands.login`). Cookies + Bearer token from
+- **Auth:** current accounts use their group directories under
+  `.storage/browser-profiles/<profile_id>/`; `.storage/kimi-profile-<account>/`
+  remains the fallback for unassigned accounts. Cookies + Bearer token from
   `localStorage.access_token` (~563 chars JWT-like). Cookies-only = 401.
   Token loaded via `page.evaluate(localStorage.getItem)` em cada captura.
   If the first API call returns 401, the client reloads the already logged-in

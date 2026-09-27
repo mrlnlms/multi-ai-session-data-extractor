@@ -93,12 +93,55 @@ As acoes expostas pela interface e por esses servicos significam:
 | `sync` | Executa captura e parse seletivos para a conta identificada pelo UUID; nao executa unify nem publicacao. |
 | `login` | Abre o fluxo headed especifico da plataforma; senha e MFA sao fornecidos diretamente pelo usuario ao servico. |
 
-`account_id` e a unica identidade imutavel. `profile_key` identifica somente o
-profile local apontado pelo binding dessa instalacao. O catalogo v2 e a
+`account_id` e a unica identidade imutavel. `profile_key` e a chave local do
+comando da conta de plataforma; o grupo de navegador escolhe o diretorio de
+cookies quando a conta esta associada. O catalogo v2 e a
 dimensao analitica nao possuem `technical_key`; o leitor v1 existe apenas na
 fronteira da migracao dos paths antigos. O glossario e a justificativa completa
 ficam em
 [`account-architecture.md`](../product/account-architecture.md#31-glossario-de-conta).
+
+### Grupos de navegador
+
+`python -m src.operations.browser_profiles` oferece `list`, `create`, `assign`,
+`unassign`, `local-init`, `local-bind` e `open-site`. Mutações são apenas preview sem `--apply`. O grupo
+lógico e sua associação com UUIDs de contas ficam em
+`data/accounts/browser_profiles.json`; a configuração de canal e o diretório
+físico ficam em `.storage/`. Exemplo de sequência após ter contas já
+catalogadas:
+
+```bash
+python -m src.operations.browser_profiles create --display-name Pessoal --email usuario@exemplo.test
+# Reuse o UUID mostrado na prévia para aplicar exatamente o mesmo grupo:
+python -m src.operations.browser_profiles create --display-name Pessoal --email usuario@exemplo.test --profile-id PROFILE_ID --apply
+python -m src.operations.browser_profiles local-init PROFILE_ID --channel chrome --apply
+python -m src.operations.browser_profiles open-site PROFILE_ID https://chatgpt.com/
+# Depois do login manual e da confirmação da conta no site:
+python -m src.operations.browser_profiles assign PROFILE_ID ACCOUNT_ID --apply
+python -m src.operations.browser_profiles list
+```
+
+`open-site` abre somente a URL indicada para login manual e não faz sync;
+os demais comandos de organização não abrem navegador. Registre o caminho
+legado da conta antes de associá-la, pois a associação passa a resolver o
+diretório compartilhado. Depois de associar a conta e preparar o diretório local, login, auth-check,
+sync e auxiliares usam esse diretório; contas sem grupo seguem no perfil
+legado. `local-init` cria apenas um diretório vazio;
+`local-bind PROFILE_ID --directory NOME_EXISTENTE --channel chromium` aponta
+para um diretório existente sob `.storage/`, sem copiá-lo, após validação
+explícita do canal. A presença do diretório não demonstra autenticação. O
+comando de PoC
+`python -m src.operations.browser_profile_poc sample --profile-id PROFILE_ID`
+usa o resolvedor e uma trava por diretório físico para leituras;
+`--verify-account-map` também exige um UUID catalogado de ChatGPT, Gemini e
+NotebookLM associado ao grupo e confirma que os três resolvem o mesmo profile.
+Essa opção verifica apenas o mapa local, sem consultar os serviços. As aberturas
+de browser por contas associadas a grupos usam o canal e a trava do diretorio
+compartilhado; contas nao associadas seguem no caminho legado. As 18 contas
+web atuais estão associadas a três grupos nesta instalação. Um clone sem
+`.storage/` restaurou os três grupos e as 18 associações pelo DVC; para
+capturar em outra instalação, é preciso preparar os diretórios locais e fazer
+login novamente. Veja o [contrato de contas](../product/account-architecture.md#direcao-aprovada-para-compartilhamento-de-profiles).
 
 Manual saves nao substituem a captura oficial. Eles geram arquivos
 `<source>_manual_<table>.parquet` na pasta processada da plataforma e sao

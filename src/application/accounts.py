@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
+from src.account_bindings import load_account_bindings
 from src.account_catalog import LifecycleStatus
 from src.accounts import AccountState
 from src.operations.accounts import PRESERVATION_NOTICE, main as account_cli
@@ -31,15 +32,18 @@ def account_actions(account: AccountState) -> tuple[AccountActionView, ...]:
     command = None
     if capability:
         source = "claude_ai" if account.platform == "Claude.ai" else account.platform.lower()
-        profile_key = account.key
+        binding = load_account_bindings().get(account.account_id) if account.account_id else None
+        profile_key = binding.profile_key if binding is not None else account.key
         metadata = PLATFORM_ACCOUNT_METADATA[account.platform]
-        if account.evidence.profile_path is not None:
+        if binding is None and account.evidence.profile_path is not None:
             name = account.evidence.profile_path.name
             if name.startswith(metadata.profile_prefix):
                 profile_key = name[len(metadata.profile_prefix):]
-        command = f"PYTHONPATH=. .venv/bin/python -m src.platforms.{source}.commands.login {capability.login_argument} {profile_key}"
+        if binding is not None or account.key != account.account_id:
+            command = f"PYTHONPATH=. .venv/bin/python -m src.platforms.{source}.commands.login {capability.login_argument} {profile_key}"
     return tuple(AccountActionView(name, account.account_id, PRESERVATION_NOTICE,
-        True if name in {"lifecycle", "bind"} else active, command if name == "login" else None)
+        True if name in {"lifecycle", "bind"} else active and (name != "login" or command is not None),
+        command if name == "login" else None)
         for name in ("lifecycle", "bind", "auth-check", "auth-confirm", "sync", "login"))
 
 def add_account_action(*, platform: str, display_name: str | None = None,

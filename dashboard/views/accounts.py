@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pandas as pd
 import streamlit as st
 
@@ -12,6 +14,11 @@ from src.application.accounts import (
     account_actions, add_account_action, auth_check_action, auth_confirm_action, bind_action,
     lifecycle_action, sync_action,
 )
+from src.application.browser_profiles import (
+    assign_browser_profile_action, browser_profile_rows, create_browser_profile_action,
+    initialize_browser_profile_action,
+)
+from src.browser_profile_catalog import load_browser_profile_catalog
 from src.platforms.registry import WEB_PLATFORMS
 
 
@@ -78,6 +85,109 @@ def _actionable_accounts(states: list[PlatformState]) -> list[AccountState]:
         for account in state.accounts
         if account.account_id is not None and account.lifecycle_status is not None
     ]
+
+
+def _render_browser_profiles(states: list[PlatformState]) -> None:
+    st.subheader("Browser profiles — prototype")
+    st.caption(
+        "A browser group organizes platform accounts and can be restored with DVC. "
+        "Its local directory and cookies stay on this machine. Current login and sync "
+        "still use the existing per-account profiles."
+    )
+    groups = load_browser_profile_catalog()
+    rows = browser_profile_rows()
+    if rows:
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    else:
+        st.caption("No browser groups have been created.")
+
+    with st.expander("1. Create browser group"):
+        name = st.text_input("Group name", key="browser_group_name")
+        email = st.text_input("Group e-mail (optional)", key="browser_group_email")
+        if st.button("Preview browser group", key="browser_group_preview"):
+            profile_id = str(uuid.uuid4())
+            outcome = create_browser_profile_action(
+                profile_id=profile_id, display_name=name, email=email or None,
+                confirmed=False,
+            )
+            if outcome.ok:
+                st.session_state["browser_group_pending"] = (profile_id, name, email or None)
+            else:
+                st.session_state.pop("browser_group_pending", None)
+                st.error(outcome.message)
+        pending = st.session_state.get("browser_group_pending")
+        if pending:
+            st.info(f"Create {pending[1]} with ID {pending[0]}. No browser login will occur.")
+            confirmed = st.checkbox("Confirm browser group", key="browser_group_confirm")
+            if st.button("Create browser group", disabled=not confirmed, key="browser_group_apply"):
+                outcome = create_browser_profile_action(
+                    profile_id=pending[0], display_name=pending[1], email=pending[2],
+                    confirmed=True,
+                )
+                (st.success if outcome.ok else st.error)(outcome.message)
+                if outcome.ok:
+                    st.session_state.pop("browser_group_pending", None)
+
+    if not groups.records:
+        return
+    group_options = [item.profile_id for item in groups.records]
+    group_names = {item.profile_id: item.display_name for item in groups.records}
+    assigned_ids = {account_id for item in groups.records for account_id in item.account_ids}
+    candidates = [item for item in _actionable_accounts(states) if item.account_id not in assigned_ids]
+    with st.expander("2. Associate an account"):
+        if candidates:
+            profile_id = st.selectbox("Browser group", group_options,
+                                      format_func=lambda value: group_names[value], key="browser_assign_group")
+            account = st.selectbox("Platform account", candidates,
+                                   format_func=lambda item: f"{item.platform} · {item.label or item.key}",
+                                   key="browser_assign_account")
+            if st.button("Preview association", key="browser_assign_preview"):
+                outcome = assign_browser_profile_action(
+                    profile_id=profile_id, account_id=account.account_id, confirmed=False,
+                )
+                if outcome.ok:
+                    st.session_state["browser_assign_pending"] = (profile_id, account.account_id)
+                else:
+                    st.session_state.pop("browser_assign_pending", None)
+                    st.error(outcome.message)
+            pending = st.session_state.get("browser_assign_pending")
+            if pending:
+                st.info(f"Associate account {pending[1]} with {group_names.get(pending[0], pending[0])}.")
+                confirmed = st.checkbox("Confirm association", key="browser_assign_confirm")
+                if st.button("Associate account", disabled=not confirmed, key="browser_assign_apply"):
+                    outcome = assign_browser_profile_action(
+                        profile_id=pending[0], account_id=pending[1], confirmed=True,
+                    )
+                    (st.success if outcome.ok else st.error)(outcome.message)
+                    if outcome.ok:
+                        st.session_state.pop("browser_assign_pending", None)
+        else:
+            st.caption("No unassigned catalogued accounts are available.")
+
+    with st.expander("3. Prepare local browser directory"):
+        profile_id = st.selectbox("Group to prepare", group_options,
+                                  format_func=lambda value: group_names[value], key="browser_init_group")
+        channel = st.selectbox("Browser", ("chromium", "chrome"), key="browser_init_channel")
+        if st.button("Preview local profile", key="browser_init_preview"):
+            outcome = initialize_browser_profile_action(
+                profile_id=profile_id, channel=channel, confirmed=False,
+            )
+            if outcome.ok:
+                st.session_state["browser_init_pending"] = (profile_id, channel)
+            else:
+                st.session_state.pop("browser_init_pending", None)
+                st.error(outcome.message)
+        pending = st.session_state.get("browser_init_pending")
+        if pending:
+            st.info(f"Create an empty local {pending[1]} directory for {group_names.get(pending[0], pending[0])}.")
+            confirmed = st.checkbox("Confirm local directory", key="browser_init_confirm")
+            if st.button("Prepare local profile", disabled=not confirmed, key="browser_init_apply"):
+                outcome = initialize_browser_profile_action(
+                    profile_id=pending[0], channel=pending[1], confirmed=True,
+                )
+                (st.success if outcome.ok else st.error)(outcome.message)
+                if outcome.ok:
+                    st.session_state.pop("browser_init_pending", None)
 
 
 def render(states: list[PlatformState]) -> None:
@@ -153,6 +263,8 @@ def render(states: list[PlatformState]) -> None:
         st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     else:
         st.caption("No account definitions are available.")
+
+    _render_browser_profiles(states)
 
     st.subheader("Account actions")
     actionable_accounts = _actionable_accounts(states)

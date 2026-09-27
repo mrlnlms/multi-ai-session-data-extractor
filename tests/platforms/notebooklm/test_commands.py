@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+from pathlib import Path
 
 import pytest
 
@@ -26,8 +27,16 @@ def test_sync_requires_explicit_account_even_for_programmatic_calls():
         asyncio.run(sync.main(args))
 
 
-def test_notebooklm_profile_and_data_paths_are_unchanged():
-    assert get_profile_dir("2").as_posix() == ".storage/notebooklm-profile-2"
+def test_notebooklm_profile_uses_resolved_target_and_keeps_data_path(mocker):
+    resolved = mocker.patch(
+        "src.platforms.notebooklm.extractor.auth.resolve_platform_browser_target",
+        return_value=mocker.Mock(path=Path(".storage/shared-notebooklm")),
+    )
+    assert get_profile_dir("2") == Path(".storage/shared-notebooklm")
+    resolved.assert_called_once_with(
+        "NotebookLM", "2", legacy_path=Path(".storage/notebooklm-profile-2"),
+        legacy_channel="chrome",
+    )
     assert (sync.MERGED_BASE / "account-2").as_posix() == "data/merged/NotebookLM/account-2"
 
 

@@ -16,6 +16,7 @@ from src.auth_health import (
     AuthEvidenceMethod, AuthObservation, AuthStatus, DEFAULT_HEALTH_PATH,
     load_auth_health, set_auth_observation, write_auth_health_atomic,
 )
+from src.browser_profile_runtime import resolve_platform_browser_target
 from src.platforms.registry import PLATFORM_ACCOUNT_METADATA, PLATFORM_COMMAND_PACKAGES
 from src.workflows.execution import run_commands
 
@@ -51,6 +52,13 @@ def plan_account_sync(
         storage_root / "perplexity-profile"
     ).is_dir():
         profile = storage_root / "perplexity-profile"
+    profile = resolve_platform_browser_target(
+        record.platform, binding.profile_key, legacy_path=profile,
+        accounts_path=catalog_path, bindings_path=bindings_path,
+        groups_path=catalog_path.with_name("browser_profiles.json"),
+        local_path=storage_root / "browser-profile-config.json",
+        storage_root=storage_root,
+    ).path
     if not profile.is_dir():
         raise ValueError("Bound local profile is missing")
     observation = load_auth_health(health_path).get(account_id)

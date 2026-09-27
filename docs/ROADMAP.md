@@ -200,9 +200,10 @@ Git repository (code + .dvc pointers) + one verified DVC object remote
     = recreate the project data at the matching Git revision with dvc pull
 ```
 
-Browser profiles and cookies in `.storage/` are deliberately outside that
-contract and require a new login after a clean-machine restore. A clean restore
-must be demonstrated before retiring any previous remote.
+Physical browser profiles and cookies in `.storage/` are deliberately outside
+that contract and require a new login after a clean-machine restore. Durable
+browser-group metadata, once published, belongs to `data/accounts/`. A clean
+restore must be demonstrated before retiring any previous remote.
 
 If a future alternative proves viable, the target is a **single** object
 remote, not a permanent Drive + R2 arrangement. Until then, Drive remains the
@@ -309,13 +310,47 @@ prerequisite.
 
 ### Chrome profile storage and reuse
 
-**Status:** future internal investigation; hypothesis not yet verified.
+**Status:** local migration completed on 2026-09-27. The 18 active web accounts
+are assigned to three browser groups and three physical Chrome directories,
+with 9, 7 and 2 accounts respectively. The owner confirmed each platform
+session in the visible browser; the NotebookLM sessions were confirmed with
+their expected notebooks. The 18 old directories and the separate Foton PoC
+directory were removed. Selective Gemini and NotebookLM syncs on the third
+profile completed capture, reconcile, parse and unify with separate UUID data
+paths. A temporary clone of the branch commit restored the three groups and
+18 memberships from the DVC remote without `.storage/`.
+The logical browser group and its account UUID associations belong in the
+DVC-managed `data/accounts/`; physical browser profiles/cookies remain local
+in `.storage/`. The updated `data/accounts.dvc` objects were pushed to the
+Google Drive remote. The sync-updated raw, merged, processed, unified and asset
+objects were pushed as well; `dvc status -c` reported cache and remote in sync.
+The Git pointers are committed on the profile branch.
 
-Disk-use investigation raised the hypothesis that multiple platform accounts
-using the same Google identity might share a local Chrome profile and reduce
-duplicated storage. This remains unverified. Google/Chrome Sync is optional
-and is not evidence of upstream authentication. Scope and evidence needs are
-recorded in the [Chrome profile investigation](product/chrome-profile-investigation.md).
+The former 18 extractor profiles occupied 2,638,588 KiB (2.52 GiB); 90.5% was
+in `Cache` and `Code Cache`. The three new directories measured 371,148 KiB
+(362.4 MiB), a point-in-time reduction of 2,267,440 KiB (2.16 GiB) for the
+18-to-3 comparison. The separate Foton PoC was excluded from that baseline and
+from the comparison. Each account retains its own UUID and `raw`/`merged`
+destinations. Chrome Sync is not a requirement or evidence of platform login.
+Sharing one automation profile among platform accounts using the
+same Google identity might reduce duplication or simplify login. A fresh
+ChatGPT + Gemini Chromium profile kept both correct authenticated sessions
+after reopening; NotebookLM also passed a read-only authenticated listing in
+that profile with Chromium. An ephemeral group and local binding resolved that
+same profile without copying it, and a directory-scoped lock guarded repeated
+read-only client calls. Offline tests now cover group routing through platform
+account bindings, command-key selection, channel choice and directory locking.
+The migrated third profile passed selective Gemini and NotebookLM syncs;
+other migrated accounts have visual login confirmation and offline route tests.
+The Gemini sync reused 34 conversations while historical image URLs returned
+HTTP 403. NotebookLM updated 53 notebooks and preserved two missing ones;
+many upstream binary links failed, while the prior vault deliveries verified.
+A bounded read-only client pilot had earlier fetched one Gemini conversation and one NotebookLM metadata body;
+ChatGPT conversation discovery was inconclusive for content. The owner chose
+not to register or sync the test account yet. Google/Chrome Sync
+is optional and is not evidence of upstream authentication. The durable group
+contract is in [account architecture](product/account-architecture.md#direcao-aprovada-para-compartilhamento-de-profiles),
+and operator commands are in [browser profiles](operations/commands.md#grupos-de-navegador).
 
 ## Decisions requiring explicit direction
 

@@ -2,6 +2,10 @@
 
 ## Pipeline
 
+For a browser-group member, the local group binding selects the persistent
+browser directory. Other accounts keep the legacy platform directory. The
+account binding key still selects the command and the UUID still selects raw/merged.
+
 - **Per-account cumulative folders:** every durable raw/merged tree uses
   `account-<account_id>/`. The local profile key is resolved from the UUID
   binding; selective sync uses `python -m src.workflows.account_sync
@@ -9,10 +13,10 @@
 - **Sync orchestrator (3 steps):** `python -m src.platforms.claude_ai.commands.sync` (capture +
   assets + reconcile).
 - **Headless capture** (no Cloudflare challenge at runtime).
-- **Auth:** the default persistent profile is
-  `.storage/claude-ai-profile-default/` (generated via
-  `python -m src.platforms.claude_ai.commands.login --profile default`). Other profile names follow
-  `.storage/claude-ai-profile-<name>/`.
+- **Auth:** current accounts use their group directory under
+  `.storage/browser-profiles/<profile_id>/` through the account binding.
+  `.storage/claude-ai-profile-<name>/` remains the fallback for unassigned
+  accounts; the login command resolves the same group path.
 
 ## Coverage
 

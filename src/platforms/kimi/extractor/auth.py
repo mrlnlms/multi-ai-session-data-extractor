@@ -1,6 +1,7 @@
 """Playwright login persistente pra Kimi (Moonshot AI).
 
-Single-account por enquanto (.storage/kimi-profile-default/).
+O diretorio legado da conta default e .storage/kimi-profile-default/; um grupo
+associado pode escolher outro diretorio local.
 Login via kimi.com (SSO Google OAuth comum).
 
 Auth particularidade: cookies sozinhos NAO bastam — endpoints retornam
@@ -15,13 +16,17 @@ Padrao similar ao Qwen (token em localStorage), diferente do Grok
 from pathlib import Path
 
 from playwright.async_api import async_playwright, BrowserContext
+from src.browser_profile_runtime import launch_persistent_profile, resolve_platform_browser_target
 
 
 HOME_URL = "https://kimi.ai/"
 
 
 def get_profile_dir(account: str = "default") -> Path:
-    return Path(f".storage/kimi-profile-{account}")
+    return resolve_platform_browser_target(
+        "Kimi", account, legacy_path=Path(f".storage/kimi-profile-{account}"),
+        legacy_channel="chrome",
+    ).path
 
 
 async def login(account: str = "default") -> None:
@@ -32,7 +37,7 @@ async def login(account: str = "default") -> None:
     print("Faca login em kimi.ai e feche o browser quando terminar.")
 
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
+        context = await launch_persistent_profile(p,
             str(profile_dir),
             headless=False,
             channel="chrome",
@@ -54,7 +59,7 @@ async def load_context(account: str = "default", headless: bool = True) -> Brows
             f"Profile nao existe: {profile_dir}. Rode python -m src.platforms.kimi.commands.login"
         )
     pw = await async_playwright().start()
-    context = await pw.chromium.launch_persistent_context(
+    context = await launch_persistent_profile(pw,
         str(profile_dir),
         headless=headless,
         channel="chrome",

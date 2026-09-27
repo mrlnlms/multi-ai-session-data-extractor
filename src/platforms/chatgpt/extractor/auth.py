@@ -7,11 +7,14 @@ cookies no profile, login feito 1x dura ate expirar no servidor.
 from pathlib import Path
 
 from playwright.async_api import async_playwright
+from src.browser_profile_runtime import launch_persistent_profile, resolve_platform_browser_target
 
 
 def get_profile_dir(profile_name: str = "default") -> Path:
     """Path do diretorio de profile pra esse account."""
-    return Path(f".storage/chatgpt-profile-{profile_name}")
+    return resolve_platform_browser_target(
+        "ChatGPT", profile_name, legacy_path=Path(f".storage/chatgpt-profile-{profile_name}"),
+    ).path
 
 
 async def login(profile_name: str = "default") -> None:
@@ -23,7 +26,7 @@ async def login(profile_name: str = "default") -> None:
     print("Faca login no ChatGPT e feche o browser quando terminar.")
 
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
+        context = await launch_persistent_profile(p,
             str(profile_dir),
             headless=False,
             args=["--disable-blink-features=AutomationControlled"],

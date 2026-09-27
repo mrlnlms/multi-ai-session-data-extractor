@@ -39,6 +39,17 @@ continua visível mesmo sem profile;
 nesse caso, a interface a identifica como acervo preservado sem profile ou como
 archive histórico, conforme a evidência disponível.
 
+A seção **Browser profiles** apresenta a organização em
+duas camadas: grupo lógico restaurável pelo DVC e diretório de navegador local.
+Ela permite criar grupo, associar uma conta catalogada e preparar um diretório
+local vazio, sempre com preview e confirmação. A tabela distingue associação,
+presença do diretório e canal escolhido; nenhum desses sinais comprova login.
+Login, auth-check e sync usam o diretorio do grupo somente quando a conta foi
+associada e o binding local foi preparado; as demais seguem no caminho legado.
+As 18 contas web atuais estão associadas a três grupos nesta instalação. O
+[contrato de contas](../product/account-architecture.md#direcao-aprovada-para-compartilhamento-de-profiles)
+descreve o roteamento e o restore.
+
 Abrir essa visão não testa login nem consulta serviços upstream. **Unknown (not
 checked)** significa que a autenticação não foi verificada; não significa sessão
 válida. Observacoes concluidas mostram tambem a origem da evidencia, como
