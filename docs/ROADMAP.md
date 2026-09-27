@@ -6,7 +6,7 @@ than duplicating it here. Completed work is marked here so its status can be
 read without searching Git history; implementation detail belongs in `git log`,
 and platform-specific behavior belongs in its own documentation.
 
-**Last reviewed:** 2026-09-26.
+**Last reviewed:** 2026-09-27.
 
 For one-time work, use **planned**, **active**, or **completed**. Mark completion
 when closing the work, with its date and an evidence pointer when available.

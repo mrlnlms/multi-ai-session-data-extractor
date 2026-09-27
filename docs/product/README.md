@@ -70,8 +70,9 @@ nao a fila de trabalho do presente. A prioridade temporal fica no
 [roadmap](../ROADMAP.md). O vault autoritativo, a retencao inicial e a prevencao
 de rematerializacao em novas capturas ja foram concluidos.
 A identidade canonica e a dimensao analitica de contas tambem foram concluidas
-e publicadas. Memoria/configuracao preservada e a proxima frente separada
-indicada pelo roadmap; leitor e mudanca do remoto DVC ficam no futuro.
+e publicadas. A primeira rodada de memoria/configuracao foi concluida; retomadas
+dependem de nova evidencia. O leitor e a lacuna de produto mais clara para a
+proxima exploracao; a mudanca do remoto DVC permanece futura.
 
 1. Manter captura, preservacao, schema e publicacao independentes da interface.
 2. Completar somente os contratos de dados exigidos por experiencias concretas,
