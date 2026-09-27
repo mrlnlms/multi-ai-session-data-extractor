@@ -3,7 +3,7 @@
 **Status:** visão de produto validada em conversa; não é especificação nem
 plano de implementação.
 
-**Data da visao:** 2026-08-31. **Horizonte revisto:** 2026-09-15.
+**Data da visao:** 2026-08-31. **Horizonte revisto:** 2026-09-27.
 
 ## 1. Decisão de produto
 
@@ -34,11 +34,11 @@ configuração de conta teve sua primeira rodada concluída; novas capturas dess
 frente dependem de evidência concreta. A identidade canônica, `account_id` e a
 dimensão analítica de contas já foram concluídos e publicados.
 A centralização física dos assets preservados, sua retenção inicial e a limpeza
-do histórico DVC não utilizado também foram concluídas. O leitor fica no
-futuro próximo como exploração de produto, provavelmente antes de uma eventual
-mudança do remoto DVC. O
-[roadmap](../ROADMAP.md) registra a prioridade temporal; esta visão
-descreve o produto-alvo e não fixa a ordem de implementação das três frentes.
+do histórico DVC não utilizado também foram concluídas. A próxima frente de
+produto começa pela nova aplicação local: operação e exploração dinâmica dos
+dados coletados, seguidas por leitor e curadoria. O leitor continua no futuro
+próximo, provavelmente antes de uma eventual mudança do remoto DVC. O
+[roadmap](../ROADMAP.md) registra a prioridade temporal.
 
 O arquivo substitui a necessidade de consultar o histórico diretamente em cada
 plataforma, sem substituir a preservação: chats removidos upstream continuam
@@ -77,8 +77,32 @@ configuração operacional, não a estrutura principal de navegação do arquivo
 
 O Streamlit atual e um frontend de prototipacao, nao a fronteira do dominio.
 Ele consome servicos importaveis de observacao, metricas e execucao em `src/`.
-Essa separacao preserva a experiencia operacional existente e permite trocar a
-interface no futuro sem reimplementar o pipeline ou suas regras de preservacao.
+Essa separacao permite reaproveitar servicos e regras de preservacao ao trocar
+a interface e evoluir a orquestracao quando a nova jornada exigir.
+Essa separacao resultou de meses de consolidacao do backend antes de uma
+interface propria. Streamlit e Quarto permitiram colocar a captura e a
+observacao em uso rapidamente; as paginas padronizadas da nova aplicacao devem
+assumir esse uso cotidiano de forma mais coesa.
+O comportamento atual da interface e da orquestracao nao e um contrato de
+produto a repetir: a nova jornada exige completar e modificar ambos onde for
+necessario. As decisoes duraveis sao a preservacao do acervo, sua proveniencia
+e a separacao entre dados canonicos, estado operacional local e curadoria.
+
+### Jornada inicial da aplicacao
+
+O usuario organiza grupos de navegador, cadastra as contas web associadas,
+ajusta sua identificacao e realiza login visivel em cada plataforma. Depois
+executa uma coleta completa ou seletiva, acompanha o resultado e explora em
+paginas dinamicas os dados que foram processados. As quatro fontes CLI entram
+na mesma jornada a partir de suas arvores locais, sem grupos de navegador.
+
+Os templates QMD atuais ja oferecem um perfil descritivo padronizado por fonte
+e uma visao transversal: volumes, cobertura, distribuicoes, evolucao e tabelas
+filtraveis. Essas visoes formam a primeira area de exploracao da aplicacao. O
+leitor acrescenta o acesso ao conteudo das conversas; a edicao e a curadoria
+vem depois, apoiadas nessa leitura. Quarto continua disponivel para analises
+exploratorias e autorais. Esta jornada e direcao de produto, nao declaracao de
+funcionalidades concluidas no Streamlit ou escolha do shell final.
 
 ## 3. Camadas de dados
 
@@ -113,8 +137,9 @@ e trechos de evidência são opcionais e só precisam ser registrados quando
 forem úteis para a decisão.
 
 Registros curatoriais nunca usam um `conversation_id` ou `message_id` isolado
-como identidade global. Conversas são ancoradas por `(source,
-conversation_id)`; mensagens, por `(source, conversation_id, message_id)`.
+como identidade global. Conversas são ancoradas por `(source, account_id,
+conversation_id)`; mensagens, por `(source, account_id, conversation_id,
+message_id)`.
 Anotações de mensagens ou trechos também preservam sinais redundantes de
 recuperação, como papel, timestamp, sequência observada e impressão do conteúdo,
 para que uma melhoria futura de parser não solte silenciosamente a curadoria do

@@ -46,6 +46,22 @@ replacement. See the [product architecture map](product/README.md) and
 [product vision](product/product-vision.md) for the durable decisions behind
 this transition. Dated plans and process records live in the private workbench.
 
+The agreed product journey starts with a new application for browser groups,
+web accounts and visible login, then full or selective collection with progress
+and health, followed by dynamic exploration of the collected data. The current
+standardized QMD templates provide the descriptive content for those pages.
+Search and conversation reading follow in the same application; editing and
+curation build on reading. CLI sources participate in collection without
+browser groups. This is a direction for future work, not a claim that the
+current Streamlit flow already supports every step. Missing rename, login,
+selective refresh and UI capabilities are expected implementation work.
+The backend-first work of recent months made this transition possible:
+Streamlit and standardized Quarto reports accelerated the prototype, while
+capture, preservation and operational rules moved into reusable services.
+The new application should reduce those UI/report dependencies in daily use;
+the current Quarto render stage and publication gate must evolve with validated
+replacement views. The final application shell remains open.
+
 The boundary already established is: source-specific capture/reconciliation/
 parsing in `src/platforms/`; UI-neutral observation and profiles in
 `src/application/`; pipeline ordering, locks and publication in
@@ -153,11 +169,12 @@ changes without repeating a remote query or filling the agent context with an
 audit. Details and explicit re-verification remain available through
 [`src.operations.archive_assurance`](../src/operations/archive_assurance.py).
 
-The archive reader is a future product front, likely before any DVC remote
-change. Research or migration of the remote is later storage work. The
-completed asset-copy correction does not change the reader contract.
-This section records planning emphasis, not an implementation sequence or
-authorization to start work during an alignment conversation.
+The initial application front now starts with operation, collection and
+dynamic exploration, then adds the archive reader and curation. The reader is
+still a major product gap and likely precedes any DVC remote change. Research
+or migration of the remote is later storage work. The completed asset-copy
+correction does not change the reader contract. This section records product
+direction and does not authorize implementation during an alignment conversation.
 
 ## Product evolution reading map
 
@@ -252,8 +269,8 @@ the DVC remote and does not change the authoritative vault contract.
 
 ### Archive reader product
 
-**Status:** future product exploration. It does not need to wait for a storage
-remote decision.
+**Status:** future product front after the initial operation and exploration
+experience. It does not need to wait for a storage remote decision.
 
 The reader is currently the clearest product gap: collection and analytical
 access exist, but the preserved messages themselves cannot be inspected
@@ -263,9 +280,11 @@ schema and presentation gaps that remain invisible in aggregate dashboards.
 The current Streamlit UI is a replaceable presentation adapter. Platform
 observation and data-profile services live under `src/application/`; pipeline
 order, gating, locks and optional publication live under `src/workflows/`.
-Account management, dynamic replacements for standardized Quarto profiles and
-separate publication controls remain product work, not behavior implied by
-this refactor.
+The new application first develops account and browser-group management,
+guided login, collection and dynamic views based on the standardized Quarto
+profiles. Current gaps in those flows are work to implement, not constraints
+that define the target experience. Queries and metric definitions should be
+reused across current reports and future pages while both are available.
 
 Build a local-first, read-only reader area beyond the current operational
 Streamlit views:
@@ -295,13 +314,16 @@ references for that investigation, not a product work sequence.
 
 ### Product fronts and architectural emphasis
 
-This describes the intended product architecture, not the current work queue
-or a requirement to finish one front completely before touching another:
+This describes the intended product architecture. The initial application
+sequence is operation and collection, dynamic exploration, reader, then
+curation; it does not require finishing one front completely before touching
+another:
 
 | Front | Architectural role | Why |
 |---|---|---|
-| Archive and reader | Reading experience | Closes the visibility gap and reveals fidelity issues in real conversations. |
 | Operation and health | Operational experience | Evolves the existing Streamlit capabilities for accounts, logins, runs and diagnostics. |
+| Dynamic exploration | Descriptive experience | Turns standardized QMD data profiles into interactive views of collected data. |
+| Archive and reader | Reading experience | Closes the visibility gap and reveals fidelity issues in real conversations. |
 | Assisted curation | Iterative experience | Depends on reading context and on durable references. |
 
 Parser and schema refinements should be made incrementally when the reader

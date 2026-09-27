@@ -130,9 +130,12 @@ arquivo.
 - Este projeto publica o contrato de dados unificado. Mudancas de schema ou
   de Parquets publicados devem ter seus impactos em consumidores downstream
   revisados antes da publicacao.
-- Toda plataforma promovida deve aparecer em `src/platforms/registry.py`, no dashboard
-  Streamlit e nos relatorios Quarto. O dashboard e iniciado por
-  `PYTHONPATH=. .venv/bin/streamlit run dashboard/app.py`.
+- No fluxo atual, toda plataforma promovida deve aparecer em
+  `src/platforms/registry.py`, no dashboard Streamlit e nos relatorios Quarto.
+  O dashboard e iniciado por
+  `PYTHONPATH=. .venv/bin/streamlit run dashboard/app.py`. Ao substituir essas
+  superficies, manter a plataforma visivel na nova aplicacao sem transformar
+  Streamlit ou Quarto em dependencias permanentes do produto.
 - Nao declarar uma pipeline verde se o Parquet for anterior aos inputs
   canonicos aplicaveis, como raw, merged, catalogo ou estado duravel do vault.
 - Para discutir prioridades ou planejar uma frente, consulte `docs/ROADMAP.md`
@@ -141,6 +144,15 @@ arquivo.
   codigo, dados ou baseline quando houver contradicao ou a tarefa exigir
   verificacao. A reestruturacao move o core reutilizavel para `src/`, nao torna
   Streamlit ou Quarto o produto.
+- Para trabalho na futura aplicacao, leia a jornada em
+  `docs/product/README.md` e `docs/product/product-vision.md`. O comportamento
+  atual de telas, QMDs e orquestracao e ponto de partida, nao requisito de
+  replica: lacunas da jornada aprovada pedem evolucao desses fluxos. A
+  consolidacao do backend em `src/` precedeu deliberadamente uma interface
+  propria; Streamlit e os relatorios padronizados em Quarto viabilizaram o
+  prototipo. Reduzir a dependencia deles na experiencia permanente e parte
+  dessa evolucao. Preserve os contratos canonicos de dados, proveniencia e
+  estado local ao modifica-los.
 - Em uma nova sessao, o hook `SessionStart` em `.codex/` apresenta o baseline
   local do acervo. Se precisar rele-lo, use
   `.venv/bin/python -m src.operations.archive_assurance status`. Um baseline

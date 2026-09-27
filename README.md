@@ -67,6 +67,12 @@ The automated test suite covers extractors, reconcilers, parsers, the
 canonical schema, dashboard, and unification. Known limitations and gaps are
 documented in [extractor engineering's known limitations](docs/extractor-engineering/known-limitations.md).
 
+The current Streamlit dashboard and standardized Quarto reports are prototype
+interfaces over a reusable backend. The next product stage is one local
+application for account and browser setup, collection, dynamic data profiles,
+then conversation reading and curation. See the
+[product architecture and journey](docs/product/README.md).
+
 ## Quickstart
 
 Prerequisites: Python ≥3.12, macOS or Linux. Windows not tested.

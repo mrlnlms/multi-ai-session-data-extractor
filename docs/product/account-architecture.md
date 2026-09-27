@@ -370,6 +370,17 @@ CLI e dashboard chamam os mesmos servicos de dominio. Nome livre, progresso
 detalhado, fila, retry e uma experiencia integrada de login permanecem temas da
 futura aplicacao. Sua tecnologia continua deliberadamente aberta.
 
+Na direcao aprovada para a nova aplicacao, este fluxo comeca pela criacao e
+identificacao de grupos de navegador, pelo cadastro das contas web associadas
+e pelo login visivel em cada plataforma. A interface deve permitir ajustar o
+nome do grupo e da conta, acompanhar uma coleta completa ou seletiva e chegar
+aos dados unificados em paginas dinamicas. A ausencia atual de edicao de grupo,
+login guiado ou atualizacao unificada apos um sync isolado e trabalho de
+implementacao dessa jornada; os comandos e telas existentes nao definem seu
+limite. Fontes CLI entram na coleta sem um grupo de navegador. Catalogo de
+grupos e contas, profile local e observacao de autenticacao continuam sendo
+estados distintos ao evoluir a interface.
+
 ### Direcao aprovada para compartilhamento de profiles
 
 O compartilhamento de profiles usa uma camada logica anterior ao login: o usuario cria um grupo
@@ -513,9 +524,11 @@ isolamento de paths, `account_id` publicado e `accounts.parquet` derivado do
 catalogo. A frente estrutural de identidade de contas esta concluida; ela nao
 depende da escolha do shell futuro.
 
-Memoria/configuracao preservada, leitor, fila operacional, empacotamento e
-distribuicao sao frentes separadas. Implementa-las nao deve reabrir a identidade
-arquivavel ja publicada sem nova evidencia ou requisito incompatível.
+A primeira rodada de memoria/configuracao esta concluida, com retomadas
+dependentes de nova evidencia. A nova aplicacao, o leitor, a fila operacional,
+o empacotamento e a distribuicao sao frentes posteriores sobre a fundacao de
+contas. Implementa-las nao deve reabrir a identidade arquivavel ja publicada
+sem nova evidencia ou requisito incompativel.
 
 ## 11. Decisoes fechadas e abertas
 
@@ -549,7 +562,9 @@ referencias historicas legiveis.
 
 13. A superficie principal sera web local, Electron, Tauri ou uma combinacao?
 14. Backend Python roda embutido, como sidecar ou como servico local separado?
-15. Como empacotar Python, Playwright/Chromium, Quarto e dependencias nativas?
+15. Como empacotar Python, Playwright/Chromium e dependencias nativas, mantendo
+    Quarto opcional para analise autoral apos a substituicao dos perfis
+    padronizados?
 16. Quais sistemas operacionais precisam ser suportados inicialmente?
 17. Como assinar, notarizar, atualizar e fazer rollback do app?
 18. Login ocorre no navegador do sistema, Chromium gerenciado ou WebView
@@ -572,8 +587,9 @@ referencias historicas legiveis.
     as nove plataformas web.
 26. Contas historicas permanecem visiveis no inventario sem exigir profile nem
     participar dos alvos de sync.
-27. Geracao dinamica de relatorios consolidados/individuais, filas, retry e
-    coordenacao de browser headed permanecem decisoes da futura experiencia.
+27. Paginas dinamicas para os perfis descritivos consolidados/individuais sao
+    direcao aprovada da nova aplicacao; consultas, filtros, filas, retry e
+    coordenacao de browser headed ainda precisam ser desenhados e implementados.
 
 ### Consumidor
 
@@ -591,5 +607,5 @@ publicacao do projeto.
 
 Empacotamento ou substituicao da interface exigem, adicionalmente, threat model,
 tratamento de profiles, estrategia de distribuicao e rollback. Essas decisoes
-nao bloqueiam manutencao do backend atual nem a frente independente de
-memoria/configuracao de contas.
+nao bloqueiam manutencao do backend atual nem retomadas de memoria/configuracao
+que atendam aos gatilhos de evidencia documentados.
