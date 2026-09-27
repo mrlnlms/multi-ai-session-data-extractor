@@ -374,12 +374,12 @@ futura aplicacao. Sua tecnologia continua deliberadamente aberta.
 
 O compartilhamento de profiles usa uma camada logica anterior ao login: o usuario cria um grupo
 de navegador com nome/e-mail opcionais e associa a ele contas de plataforma.
-O prototipo em `src/browser_profile_catalog.py` e
+A implementacao em `src/browser_profile_catalog.py` e
 `src/local_browser_profiles.py` separa esses metadados: grupos e associacoes
-ficam em `data/accounts/`, gerido por DVC quando publicado; diretorio de
+ficam em `data/accounts/`, gerido por DVC; diretorio de
 navegador, canal e cookies continuam locais em `.storage/`. Assim, uma
 restauracao futura trara a organizacao das contas, mas exigira novos logins
-para capturas. Um clone temporario do commit da migracao restaurou os tres
+para capturas. Um clone novo da branch publicada restaurou os tres
 grupos e 18 associacoes pelo DVC sem `.storage/`. Cada grupo aceita no maximo
 uma conta por plataforma. O binding local tambem pode apontar explicitamente para um
 diretorio existente sob `.storage/`, sem copiar cookies. O refactor de caminhos

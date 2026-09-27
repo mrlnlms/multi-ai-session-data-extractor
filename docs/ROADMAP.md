@@ -310,21 +310,21 @@ prerequisite.
 
 ### Chrome profile storage and reuse
 
-**Status:** local migration completed on 2026-09-27. The 18 active web accounts
+**Status:** migration completed and published on 2026-09-27. The 18 active web accounts
 are assigned to three browser groups and three physical Chrome directories,
 with 9, 7 and 2 accounts respectively. The owner confirmed each platform
 session in the visible browser; the NotebookLM sessions were confirmed with
 their expected notebooks. The 18 old directories and the separate Foton PoC
 directory were removed. Selective Gemini and NotebookLM syncs on the third
 profile completed capture, reconcile, parse and unify with separate UUID data
-paths. A temporary clone of the branch commit restored the three groups and
+paths. A fresh clone of the GitHub branch restored the three groups and
 18 memberships from the DVC remote without `.storage/`.
 The logical browser group and its account UUID associations belong in the
 DVC-managed `data/accounts/`; physical browser profiles/cookies remain local
 in `.storage/`. The updated `data/accounts.dvc` objects were pushed to the
 Google Drive remote. The sync-updated raw, merged, processed, unified and asset
 objects were pushed as well; `dvc status -c` reported cache and remote in sync.
-The Git pointers are committed on the profile branch.
+The Git pointers are committed and pushed on the profile branch.
 
 The former 18 extractor profiles occupied 2,638,588 KiB (2.52 GiB); 90.5% was
 in `Cache` and `Code Cache`. The three new directories measured 371,148 KiB
