@@ -26,6 +26,7 @@ def _state_with_parquet(tmp_path, *, name="ChatGPT", capture=None):
     processed.mkdir()
     parquet = processed / "conversations.parquet"
     parquet.touch()
+    (processed / "messages.parquet").touch()
     return PlatformState(
         name=name,
         raw_dir=raw,
@@ -68,6 +69,46 @@ def test_missing_parquet_is_failed(tmp_path):
 
     assert state.status() == "red"
     assert state.health().reason == "Processed conversations Parquet is missing"
+
+
+def test_missing_messages_parquet_is_failed(tmp_path):
+    state, _raw, _parquet = _state_with_parquet(tmp_path)
+    (state.processed_dir / "messages.parquet").unlink()
+
+    assert state.status() == "red"
+    assert state.health().reason == "Processed messages Parquet is missing"
+
+
+def test_raw_memory_change_is_not_green_when_merged_exists(tmp_path):
+    state, raw, parquet = _state_with_parquet(tmp_path)
+    merged = tmp_path / "merged"
+    merged.mkdir()
+    (merged / "conversation.json").touch()
+    state.merged_dir = merged
+    memory = raw / "account-a" / "_account_memory" / "capture.json"
+    memory.parent.mkdir(parents=True)
+    memory.touch()
+    os.utime(memory, ns=(parquet.stat().st_mtime_ns + 1_000_000_000,) * 2)
+
+    assert state.status() == "red"
+
+
+def test_catalog_change_is_not_green(tmp_path):
+    data = tmp_path / "data"
+    raw = data / "raw" / "ChatGPT"
+    processed = data / "processed" / "ChatGPT"
+    catalog = data / "accounts" / "catalog.json"
+    raw.mkdir(parents=True)
+    processed.mkdir(parents=True)
+    catalog.parent.mkdir(parents=True)
+    parquet = processed / "chatgpt_conversations.parquet"
+    parquet.touch()
+    (processed / "chatgpt_messages.parquet").touch()
+    catalog.touch()
+    os.utime(catalog, ns=(parquet.stat().st_mtime_ns + 1_000_000_000,) * 2)
+    state = PlatformState("ChatGPT", raw, None, processed, [_capture()])
+
+    assert state.status() == "red"
 
 
 def test_newer_relevant_input_is_failed(tmp_path):

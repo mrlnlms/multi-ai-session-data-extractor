@@ -24,11 +24,34 @@ def test_receipt_is_reusable_until_local_data_changes(tmp_path: Path) -> None:
     assert read_assurance(tmp_path, git_head="abc").status == "changed"
 
 
+def test_receipt_detects_asset_vault_changes(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    asset = tmp_path / "data/assets/blobs/asset"
+    asset.parent.mkdir(parents=True)
+    asset.write_bytes(b"original")
+    write_assurance(tmp_path, git_head="abc", method="verified_cloud")
+
+    assert read_assurance(tmp_path).status == "verified"
+    asset.write_bytes(b"changed content")
+    assert read_assurance(tmp_path).status == "changed"
+
+
+def test_old_receipt_requires_refresh_without_claiming_data_changed(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    receipt = write_assurance(tmp_path, git_head="abc", method="verified_cloud")
+    payload = json.loads(receipt.read_text())
+    payload["version"] = 1
+    receipt.write_text(json.dumps(payload))
+
+    assert read_assurance(tmp_path).status == "outdated"
+
+
 def test_receipt_records_scope_without_private_contents(tmp_path: Path) -> None:
     _fixture(tmp_path)
     write_assurance(tmp_path, git_head="abc", method="completed_push")
 
     payload = json.loads((tmp_path / ".runtime/archive-assurance.json").read_text())
+    assert payload["version"] == 2
     assert payload["git_head"] == "abc"
     assert payload["method"] == "completed_push"
     assert "data/raw/ChatGPT/a.json" not in json.dumps(payload)

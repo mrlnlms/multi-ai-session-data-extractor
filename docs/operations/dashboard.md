@@ -79,15 +79,18 @@ exclusão upstream.
 
 A cor da plataforma representa a saúde da pipeline, não a idade da captura:
 
-- verde: captura sem erros e Parquet cobrindo as entradas do parser;
+- verde: captura sem erros e Parquets de conversas/mensagens cobrindo as
+  entradas observadas do parser;
 - amarelo: a captura mais recente registrou erros, mas os dados existentes
   continuam disponíveis;
 - vermelho: Parquet ausente ou anterior a uma entrada relevante;
 - preto: nenhuma captura registrada.
 
 A recência aparece separadamente em **Last capture**. Para decidir frescor, o
-dashboard compara o Parquet com arquivos consumidos pelos parsers (`.json` nas
-fontes web e extensões próprias das CLIs), nunca com o `mtime` dos diretórios.
+dashboard compara o Parquet com `merged`, com `raw` nas fontes que o parser le
+diretamente, com snapshots historicos aplicaveis e com o catalogo de contas
+para fontes web. Logs e superficies raw ainda sem projecao canonica, como a
+memoria/contexto do Kimi, nao contam como entrada do parser.
 
 Use **Reload data** após uma rodada manual para invalidar o cache do
 Streamlit. Os indicadores descrevem o que existe em disco; eles não substituem
@@ -122,9 +125,8 @@ diretamente no terminal,
 caso em que o parse continua sendo um passo explícito. Os syncs das fontes CLI
 já incluem copy e parse.
 
-Uma falha nas etapas 2 ou 3 impede a publicação. Na etapa 1, falhas parciais
-são registradas, mas a rodada pode continuar quando ao menos uma fonte for
-capturada; revise o resultado antes de tratar a rodada como saudável.
+Uma falha em qualquer fonte selecionada na etapa 1 aborta antes do unify.
+Falhas nas etapas 2 ou 3 impedem a publicacao.
 
 ### Publish
 

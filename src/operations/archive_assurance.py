@@ -14,7 +14,8 @@ from pathlib import Path
 from src.runtime.project import find_project_root
 
 RECEIPT = Path(".runtime/archive-assurance.json")
-DATA_ROOTS = ("raw", "merged", "processed", "unified", "accounts", "external")
+DATA_ROOTS = ("raw", "merged", "processed", "unified", "accounts", "external", "assets")
+RECEIPT_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,11 @@ class AssuranceState:
         if self.status == "changed":
             return (
                 f"Archive baseline {self.verified_at}: local data changed afterward."
+            )
+        if self.status == "outdated":
+            return (
+                "Archive baseline predates asset tracking; run explicit verification "
+                "when a current baseline is needed."
             )
         return "Archive validation record missing; run explicit verification when needed."
 
@@ -65,7 +71,7 @@ def _checkout_digest(root: Path) -> str:
 def write_assurance(root: Path, *, git_head: str, method: str) -> Path:
     """Write a compact receipt after a completed verification or push."""
     payload = {
-        "version": 1,
+        "version": RECEIPT_VERSION,
         "verified_at": datetime.now(timezone.utc).isoformat(),
         "git_head": git_head,
         "method": method,
@@ -86,7 +92,12 @@ def read_assurance(root: Path, *, git_head: str | None = None) -> AssuranceState
         return AssuranceState("missing")
     try:
         payload = json.loads(target.read_text())
-        if payload["version"] != 1:
+        if payload["version"] == 1:
+            return AssuranceState(
+                "outdated", payload.get("verified_at"), payload.get("git_head"),
+                payload.get("method"),
+            )
+        if payload["version"] != RECEIPT_VERSION:
             return AssuranceState("missing")
         changed = (
             payload["dvc_pointer_digest"] != _pointer_digest(root)

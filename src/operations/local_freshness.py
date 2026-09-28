@@ -12,11 +12,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.application.platforms import (
-    DEFAULT_PARSER_INPUT_SUFFIXES,
-    PARSER_INPUT_SUFFIXES,
-)
-from src.platforms.registry import KNOWN_PLATFORMS
+from src.application.platforms import parser_input_files
+from src.platforms.registry import KNOWN_PLATFORMS, WEB_PLATFORMS
 from src.runtime.project import find_project_root
 from src.workflows.unify import discover_parquets
 
@@ -58,25 +55,6 @@ def _newest(paths: list[Path]) -> int | None:
     return max((path.stat().st_mtime_ns for path in paths), default=None)
 
 
-def _parser_inputs(data_root: Path, platform: str) -> list[Path]:
-    suffixes = PARSER_INPUT_SUFFIXES.get(platform, DEFAULT_PARSER_INPUT_SUFFIXES)
-    merged = data_root / "merged" / platform
-    raw = data_root / "raw" / platform
-    root = merged if merged.is_dir() else raw
-    if not root.is_dir():
-        return []
-    files = [
-        path for path in root.rglob("*")
-        if path.is_file() and path.suffix.lower() in suffixes
-        and path.name not in {"capture_log.jsonl", "reconcile_log.jsonl"}
-    ]
-    if platform == "NotebookLM":
-        historical = data_root / "external" / "notebooklm-snapshots"
-        if historical.is_dir():
-            files.extend(path for path in historical.rglob("*.json") if path.is_file())
-    return files
-
-
 def inspect_archive(
     root: Path, *, platforms: tuple[str, ...] | None = None,
 ) -> FreshnessReport:
@@ -88,17 +66,35 @@ def inspect_archive(
     checked_sources = 0
     all_inputs: list[int] = []
     all_outputs: list[int] = []
+    catalog = data_root / "accounts" / "catalog.json"
+    catalog_ns = catalog.stat().st_mtime_ns if catalog.is_file() else None
 
     for platform in names:
-        inputs = _parser_inputs(data_root, platform)
+        inputs = parser_input_files(
+            platform,
+            data_root / "raw" / platform,
+            data_root / "merged" / platform,
+            data_root / "external",
+        )
         processed = data_root / "processed" / platform
         outputs = (
             sorted(path for path in processed.glob("*.parquet") if "_manual_" not in path.stem)
             if processed.is_dir() else []
         )
         input_ns = _newest(inputs)
+        if input_ns is not None and catalog_ns is not None and platform in WEB_PLATFORMS:
+            input_ns = max(input_ns, catalog_ns)
         output_ns = min((path.stat().st_mtime_ns for path in outputs), default=None)
-        if input_ns is None or output_ns is None:
+        core_tables = {"conversations", "messages"}
+        present_core = {
+            table for table in core_tables
+            if any(
+                path.name == f"{table}.parquet"
+                or (path.name.endswith(f"_{table}.parquet") and "_manual_" not in path.name)
+                for path in outputs
+            )
+        }
+        if input_ns is None or output_ns is None or present_core != core_tables:
             missing_sources.append(platform)
             continue
         checked_sources += 1
@@ -127,6 +123,18 @@ def inspect_archive(
         all_outputs.append(output_ns)
         if output_ns < _newest(inputs):
             stale_tables.append(table)
+
+    if catalog_ns is not None:
+        accounts_output = unified / "accounts.parquet"
+        if not accounts_output.is_file():
+            missing_tables.append("accounts")
+        else:
+            checked_tables += 1
+            accounts_ns = accounts_output.stat().st_mtime_ns
+            all_inputs.append(catalog_ns)
+            all_outputs.append(accounts_ns)
+            if accounts_ns < catalog_ns:
+                stale_tables.append("accounts")
 
     status = (
         "stale" if stale_sources or stale_tables else

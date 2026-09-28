@@ -148,7 +148,10 @@ Python global.
 
 O registro local `.runtime/archive-assurance.json` guarda a ultima base
 verificada/publicada: horario, commit Git e fingerprints dos ponteiros DVC e
-do checkout de dados. Depois de um Publish completo, o pipeline o atualiza.
+do checkout de dados, incluindo o vault `data/assets`. Depois de um Publish
+completo, o pipeline o atualiza. Registros antigos, criados antes da inclusao
+do vault no fingerprint, aparecem como `outdated` e exigem nova verificacao
+deliberada para voltar a servir como baseline.
 O hook de inicio de sessao do Codex mostra apenas uma linha; ele nao faz
 consultas ao remoto nem carrega uma auditoria no contexto do agente.
 
@@ -161,9 +164,12 @@ PYTHONPATH=. .venv/bin/python -m src.operations.archive_assurance verify
 ```
 
 `verify` atualiza o registro somente se todas as checagens concluirem. Um
-registro ausente ou alterado indica que a nova base precisa ser validada; nao
-significa que o remoto desapareceu. O fingerprint local detecta mudancas
-posteriores sem recalcular hashes de conteudo nem cobrar requisicoes remotas
+registro ausente, antigo ou alterado indica que a nova base precisa ser
+validada; nao significa que o remoto desapareceu. A checagem de frescor
+considera `merged`, o `raw` lido diretamente pelos parsers, snapshots historicos
+aplicaveis, o catalogo de contas e as tabelas canonicas obrigatorias. O
+fingerprint local detecta mudancas posteriores sem recalcular hashes de
+conteudo nem cobrar requisicoes remotas
 em toda abertura de chat. O DVC calcula/verifica conteudo na publicacao e na
 verificacao deliberada.
 

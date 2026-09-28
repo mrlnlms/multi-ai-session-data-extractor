@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 from src.accounts import AccountState, discover_accounts
-from src.platforms.registry import KNOWN_PLATFORMS, SCRIPT_PREFIX
+from src.platforms.registry import KNOWN_PLATFORMS, SCRIPT_PREFIX, WEB_PLATFORMS
 from src.runtime.project import find_project_root
 
 PROJECT_ROOT = find_project_root(Path(__file__))
@@ -31,6 +31,55 @@ PARSER_INPUT_SUFFIXES: dict[str, frozenset[str]] = {
     "Antigravity CLI": frozenset({".db", ".jsonl", ".pb"}),
 }
 DEFAULT_PARSER_INPUT_SUFFIXES = frozenset({".json"})
+RAW_WEB_PARSER_INPUTS = frozenset({
+    "ChatGPT", "Claude.ai", "Gemini", "Perplexity", "Qwen",
+})
+EXTERNAL_PARSER_INPUTS = {
+    "Claude.ai": ("claude-ai-snapshots", frozenset({".json"})),
+    "NotebookLM": ("notebooklm-snapshots", frozenset({".json", ".md"})),
+}
+
+
+def parser_input_files(
+    platform: str,
+    raw_dir: Path | None,
+    merged_dir: Path | None,
+    external_dir: Path | None = None,
+) -> list[Path]:
+    """List local inputs read by a source parser, including raw-only evidence."""
+    suffixes = PARSER_INPUT_SUFFIXES.get(platform, DEFAULT_PARSER_INPUT_SUFFIXES)
+    roots: list[tuple[Path | None, frozenset[str]]] = []
+    if platform in WEB_PLATFORMS:
+        primary = merged_dir if merged_dir and merged_dir.is_dir() else raw_dir
+        primary_suffixes = (
+            suffixes | frozenset({".md"})
+            if primary == raw_dir and platform in {"ChatGPT", "Claude.ai"}
+            else suffixes
+        )
+        roots.append((primary, primary_suffixes))
+        if platform in RAW_WEB_PARSER_INPUTS and raw_dir != roots[0][0]:
+            raw_suffixes = (
+                suffixes | frozenset({".md"})
+                if platform in {"ChatGPT", "Claude.ai"} else suffixes
+            )
+            roots.append((raw_dir, raw_suffixes))
+    else:
+        roots.append((raw_dir, suffixes))
+
+    if external_dir is not None and platform in EXTERNAL_PARSER_INPUTS:
+        dirname, external_suffixes = EXTERNAL_PARSER_INPUTS[platform]
+        roots.append((external_dir / dirname, external_suffixes))
+
+    files: list[Path] = []
+    for root, allowed_suffixes in roots:
+        if root is None or not root.is_dir():
+            continue
+        files.extend(
+            path for path in root.rglob("*")
+            if path.is_file() and path.suffix.lower() in allowed_suffixes
+            and path.name not in {"capture_log.jsonl", "reconcile_log.jsonl"}
+        )
+    return files
 
 
 @dataclass(frozen=True)
@@ -125,28 +174,30 @@ class PlatformState:
     def newest_parser_input(self) -> Optional[Path]:
         """Arquivo de entrada mais recente que pode alimentar o parser.
 
-        Fontes web preferem o reconciliado; CLIs, que nao possuem essa etapa,
-        usam o raw. Logs e outros metadados ficam fora pela extensao.
+        Inclui raw nas fontes que leem memoria/configuracao diretamente e
+        snapshots historicos quando o parser os consome.
         """
-        suffixes = PARSER_INPUT_SUFFIXES.get(self.name, DEFAULT_PARSER_INPUT_SUFFIXES)
-        for root in (self.merged_dir, self.raw_dir):
-            if root is None or not root.exists():
-                continue
-            candidates = (
-                path
-                for path in root.rglob("*")
-                if path.is_file() and path.suffix.lower() in suffixes
-                and path.name not in {"capture_log.jsonl", "reconcile_log.jsonl"}
-            )
-            newest = max(candidates, key=lambda path: path.stat().st_mtime, default=None)
-            if newest is not None:
-                return newest
-        return None
+        data_root = self.processed_dir.parents[1] if self.processed_dir else PROJECT_ROOT / "data"
+        return max(
+            parser_input_files(self.name, self.raw_dir, self.merged_dir, data_root / "external"),
+            key=lambda path: path.stat().st_mtime_ns,
+            default=None,
+        )
 
     def health(self) -> HealthStatus:
         """Saude da pipeline, independente da idade da ultima captura."""
         if self._health_cache is not None:
             return self._health_cache
+        messages_parquet = None
+        if self.processed_dir:
+            messages_parquet = next(
+                (
+                    path for path in sorted(self.processed_dir.glob("*.parquet"))
+                    if path.name == "messages.parquet"
+                    or (path.name.endswith("_messages.parquet") and "_manual_" not in path.name)
+                ),
+                None,
+            )
         if self.last_capture is None:
             result = HealthStatus("gray", "never ran", "No capture has been recorded")
         elif self.last_capture.errors_count:
@@ -171,10 +222,21 @@ class PlatformState:
                 "failed",
                 "Processed conversations Parquet is missing",
             )
+        elif messages_parquet is None:
+            result = HealthStatus("red", "failed", "Processed messages Parquet is missing")
         else:
             parquet = self.conversations_parquet_path
             newest_input = self.newest_parser_input()
-            if newest_input and parquet and parquet.stat().st_mtime < newest_input.stat().st_mtime:
+            if self.name in WEB_PLATFORMS:
+                catalog = self.processed_dir.parents[1] / "accounts" / "catalog.json"
+                if catalog.is_file() and (
+                    newest_input is None or catalog.stat().st_mtime_ns > newest_input.stat().st_mtime_ns
+                ):
+                    newest_input = catalog
+            oldest_output = min(
+                (parquet, messages_parquet), key=lambda path: path.stat().st_mtime_ns,
+            )
+            if newest_input and oldest_output.stat().st_mtime_ns < newest_input.stat().st_mtime_ns:
                 result = HealthStatus(
                     "red",
                     "failed",
