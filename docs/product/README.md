@@ -87,8 +87,10 @@ tecnologia e entregas ficam para o desenho de cada etapa. O
 [roadmap](../ROADMAP.md) registra a prioridade corrente.
 
 1. Criar e identificar grupos de navegador; cadastrar contas das plataformas
-   web em cada grupo e permitir ajustar seus nomes e associacoes. Fontes CLI
-   entram na coleta sem pertencer a um grupo de navegador.
+   web em cada grupo e permitir ajustar nomes, e-mails opcionais e associacoes
+   sem mudar suas identidades. Contas distintas da mesma plataforma podem
+   pertencer a grupos diferentes; cada grupo aceita no maximo uma por
+   plataforma. Fontes CLI entram na coleta sem pertencer a um grupo de navegador.
 2. Guiar login e relogin em navegador visivel, distinguindo a organizacao
    restauravel dos grupos, os profiles e cookies locais e a evidencia de
    autenticacao de cada conta.
